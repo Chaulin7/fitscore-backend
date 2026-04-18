@@ -38,8 +38,7 @@ function scoreCV(cvText, jobDescription, weights) {
   const cvLower = cvText.toLowerCase();
   const jdLower = jobDescription.toLowerCase();
 
-  const { keywords: jdKeywords, score: kwScore, found: kwFound, missing: kwMissing } =
-    scoreKeywords(cvLower, jdLower);
+  const { score: kwScore, found: kwFound, missing: kwMissing } = scoreKeywords(cvLower, jdLower);
   const { score: skScore, skillResults } = scoreSkills(cvLower, jdLower);
   const exScore = scoreExperience(cvLower, jdLower);
   const edScore = scoreEducation(cvLower, jdLower);
@@ -71,20 +70,29 @@ function scoreKeywords(cvLower, jdLower) {
   return { keywords, score, found, missing };
 }
 
+// Extract top N keywords from text using word frequency + bigrams
 function extractTopKeywords(text, limit) {
-  const words = text.match(/[a-z0-9][a-z0-9+#.\/-]*/g) || [];
+  // Match words and common tech tokens (c++, c#, node.js, etc.)
+  const raw = text.match(/[a-z][a-z0-9]*(?:[+#]|(?:\.[a-z][a-z0-9]*)+)?/g) || [];
   const freq = {};
-  for (const w of words) {
+
+  // Unigrams
+  for (const w of raw) {
     if (w.length > 2 && !STOP_WORDS.has(w)) freq[w] = (freq[w] || 0) + 1;
   }
-  for (let i = 0; i < words.length - 1; i++) {
-    const a = words[i], b = words[i + 1];
+  // Bigrams
+  for (let i = 0; i < raw.length - 1; i++) {
+    const a = raw[i], b = raw[i + 1];
     if (!STOP_WORDS.has(a) && !STOP_WORDS.has(b) && a.length > 2 && b.length > 2) {
       const bigram = a + ' ' + b;
       freq[bigram] = (freq[bigram] || 0) + 1;
     }
   }
-  return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, limit).map(([kw]) => kw);
+
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([kw]) => kw);
 }
 
 function scoreSkills(cvLower, jdLower) {
@@ -173,7 +181,7 @@ function getVerdict(overall) {
 function generateRecommendations({ kwScore, skScore, exScore, edScore, kwMissing, skillResults, overall }) {
   const recs = [];
   if (overall >= 85) {
-    recs.push({ icon: '\u{1F31F}', text: 'Excellent profile match — strongly recommend advancing to interview.' });
+    recs.push({ icon: '\u2B50', text: 'Excellent profile match \u2014 strongly recommend advancing to interview.' });
   } else if (overall >= 70) {
     recs.push({ icon: '\u2705', text: 'Good overall fit. Consider scheduling a technical screening.' });
   } else if (overall >= 50) {
