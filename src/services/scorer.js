@@ -73,7 +73,7 @@ function scoreKeywords(cvLower, jdLower) {
 // Extract top N keywords from text using word frequency + bigrams
 function extractTopKeywords(text, limit) {
   // Match words and common tech tokens (c++, c#, node.js, etc.)
-  const raw = text.match(/[a-z][a-z0-9]*(?:[+#]|(?:\.[a-z][a-z0-9]*)+)?/g) || [];
+  const raw = text.match(/[a-z][a-z0-9]*?:[+#]+|(?:\.[a-z][a-z0-9]*)+)?/g) || [];
   const freq = {};
 
   // Unigrams
