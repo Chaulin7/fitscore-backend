@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CVsprings — CV Fit Analyzer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--card:#1a1d27;--card2:#22263a;--border:#2d3148;
+  --accent:#6c63ff;--accent2:#a78bfa;--green:#22c55e;--yellow:#f59e0b;
+  --red:#ef4444;--text:#e2e8f0;--muted:#8892a4;--radius:12px;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--accent2);text-decoration:none}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 32px;border-bottom:1px solid var(--border);background:var(--card)}
+.logo{display:flex;align-items:center;gap:10px;font-size:1.25rem;font-weight:700;letter-spacing:-.5px}
+.logo svg{width:32px;height:32px}
+.logo span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+nav button{background:none;border:none;color:var(--muted);font-size:.95rem;cursor:pointer;padding:8px 16px;border-radius:8px;transition:.2s}
+nav button.active,nav button:hover{background:var(--card2);color:var(--text)}
+
+/* MAIN LAYOUT */
+main{max-width:1100px;margin:0 auto;padding:32px 24px}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* CONFIG BAR */
+.config-bar{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;margin-bottom:28px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.config-bar label{font-size:.85rem;color:var(--muted);white-space:nowrap}
+.config-bar input{flex:1;min-width:260px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:.9rem;outline:none}
+.config-bar input:focus{border-color:var(--accent)}
+.badge-ok{font-size:.75rem;padding:3px 8px;border-radius:999px;background:#16423060;color:var(--green);border:1px solid var(--green)40}
+.badge-err{font-size:.75rem;padding:3px 8px;border-radius:999px;background:#44141460;color:var(--red);border:1px solid var(--red)40}
+
+/* FORM CARD */
+.form-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px}
+.form-card h2{font-size:1.1rem;font-weight:600;margin-bottom:20px;color:var(--text)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+@media(max-width:680px){.form-row{grid-template-columns:1fr}}
+.field label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:7px;font-weight:500}
+.field textarea,.field select{width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:.9rem;outline:none;resize:vertical;font-family:inherit}
+.field textarea:focus,.field select:focus{border-color:var(--accent)}
+
+/* DROPZONE */
+.dropzone{border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:.2s;background:var(--card2)}
+.dropzone:hover,.dropzone.drag{border-color:var(--accent);background:#1e1b4b30}
+.dropzone svg{margin:0 auto 10px;display:block;opacity:.5}
+.dropzone p{color:var(--muted);font-size:.9rem}
+.dropzone strong{color:var(--accent2)}
+.file-chosen{color:var(--green);font-size:.85rem;margin-top:8px}
+
+/* WEIGHTS */
+.weights-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.weight-chip{flex:1;min-width:100px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center}
+.weight-chip label{font-size:.75rem;color:var(--muted);display:block;margin-bottom:4px}
+.weight-chip input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:1rem;font-weight:600;text-align:center;outline:none}
+.weight-total{font-size:.82rem;margin-bottom:20px}
+.weight-total.ok{color:var(--green)} .weight-total.err{color:var(--red)}
+
+/* BUTTON */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;border:none;transition:.2s}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--card2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--accent)}
+.btn-danger{background:#7f1d1d40;color:var(--red);border:1px solid var(--red)40}
+.btn-danger:hover{background:#7f1d1d80}
+.form-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+/* SPINNER */
+.spinner{width:20px;height:20px;border:2px solid #ffffff40;border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none}
+.loading .spinner{display:block}
+.loading .btn-text{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ERROR TOAST */
+.error-box{background:#7f1d1d40;border:1px solid var(--red)60;color:#fca5a5;border-radius:10px;padding:14px 18px;margin-top:20px;display:none;font-size:.9rem}
+.error-box.show{display:block}
+
+/* RESULTS */
+.results{margin-top:32px;display:none}
+.results.show{display:block}
+.results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:gap}
+.results-header h2{font-size:1.2rem;font-weight:700}
+.verdict-badge{padding:6px 16px;border-radius:999px;font-size:.85rem;font-weight:600}
+.verdict-excellent{background:#14532d40;color:var(--green);border:1px solid var(--green)50}
+.verdict-good{background:#1e3a5f40;color:#60a5fa;border:1px solid #60a5fa50}
+.verdict-partial{background:#78350f40;color:var(--yellow);border:1px solid var(--yellow)50}
+.verdict-poor{background:#7f1d1d40;color:var(--red);border:1px solid var(--red)50}
+
+/* SCORE GRID */
+.score-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.score-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center}
+.score-card.main-score{border-color:var(--accent)60;background:linear-gradient(135deg,#1e1b4b,#1a1d27)}
+.score-num{font-size:2.4rem;font-weight:800;line-height:1}
+.score-label{font-size:.8rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+.score-bar{height:6px;background:var(--card2);border-radius:999px;margin-top:10px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:999px;transition:width 1s ease}
+
+/* SECTION CARDS */
+.section-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:16px}
+.section-card h3{font-size:.95rem;font-weight:600;margin-bottom:14px;color:var(--accent2)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:5px 12px;border-radius:999px;font-size:.82rem;font-weight:500}
+.chip-found{background:#14532d40;color:var(--green);border:1px solid var(--green)40}
+.chip-missing{background:#7f1d1d40;color:#fca5a5;border:1px solid var(--red)40}
+.chip-neutral{background:var(--card2);color:var(--muted);border:1px solid var(--border)}
+
+/* RECOMMENDATIONS */
+.rec-list{list-style:none;display:flex;flex-direction:column;gap:10px}
+.rec-item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:var(--card2);border-radius:8px;font-size:.9rem}
+.rec-icon{font-size:1.2rem;flex-shrink:0;margin-top:-1px}
+
+/* SKILL TABLE */
+.skill-table{width:100%;border-collapse:collapse;font-size:.875rem}
+.skill-table th{text-align:left;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;padding:0 8px 10px;border-bottom:1px solid var(--border)}
+.skill-table td{padding:8px;border-bottom:1px solid var(--border)80}
+.skill-table tr:last-child td{border-bottom:none}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot-green{background:var(--green)} .dot-red{background:var(--red)}
+
+/* AUDIT TAB */
+.audit-controls{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.audit-controls input,.audit-controls select{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 14px;font-size:.875rem;outline:none}
+.audit-controls input:focus,.audit-controls select:focus{border-color:var(--accent)}
+.audit-table-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:auto}
+.audit-table{width:100%;border-collapse:collapse;font-size:.875rem;min-width:700px}
+.audit-table th{background:var(--card2);text-align:left;padding:12px 16px;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;font-weight:600;border-bottom:1px solid var(--border)}
+.audit-table td{padding:12px 16px;border-bottom:1px solid var(--border)50;vertical-align:middle}
+.audit-table tr:last-child td{border-bottom:none}
+.audit-table tr:hover td{background:var(--card2)80}
+.audit-empty{text-align:center;padding:40px;color:var(--muted);font-size:.9rem}
+.score-pill{padding:3px 10px;border-radius:999px;font-size:.8rem;font-weight:600}
+.delete-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:1rem;transition:.2s}
+.delete-btn:hover{color:var(--red);background:#7f1d1d30}
+.note-input{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 9px;font-size:.8rem;width:120px}
+.decision-select{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:.8rem}
+.save-audit-btn{background:var(--accent)20;border:1px solid var(--accent)40;color:var(--accent2);border-radius:6px;padding:6px 12px;font-size:.8rem;cursor:pointer;font-weight:500}
+.save-audit-btn:hover{background:var(--accent)40}
+.save-audit-banner{background:#1e3a5f40;border:1px solid #60a5fa40;color:#93c5fd;border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:.9rem;display:none}
+.save-audit-banner.show{display:flex;align-items:center;gap:10px}
+</style>
+</head><body>
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="32" height="32" rx="8" fill="url(#g1)"/>
+      <path d="M8 22l6-8 4 5 3-4 5 7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="22" cy="10" r="3" fill="white" opacity=".9"/>
+      <defs><linearGradient id="g1" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#6c63ff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+    </svg>
+    <span>CVsprings</span>
+  </div>
+  <nav>
+    <button class="active" onclick="switchTab('analyzer',this)">Analyzer</button>
+    <button onclick="switchTab('audit',this)">Audit Log</button>
+  </nav>
+</header>
+
+<main>
+<!-- ===== ANALYZER TAB ===== -->
+<div id="tab-analyzer" class="tab-panel active">
+
+  <div class="config-bar">
+    <label>Backend URL:</label>
+    <input type="text" id="backendUrl" placeholder="https://your-api.onrender.com" value="">
+    <span id="statusBadge"></span>
+  </div>
+
+  <div class="form-card">
+    <h2>Analyze CV Against Job Description</h2>
+
+    <div class="form-row">
+      <div class="field">
+        <label>Upload CV (PDF or DOCX)</label>
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('cvFile').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event)">
+          <svg width="36" height="36" fill="none" viewBox="0 0 24 24">
+            <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke="#8892a4" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5" stroke="#8892a4" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <p>Drop file here or <strong>browse</strong></p>
+          <p style="font-size:.78rem;margin-top:4px">PDF or DOCX up to 10 MB</p>
+          <div class="file-chosen" id="fileName"></div>
+        </div>
+        <input type="file" id="cvFile" accept=".pdf,.docx" style="display:none" onchange="onFileChange(this)">
+      </div>
+
+      <div class="field">
+        <label>Job Description</label>
+        <textarea id="jobDescription" rows="9" placeholder="Paste the full job description here...&#10;&#10;e.g. We are looking for a Senior Python developer with 5+ years of experience in machine learning, AWS, and Docker..."></textarea>
+      </div>
+    </div>
+
+    <div>
+      <label style="font-size:.85rem;color:var(--muted);font-weight:500;display:block;margin-bottom:10px">Score Weights <span style="font-size:.78rem;font-weight:400">(must sum to 100)</span></label>
+      <div class="weights-row">
+        <div class="weight-chip"><label>Keywords</label><input type="number" id="wKw" value="40" min="0" max="100" onchange="updateWeightTotal()"></div>
+        <div class="weight-chip"><label>Skills</label><input type="number" id="wSk" value="30" min="0" max="100" onchange="updateWeightTotal()"></div>
+        <div class="weight-chip"><label>Experience</label><input type="number" id="wEx" value="20" min="0" max="100" onchange="updateWeightTotal()"></div>
+        <div class="weight-chip"><label>Education</label><input type="number" id="wEd" value="10" min="0" max="100" onchange="updateWeightTotal()"></div>
+      </div>
+      <div class="weight-total ok" id="weightTotal">Total: 100 ✓</div>
+    </div>
+
+    <div class="form-actions" style="margin-top:20px">
+      <button class="btn btn-primary" id="analyzeBtn" onclick="runAnalysis()">
+        <div class="spinner"></div>
+        <span class="btn-text">Analyze CV</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetForm()">Clear</button>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results" id="results">
+
+    <div class="results-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 id="resultName" style="font-size:1.3rem;font-weight:700"></h2>
+        <div style="font-size:.85rem;color:var(--muted);margin-top:2px">Analysis complete</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="verdict-badge" id="verdictBadge"></span>
+        <button class="btn btn-secondary" style="font-size:.85rem;padding:8px 16px" onclick="saveToAudit()">+ Save to Audit Log</button>
+      </div>
+    </div>
+
+    <div class="save-audit-banner" id="auditBanner">
+      <span>✅</span><span>Saved to audit log.</span>
+    </div>
+
+    <!-- SCORES -->
+    <div class="score-grid" id="scoreGrid"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px" id="kwSkGrid">
+      <div class="section-card">
+        <h3>✅ Keywords Found</h3>
+        <div class="chips" id="kwFound"></div>
+      </div>
+      <div class="section-card">
+        <h3>❌ Keywords Missing</h3>
+        <div class="chips" id="kwMissing"></div>
+      </div>
+    </div>
+    @media(max-width:600px){#kwSkGrid{grid-template-columns:1fr}}
+
+    <div class="section-card" style="margin-bottom:16px">
+      <h3>🛠 Skills Detected in Job Description</h3>
+      <table class="skill-table">
+        <thead><tr><th>Skill</th><th>Category</th><th>In CV</th></tr></thead>
+        <tbody id="skillsBody"></tbody>
+      </table>
+    </div>
+
+    <div class="section-card">
+      <h3>💡 Recommendations</h3>
+      <ul class="rec-list" id="recList"></ul>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== AUDIT TAB ===== -->
+<div id="tab-audit" class="tab-panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <h2 style="font-size:1.2rem;font-weight:700">Audit Log</h2>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secondary" style="font-size:.85rem;padding:8px 16px" onclick="loadAudit()">↻ Refresh</button>
+      <a id="csvLink" href="#" class="btn btn-secondary" style="font-size:.85rem;padding:8px 16px" onclick="return exportCsv()">⬇ Export CSV</a>
+    </div>
+  </div>
+
+  <div class="audit-controls">
+    <input type="text" id="auditSearch" placeholder="Search name..." oninput="filterAudit()">
+    <select id="auditDecision" onchange="filterAudit()">
+      <option value="">All decisions</option>
+      <option>Advance</option>
+      <option>Reject</option>
+      <option>Hold</option>
+      <option>Pending</option>
+    </select>
+  </div>
+
+  <div id="auditEmpty" style="display:none" class="section-card audit-empty">No audit records yet. Run an analysis and save it.</div>
+  <div class="audit-table-wrap" id="auditTableWrap">
+    <table class="audit-table">
+      <thead><tr>
+        <th>Candidate</th><th>File</th><th>Score</th><th>Verdict</th>
+        <th>Decision</th><th>Note</th><th>Date</th><th></th>
+      </tr></thead>
+      <tbody id="auditBody"></tbody>
+    </table>
+  </div>
+</div>
+</main>
+<script>
+// ── CONFIG ────────────────────────────────────────────────
+const STORAGE_KEY = 'cvsprings_backend_url';
+let lastResult = null;
+let auditRows = [];
+
+// Restore saved backend URL
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem(STORAGE_KEY) || '';
+  document.getElementById('backendUrl').value = saved;
+  if (saved) pingBackend(saved);
+});
+
+document.getElementById('backendUrl').addEventListener('change', function() {
+  localStorage.setItem(STORAGE_KEY, this.value.trim());
+  pingBackend(this.value.trim());
+});
+
+async function pingBackend(url) {
+  const badge = document.getElementById('statusBadge');
+  if (!url) { badge.innerHTML = ''; return; }
+  try {
+    const r = await fetch(url.replace(/\/+$/, '') + '/health', { signal: AbortSignal.timeout(4000) });
+    if (r.ok) badge.innerHTML = '<span class="badge-ok">● Connected</span>';
+    else badge.innerHTML = '<span class="badge-err">● Error ' + r.status + '</span>';
+  } catch {
+    badge.innerHTML = '<span class="badge-err">● Unreachable</span>';
+  }
+}
+
+// ── TABS ──────────────────────────────────────────────────
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'audit') loadAudit();
+}
+
+// ── FILE HANDLING ─────────────────────────────────────────
+function onFileChange(input) {
+  const f = input.files[0];
+  document.getElementById('fileName').textContent = f ? f.name : '';
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) {
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    document.getElementById('cvFile').files = dt.files;
+    document.getElementById('fileName').textContent = f.name;
+  }
+}
+
+// ── WEIGHTS ───────────────────────────────────────────────
+function updateWeightTotal() {
+  const total = ['wKw','wSk','wEx','wEd'].reduce((s,id) => s + (+document.getElementById(id).value||0), 0);
+  const el = document.getElementById('weightTotal');
+  el.textContent = 'Total: ' + total + (total === 100 ? ' ✓' : ' ✗ (must be 100)');
+  el.className = 'weight-total ' + (total === 100 ? 'ok' : 'err');
+}
+
+// ── ANALYSIS ──────────────────────────────────────────────
+async function runAnalysis() {
+  const url = (document.getElementById('backendUrl').value || '').trim().replace(/\/+$/, '');
+  const file = document.getElementById('cvFile').files[0];
+  const jd = document.getElementById('jobDescription').value.trim();
+
+  hideError();
+  if (!url) { showError('Please enter your Backend URL above.'); return; }
+  if (!file) { showError('Please upload a CV file (PDF or DOCX).'); return; }
+  if (!jd)   { showError('Please paste a job description.'); return; }
+
+  const kw = +document.getElementById('wKw').value;
+  const sk = +document.getElementById('wSk').value;
+  const ex = +document.getElementById('wEx').value;
+  const ed = +document.getElementById('wEd').value;
+  if (kw+sk+ex+ed !== 100) { showError('Score weights must sum to 100.'); return; }
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.classList.add('loading'); btn.disabled = true;
+  document.getElementById('results').classList.remove('show');
+
+  try {
+    const form = new FormData();
+    form.append('cv', file);
+    form.append('jobDescription', jd);
+    form.append('weights', JSON.stringify({kw, sk, ex, ed}));
+    const res = await fetch(url + '/api/analyze', { method: 'POST', body: form });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error('Server error ' + res.status + ': ' + err.slice(0,200));
+    }
+    const data = await res.json();
+    lastResult = { ...data, fileName: file.name };
+    renderResults(data);
+  } catch(e) {
+    showError(e.message || 'Request failed. Check the backend URL and CORS settings.');
+  } finally {
+    btn.classList.remove('loading'); btn.disabled = false;
+  }
+}
+
+function scoreColor(n) {
+  if (n >= 75) return 'var(--green)';
+  if (n >= 50) return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+function renderResults(d) {
+  // Name + verdict
+  document.getElementById('resultName').textContent = d.candidateName || 'Candidate';
+  const vb = document.getElementById('verdictBadge');
+  vb.textContent = d.verdict || '';
+  const cls = {
+    'Excellent Match':'verdict-excellent','Good Match':'verdict-good',
+    'Partial Match':'verdict-partial','Poor Match':'verdict-poor'
+  }[d.verdict] || 'verdict-poor';
+  vb.className = 'verdict-badge ' + cls;
+
+  // Score grid
+  const sg = document.getElementById('scoreGrid');
+  const entries = [
+    { label:'Overall Score', val:d.overall, main:true },
+    { label:'Keywords', val:d.scores?.keywords ?? d.scores?.kw ?? 0 },
+    { label:'Skills', val:d.scores?.skills ?? d.scores?.sk ?? 0 },
+    { label:'Experience', val:d.scores?.experience ?? d.scores?.ex ?? 0 },
+    { label:'Education', val:d.scores?.education ?? d.scores?.ed ?? 0 },
+  ];
+  sg.innerHTML = entries.map(e => `
+    <div class="score-card ${e.main ? 'main-score' : ''}">
+      <div class="score-num" style="color:${scoreColor(e.val)}">${e.val}</div>
+      <div class="score-label">${e.label}</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:${e.val}%;background:${scoreColor(e.val)}"></div></div>
+    </div>
+  `).join('');
+
+  // Keywords
+  document.getElementById('kwFound').innerHTML = (d.found || []).map(k =>
+    `<span class="chip chip-found">${k}</span>`).join('') || '<span class="chip chip-neutral">None</span>';
+  document.getElementById('kwMissing').innerHTML = (d.missing || []).map(k =>
+    `<span class="chip chip-missing">${k}</span>`).join('') || '<span class="chip chip-found">All found!</span>';
+
+  // Skills table
+  const sb = document.getElementById('skillsBody');
+  sb.innerHTML = (d.skills || []).filter(s => !s.found || d.skills.length < 30).map(s => `
+    <tr>
+      <td>${s.name}</td>
+      <td style="color:var(--muted)">${s.category||''}</td>
+      <td><span class="dot ${s.found ? 'dot-green':'dot-red'}"></span> ${s.found ? 'Found':'Missing'}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:12px">No skills matched</td></tr>';
+
+  // Recommendations
+  document.getElementById('recList').innerHTML = (d.recommendations || []).map(r =>
+    `<li class="rec-item"><span class="rec-icon">${r.icon||'💡'}</span><span>${r.text}</span></li>`
+  ).join('') || '<li class="rec-item"><span>No recommendations</span></li>';
+
+  document.getElementById('results').classList.add('show');
+  document.getElementById('auditBanner').classList.remove('show');
+  document.getElementById('results').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ── AUDIT SAVE ────────────────────────────────────────────
+async function saveToAudit() {
+  if (!lastResult) return;
+  const url = (document.getElementById('backendUrl').value || '').trim().replace(/\/+$/, '');
+  if (!url) { showError('No backend URL set.'); return; }
+  try {
+    const body = {
+      candidateName: lastResult.candidateName || 'Unknown',
+      fileName: lastResult.fileName || '',
+      overall: lastResult.overall,
+      verdict: lastResult.verdict,
+      decision: 'Pending',
+      note: ''
+    };
+    const r = await fetch(url + '/api/audit', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error('Save failed');
+    document.getElementById('auditBanner').classList.add('show');
+    setTimeout(() => document.getElementById('auditBanner').classList.remove('show'), 3000);
+  } catch(e) { showError('Could not save to audit: ' + e.message); }
+}
+
+// ── AUDIT LOG ─────────────────────────────────────────────
+async function loadAudit() {
+  const url = (document.getElementById('backendUrl').value || '').trim().replace(/\/+$/, '');
+  if (!url) {
+    document.getElementById('auditBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">Set backend URL first</td></tr>';
+    return;
+  }
+  try {
+    const r = await fetch(url + '/api/audit?limit=200');
+    if (!r.ok) throw new Error('Status ' + r.status);
+    auditRows = await r.json();
+    renderAuditTable(auditRows);
+  } catch(e) {
+    document.getElementById('auditBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:20px">Could not load audit: '+e.message+'</td></tr>';
+  }
+}
+
+function filterAudit() {
+  const q = document.getElementById('auditSearch').value.toLowerCase();
+  const dec = document.getElementById('auditDecision').value;
+  const filtered = auditRows.filter(r =>
+    (!q || (r.candidateName||'').toLowerCase().includes(q)) &&
+    (!dec || r.decision === dec)
+  );
+  renderAuditTable(filtered);
+}
+
+function renderAuditTable(rows) {
+  const body = document.getElementById('auditBody');
+  const empty = document.getElementById('auditEmpty');
+  const wrap = document.getElementById('auditTableWrap');
+  if (!rows.length) {
+    empty.style.display = 'block'; wrap.style.display = 'none'; return;
+  }
+  empty.style.display = 'none'; wrap.style.display = 'block';
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td style="font-weight:500">${r.candidateName||''}</td>
+      <td style="color:var(--muted);font-size:.8rem">${r.fileName||''}</td>
+      <td><span class="score-pill" style="background:${scoreColor(r.overall)}22;color:${scoreColor(r.overall)};border:1px solid ${scoreColor(r.overall)}44">${r.overall}</span></td>
+      <td style="color:var(--muted);font-size:.85rem">${r.verdict||''}</td>
+      <td>
+        <select class="decision-select" data-id="${r.id}" onchange="updateAuditField('${r.id}','decision',this.value)">
+          <option ${r.decision==='Pending'?'selected':''}>Pending</option>
+          <option ${r.decision==='Advance'?'selected':''}>Advance</option>
+          <option ${r.decision==='Reject'?'selected':''}>Reject</option>
+          <option ${r.decision==='Hold'?'selected':''}>Hold</option>
+        </select>
+      </td>
+      <td><input class="note-input" type="text" value="${r.note||''}" placeholder="Add note..."
+        onblur="updateAuditField('${r.id}','note',this.value)"></td>
+      <td style="color:var(--muted);font-size:.8rem">${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</td>
+      <td><button class="delete-btn" onclick="deleteAudit('${r.id}')" title="Delete">🗑</button></td>
+    </tr>
+  `).join('');
+}
+
+async function updateAuditField(id, field, value) {
+  const url = (document.getElementById('backendUrl').value || '').trim().replace(/\/+$/, '');
+  if (!url) return;
+  // Find row and update locally
+  const row = auditRows.find(r => r.id === id);
+  if (row) row[field] = value;
+  // POST a new record with updated data isn't available; skip server update if no PATCH endpoint
+}
+
+async function deleteAudit(id) {
+  if (!confirm('Delete this audit record?')) return;
+  const url = (document.getElementById('backendUrl').value || '').trim().replace(/\/+$/, '');
+  try {
+    const r = await fetch(url + '/api/audit/' + id, { method:'DELETE' });
+    if (!r.ok) throw new Error('Delete failed');
+    auditRows = auditRows.filter(r => r.id !== id);
+    renderAuditTable(auditRows);
+  } catch(e) { alert('Could not delete: ' + e.message); }
+}
+
+async function exportCsv() {
+  const url = (document.getElementById('backendUrl').value || '').trim().replace(/\/+$/, '');
+  if (!url) { alert('Set backend URL first'); return false; }
+  window.open(url + '/api/audit/export/csv', '_blank');
+  return false;
+}
+
+// ── UTILS ─────────────────────────────────────────────────
+function showError(msg) {
+  const b = document.getElementById('errorBox');
+  b.textContent = '⚠ ' + msg; b.classList.add('show');
+  b.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function hideError() { document.getElementById('errorBox').classList.remove('show'); }
+
+function resetForm() {
+  document.getElementById('cvFile').value = '';
+  document.getElementById('fileName').textContent = '';
+  document.getElementById('jobDescription').value = '';
+  document.getElementById('results').classList.remove('show');
+  hideError();
+}
+</script>
+</body>
+</html>
