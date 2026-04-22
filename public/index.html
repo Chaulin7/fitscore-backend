@@ -6,421 +6,373 @@
 <title>CVsprings · Candidate Fit Analyzer</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{
-  --navy:#0f2847;
-  --navy-mid:#1a3d6e;
-  --navy-light:#243f6a;
-  --accent:#3b82f6;
-  --accent-light:#60a5fa;
-  --green:#10b981;
-  --yellow:#f59e0b;
-  --red:#ef4444;
-  --bg:#0a0f1e;
-  --surface:#111827;
-  --surface2:#1a2236;
-  --surface3:#222d42;
-  --border:rgba(255,255,255,0.07);
-  --border2:rgba(255,255,255,0.12);
-  --text:#f1f5f9;
-  --text2:#94a3b8;
-  --text3:#64748b;
-  --radius:10px;
-  --radius-sm:6px;
-  --shadow:0 4px 24px rgba(0,0,0,0.4);
-  --shadow-sm:0 2px 8px rgba(0,0,0,0.3);
-  --glow:0 0 20px rgba(59,130,246,0.15);
-}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;overflow-x:hidden}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
 
-/* ─── Scrollbar ─────────────────────────────── */
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
-
-/* ─── Topbar ─────────────────────────────────── */
+/* ── Topbar ── */
 .topbar{
-  position:sticky;top:0;z-index:100;
-  background:rgba(10,15,30,0.85);
-  backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--border);
-  padding:0 28px;height:60px;
-  display:flex;align-items:center;gap:20px
+  background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);
+  padding:0 32px;height:60px;display:flex;align-items:center;gap:20px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.25);position:sticky;top:0;z-index:100
 }
-.topbar::after{
-  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(59,130,246,0.4),transparent)
-}
-.brand{display:flex;align-items:center;gap:10px;margin-right:auto;text-decoration:none}
-.brand-logo{
-  width:34px;height:34px;border-radius:8px;
-  background:linear-gradient(135deg,var(--navy-mid),var(--accent));
+.topbar-brand{display:flex;align-items:center;gap:11px;margin-right:auto;text-decoration:none}
+.brand-icon{
+  width:36px;height:36px;border-radius:9px;
+  background:linear-gradient(135deg,rgba(255,255,255,0.18),rgba(255,255,255,0.06));
+  border:1px solid rgba(255,255,255,0.2);
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 16px rgba(59,130,246,0.35);
-  flex-shrink:0
+  box-shadow:0 2px 8px rgba(0,0,0,0.2);flex-shrink:0
 }
-.brand-name{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-.3px}
-.brand-name span{color:var(--accent-light)}
-.nav{display:flex;gap:2px}
+.brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.4px}
+.brand-name em{font-style:normal;color:#7dd3fc}
+.topbar-nav{display:flex;gap:2px}
 .nav-btn{
-  background:none;border:none;color:var(--text2);
+  background:none;border:none;
+  color:rgba(255,255,255,0.65);
   font:600 13px 'Inter',sans-serif;
-  padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;
-  letter-spacing:.03em;transition:all .2s;position:relative
+  padding:7px 15px;border-radius:6px;cursor:pointer;
+  letter-spacing:.03em;transition:all .18s;position:relative
 }
-.nav-btn:hover{color:var(--text);background:var(--surface2)}
-.nav-btn.active{color:var(--accent-light);background:rgba(59,130,246,0.12)}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,0.1)}
+.nav-btn.active{color:#fff;background:rgba(255,255,255,0.14)}
 .nav-btn.active::after{
-  content:'';position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);
-  width:20px;height:2px;background:var(--accent);border-radius:1px
+  content:'';position:absolute;bottom:-1px;left:50%;
+  transform:translateX(-50%);width:24px;height:2px;
+  background:#7dd3fc;border-radius:1px
 }
 .conn-badge{
-  display:flex;align-items:center;gap:7px;
-  background:var(--surface2);border:1px solid var(--border);
-  border-radius:20px;padding:5px 12px;font-size:12px;font-weight:500;color:var(--text2)
+  display:flex;align-items:center;gap:6px;
+  background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;padding:5px 13px;font-size:12px;font-weight:500;
+  color:rgba(255,255,255,0.7)
 }
-.dot{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:all .3s}
-.dot.ok{background:var(--green);box-shadow:0 0 8px rgba(16,185,129,0.6)}
-.dot.err{background:var(--red);box-shadow:0 0 8px rgba(239,68,68,0.6)}
+.dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.3);transition:all .3s}
+.dot.ok{background:#4ade80;box-shadow:0 0 7px rgba(74,222,128,0.7)}
+.dot.err{background:#f87171;box-shadow:0 0 7px rgba(248,113,113,0.7)}
 
-/* ─── Config bar ─────────────────────────────── */
+/* ── Config bar ── */
 .config-bar{
-  background:var(--surface);border-bottom:1px solid var(--border);
-  padding:10px 28px;display:flex;align-items:center;gap:10px
+  background:#fff;border-bottom:1px solid #e5e7eb;
+  padding:10px 32px;display:flex;align-items:center;gap:10px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.04)
 }
-.config-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);white-space:nowrap}
-.config-input{
-  flex:1;max-width:500px;height:36px;
-  background:var(--surface2);border:1px solid var(--border2);
-  border-radius:var(--radius-sm);padding:0 12px;
-  font:500 13px 'Inter',sans-serif;color:var(--text);outline:none;transition:border .2s
-}
-.config-input:focus{border-color:var(--accent)}
-.config-input::placeholder{color:var(--text3)}
+.config-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;white-space:nowrap}
 
-/* ─── Buttons ─────────────────────────────────── */
+/* ── Buttons ── */
 .btn{
-  height:36px;padding:0 16px;border-radius:var(--radius-sm);
+  height:36px;padding:0 18px;border-radius:7px;
   font:600 13px 'Inter',sans-serif;cursor:pointer;border:none;
-  transition:all .2s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap
+  transition:all .18s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap
 }
 .btn-primary{
-  background:linear-gradient(135deg,var(--accent),#2563eb);
-  color:#fff;box-shadow:0 2px 12px rgba(59,130,246,0.35)
+  background:linear-gradient(135deg,#0f2847,#1a3d6e);
+  color:#fff;box-shadow:0 2px 8px rgba(15,40,71,0.35)
 }
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(59,130,246,0.45)}
+.btn-primary:hover{background:linear-gradient(135deg,#1a3d6e,#0f2847);box-shadow:0 4px 14px rgba(15,40,71,0.4);transform:translateY(-1px)}
 .btn-primary:active{transform:translateY(0)}
 .btn-ghost{
-  background:var(--surface2);color:var(--text2);
-  border:1px solid var(--border2)
+  background:#fff;color:#374151;
+  border:1px solid #d1d5db;box-shadow:0 1px 3px rgba(0,0,0,0.06)
 }
-.btn-ghost:hover{background:var(--surface3);color:var(--text);border-color:rgba(255,255,255,0.2)}
-.btn-danger{background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.25)}
-.btn-danger:hover{background:rgba(239,68,68,0.25)}
-.btn-green{background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.25)}
-.btn-green:hover{background:rgba(16,185,129,0.25)}
+.btn-ghost:hover{background:#f9fafb;border-color:#9ca3af;transform:translateY(-1px);box-shadow:0 3px 8px rgba(0,0,0,0.1)}
+.btn-ghost:active{transform:translateY(0)}
+.btn-danger{background:#fff5f5;color:#dc2626;border:1px solid #fecaca}
+.btn-danger:hover{background:#fee2e2}
 .btn-sm{height:30px;padding:0 12px;font-size:12px}
 
-/* ─── Tab content ─────────────────────────────── */
-.tab-content{display:none;animation:fadeIn .25s ease}
-.tab-content.active{display:block}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-.main{padding:28px}
+/* ── Inputs ── */
+.text-input{
+  height:36px;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:7px;padding:0 12px;
+  font:500 13px 'Inter',sans-serif;color:#111827;outline:none;
+  transition:border .18s,box-shadow .18s
+}
+.text-input:focus{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.08)}
+.text-input::placeholder{color:#d1d5db}
 
-/* ─── Mode toggle ─────────────────────────────── */
+/* ── Mode toggle ── */
 .mode-toggle{
-  display:inline-flex;background:var(--surface2);border:1px solid var(--border2);
-  border-radius:var(--radius-sm);overflow:hidden;margin-bottom:24px
+  display:inline-flex;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:8px;overflow:hidden;margin-bottom:22px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.06)
 }
 .mode-btn{
-  padding:8px 20px;background:none;border:none;
+  padding:8px 22px;background:none;border:none;
   font:600 12px 'Inter',sans-serif;cursor:pointer;
-  color:var(--text3);letter-spacing:.06em;text-transform:uppercase;
-  transition:all .2s
+  color:#9ca3af;letter-spacing:.06em;text-transform:uppercase;transition:all .18s
 }
-.mode-btn.active{background:var(--accent);color:#fff;box-shadow:0 0 12px rgba(59,130,246,0.4)}
+.mode-btn.active{
+  background:linear-gradient(135deg,#0f2847,#1a3d6e);
+  color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,0.1)
+}
 
-/* ─── Cards ───────────────────────────────────── */
+/* ── Tab / Sections ── */
+.tab-content{display:none}
+.tab-content.active{display:block;animation:fadeUp .22s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.main{padding:28px 32px}
+
+/* ── Cards ── */
 .card{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);margin-bottom:16px;
-  box-shadow:var(--shadow-sm);transition:border-color .2s
+  background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+  margin-bottom:18px;box-shadow:0 1px 6px rgba(0,0,0,0.05);
+  transition:box-shadow .2s
 }
-.card:hover{border-color:var(--border2)}
+.card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.09)}
 .card-head{
-  padding:14px 20px;border-bottom:1px solid var(--border);
+  padding:14px 20px;border-bottom:1px solid #f3f4f6;
   display:flex;align-items:center;justify-content:space-between
 }
-.card-title{
-  font-size:11px;font-weight:700;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--text3)
-}
+.card-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#6b7280}
 .card-body{padding:20px}
 
-/* ─── Drop zone ───────────────────────────────── */
+/* ── Drop zone ── */
 .dropzone{
-  border:2px dashed var(--border2);border-radius:var(--radius);
+  border:2px dashed #e5e7eb;border-radius:9px;
   padding:36px 20px;text-align:center;cursor:pointer;
-  transition:all .25s;position:relative;background:transparent
+  transition:all .22s;position:relative;background:#fafafa
 }
 .dropzone:hover,.dropzone.drag{
-  border-color:var(--accent);
-  background:rgba(59,130,246,0.05);
-  box-shadow:var(--glow)
+  border-color:#0f2847;background:#f0f4ff;
+  box-shadow:0 0 0 4px rgba(15,40,71,0.06)
 }
 .dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.dropzone-icon{
-  width:48px;height:48px;border-radius:12px;
-  background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);
+.dz-icon{
+  width:50px;height:50px;border-radius:12px;
+  background:linear-gradient(135deg,#eff6ff,#dbeafe);
+  border:1px solid #bfdbfe;
   display:flex;align-items:center;justify-content:center;margin:0 auto 14px
 }
-.dropzone-label{font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px}
-.dropzone-sub{font-size:12px;color:var(--text3)}
+.dz-label{font-size:15px;font-weight:700;color:#111827;margin-bottom:4px}
+.dz-sub{font-size:12px;color:#9ca3af}
 .file-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .file-chip{
-  background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);
-  border-radius:20px;padding:5px 14px;font-size:12px;font-weight:500;
-  color:var(--accent-light);display:flex;align-items:center;gap:6px
+  background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;
+  padding:5px 14px;font-size:12px;font-weight:600;color:#1d4ed8;
+  display:flex;align-items:center;gap:6px
 }
-.file-chip button{background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0;transition:color .15s}
-.file-chip button:hover{color:var(--red)}
+.file-chip button{background:none;border:none;cursor:pointer;color:#93c5fd;font-size:15px;padding:0;transition:color .15s;line-height:1}
+.file-chip button:hover{color:#dc2626}
 
-/* ─── Options ─────────────────────────────────── */
-.options-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
-.opt-group{display:flex;align-items:center;gap:8px}
-.opt-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);white-space:nowrap}
-.opt-input{
-  height:36px;background:var(--surface2);border:1px solid var(--border2);
-  border-radius:var(--radius-sm);padding:0 12px;
-  font:500 13px 'Inter',sans-serif;color:var(--text);outline:none;min-width:200px;transition:border .2s
-}
-.opt-input:focus{border-color:var(--accent)}
-.opt-input::placeholder{color:var(--text3)}
+/* ── Options row ── */
+.options-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.opt-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;white-space:nowrap}
 
-/* ─── Toggle ──────────────────────────────────── */
+/* ── Toggle ── */
 .toggle-wrap{display:flex;align-items:center;gap:8px}
-.toggle{position:relative;width:38px;height:22px;display:inline-block}
+.toggle{position:relative;width:40px;height:22px;display:inline-block;flex-shrink:0}
 .toggle input{opacity:0;width:0;height:0}
-.slider{
-  position:absolute;inset:0;background:var(--surface3);
-  border-radius:11px;cursor:pointer;transition:.25s;border:1px solid var(--border2)
+.tog-slider{
+  position:absolute;inset:0;background:#e5e7eb;
+  border-radius:11px;cursor:pointer;transition:.22s;
+  border:1.5px solid #d1d5db
 }
-.slider:before{
+.tog-slider:before{
   content:'';position:absolute;width:16px;height:16px;
-  left:2px;top:2px;background:var(--text3);border-radius:50%;transition:.25s
+  left:2px;top:1px;background:#9ca3af;border-radius:50%;transition:.22s
 }
-.toggle input:checked+.slider{background:var(--accent);border-color:var(--accent)}
-.toggle input:checked+.slider:before{transform:translateX(16px);background:#fff}
-.toggle-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)}
+.toggle input:checked+.tog-slider{background:#0f2847;border-color:#0f2847}
+.toggle input:checked+.tog-slider:before{transform:translateX(18px);background:#fff}
+.tog-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af}
 
-/* ─── Weights ─────────────────────────────────── */
+/* ── Weights ── */
 .weights-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.weight-card{
-  background:var(--surface2);border:1px solid var(--border);
-  border-radius:var(--radius-sm);padding:14px;transition:border .2s
+.w-card{
+  background:#fafafa;border:1.5px solid #e5e7eb;
+  border-radius:8px;padding:14px;transition:border .18s,box-shadow .18s
 }
-.weight-card:focus-within{border-color:var(--accent)}
-.weight-name{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
-.weight-input{
-  width:100%;height:40px;background:var(--surface3);border:1px solid var(--border2);
-  border-radius:var(--radius-sm);text-align:center;
-  font:700 22px 'Inter',sans-serif;color:var(--text);outline:none;transition:border .2s
+.w-card:focus-within{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.07)}
+.w-name{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px}
+.w-input{
+  width:100%;height:42px;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:7px;text-align:center;
+  font:800 22px 'Inter',sans-serif;color:#0f2847;outline:none;transition:border .18s
 }
-.weight-input:focus{border-color:var(--accent)}
-.weight-sum{font-size:12px;font-weight:600;color:var(--text3)}
-.weight-sum.err{color:var(--red)}
-.weight-sum.ok{color:var(--green)}
+.w-input:focus{border-color:#0f2847}
+.w-sum{font-size:12px;font-weight:600;color:#9ca3af}
+.w-sum.ok{color:#059669}.w-sum.err{color:#dc2626;font-weight:700}
 
-/* ─── Textarea ────────────────────────────────── */
+/* ── Textarea ── */
 .textarea{
-  width:100%;background:var(--surface2);border:1px solid var(--border2);
-  border-radius:var(--radius-sm);padding:12px;
-  font:400 13px 'Inter',sans-serif;color:var(--text);
-  resize:vertical;outline:none;transition:border .2s;
-  line-height:1.6
+  width:100%;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:7px;padding:12px;
+  font:400 13px 'Inter',sans-serif;color:#111827;
+  resize:vertical;outline:none;transition:border .18s,box-shadow .18s;line-height:1.65
 }
-.textarea:focus{border-color:var(--accent)}
-.textarea::placeholder{color:var(--text3)}
+.textarea:focus{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.07)}
+.textarea::placeholder{color:#d1d5db}
 
-/* ─── Scores ──────────────────────────────────── */
+/* ── Score boxes ── */
 .score-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
 .score-box{
-  background:var(--surface2);border:1px solid var(--border);
-  border-radius:var(--radius);padding:16px;text-align:center;position:relative;overflow:hidden;
-  transition:transform .2s,box-shadow .2s
+  background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;
+  padding:16px 12px;text-align:center;
+  box-shadow:0 1px 4px rgba(0,0,0,0.05);
+  transition:transform .2s,box-shadow .2s;position:relative;overflow:hidden
 }
-.score-box:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.score-box:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,0.1)}
 .score-box.overall{
-  background:linear-gradient(135deg,var(--navy-mid),#1e3a5f);
-  border-color:rgba(59,130,246,0.3);
-  box-shadow:0 0 20px rgba(59,130,246,0.2)
+  background:linear-gradient(135deg,#0a1f3d,#0f2847);
+  border-color:transparent;
+  box-shadow:0 4px 16px rgba(15,40,71,0.35)
 }
 .score-box.overall::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(135deg,rgba(59,130,246,0.1),transparent);
-  pointer-events:none
+  content:'';position:absolute;top:-30px;right:-30px;
+  width:80px;height:80px;border-radius:50%;
+  background:rgba(255,255,255,0.04)
 }
-.score-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
-.score-box.overall .score-label{color:rgba(255,255,255,0.6)}
-.score-val{font-size:36px;font-weight:800;line-height:1;margin-bottom:10px}
-.score-box.overall .score-val{color:#fff}
-.ring-wrap{display:flex;justify-content:center;margin-bottom:6px}
-.ring{transform:rotate(-90deg);overflow:visible}
-.ring-bg{fill:none;stroke:rgba(255,255,255,0.08)}
-.ring-fill{fill:none;stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}
+.s-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px}
+.score-box.overall .s-label{color:rgba(255,255,255,0.55)}
+.ring-svg{overflow:visible}
+.ring-bg{fill:none;stroke:#f3f4f6;stroke-width:5}
+.score-box.overall .ring-bg{stroke:rgba(255,255,255,0.1)}
+.ring-fill{fill:none;stroke-linecap:round;stroke-width:5;transition:stroke-dashoffset 1.1s cubic-bezier(.4,0,.2,1)}
 
-/* ─── Chips ───────────────────────────────────── */
-.section-subtitle{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+/* ── Score pill ── */
+.score-pill{display:inline-block;padding:3px 11px;border-radius:12px;font-size:12px;font-weight:700;letter-spacing:.02em}
+.pill-hi{background:#dcfce7;color:#15803d}
+.pill-med{background:#fef9c3;color:#a16207}
+.pill-lo{background:#fee2e2;color:#b91c1c}
+
+/* ── Chips ── */
+.section-sub{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:9px}
 .chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
-.chip{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;transition:transform .15s}
-.chip:hover{transform:scale(1.05)}
-.chip-found{background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.25)}
-.chip-missing{background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.2)}
+.chip{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;transition:transform .15s,box-shadow .15s}
+.chip:hover{transform:scale(1.04);box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.chip-found{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.chip-miss{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
 
-/* ─── Tables ──────────────────────────────────── */
+/* ── Tables ── */
 .data-table{width:100%;border-collapse:collapse;font-size:13px}
 .data-table th{
   text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--text3);
-  padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border)
+  text-transform:uppercase;color:#9ca3af;
+  padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6
 }
-.data-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text2)}
+.data-table td{padding:10px 14px;border-bottom:1px solid #f9fafb;color:#374151;vertical-align:middle}
 .data-table tr:last-child td{border-bottom:none}
-.data-table tbody tr{transition:background .15s}
-.data-table tbody tr:hover td{background:var(--surface2);color:var(--text)}
+.data-table tbody tr{transition:background .14s}
+.data-table tbody tr:hover td{background:#f8fafc;color:#111827}
 
-/* ─── Leaderboard ─────────────────────────────── */
-.leaderboard{width:100%;border-collapse:collapse;font-size:13px}
-.leaderboard th{
+/* ── Leaderboard ── */
+.lb{width:100%;border-collapse:collapse;font-size:13px}
+.lb th{
   text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--text3);
-  padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border)
+  text-transform:uppercase;color:#9ca3af;
+  padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6
 }
-.leaderboard td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
-.leaderboard tbody tr{transition:background .15s}
-.leaderboard tbody tr:hover td{background:rgba(59,130,246,0.04)}
+.lb td{padding:10px 14px;border-bottom:1px solid #f9fafb;vertical-align:middle}
+.lb tr:last-child td{border-bottom:none}
+.lb tbody tr{transition:background .14s}
+.lb tbody tr:hover td{background:#f8fafc}
 .rank-badge{
   display:inline-flex;align-items:center;justify-content:center;
-  width:26px;height:26px;border-radius:50%;font-size:12px;font-weight:700
+  width:26px;height:26px;border-radius:50%;font-size:11px;font-weight:700
 }
-.rank-1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 0 10px rgba(245,158,11,0.4)}
-.rank-2{background:linear-gradient(135deg,#94a3b8,#64748b);color:#fff}
-.rank-3{background:linear-gradient(135deg,#b45309,#92400e);color:#fff}
-.rank-n{background:var(--surface3);color:var(--text3)}
-.score-pill{display:inline-block;padding:3px 12px;border-radius:12px;font-size:12px;font-weight:700;letter-spacing:.02em}
-.score-hi{background:rgba(16,185,129,0.15);color:#34d399}
-.score-med{background:rgba(245,158,11,0.15);color:#fbbf24}
-.score-lo{background:rgba(239,68,68,0.12);color:#f87171}
+.r1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,0.4)}
+.r2{background:linear-gradient(135deg,#9ca3af,#6b7280);color:#fff}
+.r3{background:linear-gradient(135deg,#d97706,#92400e);color:#fff}
+.rn{background:#f3f4f6;color:#6b7280;font-size:12px}
 
-/* ─── Audit ───────────────────────────────────── */
-.audit-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
-.audit-input{
-  height:34px;background:var(--surface2);border:1px solid var(--border2);
-  border-radius:var(--radius-sm);padding:0 12px;
-  font:500 13px 'Inter',sans-serif;color:var(--text);outline:none;transition:border .2s
-}
-.audit-input:focus{border-color:var(--accent)}
-.audit-input::placeholder{color:var(--text3)}
-.decision-sel{
-  height:28px;background:var(--surface2);border:1px solid var(--border2);
-  border-radius:var(--radius-sm);padding:0 8px;
-  font:500 12px 'Inter',sans-serif;color:var(--text);outline:none
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-green{background:#dcfce7;color:#15803d}
+.badge-red{background:#fee2e2;color:#b91c1c}
+.badge-yellow{background:#fef9c3;color:#a16207}
+.badge-blue{background:#dbeafe;color:#1d4ed8}
+
+/* ── Audit toolbar ── */
+.audit-tb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.dec-sel{
+  height:28px;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:6px;padding:0 8px;font:500 12px 'Inter',sans-serif;color:#374151;outline:none
 }
 .note-inp{
-  height:28px;background:var(--surface2);border:1px solid var(--border2);
-  border-radius:var(--radius-sm);padding:0 8px;
-  font:500 12px 'Inter',sans-serif;color:var(--text);outline:none;width:130px
+  height:28px;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:6px;padding:0 8px;font:500 12px 'Inter',sans-serif;
+  color:#374151;outline:none;width:130px;transition:border .18s
 }
+.note-inp:focus{border-color:#0f2847}
 
-/* ─── Role tabs ───────────────────────────────── */
+/* ── Role tabs ── */
 .role-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
-.role-tab{
-  padding:7px 16px;border-radius:var(--radius-sm);
+.rtab{
+  padding:7px 16px;border-radius:7px;
   font:600 12px 'Inter',sans-serif;cursor:pointer;
-  background:var(--surface2);color:var(--text3);
-  border:1px solid var(--border);letter-spacing:.04em;transition:all .2s
+  background:#fff;color:#6b7280;border:1.5px solid #e5e7eb;
+  letter-spacing:.04em;transition:all .18s;
+  box-shadow:0 1px 3px rgba(0,0,0,0.05)
 }
-.role-tab:hover:not(.active){background:var(--surface3);color:var(--text)}
-.role-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 0 12px rgba(59,130,246,0.35)}
+.rtab:hover:not(.active){background:#f9fafb;border-color:#9ca3af;color:#374151}
+.rtab.active{
+  background:linear-gradient(135deg,#0f2847,#1a3d6e);
+  color:#fff;border-color:transparent;
+  box-shadow:0 3px 10px rgba(15,40,71,0.3)
+}
 
-/* ─── Error / Success ─────────────────────────── */
-.msg{border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:16px;display:none}
-.msg-err{background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:#f87171}
-.msg-ok{background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.25);color:#34d399}
+/* ── Messages ── */
+.msg{border-radius:8px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:16px;display:none}
+.msg-err{background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626}
+.msg-ok{background:#f0fdf4;border:1.5px solid #bbf7d0;color:#15803d}
 
-/* ─── Loading overlay ─────────────────────────── */
+/* ── Loading overlay ── */
 .loading-overlay{
-  position:fixed;inset:0;background:rgba(5,8,18,0.75);
-  backdrop-filter:blur(8px);display:none;
+  position:fixed;inset:0;background:rgba(15,40,71,0.45);
+  backdrop-filter:blur(6px);display:none;
   align-items:center;justify-content:center;z-index:9999
 }
 .loading-card{
-  background:var(--surface);border:1px solid var(--border2);
-  border-radius:14px;padding:32px 40px;text-align:center;
-  box-shadow:0 20px 60px rgba(0,0,0,0.5);min-width:280px
+  background:#fff;border-radius:14px;padding:32px 40px;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,0.2);min-width:280px
 }
-.big-ring{display:block;margin:0 auto 18px;animation:spin .9s linear infinite}
+.big-spinner{
+  width:44px;height:44px;border:3.5px solid #e5e7eb;border-top-color:#0f2847;
+  border-radius:50%;animation:spin .75s linear infinite;margin:0 auto 16px
+}
 @keyframes spin{to{transform:rotate(360deg)}}
-.load-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
-.load-sub{font-size:12px;color:var(--text3);margin-bottom:16px}
-.progress-track{background:var(--surface3);border-radius:4px;height:4px;overflow:hidden}
-.progress-fill{height:4px;background:linear-gradient(90deg,var(--accent),var(--accent-light));border-radius:4px;transition:width .3s}
+.load-title{font-size:15px;font-weight:700;color:#0f2847;margin-bottom:4px}
+.load-sub{font-size:12px;color:#9ca3af;margin-bottom:14px}
+.prog-track{background:#f3f4f6;border-radius:4px;height:4px;overflow:hidden}
+.prog-fill{height:4px;background:linear-gradient(90deg,#0f2847,#3b82f6);border-radius:4px;transition:width .3s}
 
-/* ─── Results sections ────────────────────────── */
+/* ── Results ── */
 .results-section{display:none}
-.verdict-box{
-  background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);
-  border-radius:var(--radius-sm);padding:14px 16px;
-  font-size:13px;color:var(--text2);line-height:1.7
-}
 
-/* ─── Misc ────────────────────────────────────── */
-.empty-state{text-align:center;padding:48px 20px;color:var(--text3);font-size:13px}
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
-.divider{height:1px;background:var(--border);margin:20px 0}
-.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
-.badge-green{background:rgba(16,185,129,0.15);color:#34d399}
-.badge-yellow{background:rgba(245,158,11,0.15);color:#fbbf24}
-.badge-red{background:rgba(239,68,68,0.12);color:#f87171}
-.badge-blue{background:rgba(59,130,246,0.15);color:#60a5fa}
+/* ── Misc ── */
+.empty-state{text-align:center;padding:48px 20px;color:#9ca3af;font-size:13px}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
 
 @media(max-width:760px){
   .weights-grid{grid-template-columns:1fr 1fr}
   .score-row{grid-template-columns:1fr 1fr}
   .main{padding:16px}
-  .topbar{padding:0 16px}
-  .config-bar{padding:10px 16px}
+  .topbar,.config-bar{padding-left:16px;padding-right:16px}
 }
 </style>
 </head>
 <body>
-<!-- Loading overlay -->
+<!-- Loading -->
 <div class="loading-overlay" id="loadingOverlay" style="display:none">
   <div class="loading-card">
-    <svg class="big-ring" width="44" height="44" viewBox="0 0 44 44">
-      <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
-      <circle cx="22" cy="22" r="18" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"
-        stroke-dasharray="60 113" transform="rotate(-90 22 22)"/>
-    </svg>
-    <div class="load-title" id="loadingMsg">Analyzing CVs...</div>
+    <div class="big-spinner"></div>
+    <div class="load-title" id="loadingMsg">Analyzing...</div>
     <div class="load-sub" id="progressLabel"></div>
-    <div class="progress-track"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+    <div class="prog-track"><div class="prog-fill" id="progressBar" style="width:0%"></div></div>
   </div>
 </div>
 
 <!-- Topbar -->
 <div class="topbar">
-  <a class="brand" href="#">
-    <div class="brand-logo">
+  <a class="topbar-brand" href="#">
+    <div class="brand-icon">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <polyline points="2,18 7,11 11,15 16,7 22,12" stroke="white" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <polyline points="2,18 7,11 11,15 16,7 22,12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
-    <span class="brand-name">CV<span>springs</span></span>
+    <span class="brand-name">CV<em>springs</em></span>
   </a>
-  <nav class="nav">
+  <nav class="topbar-nav">
     <button class="nav-btn active" onclick="switchTab('analyzer',this)">Analyzer</button>
     <button class="nav-btn" onclick="switchTab('audit',this)">Audit Log</button>
     <button class="nav-btn" onclick="switchTab('history',this)">Role History</button>
@@ -434,11 +386,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 <!-- Config bar -->
 <div class="config-bar">
   <span class="config-label">API Endpoint</span>
-  <input class="config-input" type="text" id="apiUrl" placeholder="https://your-backend.onrender.com">
+  <input class="text-input" type="text" id="apiUrl" placeholder="https://your-backend.onrender.com" style="flex:1;max-width:500px">
   <button class="btn btn-primary btn-sm" onclick="connect()">Connect</button>
 </div>
 
-<!-- ═══════════════ ANALYZER TAB ═══════════════ -->
+<!-- ═══ ANALYZER ═══ -->
 <div class="tab-content active main" id="tab-analyzer">
 
   <div class="mode-toggle">
@@ -446,42 +398,35 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
     <button class="mode-btn" id="modeBatch" onclick="setMode('batch')">Batch Upload</button>
   </div>
 
-  <!-- Upload -->
   <div class="card">
-    <div class="card-head">
-      <span class="card-title" id="uploadCardTitle">Upload CV</span>
-    </div>
+    <div class="card-head"><span class="card-title" id="uploadCardTitle">Upload CV</span></div>
     <div class="card-body">
       <div class="dropzone" id="dropzone"
         ondragover="event.preventDefault();this.classList.add('drag')"
         ondragleave="this.classList.remove('drag')"
         ondrop="handleDrop(event)">
         <input type="file" id="cvInput" accept=".pdf,.docx" onchange="handleFiles(this.files)">
-        <div class="dropzone-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="dz-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
         </div>
-        <div class="dropzone-label" id="dropLabel">Drop PDF or DOCX here, or click to browse</div>
-        <div class="dropzone-sub" id="dropSub">Max 10 MB per file</div>
+        <div class="dz-label" id="dropLabel">Drop PDF or DOCX here, or click to browse</div>
+        <div class="dz-sub" id="dropSub">Supports PDF and DOCX &middot; Max 10 MB per file</div>
       </div>
       <div class="file-list" id="fileList"></div>
     </div>
   </div>
 
-  <!-- Options row -->
   <div class="options-row">
-    <div class="opt-group">
-      <span class="opt-label">Role</span>
-      <input type="text" class="opt-input" id="roleInput" placeholder="e.g. Senior Engineer">
-    </div>
-    <div class="toggle-wrap">
-      <label class="toggle"><input type="checkbox" id="anonymizeToggle"><span class="slider"></span></label>
-      <span class="toggle-label">Anonymize</span>
+    <span class="opt-label">Role / Position</span>
+    <input type="text" class="text-input" id="roleInput" placeholder="e.g. Senior Engineer" style="min-width:200px">
+    <div class="toggle-wrap" style="margin-left:8px">
+      <label class="toggle"><input type="checkbox" id="anonymizeToggle"><span class="tog-slider"></span></label>
+      <span class="tog-label">Anonymize</span>
     </div>
   </div>
 
-  <!-- Job description -->
   <div class="card">
     <div class="card-head"><span class="card-title">Job Description</span></div>
     <div class="card-body">
@@ -489,67 +434,65 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
     </div>
   </div>
 
-  <!-- Weights -->
   <div class="card">
     <div class="card-head">
       <span class="card-title">Scoring Weights</span>
-      <span class="weight-sum ok" id="weightSum">Total: 100</span>
+      <span class="w-sum ok" id="weightSum">Total: 100</span>
     </div>
     <div class="card-body">
       <div class="weights-grid">
-        <div class="weight-card"><div class="weight-name">Keywords</div><input class="weight-input" type="number" id="wKw" value="40" min="0" max="100" oninput="updateWeightSum()"></div>
-        <div class="weight-card"><div class="weight-name">Skills</div><input class="weight-input" type="number" id="wSk" value="30" min="0" max="100" oninput="updateWeightSum()"></div>
-        <div class="weight-card"><div class="weight-name">Experience</div><input class="weight-input" type="number" id="wEx" value="20" min="0" max="100" oninput="updateWeightSum()"></div>
-        <div class="weight-card"><div class="weight-name">Education</div><input class="weight-input" type="number" id="wEd" value="10" min="0" max="100" oninput="updateWeightSum()"></div>
+        <div class="w-card"><div class="w-name">Keywords</div><input class="w-input" type="number" id="wKw" value="40" min="0" max="100" oninput="updateWeightSum()"></div>
+        <div class="w-card"><div class="w-name">Skills</div><input class="w-input" type="number" id="wSk" value="30" min="0" max="100" oninput="updateWeightSum()"></div>
+        <div class="w-card"><div class="w-name">Experience</div><input class="w-input" type="number" id="wEx" value="20" min="0" max="100" oninput="updateWeightSum()"></div>
+        <div class="w-card"><div class="w-name">Education</div><input class="w-input" type="number" id="wEd" value="10" min="0" max="100" oninput="updateWeightSum()"></div>
       </div>
     </div>
   </div>
 
   <div class="msg msg-err" id="analyzeError"></div>
-  <div style="display:flex;gap:10px;margin-bottom:8px">
+  <div style="display:flex;gap:10px;margin-bottom:6px">
     <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       Analyze
     </button>
     <button class="btn btn-ghost" onclick="clearResults()">Clear</button>
   </div>
 
   <!-- Single results -->
-  <div class="results-section" id="singleResults" style="margin-top:8px">
+  <div class="results-section" id="singleResults" style="margin-top:10px">
     <div class="card">
       <div class="card-head">
         <span class="card-title" id="resultName">Results</span>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" onclick="saveToAudit()">Save to Audit</button>
-          <button class="btn btn-ghost btn-sm" onclick="openReport()">Report</button>
+          <button class="btn btn-ghost btn-sm" onclick="openReport()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Report
+          </button>
         </div>
       </div>
       <div class="card-body">
         <div class="score-row" id="scoreRow"></div>
-        <div class="section-subtitle">Keywords Found</div>
+        <div class="section-sub">Keywords Found</div>
         <div class="chip-list" id="foundChips"></div>
-        <div class="section-subtitle">Keywords Missing</div>
+        <div class="section-sub">Keywords Missing</div>
         <div class="chip-list" id="missingChips"></div>
-        <div class="section-subtitle" style="margin-top:4px">Skills Match</div>
+        <div class="section-sub" style="margin-top:4px">Skills</div>
         <table class="data-table" id="skillsTable" style="margin-bottom:20px">
-          <thead><tr><th>Skill</th><th>Status</th></tr></thead>
-          <tbody></tbody>
+          <thead><tr><th>Skill</th><th>Status</th></tr></thead><tbody></tbody>
         </table>
-        <div class="section-subtitle">Recommendations</div>
+        <div class="section-sub">Recommendations</div>
         <table class="data-table" id="recsTable">
-          <thead><tr><th>Area</th><th>Recommendation</th></tr></thead>
-          <tbody></tbody>
+          <thead><tr><th>Area</th><th>Recommendation</th></tr></thead><tbody></tbody>
         </table>
       </div>
     </div>
-
-    <!-- Decision -->
     <div class="card">
       <div class="card-head"><span class="card-title">Recruiter Decision</span></div>
       <div class="card-body" style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div>
-          <div class="section-subtitle" style="margin-bottom:6px">Decision</div>
-          <select class="opt-input" id="decisionSelect" style="min-width:150px">
+          <div class="section-sub" style="margin-bottom:7px">Decision</div>
+          <select class="text-input" id="decisionSelect" style="min-width:160px">
             <option value="">— Select —</option>
             <option value="shortlist">Shortlist</option>
             <option value="hold">Hold</option>
@@ -557,8 +500,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
           </select>
         </div>
         <div style="flex:1;min-width:200px">
-          <div class="section-subtitle" style="margin-bottom:6px">Notes</div>
-          <textarea class="textarea" id="noteInput" rows="2" placeholder="Optional notes..."></textarea>
+          <div class="section-sub" style="margin-bottom:7px">Notes</div>
+          <textarea class="textarea" id="noteInput" rows="2" placeholder="Optional recruiter notes..."></textarea>
         </div>
         <div style="padding-top:22px">
           <button class="btn btn-primary btn-sm" onclick="saveToAudit()">Save</button>
@@ -568,24 +511,20 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
   </div>
 
   <!-- Batch results -->
-  <div class="results-section" id="batchResults" style="margin-top:8px">
+  <div class="results-section" id="batchResults" style="margin-top:10px">
     <div class="card">
       <div class="card-head">
         <span class="card-title" id="batchTitle">Batch Results</span>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-ghost btn-sm" onclick="saveAllToAudit()">Save All</button>
+          <button class="btn btn-ghost btn-sm" onclick="saveAllToAudit()">Save All to Audit</button>
           <button class="btn btn-ghost btn-sm" onclick="exportBatchCsv()">Export CSV</button>
         </div>
       </div>
       <div style="overflow-x:auto">
-        <table class="leaderboard" id="batchTable">
+        <table class="lb" id="batchTable">
           <thead><tr>
-            <th style="width:44px">#</th>
-            <th>Candidate</th>
-            <th>Overall</th>
-            <th>KW</th><th>SK</th><th>EX</th><th>ED</th>
-            <th>Decision</th>
-            <th></th>
+            <th style="width:44px">#</th><th>Candidate</th><th>Overall</th>
+            <th>KW</th><th>SK</th><th>EX</th><th>ED</th><th>Decision</th><th></th>
           </tr></thead>
           <tbody id="batchBody"></tbody>
         </table>
@@ -594,20 +533,21 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
   </div>
 
 </div>
-<!-- ═══════════════ AUDIT LOG TAB ═══════════════ -->
+
+<!-- ═══ AUDIT LOG ═══ -->
 <div class="tab-content main" id="tab-audit">
-  <div class="audit-toolbar">
-    <input class="audit-input" type="text" id="auditSearch" placeholder="Search candidate..." oninput="filterAudit()" style="min-width:180px">
-    <select class="audit-input" id="auditDecisionFilter" onchange="filterAudit()" style="min-width:130px">
+  <div class="audit-tb">
+    <input class="text-input" type="text" id="auditSearch" placeholder="Search candidate..." oninput="filterAudit()" style="min-width:180px">
+    <select class="text-input" id="auditDecisionFilter" onchange="filterAudit()" style="min-width:130px">
       <option value="">All Decisions</option>
       <option value="shortlist">Shortlist</option>
       <option value="hold">Hold</option>
       <option value="reject">Reject</option>
     </select>
-    <select class="audit-input" id="auditRoleFilter" onchange="filterAudit()" style="min-width:140px">
+    <select class="text-input" id="auditRoleFilter" onchange="filterAudit()" style="min-width:140px">
       <option value="">All Roles</option>
     </select>
-    <button class="btn btn-ghost btn-sm" onclick="loadAudit()">Refresh</button>
+    <button class="btn btn-ghost btn-sm" onclick="loadAudit()">&#8635; Refresh</button>
     <button class="btn btn-ghost btn-sm" onclick="exportAuditCsv()">Export CSV</button>
   </div>
   <div class="msg msg-err" id="auditError"></div>
@@ -625,513 +565,366 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
   </div>
 </div>
 
-<!-- ═══════════════ ROLE HISTORY TAB ═══════════════ -->
+<!-- ═══ ROLE HISTORY ═══ -->
 <div class="tab-content main" id="tab-history">
   <div class="card">
     <div class="card-head">
       <span class="card-title">Score History by Role</span>
-      <button class="btn btn-ghost btn-sm" onclick="loadRoles()">Refresh</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadRoles()">&#8635; Refresh</button>
     </div>
     <div class="card-body">
       <div class="role-tabs" id="roleTabs"></div>
-      <div id="roleHistoryContent">
-        <div class="empty-state">Select a role above to view candidate scores</div>
-      </div>
+      <div id="roleHistoryContent"><div class="empty-state">Select a role above to view candidate scores</div></div>
     </div>
   </div>
 </div>
-
 <script>
-// ── State ──────────────────────────────────────
-let API = localStorage.getItem('cvsprings_api_url') || '';
-let mode = 'single';
-let selectedFiles = [];
-let lastResult = null;
-let lastBatchResults = [];
-let lastAuditRecords = [];
+let API=localStorage.getItem('cvsprings_api_url')||'';
+let mode='single',selectedFiles=[],lastResult=null,lastBatchResults=[],lastAuditRecords=[];
 
-// ── Init ───────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  if (API) { document.getElementById('apiUrl').value = API; ping(); }
-  loadAudit(); loadRoles();
+document.addEventListener('DOMContentLoaded',()=>{
+  if(API){document.getElementById('apiUrl').value=API;ping();}
+  loadAudit();loadRoles();
 });
 
-// ── Tabs ───────────────────────────────────────
-function switchTab(name, btn) {
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  btn.classList.add('active');
-  if (name === 'audit') loadAudit();
-  if (name === 'history') loadRoles();
+function switchTab(n,btn){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+n).classList.add('active');btn.classList.add('active');
+  if(n==='audit')loadAudit();if(n==='history')loadRoles();
 }
 
-// ── Connection ─────────────────────────────────
-async function connect() {
-  const url = document.getElementById('apiUrl').value.trim().replace(/\/+$/, '');
-  if (!url) return;
-  API = url;
-  localStorage.setItem('cvsprings_api_url', API);
-  await ping();
+async function connect(){
+  const url=document.getElementById('apiUrl').value.trim().replace(/\/+$/,'');
+  if(!url)return;API=url;localStorage.setItem('cvsprings_api_url',API);await ping();
 }
-async function ping() {
-  const dot = document.getElementById('connDot');
-  const lbl = document.getElementById('connLabel');
-  dot.className = 'dot'; lbl.textContent = 'Checking...';
-  try {
-    const r = await fetch(API + '/health', { signal: AbortSignal.timeout(8000) });
-    if (r.ok) { dot.className = 'dot ok'; lbl.textContent = 'Connected'; }
-    else throw new Error();
-  } catch { dot.className = 'dot err'; lbl.textContent = 'Not connected'; }
+async function ping(){
+  const dot=document.getElementById('connDot'),lbl=document.getElementById('connLabel');
+  dot.className='dot';lbl.textContent='Checking...';
+  try{const r=await fetch(API+'/health',{signal:AbortSignal.timeout(8000)});
+    if(r.ok){dot.className='dot ok';lbl.textContent='Connected';}else throw new Error();}
+  catch{dot.className='dot err';lbl.textContent='Not connected';}
 }
 
-// ── Mode ───────────────────────────────────────
-function setMode(m) {
-  mode = m;
-  document.getElementById('modeSingle').classList.toggle('active', m === 'single');
-  document.getElementById('modeBatch').classList.toggle('active', m === 'batch');
-  document.getElementById('uploadCardTitle').textContent = m === 'single' ? 'Upload CV' : 'Upload CVs (up to 50)';
-  document.getElementById('dropLabel').textContent = m === 'single' ? 'Drop PDF or DOCX here, or click to browse' : 'Drop multiple CVs here, or click to browse';
-  document.getElementById('cvInput').multiple = m === 'batch';
-  clearResults(); selectedFiles = []; renderFileList();
+function setMode(m){
+  mode=m;
+  document.getElementById('modeSingle').classList.toggle('active',m==='single');
+  document.getElementById('modeBatch').classList.toggle('active',m==='batch');
+  document.getElementById('uploadCardTitle').textContent=m==='single'?'Upload CV':'Upload CVs (up to 50)';
+  document.getElementById('dropLabel').textContent=m==='single'?'Drop PDF or DOCX here, or click to browse':'Drop multiple CVs here, or click to browse';
+  document.getElementById('cvInput').multiple=m==='batch';
+  clearResults();selectedFiles=[];renderFileList();
 }
 
-// ── Files ──────────────────────────────────────
-function handleFiles(files) {
-  const arr = Array.from(files);
-  if (mode === 'single') { selectedFiles = arr.slice(0, 1); }
-  else { for (const f of arr) if (!selectedFiles.find(x => x.name === f.name)) selectedFiles.push(f); }
+function handleFiles(files){
+  const arr=Array.from(files);
+  if(mode==='single'){selectedFiles=arr.slice(0,1);}
+  else{for(const f of arr)if(!selectedFiles.find(x=>x.name===f.name))selectedFiles.push(f);}
   renderFileList();
 }
-function handleDrop(ev) {
-  ev.preventDefault();
-  document.getElementById('dropzone').classList.remove('drag');
-  handleFiles(ev.dataTransfer.files);
-}
-function removeFile(name) { selectedFiles = selectedFiles.filter(f => f.name !== name); renderFileList(); }
-function renderFileList() {
-  document.getElementById('fileList').innerHTML = selectedFiles.map(f =>
-    '<div class="file-chip"><span>' + f.name + '</span><button onclick="removeFile(\''+f.name+'\')">&#x2715;</button></div>'
+function handleDrop(ev){ev.preventDefault();document.getElementById('dropzone').classList.remove('drag');handleFiles(ev.dataTransfer.files);}
+function removeFile(name){selectedFiles=selectedFiles.filter(f=>f.name!==name);renderFileList();}
+function renderFileList(){
+  document.getElementById('fileList').innerHTML=selectedFiles.map(f=>
+    '<div class="file-chip"><span>'+f.name+'</span><button onclick="removeFile(\''+f.name+'\')">&#x2715;</button></div>'
   ).join('');
 }
 
-// ── Weights ────────────────────────────────────
-function updateWeightSum() {
-  const t = +document.getElementById('wKw').value + +document.getElementById('wSk').value +
-            +document.getElementById('wEx').value + +document.getElementById('wEd').value;
-  const el = document.getElementById('weightSum');
-  el.textContent = 'Total: ' + t;
-  el.className = 'weight-sum ' + (Math.abs(t - 100) > 0.01 ? 'err' : 'ok');
+function updateWeightSum(){
+  const t=+document.getElementById('wKw').value+ +document.getElementById('wSk').value+
+           +document.getElementById('wEx').value+ +document.getElementById('wEd').value;
+  const el=document.getElementById('weightSum');
+  el.textContent='Total: '+t;
+  el.className='w-sum '+(Math.abs(t-100)>0.01?'err':'ok');
 }
-function getWeights() {
-  return { kw: +document.getElementById('wKw').value, sk: +document.getElementById('wSk').value,
-           ex: +document.getElementById('wEx').value, ed: +document.getElementById('wEd').value };
-}
+function getWeights(){return{kw:+document.getElementById('wKw').value,sk:+document.getElementById('wSk').value,ex:+document.getElementById('wEx').value,ed:+document.getElementById('wEd').value};}
 
-// ── Analyze ────────────────────────────────────
-async function analyze() {
-  const errEl = document.getElementById('analyzeError');
-  errEl.style.display = 'none';
-  if (!API) { showErr(errEl, 'Set API endpoint first.'); return; }
-  if (!selectedFiles.length) { showErr(errEl, 'Upload at least one CV file.'); return; }
-  const jd = document.getElementById('jdInput').value.trim();
-  if (!jd) { showErr(errEl, 'Job description is required.'); return; }
-  const w = getWeights();
-  if (Math.abs(w.kw + w.sk + w.ex + w.ed - 100) > 0.01) { showErr(errEl, 'Weights must sum to 100.'); return; }
-  const anon = document.getElementById('anonymizeToggle').checked;
-  const role = document.getElementById('roleInput').value.trim();
-  if (mode === 'single') await analyzeSingle(selectedFiles[0], jd, w, anon, role, errEl);
-  else await analyzeBatch(selectedFiles, jd, w, anon, role, errEl);
+async function analyze(){
+  const errEl=document.getElementById('analyzeError');errEl.style.display='none';
+  if(!API){showErr(errEl,'Set API endpoint first.');return;}
+  if(!selectedFiles.length){showErr(errEl,'Upload at least one CV file.');return;}
+  const jd=document.getElementById('jdInput').value.trim();
+  if(!jd){showErr(errEl,'Job description is required.');return;}
+  const w=getWeights();
+  if(Math.abs(w.kw+w.sk+w.ex+w.ed-100)>0.01){showErr(errEl,'Weights must sum to 100.');return;}
+  const anon=document.getElementById('anonymizeToggle').checked;
+  const role=document.getElementById('roleInput').value.trim();
+  if(mode==='single')await analyzeSingle(selectedFiles[0],jd,w,anon,role,errEl);
+  else await analyzeBatch(selectedFiles,jd,w,anon,role,errEl);
 }
 
-async function analyzeSingle(file, jd, weights, anon, role, errEl) {
-  const btn = document.getElementById('analyzeBtn');
-  btn.innerHTML = '<span class="spinner"></span> Analyzing...';
-  btn.disabled = true;
-  try {
-    const fd = new FormData();
-    fd.append('cv', file);
-    fd.append('jobDescription', jd);
-    fd.append('weights', JSON.stringify(weights));
-    fd.append('anonymize', anon ? 'true' : 'false');
-    const r = await fetch(API + '/api/analyze', { method: 'POST', body: fd });
-    const data = await r.json();
-    if (!r.ok) { showErr(errEl, data.error || 'Analysis failed'); return; }
-    lastResult = { ...data, role, file: file.name };
-    renderSingleResult(data, file.name, role);
-  } catch (e) { showErr(errEl, 'Network error: ' + e.message); }
-  finally { btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Analyze'; btn.disabled = false; }
+async function analyzeSingle(file,jd,weights,anon,role,errEl){
+  const btn=document.getElementById('analyzeBtn');
+  btn.innerHTML='<span class="spinner"></span> Analyzing...';btn.disabled=true;
+  try{
+    const fd=new FormData();fd.append('cv',file);fd.append('jobDescription',jd);
+    fd.append('weights',JSON.stringify(weights));fd.append('anonymize',anon?'true':'false');
+    const r=await fetch(API+'/api/analyze',{method:'POST',body:fd});
+    const data=await r.json();
+    if(!r.ok){showErr(errEl,data.error||'Analysis failed');return;}
+    lastResult={...data,role,file:file.name};
+    renderSingleResult(data,file.name,role);
+  }catch(e){showErr(errEl,'Network error: '+e.message);}
+  finally{btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Analyze';btn.disabled=false;}
 }
 
-async function analyzeBatch(files, jd, weights, anon, role, errEl) {
-  showLoading('Analyzing ' + files.length + ' CVs...');
-  try {
-    const fd = new FormData();
-    files.forEach(f => fd.append('cvs', f));
-    fd.append('jobDescription', jd);
-    fd.append('weights', JSON.stringify(weights));
-    fd.append('anonymize', anon ? 'true' : 'false');
-    setProgress(30, 'Uploading and processing...');
-    const r = await fetch(API + '/api/analyze/batch', { method: 'POST', body: fd });
-    setProgress(80, 'Scoring candidates...');
-    const data = await r.json();
-    if (!r.ok) { showErr(errEl, data.error || 'Batch failed'); return; }
-    setProgress(100, 'Complete');
-    lastBatchResults = (data.results || []).map(res => ({ ...res, role }));
-    renderBatchResults(data.results, role);
-  } catch (e) { showErr(errEl, 'Network error: ' + e.message); }
-  finally { hideLoading(); }
+async function analyzeBatch(files,jd,weights,anon,role,errEl){
+  showLoading('Analyzing '+files.length+' CVs...');
+  try{
+    const fd=new FormData();files.forEach(f=>fd.append('cvs',f));
+    fd.append('jobDescription',jd);fd.append('weights',JSON.stringify(weights));
+    fd.append('anonymize',anon?'true':'false');
+    setProgress(30,'Uploading and processing...');
+    const r=await fetch(API+'/api/analyze/batch',{method:'POST',body:fd});
+    setProgress(80,'Scoring candidates...');
+    const data=await r.json();
+    if(!r.ok){showErr(errEl,data.error||'Batch failed');return;}
+    setProgress(100,'Complete');
+    lastBatchResults=(data.results||[]).map(res=>({...res,role}));
+    renderBatchResults(data.results,role);
+  }catch(e){showErr(errEl,'Network error: '+e.message);}
+  finally{hideLoading();}
 }
-// ── Render Single ──────────────────────────────
-function renderSingleResult(data, fileName, role) {
-  document.getElementById('singleResults').style.display = 'block';
-  document.getElementById('batchResults').style.display = 'none';
-  const name = data.anonymized ? 'Anonymous Candidate' : (data.candidateName || fileName.replace(/\.[^.]+$/,''));
-  document.getElementById('resultName').textContent = name + (role ? ' — ' + role : '');
 
-  const sr = document.getElementById('scoreRow');
-  const c = s => s >= 70 ? '#10b981' : s >= 50 ? '#f59e0b' : '#ef4444';
-  sr.innerHTML = ringBox('Overall', data.overall, true, c(data.overall)) +
-    ringBox('Keywords', data.scores?.keywords, false, '#3b82f6') +
-    ringBox('Skills', data.scores?.skills, false, '#8b5cf6') +
-    ringBox('Experience', data.scores?.experience, false, '#f59e0b') +
-    ringBox('Education', data.scores?.education, false, '#10b981');
-
-  // Animate rings after render
-  requestAnimationFrame(() => {
-    document.querySelectorAll('.ring-fill').forEach(el => {
-      const target = parseFloat(el.dataset.target);
-      const circ = 2 * Math.PI * 28;
-      el.style.strokeDasharray = circ;
-      el.style.strokeDashoffset = circ;
-      requestAnimationFrame(() => {
-        el.style.strokeDashoffset = circ * (1 - target / 100);
-      });
+function renderSingleResult(data,fileName,role){
+  document.getElementById('singleResults').style.display='block';
+  document.getElementById('batchResults').style.display='none';
+  const name=data.anonymized?'Anonymous Candidate':(data.candidateName||fileName.replace(/\.[^.]+$/,''));
+  document.getElementById('resultName').textContent=name+(role?' — '+role:'');
+  const c=s=>s>=70?'#059669':s>=50?'#d97706':'#dc2626';
+  const sr=document.getElementById('scoreRow');
+  sr.innerHTML=
+    ringBox('Overall',data.overall,true,c(data.overall))+
+    ringBox('Keywords',data.scores?.keywords,false,'#2563eb')+
+    ringBox('Skills',data.scores?.skills,false,'#7c3aed')+
+    ringBox('Experience',data.scores?.experience,false,'#d97706')+
+    ringBox('Education',data.scores?.education,false,'#059669');
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.ring-fill').forEach(el=>{
+      const v=parseFloat(el.dataset.v),circ=2*Math.PI*28;
+      el.style.strokeDasharray=circ;el.style.strokeDashoffset=circ;
+      requestAnimationFrame(()=>{el.style.strokeDashoffset=circ*(1-v/100);});
     });
   });
-
-  const found = data.keywords?.found || [];
-  const missing = data.keywords?.missing || [];
-  document.getElementById('foundChips').innerHTML = found.length
-    ? found.map(k => '<span class="chip chip-found">'+k+'</span>').join('')
-    : '<span style="color:var(--text3);font-size:13px">None found</span>';
-  document.getElementById('missingChips').innerHTML = missing.length
-    ? missing.map(k => '<span class="chip chip-missing">'+k+'</span>').join('')
-    : '<span style="color:var(--text3);font-size:13px">None missing ✓</span>';
-
-  const stb = document.getElementById('skillsTable').querySelector('tbody');
-  stb.innerHTML = (data.skills || []).map(s =>
-    '<tr><td style="font-weight:500;color:var(--text)">'+s.skill+'</td>' +
-    '<td><span class="badge '+(s.found?'badge-green':'badge-red')+'">'+(s.found?'✓ Found':'✕ Missing')+'</span></td></tr>'
-  ).join('') || '<tr><td colspan="2" class="empty-state" style="padding:20px">No skills data</td></tr>';
-
-  const rtb = document.getElementById('recsTable').querySelector('tbody');
-  rtb.innerHTML = (data.recommendations || []).map(r =>
-    '<tr><td style="font-weight:600;white-space:nowrap;color:var(--accent-light)">'+r.area+'</td><td>'+r.text+'</td></tr>'
-  ).join('') || '<tr><td colspan="2" class="empty-state" style="padding:20px">No recommendations</td></tr>';
+  const found=data.keywords?.found||[],missing=data.keywords?.missing||[];
+  document.getElementById('foundChips').innerHTML=found.length?found.map(k=>'<span class="chip chip-found">'+k+'</span>').join(''):'<span style="color:#9ca3af;font-size:13px">None found</span>';
+  document.getElementById('missingChips').innerHTML=missing.length?missing.map(k=>'<span class="chip chip-miss">'+k+'</span>').join(''):'<span style="color:#059669;font-size:13px">✓ None missing</span>';
+  document.getElementById('skillsTable').querySelector('tbody').innerHTML=(data.skills||[]).map(s=>
+    '<tr><td style="font-weight:600">'+s.skill+'</td><td><span class="badge '+(s.found?'badge-green':'badge-red')+'">'+(s.found?'✓ Found':'✕ Missing')+'</span></td></tr>'
+  ).join('')||'<tr><td colspan="2" class="empty-state" style="padding:20px">No skills data</td></tr>';
+  document.getElementById('recsTable').querySelector('tbody').innerHTML=(data.recommendations||[]).map(r=>
+    '<tr><td style="font-weight:700;color:#0f2847;white-space:nowrap">'+r.area+'</td><td style="color:#374151">'+r.text+'</td></tr>'
+  ).join('')||'<tr><td colspan="2" class="empty-state" style="padding:20px">No recommendations</td></tr>';
 }
 
-function ringBox(label, val, isOverall, color) {
-  const v = val ?? 0;
-  const r = 28, circ = 2 * Math.PI * r;
-  const offset = circ * (1 - v / 100);
+function ringBox(label,val,isOverall,color){
+  const v=val??0,r=28,circ=2*Math.PI*r;
+  const textColor=isOverall?'#fff':color;
   return '<div class="score-box'+(isOverall?' overall':'')+'">' +
-    '<div class="score-label">'+label+'</div>' +
-    '<div class="ring-wrap">' +
-    '<svg class="ring" width="70" height="70" viewBox="0 0 70 70">' +
-    '<circle class="ring-bg" cx="35" cy="35" r="'+r+'" stroke-width="5"/>' +
-    '<circle class="ring-fill" cx="35" cy="35" r="'+r+'" stroke="'+color+'" stroke-width="5"' +
-    ' data-target="'+v+'" style="stroke-dasharray:'+circ+';stroke-dashoffset:'+circ+';transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)"' +
-    ' transform="rotate(-90 35 35)"/>' +
-    '<text x="35" y="35" text-anchor="middle" dominant-baseline="central" fill="'+(isOverall?'#fff':color)+'" font-family="Inter" font-weight="800" font-size="16">'+v+'</text>' +
-    '</svg></div>' +
-    '</div>';
+    '<div class="s-label">'+label+'</div>' +
+    '<svg class="ring-svg" width="70" height="70" viewBox="0 0 70 70">' +
+    '<circle class="ring-bg" cx="35" cy="35" r="'+r+'" '+(isOverall?'stroke="rgba(255,255,255,0.12)"':'')+'/>' +
+    '<circle class="ring-fill" cx="35" cy="35" r="'+r+'" stroke="'+color+'"' +
+    ' data-v="'+v+'" transform="rotate(-90 35 35)"' +
+    ' style="stroke-dasharray:'+circ+';stroke-dashoffset:'+circ+'"/>' +
+    '<text x="35" y="35" text-anchor="middle" dominant-baseline="central"' +
+    ' fill="'+textColor+'" font-family="Inter" font-weight="800" font-size="17">'+v+'</text>' +
+    '</svg></div>';
 }
 
-// ── Render Batch ───────────────────────────────
-function renderBatchResults(results, role) {
-  document.getElementById('batchResults').style.display = 'block';
-  document.getElementById('singleResults').style.display = 'none';
-  document.getElementById('batchTitle').textContent = 'Ranked Results — ' + results.length + ' candidates' + (role ? ' / ' + role : '');
-
-  const tbody = document.getElementById('batchBody');
-  tbody.innerHTML = results.map((r, i) => {
-    const s = r.overall || 0;
-    const pill = s >= 70 ? 'score-hi' : s >= 50 ? 'score-med' : 'score-lo';
-    const rankCls = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-n';
-    const name = r.anonymized ? 'Candidate #'+(i+1) : (r.candidateName || r.fileName);
-    return '<tr style="animation:fadeIn .3s ease '+(i*0.05)+'s both">' +
-      '<td><span class="rank-badge '+rankCls+'">'+(i+1)+'</span></td>' +
-      '<td style="font-weight:600;color:var(--text)">'+escHtml(name)+'</td>' +
+function renderBatchResults(results,role){
+  document.getElementById('batchResults').style.display='block';
+  document.getElementById('singleResults').style.display='none';
+  document.getElementById('batchTitle').textContent='Ranked Results — '+results.length+' candidates'+(role?' / '+role:'');
+  document.getElementById('batchBody').innerHTML=results.map((r,i)=>{
+    const s=r.overall||0;
+    const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
+    const rc=i===0?'r1':i===1?'r2':i===2?'r3':'rn';
+    const name=r.anonymized?'Candidate #'+(i+1):(r.candidateName||r.fileName);
+    return '<tr style="animation:fadeUp .3s ease '+(i*.05)+'s both">' +
+      '<td><span class="rank-badge '+rc+'">'+(i+1)+'</span></td>' +
+      '<td style="font-weight:600;color:#111827">'+escHtml(name)+'</td>' +
       '<td><span class="score-pill '+pill+'">'+s+'</span></td>' +
-      '<td style="color:var(--text2)">'+(r.scores?.keywords??'—')+'</td>' +
-      '<td style="color:var(--text2)">'+(r.scores?.skills??'—')+'</td>' +
-      '<td style="color:var(--text2)">'+(r.scores?.experience??'—')+'</td>' +
-      '<td style="color:var(--text2)">'+(r.scores?.education??'—')+'</td>' +
-      '<td><select class="decision-sel" onchange="setBatchDecision('+i+',this.value)"><option value="">—</option><option value="shortlist">Shortlist</option><option value="hold">Hold</option><option value="reject">Reject</option></select></td>' +
-      '<td><button class="btn btn-ghost btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td>' +
-      '</tr>';
+      '<td>'+( r.scores?.keywords??'—')+'</td><td>'+(r.scores?.skills??'—')+'</td>'+
+      '<td>'+(r.scores?.experience??'—')+'</td><td>'+(r.scores?.education??'—')+'</td>' +
+      '<td><select class="dec-sel" onchange="setBatchDecision('+i+',this.value)"><option value="">—</option><option value="shortlist">Shortlist</option><option value="hold">Hold</option><option value="reject">Reject</option></select></td>' +
+      '<td><button class="btn btn-ghost btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td></tr>';
   }).join('');
 }
-
-function setBatchDecision(idx, val) { if (lastBatchResults[idx]) lastBatchResults[idx]._decision = val; }
-
-// ── Save to Audit ──────────────────────────────
-async function saveToAudit() {
-  if (!lastResult || !API) return;
-  const decision = document.getElementById('decisionSelect').value;
-  const note = document.getElementById('noteInput').value.trim();
-  const role = document.getElementById('roleInput').value.trim();
-  const body = {
-    candidateName: lastResult.candidateName || lastResult.file.replace(/\.[^.]+$/,''),
-    fileName: lastResult.file, overall: lastResult.overall, scores: lastResult.scores,
-    weights: getWeights(), verdict: (lastResult.recommendations||[]).map(r=>r.text).join(' '),
-    decision, note, jdSnippet: document.getElementById('jdInput').value.trim().slice(0,300),
-    role, anonymized: lastResult.anonymized || false
-  };
-  try {
-    const r = await fetch(API + '/api/audit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    const d = await r.json();
-    if (r.ok) { lastResult._auditId = d.id; alert('Saved to audit log.'); }
-    else alert('Error: ' + d.error);
-  } catch(e) { alert('Network error: ' + e.message); }
+function setBatchDecision(i,v){if(lastBatchResults[i])lastBatchResults[i]._decision=v;}
+async function saveToAudit(){
+  if(!lastResult||!API)return;
+  const body={candidateName:lastResult.candidateName||lastResult.file.replace(/\.[^.]+$/,''),fileName:lastResult.file,
+    overall:lastResult.overall,scores:lastResult.scores,weights:getWeights(),
+    verdict:(lastResult.recommendations||[]).map(r=>r.text).join(' '),
+    decision:document.getElementById('decisionSelect').value,
+    note:document.getElementById('noteInput').value.trim(),
+    jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
+    role:document.getElementById('roleInput').value.trim(),anonymized:lastResult.anonymized||false};
+  try{const r=await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();if(r.ok){lastResult._auditId=d.id;alert('Saved to audit log.');}else alert('Error: '+d.error);}
+  catch(e){alert('Network error: '+e.message);}
 }
-
-async function saveSingleBatch(idx) {
-  if (!API || !lastBatchResults[idx]) return;
-  const res = lastBatchResults[idx];
-  const body = {
-    candidateName: res.candidateName || res.fileName, fileName: res.fileName||'',
-    overall: res.overall, scores: res.scores, weights: getWeights(),
-    verdict: (res.recommendations||[]).map(r=>r.text).join(' '),
-    decision: res._decision||'', note:'',
-    jdSnippet: document.getElementById('jdInput').value.trim().slice(0,300),
-    role: res.role||'', anonymized: res.anonymized||false
-  };
-  try {
-    const r = await fetch(API + '/api/audit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    if (r.ok) alert('Saved: ' + body.candidateName);
-    else { const d = await r.json(); alert('Error: ' + d.error); }
-  } catch(e) { alert('Network error: ' + e.message); }
+async function saveSingleBatch(i){
+  if(!API||!lastBatchResults[i])return;
+  const res=lastBatchResults[i];
+  const body={candidateName:res.candidateName||res.fileName,fileName:res.fileName||'',
+    overall:res.overall,scores:res.scores,weights:getWeights(),
+    verdict:(res.recommendations||[]).map(r=>r.text).join(' '),
+    decision:res._decision||'',note:'',
+    jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
+    role:res.role||'',anonymized:res.anonymized||false};
+  try{const r=await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(r.ok)alert('Saved: '+body.candidateName);else{const d=await r.json();alert('Error: '+d.error);}}
+  catch(e){alert('Network error: '+e.message);}
 }
-
-async function saveAllToAudit() {
-  if (!API || !lastBatchResults.length) return;
-  if (!confirm('Save all ' + lastBatchResults.length + ' results?')) return;
-  let saved = 0;
-  for (const res of lastBatchResults) {
-    const body = {
-      candidateName: res.candidateName||res.fileName, fileName: res.fileName||'',
-      overall: res.overall, scores: res.scores, weights: getWeights(),
-      verdict: (res.recommendations||[]).map(r=>r.text).join(' '),
-      decision: res._decision||'', note:'',
-      jdSnippet: document.getElementById('jdInput').value.trim().slice(0,300),
-      role: res.role||'', anonymized: res.anonymized||false
-    };
-    try { const r = await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(r.ok) saved++; } catch(_) {}
+async function saveAllToAudit(){
+  if(!API||!lastBatchResults.length)return;
+  if(!confirm('Save all '+lastBatchResults.length+' results?'))return;
+  let saved=0;
+  for(const res of lastBatchResults){
+    const body={candidateName:res.candidateName||res.fileName,fileName:res.fileName||'',
+      overall:res.overall,scores:res.scores,weights:getWeights(),
+      verdict:(res.recommendations||[]).map(r=>r.text).join(' '),
+      decision:res._decision||'',note:'',
+      jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
+      role:res.role||'',anonymized:res.anonymized||false};
+    try{const r=await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.ok)saved++;}catch(_){}
   }
-  alert(saved + ' of ' + lastBatchResults.length + ' records saved.');
+  alert(saved+' of '+lastBatchResults.length+' records saved.');
+}
+function exportBatchCsv(){
+  if(!lastBatchResults.length)return;
+  const rows=[['Rank','Candidate','Overall','Keywords','Skills','Experience','Education','Decision','Role'].join(',')];
+  lastBatchResults.forEach((r,i)=>rows.push([i+1,'"'+escCsv(r.candidateName||r.fileName)+'"',r.overall||0,r.scores?.keywords||0,r.scores?.skills||0,r.scores?.experience||0,r.scores?.education||0,'"'+escCsv(r._decision||'')+'"','"'+escCsv(r.role||'')+'"'].join(',')));
+  download('batch-results.csv',rows.join('\n'),'text/csv');
+}
+async function openReport(){
+  if(!lastResult?._auditId||!API){alert('Save to audit log first to generate a report.');return;}
+  window.open(API+'/api/audit/report/'+lastResult._auditId,'_blank');
 }
 
-function exportBatchCsv() {
-  if (!lastBatchResults.length) return;
-  const rows = [['Rank','Candidate','Overall','Keywords','Skills','Experience','Education','Decision','Role'].join(',')];
-  lastBatchResults.forEach((r,i) => rows.push([i+1,'"'+escCsv(r.candidateName||r.fileName)+'"',r.overall||0,r.scores?.keywords||0,r.scores?.skills||0,r.scores?.experience||0,r.scores?.education||0,'"'+escCsv(r._decision||'')+'"','"'+escCsv(r.role||'')+'"'].join(',')));
-  download('batch-results.csv', rows.join('\n'), 'text/csv');
+async function loadAudit(){
+  if(!API)return;
+  const errEl=document.getElementById('auditError');errEl.style.display='none';
+  try{const r=await fetch(API+'/api/audit');if(!r.ok)throw new Error('HTTP '+r.status);
+    lastAuditRecords=await r.json();populateRoleFilter(lastAuditRecords);renderAuditTable(lastAuditRecords);}
+  catch(e){showErr(errEl,'Could not load: '+e.message);}
 }
-
-async function openReport() {
-  if (!lastResult?._auditId || !API) { alert('Save to audit log first.'); return; }
-  window.open(API + '/api/audit/report/' + lastResult._auditId, '_blank');
+function populateRoleFilter(records){
+  const roles=[...new Set(records.map(r=>r.role).filter(Boolean))].sort();
+  const sel=document.getElementById('auditRoleFilter');const cur=sel.value;
+  sel.innerHTML='<option value="">All Roles</option>'+roles.map(r=>'<option value="'+escHtml(r)+'">'+escHtml(r)+'</option>').join('');
+  if(cur)sel.value=cur;
 }
-// ── Audit Log ──────────────────────────────────
-async function loadAudit() {
-  if (!API) return;
-  const errEl = document.getElementById('auditError');
-  errEl.style.display = 'none';
-  try {
-    const r = await fetch(API + '/api/audit');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    lastAuditRecords = await r.json();
-    populateRoleFilter(lastAuditRecords);
-    renderAuditTable(lastAuditRecords);
-  } catch(e) { showErr(errEl, 'Could not load: ' + e.message); }
+function filterAudit(){
+  const q=document.getElementById('auditSearch').value.toLowerCase();
+  const dec=document.getElementById('auditDecisionFilter').value;
+  const role=document.getElementById('auditRoleFilter').value;
+  renderAuditTable(lastAuditRecords.filter(r=>(r.candidateName||'').toLowerCase().includes(q)&&(!dec||r.decision===dec)&&(!role||r.role===role)));
 }
-
-function populateRoleFilter(records) {
-  const roles = [...new Set(records.map(r=>r.role).filter(Boolean))].sort();
-  const sel = document.getElementById('auditRoleFilter');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">All Roles</option>' + roles.map(r=>'<option value="'+escHtml(r)+'">'+escHtml(r)+'</option>').join('');
-  if (cur) sel.value = cur;
-}
-
-function filterAudit() {
-  const q = document.getElementById('auditSearch').value.toLowerCase();
-  const dec = document.getElementById('auditDecisionFilter').value;
-  const role = document.getElementById('auditRoleFilter').value;
-  renderAuditTable(lastAuditRecords.filter(r =>
-    (r.candidateName||'').toLowerCase().includes(q) &&
-    (!dec || r.decision===dec) && (!role || r.role===role)
-  ));
-}
-
-function renderAuditTable(records) {
-  const tbody = document.getElementById('auditBody');
-  if (!records.length) {
-    tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state">No records found</div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = records.map(rec => {
-    const date = rec.createdAt ? new Date(rec.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
-    const s = rec.overall || 0;
-    const pill = s>=70?'score-hi':s>=50?'score-med':'score-lo';
-    const decBadge = rec.decision==='shortlist'?'badge-green':rec.decision==='reject'?'badge-red':rec.decision==='hold'?'badge-yellow':'';
-    return '<tr>' +
-      '<td style="font-size:11px;color:var(--text3);white-space:nowrap">'+date+'</td>' +
-      '<td style="font-weight:600;color:var(--text)">'+escHtml(rec.candidateName)+(rec.anonymized?' <span style="font-size:10px;color:var(--text3)">(anon)</span>':'')+'</td>' +
-      '<td style="color:var(--text3);font-size:12px">'+escHtml(rec.role||'—')+'</td>' +
-      '<td><span class="score-pill '+pill+'">'+s+'</span></td>' +
-      '<td style="color:var(--text2)">'+(rec.scores?.keywords??'—')+'</td>' +
-      '<td style="color:var(--text2)">'+(rec.scores?.skills??'—')+'</td>' +
-      '<td style="color:var(--text2)">'+(rec.scores?.experience??'—')+'</td>' +
-      '<td style="color:var(--text2)">'+(rec.scores?.education??'—')+'</td>' +
-      '<td><select class="decision-sel" onchange="updateAuditDecision(\''+rec.id+'\',this.value)">' +
-        '<option value=""'+((!rec.decision)?' selected':'')+'>—</option>' +
-        '<option value="shortlist"'+(rec.decision==='shortlist'?' selected':'')+'>Shortlist</option>' +
-        '<option value="hold"'+(rec.decision==='hold'?' selected':'')+'>Hold</option>' +
-        '<option value="reject"'+(rec.decision==='reject'?' selected':'')+'>Reject</option>' +
-      '</select></td>' +
-      '<td><input class="note-inp" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." onblur="updateAuditNote(\''+rec.id+'\',this.value)"></td>' +
-      '<td style="white-space:nowrap;display:flex;gap:4px">' +
-        '<button class="btn btn-ghost btn-sm" onclick="window.open(\''+API+'/api/audit/report/'+rec.id+'\',\'_blank\')" title="View Report">&#128196;</button>' +
-        '<button class="btn btn-danger btn-sm" onclick="deleteAuditRecord(\''+rec.id+'\')">&#x2715;</button>' +
+function renderAuditTable(records){
+  const tb=document.getElementById('auditBody');
+  if(!records.length){tb.innerHTML='<tr><td colspan="11"><div class="empty-state">No records found</div></td></tr>';return;}
+  tb.innerHTML=records.map(rec=>{
+    const date=rec.createdAt?new Date(rec.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';
+    const s=rec.overall||0;
+    const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
+    return '<tr>'+
+      '<td style="font-size:11px;color:#9ca3af;white-space:nowrap">'+date+'</td>'+
+      '<td style="font-weight:600;color:#111827">'+escHtml(rec.candidateName)+(rec.anonymized?' <span style="font-size:10px;color:#9ca3af">(anon)</span>':'')+'</td>'+
+      '<td style="color:#6b7280;font-size:12px">'+escHtml(rec.role||'—')+'</td>'+
+      '<td><span class="score-pill '+pill+'">'+s+'</span></td>'+
+      '<td>'+(rec.scores?.keywords??'—')+'</td><td>'+(rec.scores?.skills??'—')+'</td>'+
+      '<td>'+(rec.scores?.experience??'—')+'</td><td>'+(rec.scores?.education??'—')+'</td>'+
+      '<td><select class="dec-sel" onchange="updateAuditDecision(\''+rec.id+'\',this.value)">'+
+        '<option value=""'+((!rec.decision)?' selected':'')+'>—</option>'+
+        '<option value="shortlist"'+(rec.decision==='shortlist'?' selected':'')+'>Shortlist</option>'+
+        '<option value="hold"'+(rec.decision==='hold'?' selected':'')+'>Hold</option>'+
+        '<option value="reject"'+(rec.decision==='reject'?' selected':'')+'>Reject</option>'+
+      '</select></td>'+
+      '<td><input class="note-inp" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." onblur="updateAuditNote(\''+rec.id+'\',this.value)"></td>'+
+      '<td style="white-space:nowrap;display:flex;gap:4px">'+
+        '<button class="btn btn-ghost btn-sm" onclick="window.open(\''+API+'/api/audit/report/'+rec.id+'\',\'_blank\')" title="Report">📄</button>'+
+        '<button class="btn btn-danger btn-sm" onclick="deleteAuditRecord(\''+rec.id+'\')">✕</button>'+
       '</td></tr>';
   }).join('');
 }
-
-async function updateAuditDecision(id, decision) {
-  const rec = lastAuditRecords.find(r => r.id===id);
-  if (!rec || !API) return;
-  try {
-    await fetch(API+'/api/audit/'+id, {method:'DELETE'});
-    const body = {...rec, decision, scores:rec.scores}; delete body.id; delete body.createdAt;
-    await fetch(API+'/api/audit', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    loadAudit();
-  } catch(_) {}
+async function updateAuditDecision(id,decision){
+  const rec=lastAuditRecords.find(r=>r.id===id);if(!rec||!API)return;
+  try{await fetch(API+'/api/audit/'+id,{method:'DELETE'});
+    const body={...rec,decision,scores:rec.scores};delete body.id;delete body.createdAt;
+    await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    loadAudit();}catch(_){}
+}
+async function updateAuditNote(id,note){
+  const rec=lastAuditRecords.find(r=>r.id===id);if(!rec||!API)return;
+  try{await fetch(API+'/api/audit/'+id,{method:'DELETE'});
+    const body={...rec,note,scores:rec.scores};delete body.id;delete body.createdAt;
+    await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    loadAudit();}catch(_){}
+}
+async function deleteAuditRecord(id){
+  if(!confirm('Delete this record?')||!API)return;
+  try{await fetch(API+'/api/audit/'+id,{method:'DELETE'});loadAudit();}
+  catch(e){alert('Error: '+e.message);}
+}
+async function exportAuditCsv(){
+  if(!API)return;
+  const a=document.createElement('a');a.href=API+'/api/audit/export/csv';a.download='audit-log.csv';a.click();
 }
 
-async function updateAuditNote(id, note) {
-  const rec = lastAuditRecords.find(r => r.id===id);
-  if (!rec || !API) return;
-  try {
-    await fetch(API+'/api/audit/'+id, {method:'DELETE'});
-    const body = {...rec, note, scores:rec.scores}; delete body.id; delete body.createdAt;
-    await fetch(API+'/api/audit', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    loadAudit();
-  } catch(_) {}
+async function loadRoles(){
+  if(!API)return;
+  try{const r=await fetch(API+'/api/audit/roles');if(!r.ok)return;
+    const roles=await r.json();const tabs=document.getElementById('roleTabs');
+    if(!roles.length){tabs.innerHTML='<span style="color:#9ca3af;font-size:13px">No roles yet. Tag CVs with a role when analyzing.</span>';return;}
+    tabs.innerHTML=roles.map(role=>'<button class="rtab" onclick="loadRoleHistory(\''+escHtml(role.role)+'\',this)">'+escHtml(role.role)+' <span style="opacity:.6;font-size:11px">('+role.count+')</span></button>').join('');}
+  catch(_){}
+}
+async function loadRoleHistory(role,btn){
+  document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const content=document.getElementById('roleHistoryContent');
+  content.innerHTML='<div class="empty-state">Loading...</div>';
+  try{const r=await fetch(API+'/api/audit/roles/'+encodeURIComponent(role)+'/history');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const history=await r.json();
+    if(!history.length){content.innerHTML='<div class="empty-state">No records for this role</div>';return;}
+    const avg=Math.round(history.reduce((s,r)=>s+(r.overall||0),0)/history.length);
+    const top=history[0];const short=history.filter(r=>r.decision==='shortlist').length;
+    const statC=(l,v,c)=>'<div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:16px 20px;min-width:110px;flex:1;box-shadow:0 1px 4px rgba(0,0,0,0.05)">'+
+      '<div style="font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px">'+l+'</div>'+
+      '<div style="font-size:30px;font-weight:800;color:'+c+'">'+v+'</div></div>';
+    content.innerHTML=
+      '<div style="display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap">'+
+        statC('Candidates',history.length,'#0f2847')+
+        statC('Avg Score',avg,avg>=70?'#059669':avg>=50?'#d97706':'#dc2626')+
+        statC('Top Score',top.overall||0,'#059669')+
+        statC('Shortlisted',short,'#7c3aed')+
+      '</div>'+
+      '<table class="data-table"><thead><tr><th>#</th><th>Candidate</th><th>Overall</th><th>KW</th><th>SK</th><th>EX</th><th>ED</th><th>Decision</th></tr></thead><tbody>'+
+      history.map((r,i)=>{
+        const s=r.overall||0;const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
+        const dc=r.decision==='shortlist'?'#15803d':r.decision==='reject'?'#b91c1c':'#a16207';
+        return '<tr style="animation:fadeUp .25s ease '+(i*.04)+'s both">'+
+          '<td style="color:#9ca3af;font-size:12px">'+(i+1)+'</td>'+
+          '<td style="font-weight:600;color:#111827">'+escHtml(r.candidateName)+'</td>'+
+          '<td><span class="score-pill '+pill+'">'+s+'</span></td>'+
+          '<td>'+(r.scores?.keywords??'—')+'</td><td>'+(r.scores?.skills??'—')+'</td>'+
+          '<td>'+(r.scores?.experience??'—')+'</td><td>'+(r.scores?.education??'—')+'</td>'+
+          '<td style="font-weight:600;color:'+dc+'">'+escHtml(r.decision||'—')+'</td></tr>';
+      }).join('')+'</tbody></table>';}
+  catch(e){content.innerHTML='<div class="empty-state">Error: '+e.message+'</div>';}
 }
 
-async function deleteAuditRecord(id) {
-  if (!confirm('Delete this record?') || !API) return;
-  try { await fetch(API+'/api/audit/'+id, {method:'DELETE'}); loadAudit(); }
-  catch(e) { alert('Error: '+e.message); }
-}
-
-async function exportAuditCsv() {
-  if (!API) return;
-  const a = document.createElement('a'); a.href = API+'/api/audit/export/csv'; a.download='audit-log.csv'; a.click();
-}
-
-// ── Role History ───────────────────────────────
-async function loadRoles() {
-  if (!API) return;
-  try {
-    const r = await fetch(API + '/api/audit/roles');
-    if (!r.ok) return;
-    const roles = await r.json();
-    const tabs = document.getElementById('roleTabs');
-    if (!roles.length) {
-      tabs.innerHTML = '<span style="color:var(--text3);font-size:13px">No roles yet. Tag CVs with a role when analyzing.</span>';
-      return;
-    }
-    tabs.innerHTML = roles.map(role =>
-      '<button class="role-tab" onclick="loadRoleHistory(\''+escHtml(role.role)+'\',this)">'+escHtml(role.role)+' <span style="opacity:.6;font-size:11px">('+role.count+')</span></button>'
-    ).join('');
-  } catch(_) {}
-}
-
-async function loadRoleHistory(role, btn) {
-  document.querySelectorAll('.role-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const content = document.getElementById('roleHistoryContent');
-  content.innerHTML = '<div class="empty-state">Loading...</div>';
-  try {
-    const r = await fetch(API + '/api/audit/roles/' + encodeURIComponent(role) + '/history');
-    if (!r.ok) throw new Error('HTTP '+r.status);
-    const history = await r.json();
-    if (!history.length) { content.innerHTML = '<div class="empty-state">No records for this role</div>'; return; }
-    const avg = Math.round(history.reduce((s,r)=>s+(r.overall||0),0)/history.length);
-    const top = history[0];
-    const short = history.filter(r=>r.decision==='shortlist').length;
-    content.innerHTML =
-      '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">' +
-        statCard('Candidates', history.length, '#60a5fa') +
-        statCard('Avg Score', avg, avg>=70?'#34d399':avg>=50?'#fbbf24':'#f87171') +
-        statCard('Top Score', top.overall||0, '#34d399') +
-        statCard('Shortlisted', short, '#a78bfa') +
-      '</div>' +
-      '<table class="data-table"><thead><tr><th>#</th><th>Candidate</th><th>Overall</th><th>Keywords</th><th>Skills</th><th>Experience</th><th>Education</th><th>Decision</th></tr></thead><tbody>' +
-      history.map((r,i) => {
-        const s = r.overall||0;
-        const pill = s>=70?'score-hi':s>=50?'score-med':'score-lo';
-        return '<tr style="animation:fadeIn .25s ease '+(i*.04)+'s both">' +
-          '<td style="color:var(--text3);font-size:12px">'+(i+1)+'</td>' +
-          '<td style="font-weight:600;color:var(--text)">'+escHtml(r.candidateName)+'</td>' +
-          '<td><span class="score-pill '+pill+'">'+s+'</span></td>' +
-          '<td>'+(r.scores?.keywords??'—')+'</td>' +
-          '<td>'+(r.scores?.skills??'—')+'</td>' +
-          '<td>'+(r.scores?.experience??'—')+'</td>' +
-          '<td>'+(r.scores?.education??'—')+'</td>' +
-          '<td style="font-weight:600;color:'+(r.decision==='shortlist'?'#34d399':r.decision==='reject'?'#f87171':'#fbbf24')+'">'+escHtml(r.decision||'—')+'</td>' +
-          '</tr>';
-      }).join('') + '</tbody></table>';
-  } catch(e) { content.innerHTML = '<div class="empty-state">Error: '+e.message+'</div>'; }
-}
-
-function statCard(label, value, color) {
-  return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;min-width:110px;flex:1;transition:transform .2s" onmouseenter="this.style.transform=\'translateY(-2px)\'" onmouseleave="this.style.transform=\'none\'">' +
-    '<div style="font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">'+label+'</div>' +
-    '<div style="font-size:28px;font-weight:800;color:'+color+'">'+value+'</div>' +
-    '</div>';
-}
-
-// ── Helpers ────────────────────────────────────
-function clearResults() {
-  document.getElementById('singleResults').style.display = 'none';
-  document.getElementById('batchResults').style.display = 'none';
-  lastResult = null; lastBatchResults = [];
-}
-function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function escCsv(s) { return String(s||'').replace(/"/g,'""'); }
-function showLoading(msg) {
-  document.getElementById('loadingMsg').textContent = msg||'Processing...';
-  document.getElementById('progressBar').style.width = '0%';
-  document.getElementById('progressLabel').textContent = '';
-  document.getElementById('loadingOverlay').style.display = 'flex';
-}
-function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
-function setProgress(pct, label) {
-  document.getElementById('progressBar').style.width = pct+'%';
-  document.getElementById('progressLabel').textContent = label;
-}
-function download(filename, text, type) {
-  const blob = new Blob([text],{type});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download=filename; a.click();
-  URL.revokeObjectURL(url);
-}
+function clearResults(){document.getElementById('singleResults').style.display='none';document.getElementById('batchResults').style.display='none';lastResult=null;lastBatchResults=[];}
+function showErr(el,msg){el.textContent=msg;el.style.display='block';}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escCsv(s){return String(s||'').replace(/"/g,'""');}
+function showLoading(msg){document.getElementById('loadingMsg').textContent=msg||'Processing...';document.getElementById('progressBar').style.width='0%';document.getElementById('progressLabel').textContent='';document.getElementById('loadingOverlay').style.display='flex';}
+function hideLoading(){document.getElementById('loadingOverlay').style.display='none';}
+function setProgress(p,l){document.getElementById('progressBar').style.width=p+'%';document.getElementById('progressLabel').textContent=l;}
+function download(fn,text,type){const b=new Blob([text],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;a.click();URL.revokeObjectURL(u);}
 </script>
 </body>
 </html>
