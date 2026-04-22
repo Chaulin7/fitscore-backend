@@ -1,15 +1,18 @@
 'use strict';
 
 const Database = require('better-sqlite3');
-const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
-const DB_PATH = path.join(__dirname, '..', '..', 'audit.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data', 'audit.db');
 
 let db;
 
 function getDb() {
   if (!db) {
+    const fs = require('fs');
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
     initSchema();
@@ -33,22 +36,26 @@ function initSchema() {
       decision TEXT,
       note TEXT,
       jd_snippet TEXT,
+      role TEXT DEFAULT '',
+      anonymized INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
+  // Add columns if upgrading from older schema
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN role TEXT DEFAULT ''"); } catch(_) {}
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN anonymized INTEGER DEFAULT 0"); } catch(_) {}
 }
 
 // Insert an audit record
 function insertAudit(data) {
-  const db = getDb();
   const id = uuidv4();
-  const stmt = db.prepare(`
+  const stmt = getDb().prepare(`
     INSERT INTO audit_log
       (id, candidate_name, file_name, overall, keywords_score, skills_score,
-       experience_score, education_score, weights, verdict, decision, note, jd_snippet)
+       experience_score, education_score, weights, verdict, decision, note, jd_snippet, role, anonymized)
     VALUES
       (@id, @candidate_name, @file_name, @overall, @keywords_score, @skills_score,
-       @experience_score, @education_score, @weights, @verdict, @decision, @note, @jd_snippet)
+       @experience_score, @education_score, @weights, @verdict, @decision, @note, @jd_snippet, @role, @anonymized)
   `);
 
   stmt.run({
@@ -64,57 +71,79 @@ function insertAudit(data) {
     verdict: data.verdict || '',
     decision: data.decision || '',
     note: data.note || '',
-    jd_snippet: data.jdSnippet || ''
+    jd_snippet: data.jdSnippet || '',
+    role: data.role || '',
+    anonymized: data.anonymized ? 1 : 0
   });
 
   return getAuditById(id);
 }
 
 // Get all audit records
-function getAllAudits({ decision, limit } = {}) {
-  const db = getDb();
-  let query = 'SELECT * FROM audit_log';
+function getAllAudits({ decision, limit, role } = {}) {
+  let sql = 'SELECT * FROM audit_log WHERE 1=1';
   const params = [];
 
   if (decision) {
-    query += ' WHERE decision = ?';
+    sql += ' AND decision = ?';
     params.push(decision);
   }
 
-  query += ' ORDER BY created_at DESC';
+  if (role) {
+    sql += ' AND role = ?';
+    params.push(role);
+  }
+
+  sql += ' ORDER BY created_at DESC';
 
   if (limit) {
-    query += ` LIMIT ?`;
+    sql += ' LIMIT ?';
     params.push(Number(limit));
   }
 
-  const rows = db.prepare(query).all(...params);
+  const rows = getDb().prepare(sql).all(...params);
   return rows.map(formatRow);
 }
 
 // Get single audit by ID
 function getAuditById(id) {
-  const db = getDb();
-  const row = db.prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
+  const row = getDb().prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
   return row ? formatRow(row) : null;
 }
 
 // Delete an audit record
 function deleteAudit(id) {
-  const db = getDb();
-  const result = db.prepare('DELETE FROM audit_log WHERE id = ?').run(id);
+  const result = getDb().prepare('DELETE FROM audit_log WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+// Get list of distinct roles
+function getRoles() {
+  const rows = getDb().prepare("SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE role != '' GROUP BY role ORDER BY role").all();
+  return rows;
+}
+
+// Get score history for a role
+function getRoleHistory(role) {
+  const rows = getDb().prepare(
+    "SELECT candidate_name, overall, keywords_score, skills_score, experience_score, education_score, decision, created_at FROM audit_log WHERE role = ? ORDER BY overall DESC"
+  ).all(role);
+  return rows.map(r => ({
+    candidateName: r.candidate_name,
+    overall: r.overall,
+    scores: { keywords: r.keywords_score, skills: r.skills_score, experience: r.experience_score, education: r.education_score },
+    decision: r.decision,
+    createdAt: r.created_at
+  }));
 }
 
 // Export all as CSV
 function exportCsv() {
-  const db = getDb();
-  const rows = db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC').all();
-
+  const rows = getDb().prepare('SELECT * FROM audit_log ORDER BY created_at DESC').all();
   const headers = [
     'id', 'candidateName', 'fileName', 'overall',
     'keywordsScore', 'skillsScore', 'experienceScore', 'educationScore',
-    'weights', 'verdict', 'decision', 'note', 'jdSnippet', 'createdAt'
+    'weights', 'verdict', 'decision', 'note', 'jdSnippet', 'role', 'anonymized', 'createdAt'
   ];
 
   const csvRows = [headers.join(',')];
@@ -134,6 +163,8 @@ function exportCsv() {
       esc(formatted.decision),
       esc(formatted.note),
       esc(formatted.jdSnippet),
+      esc(formatted.role || ''),
+      formatted.anonymized ? 1 : 0,
       esc(formatted.createdAt)
     ].join(','));
   }
@@ -142,7 +173,7 @@ function exportCsv() {
 }
 
 function esc(v) {
-  if (v == null) return '';
+  if (v == null) return '""';
   return '"' + String(v).replace(/"/g, '""') + '"';
 }
 
@@ -163,8 +194,10 @@ function formatRow(row) {
     decision: row.decision,
     note: row.note,
     jdSnippet: row.jd_snippet,
+    role: row.role || '',
+    anonymized: row.anonymized === 1,
     createdAt: row.created_at
   };
 }
 
-module.exports = { insertAudit, getAllAudits, getAuditById, deleteAudit, exportCsv };
+module.exports = { insertAudit, getAllAudits, getAuditById, deleteAudit, exportCsv, getRoles, getRoleHistory };
