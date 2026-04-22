@@ -2,737 +2,997 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CVsprings · Candidate Fit Analyzer</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* ── RESET & BASE ──────────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0}
-html{font-size:14px}
-body{font-family:'Inter',system-ui,sans-serif;background:#f0f2f5;color:#1a2332;min-height:100vh;line-height:1.5}
-button,input,select,textarea{font-family:inherit;font-size:inherit}
-a{color:#1d4ed8;text-decoration:none}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a202c;font-size:14px}
+a{color:inherit;text-decoration:none}
 
-/* ── LAYOUT SHELL ──────────────────────────────────────── */
-.shell{display:flex;flex-direction:column;min-height:100vh}
-
-/* ── TOP BAR ───────────────────────────────────────────── */
-.topbar{background:#0f2847;color:#fff;height:56px;display:flex;align-items:center;padding:0 28px;gap:0;position:sticky;top:0;z-index:100;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-.topbar-brand{display:flex;align-items:center;gap:10px;font-size:1.15rem;font-weight:700;letter-spacing:-.3px;color:#fff;margin-right:32px;text-decoration:none}
-.brand-icon{width:30px;height:30px;background:#1d6fef;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.brand-icon svg{width:18px;height:18px}
-.topbar-nav{display:flex;align-items:center;gap:2px;flex:1}
-.nav-btn{background:none;border:none;color:rgba(255,255,255,.65);font-size:.875rem;font-weight:500;padding:6px 14px;border-radius:4px;cursor:pointer;transition:background .15s,color .15s;height:36px}
-.nav-btn:hover{background:rgba(255,255,255,.1);color:#fff}
-.nav-btn.active{background:rgba(255,255,255,.15);color:#fff}
-.topbar-right{display:flex;align-items:center;gap:8px;margin-left:auto}
-.conn-badge{display:flex;align-items:center;gap:5px;font-size:.78rem;font-weight:500;padding:4px 10px;border-radius:3px;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
-.conn-dot{width:6px;height:6px;border-radius:50%;background:#94a3b8}
-.conn-dot.ok{background:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.25)}
+/* ─── Topbar ─────────────────────────────────────────────── */
+.topbar{background:#0f2847;padding:0 32px;height:56px;display:flex;align-items:center;gap:24px}
+.topbar-brand{display:flex;align-items:center;gap:10px;color:#fff;font-weight:700;font-size:16px;margin-right:auto}
+.topbar-brand svg{flex-shrink:0}
+.topbar-nav{display:flex;gap:4px}
+.nav-btn{background:none;border:none;color:rgba(255,255,255,0.65);font:600 13px 'Inter',sans-serif;padding:6px 14px;border-radius:4px;cursor:pointer;letter-spacing:.04em;transition:background .15s,color .15s}
+.nav-btn:hover,.nav-btn.active{background:rgba(255,255,255,0.12);color:#fff}
+.conn-badge{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.7)}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#6b7280}
+.conn-dot.ok{background:#10b981}
 .conn-dot.err{background:#ef4444}
 
-/* ── PAGE BODY ─────────────────────────────────────────── */
-.page{flex:1;padding:28px 32px;max-width:1160px;margin:0 auto;width:100%}
-.tab-panel{display:none}
-.tab-panel.active{display:block}
+/* ─── Config bar ─────────────────────────────────────────── */
+.config-bar{background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 32px;display:flex;align-items:center;gap:12px}
+.config-bar input{flex:1;max-width:480px;height:36px;border:1px solid #d1d5db;border-radius:4px;padding:0 10px;font:500 13px 'Inter',sans-serif;color:#1a202c}
+.config-bar input:focus{outline:none;border-color:#0f2847}
+.btn{height:36px;padding:0 16px;border-radius:4px;font:600 13px 'Inter',sans-serif;cursor:pointer;border:none;transition:background .15s}
+.btn-primary{background:#0f2847;color:#fff}
+.btn-primary:hover{background:#1a3d6e}
+.btn-outline{background:#fff;color:#374151;border:1px solid #d1d5db}
+.btn-outline:hover{background:#f9fafb}
+.btn-sm{height:30px;padding:0 12px;font-size:12px}
+.btn-danger{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.btn-danger:hover{background:#fca5a5}
+.btn-green{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
+.btn-green:hover{background:#a7f3d0}
 
-/* ── PAGE HEADER ───────────────────────────────────────── */
-.page-header{margin-bottom:24px;border-bottom:1px solid #dde2ea;padding-bottom:18px}
-.page-header h1{font-size:1.25rem;font-weight:700;color:#0f2847}
-.page-header p{font-size:.875rem;color:#64748b;margin-top:3px}
+/* ─── Tabs / Sections ────────────────────────────────────── */
+.tab-content{display:none}.tab-content.active{display:block}
+.main{padding:24px 32px}
 
-/* ── API CONFIG ROW ────────────────────────────────────── */
-.api-row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #dde2ea;border-radius:6px;padding:10px 16px;margin-bottom:22px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-.api-row label{font-size:.8rem;font-weight:600;color:#64748b;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
-.api-row input{flex:1;border:none;outline:none;font-size:.875rem;color:#1a2332;background:transparent;min-width:0}
-.api-row input::placeholder{color:#94a3b8}
-.api-sep{width:1px;height:18px;background:#dde2ea;flex-shrink:0}
-
-/* ── CARD ──────────────────────────────────────────────── */
-.card{background:#fff;border:1px solid #dde2ea;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
-.card-head{padding:16px 20px;border-bottom:1px solid #f1f3f6;display:flex;align-items:center;gap:8px}
-.card-head h2{font-size:.9375rem;font-weight:600;color:#0f2847}
-.card-head .card-sub{font-size:.8rem;color:#94a3b8;margin-left:auto}
+/* ─── Cards ──────────────────────────────────────────────── */
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:20px}
+.card-head{padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280}
 .card-body{padding:20px}
 
-/* ── FORM GRID ─────────────────────────────────────────── */
-.form-2col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-@media(max-width:700px){.form-2col{grid-template-columns:1fr}}
-.field-label{display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
-.field-hint{font-size:.75rem;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px}
+/* ─── Mode toggle ────────────────────────────────────────── */
+.mode-toggle{display:flex;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;margin-bottom:20px}
+.mode-btn{flex:1;height:36px;background:#fff;border:none;font:600 12px 'Inter',sans-serif;cursor:pointer;color:#6b7280;letter-spacing:.05em;text-transform:uppercase;transition:background .1s,color .1s}
+.mode-btn.active{background:#0f2847;color:#fff}
 
-/* ── DROP ZONE ─────────────────────────────────────────── */
-.dropzone{border:2px dashed #cbd5e1;border-radius:5px;background:#f8fafc;padding:30px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
-.dropzone:hover,.dropzone.drag{border-color:#1d6fef;background:#eff6ff}
-.dropzone-icon{width:36px;height:36px;background:#e2e8f0;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
-.dropzone-icon svg{width:18px;height:18px;color:#64748b}
-.dropzone p{font-size:.875rem;color:#64748b}
-.dropzone strong{color:#1d6fef;font-weight:600}
-.dropzone .file-note{font-size:.75rem;color:#94a3b8}
-.file-chosen{font-size:.8rem;color:#16a34a;font-weight:500;margin-top:6px;display:flex;align-items:center;gap:4px}
+/* ─── Drop zone ──────────────────────────────────────────── */
+.dropzone{border:2px dashed #d1d5db;border-radius:6px;padding:32px 20px;text-align:center;cursor:pointer;transition:border .2s,background .2s;position:relative}
+.dropzone:hover,.dropzone.drag{border-color:#0f2847;background:#f8fafc}
+.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.dropzone-icon{color:#9ca3af;margin-bottom:8px}
+.dropzone-label{font-size:14px;font-weight:600;color:#374151}
+.dropzone-sub{font-size:12px;color:#9ca3af;margin-top:4px}
+.file-list{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}
+.file-chip{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:500;color:#374151;display:flex;align-items:center;gap:6px}
+.file-chip button{background:none;border:none;cursor:pointer;color:#9ca3af;font-size:14px;line-height:1;padding:0}
+.file-chip button:hover{color:#ef4444}
 
-/* ── TEXTAREA ──────────────────────────────────────────── */
-.field-textarea{width:100%;border:1px solid #dde2ea;border-radius:5px;padding:10px 12px;font-size:.875rem;color:#1a2332;resize:vertical;outline:none;transition:border-color .15s;background:#fff;min-height:160px}
-.field-textarea:focus{border-color:#1d6fef;box-shadow:0 0 0 3px rgba(29,111,239,.1)}
-.field-textarea::placeholder{color:#94a3b8}
+/* ─── Options row ────────────────────────────────────────── */
+.options-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.opt-group{display:flex;align-items:center;gap:8px}
+.opt-label{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#6b7280}
+.opt-input{height:34px;border:1px solid #d1d5db;border-radius:4px;padding:0 10px;font:500 13px 'Inter',sans-serif;min-width:180px}
+.opt-input:focus{outline:none;border-color:#0f2847}
+.toggle-wrap{display:flex;align-items:center;gap:8px}
+.toggle{position:relative;display:inline-block;width:36px;height:20px}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#d1d5db;border-radius:20px;cursor:pointer;transition:.2s}
+.toggle-slider:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked+.toggle-slider{background:#0f2847}
+.toggle input:checked+.toggle-slider:before{transform:translateX(16px)}
+.toggle-label{font-size:12px;font-weight:600;color:#6b7280;letter-spacing:.05em;text-transform:uppercase}
 
-/* ── WEIGHTS ───────────────────────────────────────────── */
-.weights-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
-@media(max-width:600px){.weights-grid{grid-template-columns:repeat(2,1fr)}}
-.weight-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:12px;text-align:center}
-.weight-card label{display:block;font-size:.72rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
-.weight-card input{width:100%;border:none;border-bottom:2px solid #cbd5e1;background:transparent;font-size:1.1rem;font-weight:700;color:#0f2847;text-align:center;outline:none;transition:border-color .15s;padding:2px 0}
-.weight-card input:focus{border-color:#1d6fef}
-.weight-footer{margin-top:12px;font-size:.8rem;font-weight:500}
-.weight-footer.ok{color:#16a34a}
-.weight-footer.err{color:#dc2626}
+/* ─── Weights ────────────────────────────────────────────── */
+.weights-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.weight-card{border:1px solid #e5e7eb;border-radius:6px;padding:12px 14px}
+.weight-name{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:6px}
+.weight-input{width:100%;height:36px;border:1px solid #d1d5db;border-radius:4px;text-align:center;font:700 18px 'Inter',sans-serif;color:#0f2847}
+.weight-input:focus{outline:none;border-color:#0f2847}
+.weight-sum{font-size:12px;color:#6b7280;margin-top:8px;text-align:right}
+.weight-sum.err{color:#ef4444;font-weight:600}
 
-/* ── FORM ACTIONS ──────────────────────────────────────── */
-.form-actions{display:flex;align-items:center;gap:10px;margin-top:20px;padding-top:20px;border-top:1px solid #f1f3f6}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 18px;height:36px;border-radius:4px;font-size:.875rem;font-weight:600;cursor:pointer;border:none;transition:background .15s,box-shadow .15s,opacity .15s;white-space:nowrap}
-.btn-primary{background:#1d6fef;color:#fff}
-.btn-primary:hover{background:#1a5fd4;box-shadow:0 1px 4px rgba(29,111,239,.35)}
-.btn-primary:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
-.btn-ghost{background:transparent;color:#374151;border:1px solid #dde2ea}
-.btn-ghost:hover{background:#f8fafc;border-color:#94a3b8}
-.btn-danger-ghost{background:transparent;color:#dc2626;border:1px solid #fecaca}
-.btn-danger-ghost:hover{background:#fef2f2}
-.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .55s linear infinite;display:none;flex-shrink:0}
-.loading .spinner{display:block}
-.loading .btn-label{display:none}
+/* ─── Results ────────────────────────────────────────────── */
+.results-section{display:none}
+.score-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px}
+.score-box{border:1px solid #e5e7eb;border-radius:6px;padding:14px 16px;text-align:center}
+.score-box.overall{background:#0f2847;color:#fff;border-color:#0f2847}
+.score-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+.score-val{font-size:32px;font-weight:800;line-height:1.1;margin:4px 0}
+.score-bar-wrap{background:rgba(255,255,255,0.2);border-radius:3px;height:4px;margin-top:6px}
+.score-box:not(.overall) .score-bar-wrap{background:#e5e7eb}
+.score-bar{height:4px;border-radius:3px;background:#10b981}
+
+/* ─── Batch leaderboard ──────────────────────────────────── */
+.leaderboard{width:100%;border-collapse:collapse;font-size:13px}
+.leaderboard th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb}
+.leaderboard td{padding:9px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+.leaderboard tr:last-child td{border-bottom:none}
+.leaderboard tr:nth-child(even) td{background:#fafafa}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:700;background:#f3f4f6;color:#374151}
+.rank-1{background:#fef3c7;color:#92400e}
+.rank-2{background:#f3f4f6;color:#374151}
+.rank-3{background:#fee2e2;color:#92400e}
+.score-pill{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700}
+.score-hi{background:#d1fae5;color:#065f46}
+.score-med{background:#fef3c7;color:#92400e}
+.score-lo{background:#fee2e2;color:#991b1b}
+
+/* ─── Keyword chips ──────────────────────────────────────── */
+.chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{padding:3px 10px;border-radius:12px;font-size:12px;font-weight:500}
+.chip-found{background:#d1fae5;color:#065f46}
+.chip-missing{background:#fee2e2;color:#991b1b}
+
+/* ─── Tables ─────────────────────────────────────────────── */
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb}
+.data-table td{padding:9px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:nth-child(even) td{background:#fafafa}
+
+/* ─── Audit ──────────────────────────────────────────────── */
+.audit-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.audit-toolbar input,.audit-toolbar select{height:34px;border:1px solid #d1d5db;border-radius:4px;padding:0 10px;font:500 13px 'Inter',sans-serif;background:#fff}
+.audit-toolbar input:focus,.audit-toolbar select:focus{outline:none;border-color:#0f2847}
+.decision-select{height:28px;border:1px solid #d1d5db;border-radius:4px;padding:0 6px;font:500 12px 'Inter',sans-serif}
+.note-input{height:28px;border:1px solid #d1d5db;border-radius:4px;padding:0 8px;font:500 12px 'Inter',sans-serif;width:140px}
+
+/* ─── Role history ───────────────────────────────────────── */
+.role-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px}
+.role-tab{padding:6px 14px;border-radius:4px;font:600 12px 'Inter',sans-serif;cursor:pointer;background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;letter-spacing:.04em}
+.role-tab.active{background:#0f2847;color:#fff;border-color:#0f2847}
+.role-tab:hover:not(.active){background:#e5e7eb}
+
+/* ─── Misc ───────────────────────────────────────────────── */
+.section-subtitle{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin-bottom:10px}
+.empty-state{text-align:center;padding:40px 20px;color:#9ca3af;font-size:13px}
+.error-msg{background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:10px 14px;color:#991b1b;font-size:13px;margin-bottom:16px;display:none}
+.success-msg{background:#d1fae5;border:1px solid #6ee7b7;border-radius:6px;padding:10px 14px;color:#065f46;font-size:13px;margin-bottom:16px;display:none}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:9999;display:none}
+.loading-card{background:#fff;border-radius:8px;padding:28px 36px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.15)}
+.loading-card .big-spinner{width:36px;height:36px;border:3px solid #e5e7eb;border-top-color:#0f2847;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px}
+.progress-bar-wrap{background:#e5e7eb;border-radius:4px;height:6px;width:260px;margin:12px auto 0;overflow:hidden}
+.progress-bar-fill{height:6px;background:#0f2847;border-radius:4px;transition:width .3s}
 
-/* ── INLINE ERROR ──────────────────────────────────────── */
-.inline-error{display:none;background:#fef2f2;border:1px solid #fecaca;border-left:3px solid #dc2626;border-radius:4px;padding:10px 14px;font-size:.85rem;color:#991b1b;margin-top:16px}
-.inline-error.show{display:flex;align-items:flex-start;gap:8px}
-
-/* ── DIVIDER ───────────────────────────────────────────── */
-.section-divider{border:none;border-top:1px solid #f1f3f6;margin:0}
+@media(max-width:700px){
+  .weights-grid{grid-template-columns:1fr 1fr}
+  .score-row{grid-template-columns:1fr 1fr}
+  .main{padding:16px}
+  .config-bar{padding:10px 16px}
+}
 </style>
 </head>
 <body>
-<div class="shell">
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-card">
+    <div class="big-spinner"></div>
+    <div style="font-weight:600;color:#0f2847" id="loadingMsg">Analyzing CVs...</div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressBar" style="width:0%"></div></div>
+    <div style="font-size:12px;color:#6b7280;margin-top:8px" id="progressLabel"></div>
+  </div>
+</div>
 
-<!-- TOP BAR -->
-<header class="topbar">
-  <a class="topbar-brand" href="#">
-    <div class="brand-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-      </svg>
-    </div>
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="#1a3d6e"/><polyline points="4,20 9,13 13,17 18,9 24,14" stroke="#10b981" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" fill="none"/></svg>
     CVsprings
-  </a>
-  <nav class="topbar-nav">
+  </div>
+  <div class="topbar-nav">
     <button class="nav-btn active" onclick="switchTab('analyzer',this)">Analyzer</button>
     <button class="nav-btn" onclick="switchTab('audit',this)">Audit Log</button>
-  </nav>
-  <div class="topbar-right">
-    <div class="conn-badge" id="connBadge">
-      <span class="conn-dot" id="connDot"></span>
-      <span id="connLabel">Not connected</span>
-    </div>
+    <button class="nav-btn" onclick="switchTab('history',this)">Role History</button>
   </div>
-</header>
-<!-- MAIN CONTENT -->
-<main class="page">
-
-<!-- ===== ANALYZER TAB ===== -->
-<div id="tab-analyzer" class="tab-panel active">
-
-  <div class="page-header">
-    <h1>Candidate Fit Analyzer</h1>
-    <p>Upload a CV and paste a job description to generate a structured fit score report.</p>
+  <div class="conn-badge">
+    <span class="conn-dot" id="connDot"></span>
+    <span id="connLabel">Not connected</span>
   </div>
+</div>
 
-  <!-- API Config -->
-  <div class="api-row">
-    <label>API Endpoint</label>
-    <div class="api-sep"></div>
-    <input type="url" id="backendUrl" placeholder="https://your-backend.onrender.com" autocomplete="off" onchange="onUrlChange(this.value)">
+<!-- Config bar -->
+<div class="config-bar">
+  <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280">API Endpoint</span>
+  <input type="text" id="apiUrl" placeholder="https://your-backend.onrender.com" />
+  <button class="btn btn-primary btn-sm" onclick="connect()">Connect</button>
+</div>
+
+<!-- ═══════════════════════ ANALYZER TAB ═══════════════════════ -->
+<div class="tab-content active main" id="tab-analyzer">
+
+  <!-- Mode toggle -->
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="modeSingle" onclick="setMode('single')">Single CV</button>
+    <button class="mode-btn" id="modeBatch" onclick="setMode('batch')">Batch Upload</button>
   </div>
 
-  <!-- Analysis Form -->
-  <div class="card" style="margin-bottom:20px">
+  <!-- Upload card -->
+  <div class="card">
     <div class="card-head">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#0f2847" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-      <h2>Submit for Analysis</h2>
+      <span class="card-title" id="uploadCardTitle">Upload CV</span>
     </div>
     <div class="card-body">
-      <div class="form-2col">
-        <!-- CV Upload -->
-        <div>
-          <label class="field-label">CV Document <span class="field-hint">PDF or DOCX</span></label>
-          <div class="dropzone" id="dropzone"
-            onclick="document.getElementById('cvFile').click()"
-            ondragover="event.preventDefault();this.classList.add('drag')"
-            ondragleave="this.classList.remove('drag')"
-            ondrop="handleDrop(event)">
-            <div class="dropzone-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            </div>
-            <p>Drag &amp; drop or <strong>click to browse</strong></p>
-            <p class="file-note">Accepted: .pdf, .docx &nbsp;·&nbsp; Max 10 MB</p>
-            <div class="file-chosen" id="fileName" style="display:none">
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <span id="fileNameText"></span>
-            </div>
-          </div>
-          <input type="file" id="cvFile" accept=".pdf,.docx" style="display:none" onchange="onFileChange(this)">
+      <div class="dropzone" id="dropzone"
+        ondragover="ev.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="handleDrop(event)">
+        <input type="file" id="cvInput" accept=".pdf,.docx" onchange="handleFiles(this.files)">
+        <div class="dropzone-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="8" x2="12" y2="20"/></svg>
         </div>
-
-        <!-- Job Description -->
-        <div>
-          <label class="field-label">Job Description</label>
-          <textarea id="jobDescription" class="field-textarea" rows="9"
-            placeholder="Paste the full job description here...
-
-e.g. We are looking for a Senior Python Developer with 5+ years of experience in machine learning, AWS, and microservices architecture..."></textarea>
-        </div>
+        <div class="dropzone-label" id="dropLabel">Drop PDF or DOCX here, or click to browse</div>
+        <div class="dropzone-sub" id="dropSub">Max 10 MB per file</div>
       </div>
-
-      <hr class="section-divider" style="margin:20px 0">
-
-      <!-- Score Weights -->
-      <div>
-        <label class="field-label">Scoring Weights <span class="field-hint">Must total 100</span></label>
-        <div class="weights-grid">
-          <div class="weight-card">
-            <label>Keywords</label>
-            <input type="number" id="wKw" value="40" min="0" max="100" onchange="updateWeightTotal()">
-          </div>
-          <div class="weight-card">
-            <label>Skills</label>
-            <input type="number" id="wSk" value="30" min="0" max="100" onchange="updateWeightTotal()">
-          </div>
-          <div class="weight-card">
-            <label>Experience</label>
-            <input type="number" id="wEx" value="20" min="0" max="100" onchange="updateWeightTotal()">
-          </div>
-          <div class="weight-card">
-            <label>Education</label>
-            <input type="number" id="wEd" value="10" min="0" max="100" onchange="updateWeightTotal()">
-          </div>
-        </div>
-        <p class="weight-footer ok" id="weightTotal">Total: 100 — weights are valid</p>
-      </div>
-
-      <div class="form-actions">
-        <button class="btn btn-primary" id="analyzeBtn" onclick="runAnalysis()">
-          <div class="spinner"></div>
-          <span class="btn-label">Run Analysis</span>
-        </button>
-        <button class="btn btn-ghost" onclick="resetForm()">Clear Form</button>
-      </div>
-
-      <div class="inline-error" id="errorBox">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span id="errorMsg"></span>
-      </div>
+      <div class="file-list" id="fileList"></div>
     </div>
   </div>
 
-  <!-- ── RESULTS ── -->
-  <div id="results" style="display:none">
-
-    <!-- Result Header Banner -->
-    <div id="resultBanner" style="background:#0f2847;border-radius:6px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.55);margin-bottom:4px">Analysis Report</div>
-        <div id="resultName" style="font-size:1.1rem;font-weight:700;color:#fff"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <span id="verdictBadge" style="font-size:.8rem;font-weight:600;padding:5px 14px;border-radius:3px;border:1px solid rgba(255,255,255,.2);color:#fff;background:rgba(255,255,255,.1)"></span>
-        <button class="btn" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);font-size:.8rem;height:32px;padding:0 14px" onclick="saveToAudit()">
-          Save to Audit Log
-        </button>
-      </div>
+  <!-- Options row -->
+  <div class="options-row">
+    <div class="opt-group">
+      <span class="opt-label">Role / Position</span>
+      <input type="text" class="opt-input" id="roleInput" placeholder="e.g. Senior Engineer">
     </div>
-
-    <!-- Score Row -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px" id="scoreRow">
-      <!-- filled by JS -->
-    </div>
-
-    <!-- Keywords + Skills in 2 cols -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <!-- Keywords Found -->
-      <div class="card">
-        <div class="card-head">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <h2>Keywords Matched</h2>
-          <span class="card-sub" id="kwFoundCount"></span>
-        </div>
-        <div class="card-body" style="padding:14px 16px">
-          <div id="kwFound" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-        </div>
-      </div>
-      <!-- Keywords Missing -->
-      <div class="card">
-        <div class="card-head">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          <h2>Keywords Missing</h2>
-          <span class="card-sub" id="kwMissingCount"></span>
-        </div>
-        <div class="card-body" style="padding:14px 16px">
-          <div id="kwMissing" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Skills Table -->
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-head">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f2847" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        <h2>Technical Skills Assessment</h2>
-        <span class="card-sub" id="skillsCount"></span>
-      </div>
-      <div style="overflow-x:auto">
-        <table id="skillsTable" style="width:100%;border-collapse:collapse;font-size:.84rem">
-          <thead>
-            <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0">
-              <th style="padding:10px 16px;text-align:left;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Skill</th>
-              <th style="padding:10px 16px;text-align:left;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Category</th>
-              <th style="padding:10px 16px;text-align:center;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">In CV</th>
-            </tr>
-          </thead>
-          <tbody id="skillsBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Recommendations -->
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-head">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f2847" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <h2>Recruiter Recommendations</h2>
-      </div>
-      <div class="card-body" style="padding:12px 16px">
-        <table style="width:100%;border-collapse:collapse;font-size:.875rem" id="recTable">
-          <tbody id="recBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Audit saved notice -->
-    <div id="auditNotice" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:10px 16px;font-size:.85rem;color:#15803d;margin-bottom:16px;display:none;align-items:center;gap:8px">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      Result saved to audit log.
-    </div>
-
-  </div><!-- /results -->
-</div><!-- /analyzer tab -->
-<!-- ===== AUDIT TAB ===== -->
-<div id="tab-audit" class="tab-panel">
-
-  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
-    <div>
-      <h1>Audit Log</h1>
-      <p>All saved candidate analysis records. Update decisions, add notes, or export.</p>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="btn btn-ghost" onclick="loadAudit()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
-        Refresh
-      </button>
-      <button class="btn btn-ghost" onclick="exportCsv()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export CSV
-      </button>
+    <div class="toggle-wrap">
+      <label class="toggle"><input type="checkbox" id="anonymizeToggle"><span class="toggle-slider"></span></label>
+      <span class="toggle-label">Anonymize</span>
     </div>
   </div>
 
-  <!-- Filters -->
-  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-    <input type="text" id="auditSearch" placeholder="Search by candidate name…"
-      style="height:34px;border:1px solid #dde2ea;border-radius:4px;padding:0 12px;font-size:.85rem;color:#1a2332;outline:none;width:240px;background:#fff"
-      oninput="filterAudit()">
-    <select id="auditDecision" onchange="filterAudit()"
-      style="height:34px;border:1px solid #dde2ea;border-radius:4px;padding:0 10px;font-size:.85rem;color:#1a2332;outline:none;background:#fff">
-      <option value="">All Decisions</option>
-      <option>Advance</option>
-      <option>Reject</option>
-      <option>Hold</option>
-      <option>Pending</option>
-    </select>
-  </div>
-
-  <!-- Table -->
+  <!-- Job Description -->
   <div class="card">
+    <div class="card-head"><span class="card-title">Job Description</span></div>
+    <div class="card-body">
+      <textarea id="jdInput" rows="6" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:10px;font:400 13px 'Inter',sans-serif;resize:vertical;color:#1a202c" placeholder="Paste the full job description here..."></textarea>
+    </div>
+  </div>
+
+  <!-- Scoring Weights -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Scoring Weights</span>
+      <span class="weight-sum" id="weightSum">Total: 100</span>
+    </div>
+    <div class="card-body">
+      <div class="weights-grid">
+        <div class="weight-card"><div class="weight-name">Keywords</div><input class="weight-input" type="number" id="wKw" value="40" min="0" max="100" oninput="updateWeightSum()"></div>
+        <div class="weight-card"><div class="weight-name">Skills</div><input class="weight-input" type="number" id="wSk" value="30" min="0" max="100" oninput="updateWeightSum()"></div>
+        <div class="weight-card"><div class="weight-name">Experience</div><input class="weight-input" type="number" id="wEx" value="20" min="0" max="100" oninput="updateWeightSum()"></div>
+        <div class="weight-card"><div class="weight-name">Education</div><input class="weight-input" type="number" id="wEd" value="10" min="0" max="100" oninput="updateWeightSum()"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="error-msg" id="analyzeError"></div>
+  <div style="display:flex;gap:10px">
+    <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()" style="width:200px">Analyze</button>
+    <button class="btn btn-outline" onclick="clearResults()">Clear</button>
+  </div>
+
+  <!-- ── Single result ── -->
+  <div class="results-section" id="singleResults" style="margin-top:24px">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" id="resultName">Results</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="saveToAudit()">Save to Audit Log</button>
+          <button class="btn btn-outline btn-sm" onclick="openReport()">Download Report</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="score-row" id="scoreRow"></div>
+        <div style="margin-bottom:16px">
+          <div class="section-subtitle">Keywords Found</div>
+          <div class="chip-list" id="foundChips"></div>
+        </div>
+        <div style="margin-bottom:16px">
+          <div class="section-subtitle">Keywords Missing</div>
+          <div class="chip-list" id="missingChips"></div>
+        </div>
+        <div class="section-subtitle">Skills</div>
+        <table class="data-table" id="skillsTable" style="margin-bottom:16px">
+          <thead><tr><th>Skill</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="section-subtitle">Recommendations</div>
+        <table class="data-table" id="recsTable">
+          <thead><tr><th>Area</th><th>Recommendation</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Recruiter Decision</span></div>
+      <div class="card-body" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <div class="section-subtitle" style="margin-bottom:6px">Decision</div>
+          <select class="opt-input" id="decisionSelect" style="min-width:150px">
+            <option value="">— Select —</option>
+            <option value="shortlist">Shortlist</option>
+            <option value="hold">Hold</option>
+            <option value="reject">Reject</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div class="section-subtitle" style="margin-bottom:6px">Notes</div>
+          <textarea id="noteInput" rows="2" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:8px;font:400 13px 'Inter',sans-serif" placeholder="Optional recruiter notes..."></textarea>
+        </div>
+        <div style="padding-top:20px">
+          <button class="btn btn-primary btn-sm" onclick="saveToAudit()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Batch results ── -->
+  <div class="results-section" id="batchResults" style="margin-top:24px">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" id="batchTitle">Batch Results</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="saveAllToAudit()">Save All to Audit</button>
+          <button class="btn btn-outline btn-sm" onclick="exportBatchCsv()">Export CSV</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;overflow-x:auto">
+        <table class="leaderboard" id="batchTable">
+          <thead><tr>
+            <th style="width:40px">#</th>
+            <th>Candidate</th>
+            <th>Overall</th>
+            <th>Keywords</th>
+            <th>Skills</th>
+            <th>Experience</th>
+            <th>Education</th>
+            <th>Decision</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="batchBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+<!-- ═══════════════════════ AUDIT LOG TAB ═══════════════════════ -->
+<div class="tab-content main" id="tab-audit">
+  <div class="audit-toolbar">
+    <input type="text" id="auditSearch" placeholder="Search candidate..." oninput="filterAudit()" style="min-width:200px">
+    <select id="auditDecisionFilter" onchange="filterAudit()">
+      <option value="">All Decisions</option>
+      <option value="shortlist">Shortlist</option>
+      <option value="hold">Hold</option>
+      <option value="reject">Reject</option>
+    </select>
+    <select id="auditRoleFilter" onchange="filterAudit()">
+      <option value="">All Roles</option>
+    </select>
+    <button class="btn btn-outline btn-sm" onclick="loadAudit()">Refresh</button>
+    <button class="btn btn-outline btn-sm" onclick="exportAuditCsv()">Export CSV</button>
+  </div>
+  <div class="error-msg" id="auditError"></div>
+  <div class="card" style="margin-bottom:0">
     <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:.855rem;min-width:780px">
-        <thead>
-          <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
-            <th style="padding:11px 16px;text-align:left;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Candidate</th>
-            <th style="padding:11px 16px;text-align:left;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">File</th>
-            <th style="padding:11px 12px;text-align:center;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Score</th>
-            <th style="padding:11px 16px;text-align:left;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Verdict</th>
-            <th style="padding:11px 16px;text-align:left;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Decision</th>
-            <th style="padding:11px 16px;text-align:left;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Note</th>
-            <th style="padding:11px 16px;text-align:left;font-weight:600;color:#374151;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em">Date</th>
-            <th style="padding:11px 12px;width:40px"></th>
-          </tr>
-        </thead>
-        <tbody id="auditBody">
-          <tr id="auditPlaceholder"><td colspan="8" style="padding:32px;text-align:center;color:#94a3b8;font-size:.875rem">No records. Run an analysis and save it to the audit log.</td></tr>
-        </tbody>
+      <table class="data-table">
+        <thead><tr>
+          <th>Date</th>
+          <th>Candidate</th>
+          <th>Role</th>
+          <th>Overall</th>
+          <th>KW</th><th>SK</th><th>EX</th><th>ED</th>
+          <th>Decision</th>
+          <th>Note</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="auditBody"></tbody>
       </table>
     </div>
   </div>
+</div>
 
-</div><!-- /audit tab -->
-
-</main><!-- /page -->
-</div><!-- /shell -->
-<style>
-/* ── RESULT SCORE CARDS ──────────────────────────────── */
-.score-card{background:#fff;border:1px solid #dde2ea;border-radius:6px;padding:16px;text-align:center}
-.score-card.primary{background:#0f2847;border-color:#0f2847}
-.score-val{font-size:2rem;font-weight:800;line-height:1;margin-bottom:2px}
-.score-lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:600}
-.score-card.primary .score-val{color:#fff}
-.score-card.primary .score-lbl{color:rgba(255,255,255,.55)}
-.score-bar{height:4px;background:#e2e8f0;border-radius:2px;margin-top:10px;overflow:hidden}
-.score-bar-fill{height:100%;border-radius:2px;transition:width .9s cubic-bezier(.4,0,.2,1)}
-
-/* ── KW CHIPS ────────────────────────────────────────── */
-.chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:3px;font-size:.78rem;font-weight:500;line-height:1.5}
-.chip-green{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
-.chip-red{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
-.chip-grey{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0}
-
-/* ── STATUS BADGES ───────────────────────────────────── */
-.status-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.status-advance{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
-.status-reject{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
-.status-hold{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
-.status-pending{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0}
-
-/* ── AUDIT TABLE INPUTS ──────────────────────────────── */
-.audit-decision{border:1px solid #dde2ea;border-radius:3px;padding:3px 6px;font-size:.8rem;color:#1a2332;background:#fff;outline:none;cursor:pointer}
-.audit-decision:focus{border-color:#1d6fef}
-.audit-note{border:1px solid #dde2ea;border-radius:3px;padding:4px 8px;font-size:.8rem;color:#1a2332;background:#fff;outline:none;width:160px}
-.audit-note:focus{border-color:#1d6fef}
-.audit-del{background:none;border:none;color:#94a3b8;cursor:pointer;padding:4px 6px;border-radius:3px;line-height:1;font-size:.9rem;transition:color .15s,background .15s}
-.audit-del:hover{color:#dc2626;background:#fef2f2}
-
-/* ── VERDICT COLORS ──────────────────────────────────── */
-.verdict-excellent{background:#f0fdf4;color:#15803d;border-color:#bbf7d0}
-.verdict-good{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
-.verdict-partial{background:#fffbeb;color:#b45309;border-color:#fde68a}
-.verdict-poor{background:#fef2f2;color:#dc2626;border-color:#fecaca}
-</style>
+<!-- ═══════════════════════ ROLE HISTORY TAB ═══════════════════════ -->
+<div class="tab-content main" id="tab-history">
+  <div class="card">
+    <div class="card-head"><span class="card-title">Score History by Role</span><button class="btn btn-outline btn-sm" onclick="loadRoles()">Refresh</button></div>
+    <div class="card-body">
+      <div class="role-tabs" id="roleTabs"></div>
+      <div id="roleHistoryContent">
+        <div class="empty-state">Select a role above to view candidate scores</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
-// ─── CONSTANTS & STATE ────────────────────────────────────
-const URL_KEY = 'cvsprings_api_url';
+// ── State ─────────────────────────────────────────────────────────────────
+let API = localStorage.getItem('cvsprings_api_url') || '';
+let mode = 'single';
+let selectedFiles = [];
 let lastResult = null;
-let allAuditRows = [];
+let lastBatchResults = [];
+let lastAuditRecords = [];
 
-// ─── INIT ─────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem(URL_KEY) || '';
-  if (saved) { document.getElementById('backendUrl').value = saved; pingBackend(saved); }
+  if (API) {
+    document.getElementById('apiUrl').value = API;
+    ping();
+  }
+  loadAudit();
+  loadRoles();
 });
 
-// ─── URL CHANGE ───────────────────────────────────────────
-function onUrlChange(val) {
-  const url = val.trim().replace(/\/+$/, '');
-  localStorage.setItem(URL_KEY, url);
-  pingBackend(url);
+// ── Tabs ──────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'audit') loadAudit();
+  if (name === 'history') loadRoles();
 }
 
-async function pingBackend(url) {
+// ── Connection ─────────────────────────────────────────────────────────────
+async function connect() {
+  const url = document.getElementById('apiUrl').value.trim().replace(/\/+$/, '');
+  if (!url) return;
+  API = url;
+  localStorage.setItem('cvsprings_api_url', API);
+  await ping();
+}
+
+async function ping() {
   const dot = document.getElementById('connDot');
   const lbl = document.getElementById('connLabel');
-  if (!url) { dot.className = 'conn-dot'; lbl.textContent = 'Not connected'; return; }
-  dot.className = 'conn-dot'; lbl.textContent = 'Connecting…';
+  dot.className = 'conn-dot';
+  lbl.textContent = 'Checking...';
   try {
-    const r = await fetch(url + '/health', { signal: AbortSignal.timeout(5000) });
-    if (r.ok) { dot.className = 'conn-dot ok'; lbl.textContent = 'Connected'; }
-    else      { dot.className = 'conn-dot err'; lbl.textContent = 'Error ' + r.status; }
+    const r = await fetch(API + '/health', { signal: AbortSignal.timeout(8000) });
+    if (r.ok) {
+      dot.className = 'conn-dot ok';
+      lbl.textContent = 'Connected';
+    } else throw new Error('Non-OK');
   } catch {
-    dot.className = 'conn-dot err'; lbl.textContent = 'Unreachable';
+    dot.className = 'conn-dot err';
+    lbl.textContent = 'Not connected';
   }
 }
 
-// ─── TAB SWITCH ───────────────────────────────────────────
-function switchTab(id, btn) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
-  btn.classList.add('active');
-  if (id === 'audit') loadAudit();
+// ── Mode ───────────────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('modeSingle').classList.toggle('active', m === 'single');
+  document.getElementById('modeBatch').classList.toggle('active', m === 'batch');
+  document.getElementById('uploadCardTitle').textContent = m === 'single' ? 'Upload CV' : 'Upload CVs (up to 50)';
+  document.getElementById('dropLabel').textContent = m === 'single'
+    ? 'Drop PDF or DOCX here, or click to browse'
+    : 'Drop multiple CVs here, or click to browse';
+  document.getElementById('cvInput').multiple = m === 'batch';
+  clearResults();
+  selectedFiles = [];
+  renderFileList();
 }
 
-// ─── FILE HANDLING ────────────────────────────────────────
-function onFileChange(input) {
-  const f = input.files[0];
-  const nm = document.getElementById('fileName');
-  const nt = document.getElementById('fileNameText');
-  if (f) { nt.textContent = f.name; nm.style.display = 'flex'; }
-  else   { nm.style.display = 'none'; }
+// ── File handling ──────────────────────────────────────────────────────────
+function handleFiles(files) {
+  const arr = Array.from(files);
+  if (mode === 'single') {
+    selectedFiles = arr.slice(0, 1);
+  } else {
+    for (const f of arr) {
+      if (!selectedFiles.find(x => x.name === f.name)) selectedFiles.push(f);
+    }
+  }
+  renderFileList();
 }
-function handleDrop(e) {
-  e.preventDefault();
+
+function handleDrop(ev) {
+  ev.preventDefault();
   document.getElementById('dropzone').classList.remove('drag');
-  const f = e.dataTransfer.files[0];
-  if (!f) return;
-  const dt = new DataTransfer(); dt.items.add(f);
-  document.getElementById('cvFile').files = dt.files;
-  onFileChange(document.getElementById('cvFile'));
+  handleFiles(ev.dataTransfer.files);
 }
 
-// ─── WEIGHTS ─────────────────────────────────────────────
-function updateWeightTotal() {
-  const t = ['wKw','wSk','wEx','wEd'].reduce((s,id)=>s+(+document.getElementById(id).value||0),0);
-  const el = document.getElementById('weightTotal');
-  if (t === 100) { el.textContent = 'Total: 100 — weights are valid'; el.className = 'weight-footer ok'; }
-  else           { el.textContent = 'Total: ' + t + ' — must equal 100'; el.className = 'weight-footer err'; }
+function removeFile(name) {
+  selectedFiles = selectedFiles.filter(f => f.name !== name);
+  renderFileList();
 }
 
-// ─── RUN ANALYSIS ─────────────────────────────────────────
-async function runAnalysis() {
-  const url = (document.getElementById('backendUrl').value||'').trim().replace(/\/+$/,'');
-  const file = document.getElementById('cvFile').files[0];
-  const jd   = document.getElementById('jobDescription').value.trim();
-  hideError();
-  if (!url)  { showError('Enter your API endpoint URL above.'); return; }
-  if (!file) { showError('Please upload a CV file (PDF or DOCX).'); return; }
-  if (!jd)   { showError('Please paste a job description.'); return; }
-  const kw=+document.getElementById('wKw').value, sk=+document.getElementById('wSk').value,
-        ex=+document.getElementById('wEx').value, ed=+document.getElementById('wEd').value;
-  if (kw+sk+ex+ed !== 100) { showError('Score weights must sum to 100.'); return; }
+function renderFileList() {
+  const fl = document.getElementById('fileList');
+  fl.innerHTML = selectedFiles.map(f =>
+    '<div class="file-chip"><span>' + f.name + '</span><button onclick="removeFile(\''+f.name+'\')">x</button></div>'
+  ).join('');
+}
 
-  const btn = document.getElementById('analyzeBtn');
-  btn.classList.add('loading'); btn.disabled = true;
-  document.getElementById('results').style.display = 'none';
+// ── Weights ────────────────────────────────────────────────────────────────
+function updateWeightSum() {
+  const t = +document.getElementById('wKw').value + +document.getElementById('wSk').value +
+            +document.getElementById('wEx').value + +document.getElementById('wEd').value;
+  const el = document.getElementById('weightSum');
+  el.textContent = 'Total: ' + t;
+  el.className = 'weight-sum' + (Math.abs(t - 100) > 0.01 ? ' err' : '');
+}
 
-  try {
-    const form = new FormData();
-    form.append('cv', file);
-    form.append('jobDescription', jd);
-    form.append('weights', JSON.stringify({kw, sk, ex, ed}));
-    const res = await fetch(url + '/api/analyze', { method:'POST', body:form });
-    if (!res.ok) { const t = await res.text(); throw new Error('Server ' + res.status + ': ' + t.slice(0,180)); }
-    const data = await res.json();
-    lastResult = { ...data, _fileName: file.name };
-    renderResults(data);
-  } catch(e) {
-    showError(e.message || 'Request failed. Check the API URL and CORS configuration.');
-  } finally {
-    btn.classList.remove('loading'); btn.disabled = false;
+function getWeights() {
+  return { kw: +document.getElementById('wKw').value, sk: +document.getElementById('wSk').value,
+           ex: +document.getElementById('wEx').value, ed: +document.getElementById('wEd').value };
+}
+
+// ── Analyze ────────────────────────────────────────────────────────────────
+async function analyze() {
+  const errEl = document.getElementById('analyzeError');
+  errEl.style.display = 'none';
+
+  if (!API) { showError(errEl, 'Set API endpoint first.'); return; }
+  if (!selectedFiles.length) { showError(errEl, 'Upload at least one CV file.'); return; }
+
+  const jd = document.getElementById('jdInput').value.trim();
+  if (!jd) { showError(errEl, 'Job description is required.'); return; }
+
+  const w = getWeights();
+  if (Math.abs(w.kw + w.sk + w.ex + w.ed - 100) > 0.01) {
+    showError(errEl, 'Scoring weights must sum to 100.'); return;
+  }
+
+  const anonymize = document.getElementById('anonymizeToggle').checked;
+  const role = document.getElementById('roleInput').value.trim();
+
+  if (mode === 'single') {
+    await analyzeSingle(selectedFiles[0], jd, w, anonymize, role, errEl);
+  } else {
+    await analyzeBatch(selectedFiles, jd, w, anonymize, role, errEl);
   }
 }
 
-// ─── RENDER RESULTS ───────────────────────────────────────
-function scoreColor(n) {
-  if (n >= 75) return '#16a34a';
-  if (n >= 50) return '#d97706';
-  return '#dc2626';
-}
-function scoreBg(n) {
-  if (n >= 75) return '#f0fdf4';
-  if (n >= 50) return '#fffbeb';
-  return '#fef2f2';
-}
+async function analyzeSingle(file, jd, weights, anonymize, role, errEl) {
+  const btn = document.getElementById('analyzeBtn');
+  btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+  btn.disabled = true;
 
-function renderResults(d) {
-  // Banner
-  document.getElementById('resultName').textContent = (d.candidateName || 'Candidate') + ' — Fit Analysis';
-  const vb = document.getElementById('verdictBadge');
-  vb.textContent = d.verdict || '';
-  const vcls = {'Excellent Match':'verdict-excellent','Good Match':'verdict-good','Partial Match':'verdict-partial','Poor Match':'verdict-poor'}[d.verdict]||'verdict-partial';
-  vb.className = vcls;
-  vb.style.background = ''; vb.style.border = ''; vb.style.color = '';
-
-  // Score cards
-  const cats = [
-    { label:'Overall Score', val:d.overall, primary:true },
-    { label:'Keywords',    val:d.scores?.keywords  ?? 0 },
-    { label:'Skills',      val:d.scores?.skills    ?? 0 },
-    { label:'Experience',  val:d.scores?.experience ?? 0 },
-    { label:'Education',   val:d.scores?.education  ?? 0 },
-  ];
-  document.getElementById('scoreRow').innerHTML = cats.map(c => `
-    <div class="score-card ${c.primary?'primary':''}">
-      <div class="score-val" ${c.primary?'':(`style="color:${scoreColor(c.val)}"`)}>${c.val}</div>
-      <div class="score-lbl">${c.label}</div>
-      ${c.primary?'':(`<div class="score-bar"><div class="score-bar-fill" style="width:${c.val}%;background:${scoreColor(c.val)}"></div></div>`)}
-    </div>
-  `).join('');
-
-  // Keywords
-  const found = d.found || [], missing = d.missing || [];
-  document.getElementById('kwFoundCount').textContent = found.length + ' matched';
-  document.getElementById('kwMissingCount').textContent = missing.length + ' missing';
-  document.getElementById('kwFound').innerHTML = found.length
-    ? found.map(k=>`<span class="chip chip-green">${k}</span>`).join('')
-    : '<span class="chip chip-grey">None matched</span>';
-  document.getElementById('kwMissing').innerHTML = missing.length
-    ? missing.map(k=>`<span class="chip chip-red">${k}</span>`).join('')
-    : '<span class="chip chip-green">All keywords found!</span>';
-
-  // Skills table
-  const skills = d.skills || [];
-  document.getElementById('skillsCount').textContent = skills.length + ' skills evaluated';
-  document.getElementById('skillsBody').innerHTML = skills.length
-    ? skills.map((s,i) => `
-      <tr style="border-bottom:1px solid #f1f3f6;${i%2===1?'background:#fafafa':''}">
-        <td style="padding:9px 16px;font-weight:500;color:#1a2332">${s.name}</td>
-        <td style="padding:9px 16px;color:#64748b">${s.category||'—'}</td>
-        <td style="padding:9px 16px;text-align:center">
-          ${s.found
-            ? '<span class="chip chip-green">Found</span>'
-            : '<span class="chip chip-red">Missing</span>'}
-        </td>
-      </tr>`).join('')
-    : '<tr><td colspan="3" style="padding:16px;text-align:center;color:#94a3b8">No skills evaluated</td></tr>';
-
-  // Recommendations
-  const recs = d.recommendations || [];
-  document.getElementById('recBody').innerHTML = recs.length
-    ? recs.map((r,i) => `
-      <tr style="${i>0?'border-top:1px solid #f1f3f6':''}">
-        <td style="padding:10px 4px;width:28px;font-size:1.05rem;vertical-align:top">${r.icon||'•'}</td>
-        <td style="padding:10px 0;color:#374151;line-height:1.6">${r.text}</td>
-      </tr>`).join('')
-    : '<tr><td colspan="2" style="padding:12px 0;color:#94a3b8">No recommendations</td></tr>';
-
-  document.getElementById('auditNotice').style.display = 'none';
-  document.getElementById('results').style.display = 'block';
-  document.getElementById('results').scrollIntoView({ behavior:'smooth', block:'start' });
-}
-
-// ─── AUDIT SAVE ───────────────────────────────────────────
-async function saveToAudit() {
-  if (!lastResult) return;
-  const url = (document.getElementById('backendUrl').value||'').trim().replace(/\/+$/,'');
-  if (!url) { showError('Set the API endpoint first.'); return; }
   try {
-    await fetch(url + '/api/audit', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        candidateName: lastResult.candidateName || 'Unknown',
-        fileName: lastResult._fileName || '',
-        overall: lastResult.overall,
-        verdict: lastResult.verdict,
-        decision: 'Pending',
-        note: ''
-      })
-    });
-    const n = document.getElementById('auditNotice');
-    n.style.display = 'flex';
-    setTimeout(() => { n.style.display = 'none'; }, 3500);
-  } catch(e) { showError('Could not save: ' + e.message); }
+    const fd = new FormData();
+    fd.append('cv', file);
+    fd.append('jobDescription', jd);
+    fd.append('weights', JSON.stringify(weights));
+    fd.append('anonymize', anonymize ? 'true' : 'false');
+
+    const r = await fetch(API + '/api/analyze', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (!r.ok) { showError(errEl, data.error || 'Analysis failed'); return; }
+
+    lastResult = { ...data, role, file: file.name };
+    renderSingleResult(data, file.name, role);
+  } catch (e) {
+    showError(errEl, 'Network error: ' + e.message);
+  } finally {
+    btn.textContent = 'Analyze';
+    btn.disabled = false;
+  }
 }
 
-// ─── AUDIT LOG ────────────────────────────────────────────
-async function loadAudit() {
-  const url = (document.getElementById('backendUrl').value||'').trim().replace(/\/+$/,'');
-  if (!url) {
-    document.getElementById('auditBody').innerHTML =
-      '<tr><td colspan="8" style="padding:24px;text-align:center;color:#94a3b8">Set API endpoint first.</td></tr>';
+async function analyzeBatch(files, jd, weights, anonymize, role, errEl) {
+  showLoading('Analyzing ' + files.length + ' CVs...');
+
+  try {
+    const fd = new FormData();
+    files.forEach(f => fd.append('cvs', f));
+    fd.append('jobDescription', jd);
+    fd.append('weights', JSON.stringify(weights));
+    fd.append('anonymize', anonymize ? 'true' : 'false');
+
+    setProgress(30, 'Uploading and processing...');
+    const r = await fetch(API + '/api/analyze/batch', { method: 'POST', body: fd });
+    setProgress(80, 'Scoring...');
+    const data = await r.json();
+    if (!r.ok) { showError(errEl, data.error || 'Batch analysis failed'); return; }
+
+    setProgress(100, 'Done');
+    lastBatchResults = (data.results || []).map(res => ({ ...res, role }));
+    renderBatchResults(data.results, role);
+  } catch (e) {
+    showError(errEl, 'Network error: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+// ── Render Single ─────────────────────────────────────────────────────────
+function renderSingleResult(data, fileName, role) {
+  document.getElementById('singleResults').style.display = 'block';
+  document.getElementById('batchResults').style.display = 'none';
+  const name = data.candidateName || fileName.replace(/\.[^.]+$/, '');
+  document.getElementById('resultName').textContent = (data.anonymized ? 'Anonymous' : name) + (role ? ' — ' + role : '');
+
+  const sr = document.getElementById('scoreRow');
+  const scoreColor = s => s >= 70 ? '#10b981' : s >= 50 ? '#f59e0b' : '#ef4444';
+  sr.innerHTML = scoreBox('Overall', data.overall, true, scoreColor(data.overall)) +
+    scoreBox('Keywords', data.scores?.keywords, false, '#3b82f6') +
+    scoreBox('Skills', data.scores?.skills, false, '#8b5cf6') +
+    scoreBox('Experience', data.scores?.experience, false, '#f59e0b') +
+    scoreBox('Education', data.scores?.education, false, '#10b981');
+
+  const found = (data.keywords?.found || []);
+  const missing = (data.keywords?.missing || []);
+  document.getElementById('foundChips').innerHTML = found.map(k => '<span class="chip chip-found">'+k+'</span>').join('') || '<span style="color:#9ca3af;font-size:13px">None found</span>';
+  document.getElementById('missingChips').innerHTML = missing.map(k => '<span class="chip chip-missing">'+k+'</span>').join('') || '<span style="color:#9ca3af;font-size:13px">None missing</span>';
+
+  const stb = document.getElementById('skillsTable').querySelector('tbody');
+  stb.innerHTML = (data.skills || []).map(s =>
+    '<tr><td>' + s.skill + '</td><td style="color:' + (s.found ? '#10b981' : '#ef4444') + ';font-weight:600">' + (s.found ? 'Found' : 'Missing') + '</td></tr>'
+  ).join('') || '<tr><td colspan="2" class="empty-state">No skills data</td></tr>';
+
+  const rtb = document.getElementById('recsTable').querySelector('tbody');
+  rtb.innerHTML = (data.recommendations || []).map(r =>
+    '<tr><td style="font-weight:600;white-space:nowrap">' + r.area + '</td><td>' + r.text + '</td></tr>'
+  ).join('') || '<tr><td colspan="2" class="empty-state">No recommendations</td></tr>';
+}
+
+function scoreBox(label, val, isOverall, color) {
+  const v = val ?? 0;
+  return '<div class="score-box' + (isOverall ? ' overall' : '') + '">' +
+    '<div class="score-label">' + label + '</div>' +
+    '<div class="score-val">' + v + '</div>' +
+    '<div class="score-bar-wrap"><div class="score-bar" style="width:' + v + '%;background:' + (isOverall ? 'rgba(255,255,255,0.6)' : color) + '"></div></div>' +
+    '</div>';
+}
+
+// ── Render Batch ──────────────────────────────────────────────────────────
+function renderBatchResults(results, role) {
+  document.getElementById('batchResults').style.display = 'block';
+  document.getElementById('singleResults').style.display = 'none';
+  document.getElementById('batchTitle').textContent = 'Batch Results — ' + results.length + ' candidates' + (role ? ' / ' + role : '');
+
+  const tbody = document.getElementById('batchBody');
+  tbody.innerHTML = results.map((r, i) => {
+    const s = r.overall || 0;
+    const cls = s >= 70 ? 'score-hi' : s >= 50 ? 'score-med' : 'score-lo';
+    const rankCls = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+    const name = r.anonymized ? 'Candidate #' + (i+1) : (r.candidateName || r.fileName);
+    return '<tr>' +
+      '<td><span class="rank-badge ' + rankCls + '">' + (i+1) + '</span></td>' +
+      '<td style="font-weight:500">' + escHtml(name) + '</td>' +
+      '<td><span class="score-pill ' + cls + '">' + s + '</span></td>' +
+      '<td>' + (r.scores?.keywords ?? '—') + '</td>' +
+      '<td>' + (r.scores?.skills ?? '—') + '</td>' +
+      '<td>' + (r.scores?.experience ?? '—') + '</td>' +
+      '<td>' + (r.scores?.education ?? '—') + '</td>' +
+      '<td><select class="decision-select" data-idx="'+i+'" onchange="setBatchDecision('+i+',this.value)"><option value="">—</option><option value="shortlist">Shortlist</option><option value="hold">Hold</option><option value="reject">Reject</option></select></td>' +
+      '<td><button class="btn btn-outline btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+function setBatchDecision(idx, val) {
+  if (lastBatchResults[idx]) lastBatchResults[idx]._decision = val;
+}
+
+// ── Save to Audit ─────────────────────────────────────────────────────────
+async function saveToAudit() {
+  if (!lastResult || !API) return;
+  const decision = document.getElementById('decisionSelect').value;
+  const note = document.getElementById('noteInput').value.trim();
+  const role = document.getElementById('roleInput').value.trim();
+
+  const body = {
+    candidateName: lastResult.candidateName || lastResult.file.replace(/\.[^.]+$/, ''),
+    fileName: lastResult.file,
+    overall: lastResult.overall,
+    scores: lastResult.scores,
+    weights: getWeights(),
+    verdict: (lastResult.recommendations || []).map(r => r.text).join(' '),
+    decision, note,
+    jdSnippet: document.getElementById('jdInput').value.trim().slice(0, 300),
+    role,
+    anonymized: lastResult.anonymized || false
+  };
+
+  try {
+    const r = await fetch(API + '/api/audit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) alert('Saved to audit log.');
+    else { const d = await r.json(); alert('Error: ' + d.error); }
+  } catch (e) { alert('Network error: ' + e.message); }
+}
+
+async function saveSingleBatch(idx) {
+  if (!API || !lastBatchResults[idx]) return;
+  const res = lastBatchResults[idx];
+  const body = {
+    candidateName: res.candidateName || res.fileName,
+    fileName: res.fileName || '',
+    overall: res.overall,
+    scores: res.scores,
+    weights: getWeights(),
+    verdict: (res.recommendations || []).map(r => r.text).join(' '),
+    decision: res._decision || '',
+    note: '',
+    jdSnippet: document.getElementById('jdInput').value.trim().slice(0, 300),
+    role: res.role || '',
+    anonymized: res.anonymized || false
+  };
+  try {
+    const r = await fetch(API + '/api/audit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) alert('Saved: ' + body.candidateName);
+    else { const d = await r.json(); alert('Error: ' + d.error); }
+  } catch (e) { alert('Network error: ' + e.message); }
+}
+
+async function saveAllToAudit() {
+  if (!API || !lastBatchResults.length) return;
+  if (!confirm('Save all ' + lastBatchResults.length + ' results to audit log?')) return;
+  let saved = 0;
+  for (const res of lastBatchResults) {
+    const body = {
+      candidateName: res.candidateName || res.fileName,
+      fileName: res.fileName || '',
+      overall: res.overall,
+      scores: res.scores,
+      weights: getWeights(),
+      verdict: (res.recommendations || []).map(r => r.text).join(' '),
+      decision: res._decision || '',
+      note: '',
+      jdSnippet: document.getElementById('jdInput').value.trim().slice(0, 300),
+      role: res.role || '',
+      anonymized: res.anonymized || false
+    };
+    try {
+      const r = await fetch(API + '/api/audit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      if (r.ok) saved++;
+    } catch(_) {}
+  }
+  alert(saved + ' of ' + lastBatchResults.length + ' records saved.');
+}
+
+// ── Export batch CSV (client side) ────────────────────────────────────────
+function exportBatchCsv() {
+  if (!lastBatchResults.length) return;
+  const headers = ['Rank','Candidate','Overall','Keywords','Skills','Experience','Education','Decision','Role','Anonymized'];
+  const rows = [headers.join(',')];
+  lastBatchResults.forEach((r, i) => {
+    rows.push([
+      i+1,
+      '"'+escCsv(r.candidateName || r.fileName)+'"',
+      r.overall || 0,
+      r.scores?.keywords || 0,
+      r.scores?.skills || 0,
+      r.scores?.experience || 0,
+      r.scores?.education || 0,
+      '"'+escCsv(r._decision || '')+'"',
+      '"'+escCsv(r.role || '')+'"',
+      r.anonymized ? 1 : 0
+    ].join(','));
+  });
+  download('batch-results.csv', rows.join('\n'), 'text/csv');
+}
+
+// ── Report ─────────────────────────────────────────────────────────────────
+async function openReport() {
+  if (!lastResult?._auditId || !API) {
+    alert('Save to audit log first to generate a report.');
     return;
   }
+  window.open(API + '/api/audit/report/' + lastResult._auditId, '_blank');
+}
+// ── Audit Log ─────────────────────────────────────────────────────────────
+async function loadAudit() {
+  if (!API) return;
+  const errEl = document.getElementById('auditError');
+  errEl.style.display = 'none';
   try {
-    const r = await fetch(url + '/api/audit?limit=200');
-    if (!r.ok) throw new Error('Status ' + r.status);
-    allAuditRows = await r.json();
-    renderAudit(allAuditRows);
+    const r = await fetch(API + '/api/audit');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    lastAuditRecords = await r.json();
+    populateRoleFilter(lastAuditRecords);
+    renderAuditTable(lastAuditRecords);
   } catch(e) {
-    document.getElementById('auditBody').innerHTML =
-      `<tr><td colspan="8" style="padding:24px;text-align:center;color:#dc2626">Could not load: ${e.message}</td></tr>`;
+    showError(errEl, 'Could not load audit log: ' + e.message);
   }
+}
+
+function populateRoleFilter(records) {
+  const roles = [...new Set(records.map(r => r.role).filter(Boolean))].sort();
+  const sel = document.getElementById('auditRoleFilter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Roles</option>' + roles.map(r => '<option value="'+escHtml(r)+'">'+escHtml(r)+'</option>').join('');
+  if (cur) sel.value = cur;
 }
 
 function filterAudit() {
   const q = document.getElementById('auditSearch').value.toLowerCase();
-  const dec = document.getElementById('auditDecision').value;
-  renderAudit(allAuditRows.filter(r =>
-    (!q || (r.candidateName||'').toLowerCase().includes(q)) &&
-    (!dec || r.decision === dec)
-  ));
+  const dec = document.getElementById('auditDecisionFilter').value;
+  const role = document.getElementById('auditRoleFilter').value;
+  const filtered = lastAuditRecords.filter(r =>
+    (r.candidateName || '').toLowerCase().includes(q) &&
+    (!dec || r.decision === dec) &&
+    (!role || r.role === role)
+  );
+  renderAuditTable(filtered);
 }
 
-function renderAudit(rows) {
+function renderAuditTable(records) {
   const tbody = document.getElementById('auditBody');
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="padding:32px;text-align:center;color:#94a3b8">No matching records found.</td></tr>';
+  if (!records.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="empty-state">No records found</td></tr>';
     return;
   }
-  tbody.innerHTML = rows.map((r,i) => {
-    const sc = scoreColor(r.overall);
-    const decCls = {Advance:'status-advance',Reject:'status-reject',Hold:'status-hold',Pending:'status-pending'}[r.decision]||'status-pending';
-    const date = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
-    return `<tr style="border-bottom:1px solid #f1f3f6;${i%2===1?'background:#fafafa':''}">
-      <td style="padding:10px 16px;font-weight:600;color:#0f2847">${r.candidateName||'—'}</td>
-      <td style="padding:10px 16px;color:#64748b;font-size:.8rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.fileName||'—'}</td>
-      <td style="padding:10px 12px;text-align:center">
-        <span style="display:inline-block;min-width:36px;padding:2px 8px;border-radius:3px;font-weight:700;font-size:.85rem;background:${scoreBg(r.overall)};color:${sc};border:1px solid ${sc}33">
-          ${r.overall}
-        </span>
-      </td>
-      <td style="padding:10px 16px;color:#374151;font-size:.83rem">${r.verdict||'—'}</td>
-      <td style="padding:10px 16px">
-        <select class="audit-decision" data-id="${r.id}" onchange="patchDecision('${r.id}',this.value)">
-          ${['Pending','Advance','Reject','Hold'].map(o=>`<option ${r.decision===o?'selected':''}>${o}</option>`).join('')}
-        </select>
-      </td>
-      <td style="padding:10px 16px">
-        <input class="audit-note" type="text" value="${r.note||''}" placeholder="Add note…"
-          onblur="patchNote('${r.id}',this.value)">
-      </td>
-      <td style="padding:10px 16px;color:#94a3b8;font-size:.8rem;white-space:nowrap">${date}</td>
-      <td style="padding:10px 8px;text-align:center">
-        <button class="audit-del" onclick="deleteAudit('${r.id}')" title="Delete record">&#x2715;</button>
-      </td>
-    </tr>`;
+  tbody.innerHTML = records.map(rec => {
+    const date = rec.createdAt ? new Date(rec.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+    const s = rec.overall || 0;
+    const cls = s >= 70 ? 'score-hi' : s >= 50 ? 'score-med' : 'score-lo';
+    return '<tr>' +
+      '<td style="white-space:nowrap;font-size:12px;color:#6b7280">' + date + '</td>' +
+      '<td style="font-weight:500">' + escHtml(rec.candidateName) + (rec.anonymized ? ' <span style="font-size:11px;color:#9ca3af">(anon)</span>' : '') + '</td>' +
+      '<td style="color:#6b7280;font-size:12px">' + escHtml(rec.role || '—') + '</td>' +
+      '<td><span class="score-pill ' + cls + '">' + s + '</span></td>' +
+      '<td>' + (rec.scores?.keywords ?? '—') + '</td>' +
+      '<td>' + (rec.scores?.skills ?? '—') + '</td>' +
+      '<td>' + (rec.scores?.experience ?? '—') + '</td>' +
+      '<td>' + (rec.scores?.education ?? '—') + '</td>' +
+      '<td>' +
+        '<select class="decision-select" onchange="updateAuditDecision(\''+rec.id+'\',this.value)">' +
+          '<option value=""' + (!rec.decision ? ' selected' : '') + '>—</option>' +
+          '<option value="shortlist"' + (rec.decision==='shortlist' ? ' selected' : '') + '>Shortlist</option>' +
+          '<option value="hold"' + (rec.decision==='hold' ? ' selected' : '') + '>Hold</option>' +
+          '<option value="reject"' + (rec.decision==='reject' ? ' selected' : '') + '>Reject</option>' +
+        '</select>' +
+      '</td>' +
+      '<td><input class="note-input" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." onblur="updateAuditNote(\''+rec.id+'\',this.value)"></td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn btn-outline btn-sm" onclick="window.open(\''+API+'/api/audit/report/'+rec.id+'\', \'_blank\')" title="Report" style="margin-right:4px">Report</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteAuditRecord(\''+rec.id+'\')">Delete</button>' +
+      '</td>' +
+      '</tr>';
   }).join('');
 }
 
-function patchDecision(id, val) {
-  const row = allAuditRows.find(r => r.id === id);
-  if (row) row.decision = val;
-}
-function patchNote(id, val) {
-  const row = allAuditRows.find(r => r.id === id);
-  if (row) row.note = val;
-}
-
-async function deleteAudit(id) {
-  if (!confirm('Permanently delete this record?')) return;
-  const url = (document.getElementById('backendUrl').value||'').trim().replace(/\/+$/,'');
+async function updateAuditDecision(id, decision) {
+  // Re-POST the record with updated decision (simplest approach without PATCH endpoint)
+  const rec = lastAuditRecords.find(r => r.id === id);
+  if (!rec || !API) return;
   try {
-    const r = await fetch(url + '/api/audit/' + id, { method:'DELETE' });
-    if (!r.ok) throw new Error('Delete failed');
-    allAuditRows = allAuditRows.filter(r => r.id !== id);
-    renderAudit(allAuditRows);
-  } catch(e) { alert('Delete failed: ' + e.message); }
+    await fetch(API + '/api/audit/' + id, { method: 'DELETE' });
+    const body = { ...rec, decision, scores: rec.scores };
+    delete body.id; delete body.createdAt;
+    await fetch(API + '/api/audit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    loadAudit();
+  } catch(_) {}
 }
 
-function exportCsv() {
-  const url = (document.getElementById('backendUrl').value||'').trim().replace(/\/+$/,'');
-  if (!url) { alert('Set the API endpoint first.'); return; }
-  window.open(url + '/api/audit/export/csv', '_blank');
+async function updateAuditNote(id, note) {
+  const rec = lastAuditRecords.find(r => r.id === id);
+  if (!rec || !API) return;
+  try {
+    await fetch(API + '/api/audit/' + id, { method: 'DELETE' });
+    const body = { ...rec, note, scores: rec.scores };
+    delete body.id; delete body.createdAt;
+    await fetch(API + '/api/audit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    loadAudit();
+  } catch(_) {}
 }
 
-// ─── UTILS ───────────────────────────────────────────────
-function showError(msg) {
-  document.getElementById('errorMsg').textContent = msg;
-  document.getElementById('errorBox').classList.add('show');
+async function deleteAuditRecord(id) {
+  if (!confirm('Delete this record?') || !API) return;
+  try {
+    await fetch(API + '/api/audit/' + id, { method: 'DELETE' });
+    loadAudit();
+  } catch(e) { alert('Error: ' + e.message); }
 }
-function hideError() { document.getElementById('errorBox').classList.remove('show'); }
 
-function resetForm() {
-  document.getElementById('cvFile').value = '';
-  document.getElementById('fileName').style.display = 'none';
-  document.getElementById('jobDescription').value = '';
-  document.getElementById('results').style.display = 'none';
-  hideError();
+async function exportAuditCsv() {
+  if (!API) return;
+  const a = document.createElement('a');
+  a.href = API + '/api/audit/export/csv';
+  a.download = 'audit-log.csv';
+  a.click();
+}
+
+// ── Role History ──────────────────────────────────────────────────────────
+async function loadRoles() {
+  if (!API) return;
+  try {
+    const r = await fetch(API + '/api/audit/roles');
+    if (!r.ok) return;
+    const roles = await r.json();
+    const tabs = document.getElementById('roleTabs');
+    if (!roles.length) {
+      tabs.innerHTML = '<span style="color:#9ca3af;font-size:13px">No roles found. Analyze CVs and assign a role to see history here.</span>';
+      return;
+    }
+    tabs.innerHTML = roles.map(role =>
+      '<button class="role-tab" onclick="loadRoleHistory(\''+escHtml(role.role)+'\',this)">'+escHtml(role.role)+' <span style="font-size:11px;opacity:.7">('+role.count+')</span></button>'
+    ).join('');
+  } catch(_) {}
+}
+
+async function loadRoleHistory(role, btn) {
+  document.querySelectorAll('.role-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const content = document.getElementById('roleHistoryContent');
+  content.innerHTML = '<div class="empty-state">Loading...</div>';
+
+  try {
+    const r = await fetch(API + '/api/audit/roles/' + encodeURIComponent(role) + '/history');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const history = await r.json();
+
+    if (!history.length) {
+      content.innerHTML = '<div class="empty-state">No records for this role</div>';
+      return;
+    }
+
+    const avg = Math.round(history.reduce((s, r) => s + (r.overall || 0), 0) / history.length);
+    const top = history[0];
+
+    content.innerHTML = '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">' +
+      '<div class="score-box" style="flex:0 0 auto;min-width:120px;text-align:center;border:1px solid #e5e7eb;border-radius:6px;padding:14px 16px">' +
+        '<div class="score-label">Candidates</div><div class="score-val">' + history.length + '</div></div>' +
+      '<div class="score-box" style="flex:0 0 auto;min-width:120px;text-align:center;border:1px solid #e5e7eb;border-radius:6px;padding:14px 16px">' +
+        '<div class="score-label">Avg Score</div><div class="score-val" style="color:' + (avg>=70?'#10b981':avg>=50?'#f59e0b':'#ef4444') + '">' + avg + '</div></div>' +
+      '<div class="score-box" style="flex:0 0 auto;min-width:120px;text-align:center;border:1px solid #e5e7eb;border-radius:6px;padding:14px 16px">' +
+        '<div class="score-label">Top Score</div><div class="score-val" style="color:#10b981">' + (top.overall || 0) + '</div></div>' +
+      '</div>' +
+      '<table class="data-table">' +
+        '<thead><tr><th>#</th><th>Candidate</th><th>Overall</th><th>Keywords</th><th>Skills</th><th>Experience</th><th>Education</th><th>Decision</th></tr></thead>' +
+        '<tbody>' + history.map((r, i) => {
+          const s = r.overall || 0;
+          const cls = s >= 70 ? 'score-hi' : s >= 50 ? 'score-med' : 'score-lo';
+          return '<tr>' +
+            '<td style="color:#9ca3af;font-size:12px">' + (i+1) + '</td>' +
+            '<td style="font-weight:500">' + escHtml(r.candidateName) + '</td>' +
+            '<td><span class="score-pill ' + cls + '">' + s + '</span></td>' +
+            '<td>' + (r.scores?.keywords ?? '—') + '</td>' +
+            '<td>' + (r.scores?.skills ?? '—') + '</td>' +
+            '<td>' + (r.scores?.experience ?? '—') + '</td>' +
+            '<td>' + (r.scores?.education ?? '—') + '</td>' +
+            '<td style="font-weight:600;color:' + (r.decision==='shortlist'?'#065f46':r.decision==='reject'?'#991b1b':'#92400e') + '">' + (r.decision || '—') + '</td>' +
+            '</tr>';
+        }).join('') + '</tbody></table>';
+  } catch(e) {
+    content.innerHTML = '<div class="empty-state">Error: ' + e.message + '</div>';
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function clearResults() {
+  document.getElementById('singleResults').style.display = 'none';
+  document.getElementById('batchResults').style.display = 'none';
+  lastResult = null;
+  lastBatchResults = [];
+}
+
+function showError(el, msg) {
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escCsv(s) {
+  return String(s||'').replace(/"/g,'""');
+}
+
+function showLoading(msg) {
+  document.getElementById('loadingMsg').textContent = msg || 'Processing...';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('progressLabel').textContent = '';
+  document.getElementById('loadingOverlay').style.display = 'flex';
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
+function download(filename, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 }
 </script>
 </body>
