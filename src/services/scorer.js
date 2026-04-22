@@ -213,4 +213,17 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-module.exports = { scoreCV };
+
+// -- Anonymization --
+function anonymizeText(text) {
+  let t = text;
+  t = t.replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, '[EMAIL]');
+  t = t.replace(/(\+?[0-9][\s\-.]?){8,}[0-9]/g, '[PHONE]');
+  t = t.replace(/https?:\/\/[^\s]+/g, '[URL]');
+  t = t.replace(/^.*\b\d{1,5}\b.{0,60}\b(street|st|avenue|ave|road|rd|lane|drive|dr|boulevard|way|court|place)\b.*$/gim, '[ADDRESS]');
+  t = t.replace(/\b(19[4-9]\d|200\d|201[0-5])\b/g, '[YEAR]');
+  t = t.replace(/^([A-Z][a-z]+(?: [A-Z][a-z]+){1,3})$/gm, '[NAME]');
+  return t;
+}
+
+module.exports = { scoreCV, anonymizeText };
