@@ -347,6 +347,14 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   .main{padding:16px}
   .topbar,.config-bar{padding-left:16px;padding-right:16px}
 }
+
+/* Anonymize tooltip */
+.anon-tooltip-wrap{position:relative;display:inline-flex;align-items:center;margin-left:4px;cursor:default}
+.anon-tooltip-icon{width:15px;height:15px;border-radius:50%;border:1.5px solid #9ca3af;color:#9ca3af;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;user-select:none;transition:border-color .15s,color .15s}
+.anon-tooltip-wrap:hover .anon-tooltip-icon{border-color:#6366f1;color:#6366f1}
+.anon-tooltip-box{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1e1b4b;color:#e0e7ff;font-size:12px;line-height:1.55;padding:10px 13px;border-radius:9px;width:240px;box-shadow:0 6px 24px rgba(0,0,0,.22);z-index:9999;pointer-events:none;text-align:left;white-space:normal}
+.anon-tooltip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#1e1b4b}
+.anon-tooltip-wrap:hover .anon-tooltip-box{display:block}
 </style>
 </head>
 <body>
@@ -418,6 +426,10 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
     <div class="toggle-wrap" style="margin-left:8px">
       <label class="toggle"><input type="checkbox" id="anonymizeToggle"><span class="tog-slider"></span></label>
       <span class="tog-label">Anonymize</span>
+      <span class="anon-tooltip-wrap">
+        <span class="anon-tooltip-icon">?</span>
+        <span class="anon-tooltip-box"><strong style="display:block;margin-bottom:4px">What is Anonymize?</strong>Strips names, contact details, and other personally identifiable information from CVs before analysis — helping reduce unconscious bias and ensuring candidates are evaluated on skills and experience alone.</span>
+      </span>
     </div>
   </div>
 
