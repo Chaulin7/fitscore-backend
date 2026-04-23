@@ -356,6 +356,29 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .anon-tooltip-box{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1e1b4b;color:#e0e7ff;font-size:12px;line-height:1.55;padding:10px 13px;border-radius:9px;width:240px;box-shadow:0 6px 24px rgba(0,0,0,.22);z-index:9999;pointer-events:none;text-align:left;white-space:normal}
 .anon-tooltip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#1e1b4b}
 .anon-tooltip-wrap:hover .anon-tooltip-box{display:block}
+
+/* ── How-it-works banner ─────────────────────────────────────── */
+.how-banner{display:flex;gap:0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-bottom:22px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.how-step{flex:1;display:flex;align-items:flex-start;gap:12px;padding:16px 18px;position:relative}
+.how-step:not(:last-child)::after{content:'';position:absolute;right:0;top:20%;height:60%;width:1px;background:#e5e7eb}
+.how-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#0a1f3d,#0f2847);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.how-text strong{display:block;font-size:13px;font-weight:700;color:#0f2847;margin-bottom:2px}
+.how-text span{font-size:12px;color:#6b7280;line-height:1.4}
+
+/* ── Sort controls ───────────────────────────────────────────── */
+.batch-controls{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.batch-controls label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af}
+.sort-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
+.sort-btn:hover,.sort-btn.active{background:#0f2847;color:#fff;border-color:#0f2847}
+.sort-arrow{font-size:10px;opacity:.7}
+
+/* ── Footer / About ─────────────────────────────────────────── */
+.site-footer{background:#0a1f3d;color:rgba(255,255,255,.7);font-size:12px;line-height:1.7;padding:32px;margin-top:40px}
+.footer-inner{max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.footer-section h4{font-size:13px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
+.footer-section p{margin:0;color:rgba(255,255,255,.6)}
+.footer-bottom{max-width:900px;margin:20px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.4)}
+@media(max-width:600px){.how-banner{flex-direction:column}.how-step:not(:last-child)::after{display:none}.footer-inner{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -400,6 +423,23 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
     <button class="mode-btn active" id="modeSingle" onclick="setMode('single')">Single CV</button>
     <button class="mode-btn" id="modeBatch" onclick="setMode('batch')">Batch Upload</button>
   </div>
+
+  <!-- How it works -->
+  <div class="how-banner">
+    <div class="how-step">
+      <div class="how-num">1</div>
+      <div class="how-text"><strong>Upload CVs</strong><span>Drop one or multiple PDF / DOCX files into the upload zone</span></div>
+    </div>
+    <div class="how-step">
+      <div class="how-num">2</div>
+      <div class="how-text"><strong>Add a Job Description</strong><span>Paste the full job posting so the AI has the right context to score against</span></div>
+    </div>
+    <div class="how-step">
+      <div class="how-num">3</div>
+      <div class="how-text"><strong>Review Your Scores</strong><span>Get instant fit scores across Keywords, Skills, Experience and Education</span></div>
+    </div>
+  </div>
+
 
   <div class="card">
     <div class="card-head"><span class="card-title" id="uploadCardTitle">Upload CV</span></div>
@@ -528,6 +568,11 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
         </div>
       </div>
       <div style="overflow-x:auto">
+        <div class="batch-controls">
+          <label>Sort by</label>
+          <button class="sort-btn active" id="sortScore" onclick="sortBatch('score')">Score <span class="sort-arrow" id="arrowScore">&#9660;</span></button>
+          <button class="sort-btn" id="sortName" onclick="sortBatch('name')">Name <span class="sort-arrow" id="arrowName">&#9660;</span></button>
+        </div>
         <table class="lb" id="batchTable">
           <thead><tr>
             <th style="width:44px">#</th><th>Candidate</th><th>Overall</th>
@@ -681,9 +726,9 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     const fd=new FormData();files.forEach(f=>fd.append('cvs',f));
     fd.append('jobDescription',jd);fd.append('weights',JSON.stringify(weights));
     fd.append('anonymize',anon?'true':'false');
-    setProgress(30,'Uploading and processing...');
+    setProgress(30,'Extracting text from CV...');
     const r=await fetch(API+'/api/analyze/batch',{method:'POST',body:fd});
-    setProgress(80,'Scoring candidates...');
+    setProgress(80,'Comparing against job description...');
     const data=await r.json();
     if(!r.ok){showErr(errEl,data.error||'Batch failed');return;}
     setProgress(100,'Complete');
@@ -748,7 +793,7 @@ function renderBatchResults(results,role){
     const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
     const rc=i===0?'r1':i===1?'r2':i===2?'r3':'rn';
     const name=r.anonymized?'Candidate #'+(i+1):(r.candidateName||r.fileName);
-    return '<tr style="animation:fadeUp .3s ease '+(i*.05)+'s both">' +
+    return '<tr style="animation:fadeUp .3s ease '+(i*.05)+'s both" data-score="'+(r.overall||0)+'" data-name="'+(r.candidateName||r.fileName||'')+'">' +
       '<td><span class="rank-badge '+rc+'">'+(i+1)+'</span></td>' +
       '<td style="font-weight:600;color:#111827">'+escHtml(name)+'</td>' +
       '<td><span class="score-pill '+pill+'">'+s+'</span></td>' +
@@ -932,6 +977,57 @@ function showLoading(msg){document.getElementById('loadingMsg').textContent=msg|
 function hideLoading(){document.getElementById('loadingOverlay').style.display='none';}
 function setProgress(p,l){document.getElementById('progressBar').style.width=p+'%';document.getElementById('progressLabel').textContent=l;}
 function download(fn,text,type){const b=new Blob([text],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;a.click();URL.revokeObjectURL(u);}
+
+// ── Sort batch results ────────────────────────────────────────
+let _batchRows = [];
+let _sortDir = { score: -1, name: 1 };
+let _sortKey = 'score';
+
+const _origRenderBatch = typeof renderBatchResults === 'function' ? renderBatchResults : null;
+
+function sortBatch(key) {
+  _sortKey = key;
+  _sortDir[key] *= -1;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('sort' + (key === 'score' ? 'Score' : 'Name'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('arrowScore').innerHTML = _sortDir.score === -1 ? '&#9660;' : '&#9650;';
+  document.getElementById('arrowName').innerHTML = _sortDir.name === -1 ? '&#9660;' : '&#9650;';
+  const tbody = document.getElementById('batchBody');
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    if (key === 'score') {
+      const aVal = parseFloat(a.dataset.score || 0);
+      const bVal = parseFloat(b.dataset.score || 0);
+      return _sortDir.score * (bVal - aVal);
+    } else {
+      const aName = (a.dataset.name || '').toLowerCase();
+      const bName = (b.dataset.name || '').toLowerCase();
+      return _sortDir.name * aName.localeCompare(bName);
+    }
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
 </script>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-section">
+      <h4>How Scores Are Calculated</h4>
+      <p>Each CV is analysed by a large language model that extracts structured data — skills, experience, education and keywords — and compares them against your job description. Four sub-scores are produced (KW, SK, EX, ED) and combined using the weights you set in the Scoring Weights panel to produce a single Overall Fit score out of 100.</p>
+    </div>
+    <div class="footer-section">
+      <h4>Privacy &amp; Anonymisation</h4>
+      <p>When Anonymise is enabled, names, contact details and other personally identifiable information are stripped from the CV text before it is sent for analysis. No CV data is stored permanently — results are held in your browser session only and cleared when you leave the page.</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>CVsprings &mdash; AI-powered candidate fit analysis</span>
+    <span>Scores are AI-generated and intended as a decision aid, not a final verdict.</span>
+  </div>
+</footer>
+
 </body>
 </html>
