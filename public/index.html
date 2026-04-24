@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/png" href="/logo.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CVsprings · Candidate Fit Analyzer</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -477,6 +478,78 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 /* ── Footer link style ── */
 .footer-link{background:none;border:none;color:#93c5fd;font-size:inherit;cursor:pointer;text-decoration:underline;padding:0;font-family:inherit}
 .footer-link:hover{color:#fff}
+/* ── Mobile responsiveness ── */
+@media(max-width:480px){
+  .topbar{padding:0 14px;height:52px}
+  .brand-name{font-size:15px}
+  .brand-icon{width:44px!important;height:44px!important}
+  .main{padding:12px}
+  .card{border-radius:10px}
+  .card-head{padding:12px 14px 8px}
+  .card-body{padding:12px 14px 14px}
+  .mode-toggle{gap:0}
+  .mode-btn{font-size:11px;padding:6px 10px}
+  .how-banner{display:none}
+  .score-row{grid-template-columns:1fr 1fr;gap:8px}
+  .weights-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .weight-card{padding:10px}
+  .batch-summary{grid-template-columns:1fr 1fr}
+  .data-table{font-size:11px}
+  .data-table th,.data-table td{padding:8px 6px}
+  .data-table th:nth-child(n+4),.data-table td:nth-child(n+4){display:none}
+  .batch-actions{flex-wrap:wrap;gap:6px}
+  .footer-inner{grid-template-columns:1fr}
+  .footer-bottom{flex-direction:column;gap:6px;text-align:center}
+  .about-grid{grid-template-columns:1fr}
+  .modal-box{max-height:92vh}
+  .sort-bar{flex-wrap:wrap;gap:6px}
+}
+@media(max-width:640px){
+  .score-row{grid-template-columns:1fr 1fr;gap:10px}
+  .batch-summary{grid-template-columns:1fr 1fr}
+  .main{padding:16px}
+  .data-table th:nth-child(n+5),.data-table td:nth-child(n+5){display:none}
+  .batch-actions{flex-wrap:wrap}
+  .topbar-nav{gap:8px}
+  .topbar-nav a{font-size:12px}
+  .modal-box{margin:10px}
+}
+@media(max-width:768px){
+  .weights-grid{grid-template-columns:1fr 1fr}
+  .score-row{grid-template-columns:1fr 1fr}
+  .batch-actions{flex-wrap:wrap;gap:8px}
+}
+
+/* ── Smooth result transitions ── */
+.slide-in{animation:slideIn .35s cubic-bezier(.22,1,.36,1) both}
+@keyframes slideIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.slide-in-fast{animation:slideIn .22s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Success flash animation ── */
+.success-flash{animation:successPulse .6s ease both}
+@keyframes successPulse{
+  0%{box-shadow:0 0 0 0 rgba(5,150,105,0.4)}
+  50%{box-shadow:0 0 0 12px rgba(5,150,105,0)}
+  100%{box-shadow:0 0 0 0 rgba(5,150,105,0)}
+}
+.success-tick{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#dcfce7;border-radius:50%;animation:tickPop .4s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes tickPop{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ── Drag-and-drop enhanced ── */
+.dropzone{transition:border-color .2s,background .2s,transform .15s}
+.dropzone.drag{border-color:#0f2847;background:#eef2ff;transform:scale(1.01);box-shadow:0 0 0 4px rgba(15,40,71,0.1)}
+.dropzone.drag .dz-icon svg{transform:translateY(-4px);transition:transform .2s}
+.dropzone.drag .dz-label{color:#0f2847;font-weight:600}
+
+/* ── Candidate notes in batch rows ── */
+.row-notes-wrap{padding:4px 0}
+.row-notes{width:100%;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;color:#374151;resize:none;height:32px;transition:border-color .15s,height .2s;background:#fafafa}
+.row-notes:focus{outline:none;border-color:#0f2847;background:#fff;height:56px}
+.row-notes::placeholder{color:#d1d5db}
+
+/* ── Keyboard hint ── */
+.kbd-hint{font-size:11px;color:#9ca3af;margin-left:10px}
+.kbd-hint kbd{background:#f3f4f6;border:1px solid #d1d5db;border-radius:3px;padding:1px 5px;font-size:10px;font-family:inherit}
 </style>
 </head>
 <body>
@@ -637,6 +710,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
       Analyze
     </button>
     <button class="btn btn-ghost" onclick="clearResults()">Clear</button>
+  <span class="kbd-hint">Press <kbd>Enter</kbd> to analyze</span>
   </div>
 
   <!-- Single results -->
@@ -886,7 +960,7 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
 }
 
 function renderSingleResult(data,fileName,role){
-  document.getElementById('singleResults').style.display='block';
+  var _sr=document.getElementById('singleResults');_sr.style.display='block';_sr.classList.remove('slide-in');void _sr.offsetWidth;_sr.classList.add('slide-in');
   document.getElementById('batchResults').style.display='none';
   const name=data.anonymized?'Anonymous Candidate':(data.candidateName||fileName.replace(/\.[^.]+$/,''));
   document.getElementById('resultName').textContent=name+(role?' ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ '+role:'');
@@ -934,7 +1008,7 @@ function ringBox(label,val,isOverall,color){
 }
 
 function renderBatchResults(results,role){
-  document.getElementById('batchResults').style.display='block';
+  var _br=document.getElementById('batchResults');_br.style.display='block';_br.classList.remove('slide-in','success-flash');void _br.offsetWidth;_br.classList.add('slide-in','success-flash');
   document.getElementById('singleResults').style.display='none';
   document.getElementById('batchTitle').textContent='Ranked Results '+results.length+' candidates'+(role?' / '+role:'');
   document.getElementById('batchBody').innerHTML=results.map((r,i)=>{
@@ -949,7 +1023,7 @@ function renderBatchResults(results,role){
       '<td>'+( r.scores?.keywords??'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ')+'</td><td>'+(r.scores?.skills??'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ')+'</td>'+
       '<td>'+(r.scores?.experience??'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ')+'</td><td>'+(r.scores?.education??'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ')+'</td>' +
       '<td><select class="dec-sel" onchange="setBatchDecision('+i+',this.value)"><option value="">— Decision —</option><option value="shortlist">Shortlist</option><option value="hold">On Hold</option><option value="reject">Reject</option></select></td>' +
-      '<td><button class="btn btn-ghost btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td></tr>';
+      '<td><button class="btn btn-ghost btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td><td><textarea class="row-notes" placeholder="Notes..." rows="1" oninput="saveBatchNote('+i+',this.value)" onblur="saveBatchNote('+i+',this.value)">'+getBatchNote('+i+'+'</textarea></td></tr>';
   }).join('');
   updateBatchSummary(results);
 }
@@ -1104,7 +1178,7 @@ async function loadRoleHistory(role,btn){
         statC('Top Score',top.overall||0,'#059669')+
         statC('Shortlisted',short,'#7c3aed')+
       '</div>'+
-      '<table class="data-table"><thead><tr><th>#</th><th>Candidate</th><th>Overall</th><th>KW</th><th>SK</th><th>EX</th><th>ED</th><th>Decision</th></tr></thead><tbody>'+
+      '<table class="data-table"><thead><tr><th>#</th><th>Candidate</th><th>Overall</th><th>KW</th><th>SK</th><th>EX</th><th>ED</th><th>Decision</th><th class="notes-th" style="min-width:120px">Notes</th></tr></thead><tbody>'+
       history.map((r,i)=>{
         const s=r.overall||0;const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
         const dc=r.decision==='shortlist'?'#15803d':r.decision==='reject'?'#b91c1c':'#a16207';
@@ -1430,6 +1504,57 @@ function switchModalTab(idx){
   document.getElementById('infoModalTitle').textContent=idx===0?'How Scores Are Calculated':'About & Contact';
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeInfoModal();});
+</script>
+<script>
+/* ── Candidate batch notes ── */
+var _batchNotes = {};
+function saveBatchNote(idx, val){
+  _batchNotes[idx] = val;
+  try { sessionStorage.setItem('cvsprings_notes', JSON.stringify(_batchNotes)); } catch(e){}
+}
+function getBatchNote(idx){
+  if (!Object.keys(_batchNotes).length) {
+    try { var s=sessionStorage.getItem('cvsprings_notes'); if(s)_batchNotes=JSON.parse(s); } catch(e){}
+  }
+  return (_batchNotes[idx]||'').replace(/</g,'&lt;');
+}
+
+/* ── Keyboard shortcuts ── */
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    var tag = document.activeElement.tagName.toLowerCase();
+    if (tag === 'textarea' || tag === 'input') return;
+    var btn = document.getElementById('analyzeBtn');
+    if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+  }
+});
+
+/* ── Keep-alive ping (prevent Render cold start) ── */
+(function keepAlive(){
+  setInterval(function(){
+    fetch('/api/health', {method:'GET'}).catch(function(){
+      fetch('/', {method:'HEAD'}).catch(function(){});
+    });
+  }, 10 * 60 * 1000);
+})();
+
+/* ── Enhanced dropzone drag feedback ── */
+(function setupDrag(){
+  var dz = document.getElementById('dropzone');
+  if (!dz) return;
+  var dragCounter = 0;
+  document.addEventListener('dragenter', function(e){
+    if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+      dragCounter++;
+      dz.classList.add('drag');
+    }
+  });
+  document.addEventListener('dragleave', function(e){
+    dragCounter--;
+    if (dragCounter <= 0) { dragCounter = 0; dz.classList.remove('drag'); }
+  });
+  document.addEventListener('drop', function(){ dragCounter = 0; dz.classList.remove('drag'); });
+})();
 </script>
 </body>
 </html>
