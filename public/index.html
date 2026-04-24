@@ -549,7 +549,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
     <div class="card-head" style="position:relative">
       <span class="card-title">Job Description</span>
       <div class="tpl-wrap" id="tplWrap">
-        <button class="tpl-trigger" id="tplTrigger" onclick="toggleTplPanel()">
+        <button class="tpl-trigger" id="tplTrigger" onclick="toggleTplPanel(event)">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/></svg>
           Templates
           <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
@@ -1190,7 +1190,8 @@ function getTemplates(){
   catch(e){ return {}; }
 }
 
-function toggleTplPanel(){
+function toggleTplPanel(e){
+  if(e) e.stopPropagation();
   const trigger = document.getElementById('tplTrigger');
   const panel = document.getElementById('tplPanel');
   const isOpen = panel.classList.contains('open');
