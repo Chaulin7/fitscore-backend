@@ -379,6 +379,50 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .footer-section p{margin:0;color:rgba(255,255,255,.6)}
 .footer-bottom{max-width:900px;margin:20px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.4)}
 @media(max-width:600px){.how-banner{flex-direction:column}.how-step:not(:last-child)::after{display:none}.footer-inner{grid-template-columns:1fr}}
+
+/* Settings panel */
+.settings-btn{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:6px 10px;cursor:pointer;color:rgba(255,255,255,0.8);font-size:18px;line-height:1;transition:all .18s;position:relative}
+.settings-btn:hover{background:rgba(255,255,255,0.2);color:#fff}
+.settings-panel{display:none;position:fixed;top:54px;right:16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:9999;min-width:340px}
+.settings-panel.open{display:block}
+.settings-panel h3{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin:0 0 10px}
+.settings-row{display:flex;align-items:center;gap:8px}
+.settings-row .text-input{flex:1}
+.settings-close{position:absolute;top:10px;right:12px;background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1}
+.settings-close:hover{color:#374151;background:#f3f4f6}
+.settings-overlay{display:none;position:fixed;inset:0;z-index:9998}
+.settings-overlay.open{display:block}
+/* Hero */
+.hero-tagline{text-align:center;margin-bottom:20px;padding:4px 0}
+.hero-tagline h1{font-size:21px;font-weight:800;color:#0a1f3d;margin:0 0 4px;letter-spacing:-.3px}
+.hero-tagline p{font-size:13px;color:#6b7280;margin:0}
+/* Batch summary */
+.batch-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.bs-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;text-align:center}
+.bs-val{font-size:26px;font-weight:800;color:#0a1f3d;line-height:1}
+.bs-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-top:4px}
+.bs-sub{font-size:11px;color:#6b7280;margin-top:2px}
+/* Why score */
+.why-toggle{background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:#6b7280;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.why-toggle:hover{border-color:#0f2847;color:#0f2847}
+.why-arrow{font-size:9px;transition:transform .2s;display:inline-block}
+.why-toggle.open .why-arrow{transform:rotate(180deg)}
+.why-box{display:none;background:#f8faff;border:1px solid #dde4f7;border-radius:8px;padding:12px 14px;margin-top:10px;font-size:12px;line-height:1.65;color:#374151}
+.why-box.open{display:block}
+/* Templates */
+.template-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.template-bar label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;white-space:nowrap}
+.template-select{border:1px solid #e5e7eb;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:500;color:#374151;background:#fff;cursor:pointer;min-width:150px}
+.tpl-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tpl-btn:hover{background:#0f2847;color:#fff;border-color:#0f2847}
+.tpl-btn.danger:hover{background:#dc2626;color:#fff;border-color:#dc2626}
+/* Print */
+.print-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.print-btn:hover{background:#0f2847;color:#fff;border-color:#0f2847}
+@media print{.topbar,.config-bar,.mode-toggle,.how-banner,.options-row,.card-has-jd,.card-has-weights,.action-row,.batch-controls,.template-bar,.site-footer,.nav-btn,.conn-badge,.settings-btn,.settings-panel,.print-btn,.why-toggle,.tpl-btn,.sort-btn,.btn{display:none!important}body{background:#fff!important}
+.main{padding:10px!important}.card{box-shadow:none!important;border:1px solid #ddd!important;break-inside:avoid}.batch-summary{break-inside:avoid}.lb td,.lb th{padding:4px 6px!important;font-size:11px}}
+/* Slider */
+.w-slider{width:100%;margin-top:8px;accent-color:#0f2847;cursor:pointer;height:4px}
 </style>
 </head>
 <body>
@@ -403,21 +447,34 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
     <button class="nav-btn" onclick="switchTab('audit',this)">Audit Log</button>
     <button class="nav-btn" onclick="switchTab('history',this)">Role History</button>
   </nav>
-  <div class="conn-badge">
-    <span class="dot" id="connDot"></span>
-    <span id="connLabel">Not connected</span>
-  </div>
+  <button class="settings-btn" onclick="toggleSettings()" title="Settings">&#9881;</button>
 </div>
 
 <!-- Config bar -->
-<div class="config-bar">
-  <span class="config-label">API Endpoint</span>
-  <input class="text-input" type="text" id="apiUrl" placeholder="https://your-backend.onrender.com" style="flex:1;max-width:500px">
-  <button class="btn btn-primary btn-sm" onclick="connect()">Connect</button>
+<!-- Settings overlay -->
+<div class="settings-overlay" id="settingsOverlay" onclick="toggleSettings()"></div>
+<!-- Settings panel -->
+<div class="settings-panel" id="settingsPanel">
+  <button class="settings-close" onclick="toggleSettings()">&#215;</button>
+  <h3>Connection Settings</h3>
+  <div class="settings-row" style="margin-top:6px">
+    <input class="text-input" type="text" id="apiUrl" placeholder="https://your-api.onrender.com" style="flex:1">
+    <button class="btn btn-primary btn-sm" onclick="connect()">Connect</button>
+  </div>
+  <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+    <span class="dot" id="connDot"></span>
+    <span id="connLabel" style="font-size:12px;color:#6b7280">Not connected</span>
+  </div>
 </div>
 
 <!-- ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ANALYZER ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ -->
 <div class="tab-content active main" id="tab-analyzer">
+
+  <!-- Hero -->
+  <div class="hero-tagline">
+    <h1>AI-Powered Candidate Fit Analysis</h1>
+    <p>Upload CVs, set your criteria, and instantly identify your best-fit candidates</p>
+  </div>
 
   <div class="mode-toggle">
     <button class="mode-btn active" id="modeSingle" onclick="setMode('single')">Single CV</button>
@@ -475,6 +532,14 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   </div>
 
   <div class="card">
+    <div class="template-bar">
+      <label>Templates</label>
+      <select class="template-select" id="templateSelect" onchange="loadTemplate()">
+        <option value="">-- Load a saved template --</option>
+      </select>
+      <button class="tpl-btn" onclick="saveTemplate()">Save Template</button>
+      <button class="tpl-btn danger" onclick="deleteTemplate()">Delete</button>
+    </div>
     <div class="card-head"><span class="card-title">Job Description</span></div>
     <div class="card-body">
       <textarea class="textarea" id="jdInput" rows="6" placeholder="Paste the full job description here..."></textarea>
@@ -488,10 +553,14 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
     </div>
     <div class="card-body">
       <div class="weights-grid">
-        <div class="w-card"><div class="w-name">Keywords</div><div class="w-desc">Job title &amp; role terms</div><input class="w-input" type="number" id="wKw" value="40" min="0" max="100" oninput="updateWeightSum()"></div>
-        <div class="w-card"><div class="w-name">Skills</div><div class="w-desc">Technical &amp; soft skills</div><input class="w-input" type="number" id="wSk" value="30" min="0" max="100" oninput="updateWeightSum()"></div>
-        <div class="w-card"><div class="w-name">Experience</div><div class="w-desc">Years &amp; seniority level</div><input class="w-input" type="number" id="wEx" value="20" min="0" max="100" oninput="updateWeightSum()"></div>
-        <div class="w-card"><div class="w-name">Education</div><div class="w-desc">Degrees &amp; qualifications</div><input class="w-input" type="number" id="wEd" value="10" min="0" max="100" oninput="updateWeightSum()"></div>
+        <div class="w-card"><div class="w-name">Keywords</div><div class="w-desc">Job title &amp; role terms</div><input class="w-input" type="number" id="wKw" value="40" min="0" max="100" oninput="syncSlider('wKw');updateWeightSum()">
+          <input type="range" class="w-slider" id="wKwSlider" min="0" max="100" value="40" oninput="syncInput('wKw');updateWeightSum()"></div>
+        <div class="w-card"><div class="w-name">Skills</div><div class="w-desc">Technical &amp; soft skills</div><input class="w-input" type="number" id="wSk" value="30" min="0" max="100" oninput="syncSlider('wSk');updateWeightSum()">
+          <input type="range" class="w-slider" id="wSkSlider" min="0" max="100" value="30" oninput="syncInput('wSk');updateWeightSum()"></div>
+        <div class="w-card"><div class="w-name">Experience</div><div class="w-desc">Years &amp; seniority level</div><input class="w-input" type="number" id="wEx" value="20" min="0" max="100" oninput="syncSlider('wEx');updateWeightSum()">
+          <input type="range" class="w-slider" id="wExSlider" min="0" max="100" value="20" oninput="syncInput('wEx');updateWeightSum()"></div>
+        <div class="w-card"><div class="w-name">Education</div><div class="w-desc">Degrees &amp; qualifications</div><input class="w-input" type="number" id="wEd" value="10" min="0" max="100" oninput="syncSlider('wEd');updateWeightSum()">
+          <input type="range" class="w-slider" id="wEdSlider" min="0" max="100" value="10" oninput="syncInput('wEd');updateWeightSum()"></div>
       </div>
     </div>
   </div>
@@ -528,6 +597,12 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
         <table class="data-table" id="skillsTable" style="margin-bottom:20px">
           <thead><tr><th>Skill</th><th>Status</th></tr></thead><tbody></tbody>
         </table>
+        <div style="margin-bottom:12px">
+          <button class="why-toggle" onclick="toggleWhy('singleWhy',this)">
+            <span>Why this score?</span><span class="why-arrow">&#9660;</span>
+          </button>
+          <div class="why-box" id="singleWhy"></div>
+        </div>
         <div class="section-sub">Recommendations</div>
         <table class="data-table" id="recsTable">
           <thead><tr><th>Area</th><th>Recommendation</th></tr></thead><tbody></tbody>
@@ -565,7 +640,14 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" onclick="saveAllToAudit()">Save All to Audit</button>
           <button class="btn btn-ghost btn-sm" onclick="exportBatchCsv()">Export CSV</button>
+          <button class="print-btn" onclick="window.print()" title="Print / Save as PDF">&#128438; Print Report</button>
         </div>
+      </div>
+      <div class="batch-summary" id="batchSummary" style="display:none">
+        <div class="bs-card"><div class="bs-val" id="bsTotalCVs">0</div><div class="bs-label">CVs Analysed</div></div>
+        <div class="bs-card"><div class="bs-val" id="bsAvgScore">—</div><div class="bs-label">Avg Score</div><div class="bs-sub">out of 100</div></div>
+        <div class="bs-card"><div class="bs-val" id="bsShortlisted">0</div><div class="bs-label">Shortlisted</div><div class="bs-sub">score &ge; 70</div></div>
+        <div class="bs-card"><div class="bs-val" id="bsTopCandidate" style="font-size:14px;padding-top:4px">—</div><div class="bs-label">Top Candidate</div></div>
       </div>
       <div style="overflow-x:auto">
         <div class="batch-controls">
@@ -751,6 +833,8 @@ function renderSingleResult(data,fileName,role){
     ringBox('Skills',data.scores?.skills,false,'#7c3aed')+
     ringBox('Experience',data.scores?.experience,false,'#d97706')+
     ringBox('Education',data.scores?.education,false,'#059669');
+  const whyEl = document.getElementById('singleWhy');
+  if(whyEl) whyEl.innerHTML = buildWhyHTML(data);
   requestAnimationFrame(()=>{
     document.querySelectorAll('.ring-fill').forEach(el=>{
       const v=parseFloat(el.dataset.v),circ=2*Math.PI*28;
@@ -802,6 +886,7 @@ function renderBatchResults(results,role){
       '<td><select class="dec-sel" onchange="setBatchDecision('+i+',this.value)"><option value="">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</option><option value="shortlist">Shortlist</option><option value="hold">Hold</option><option value="reject">Reject</option></select></td>' +
       '<td><button class="btn btn-ghost btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td></tr>';
   }).join('');
+  updateBatchSummary(results);
 }
 function setBatchDecision(i,v){if(lastBatchResults[i])lastBatchResults[i]._decision=v;}
 async function saveToAudit(){
@@ -1009,6 +1094,160 @@ function sortBatch(key) {
   });
   rows.forEach(r => tbody.appendChild(r));
 }
+
+
+// ── Settings panel ─────────────────────────────────────────────
+function toggleSettings(){
+  const panel = document.getElementById('settingsPanel');
+  const overlay = document.getElementById('settingsOverlay');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open', !isOpen);
+  overlay.classList.toggle('open', !isOpen);
+}
+
+// ── Slider sync ────────────────────────────────────────────────
+function syncSlider(id){
+  const input = document.getElementById(id);
+  const slider = document.getElementById(id+'Slider');
+  if(slider) slider.value = input.value;
+}
+function syncInput(id){
+  const slider = document.getElementById(id+'Slider');
+  const input = document.getElementById(id);
+  if(input) input.value = slider.value;
+}
+
+// ── Why this score ──────────────────────────────────────────────
+function toggleWhy(id, btn){
+  const box = document.getElementById(id);
+  if(!box) return;
+  const open = box.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+
+function buildWhyHTML(data){
+  const scores = data.scores || {};
+  const overall = data.overall || 0;
+  let html = '<strong>Overall: ' + overall + '/100</strong><br>';
+  if(scores.keywords != null) html += '<div class="why-row">&#128273; <strong>Keywords ' + scores.keywords + '</strong> — match between job title, required terms and CV content.</div>';
+  if(scores.skills != null) html += '<div class="why-row">&#9889; <strong>Skills ' + scores.skills + '</strong> — technical and soft skills alignment with the role requirements.</div>';
+  if(scores.experience != null) html += '<div class="why-row">&#128197; <strong>Experience ' + scores.experience + '</strong> — years of relevant experience and seniority match.</div>';
+  if(scores.education != null) html += '<div class="why-row">&#127891; <strong>Education ' + scores.education + '</strong> — academic qualifications and certifications match.</div>';
+  const recs = (data.recommendations||[]);
+  if(recs.length){
+    html += '<div class="why-row" style="margin-top:6px"><strong>Key notes:</strong> ' + recs.map(r=>r.text||r).slice(0,2).join(' ') + '</div>';
+  }
+  return html;
+}
+
+// ── Batch summary panel ─────────────────────────────────────────
+function updateBatchSummary(results){
+  if(!results || !results.length) return;
+  const summary = document.getElementById('batchSummary');
+  if(summary) summary.style.display = 'grid';
+  const total = results.length;
+  const avg = Math.round(results.reduce((s,r)=>s+(r.overall||0),0)/total);
+  const shortlisted = results.filter(r=>(r.overall||0)>=70).length;
+  const top = results.reduce((a,b)=>(a.overall||0)>=(b.overall||0)?a:b, results[0]);
+  const topName = top.candidateName || top.fileName || 'N/A';
+  const el = id=>document.getElementById(id);
+  if(el('bsTotalCVs')) el('bsTotalCVs').textContent = total;
+  if(el('bsAvgScore')) el('bsAvgScore').textContent = avg;
+  if(el('bsShortlisted')) el('bsShortlisted').textContent = shortlisted;
+  if(el('bsTopCandidate')) el('bsTopCandidate').textContent = topName.length > 18 ? topName.substring(0,16)+'…' : topName;
+}
+
+// ── Role template library ───────────────────────────────────────
+const TMPL_KEY = 'cvsprings_templates';
+
+function getTemplates(){
+  try{ return JSON.parse(localStorage.getItem(TMPL_KEY)||'{}'); }
+  catch(e){ return {}; }
+}
+
+function saveTemplate(){
+  const name = prompt('Template name (e.g. "Senior Engineer"):');
+  if(!name || !name.trim()) return;
+  const templates = getTemplates();
+  templates[name.trim()] = {
+    jd: document.getElementById('jdInput').value,
+    role: document.getElementById('roleInput').value,
+    weights: getWeights()
+  };
+  localStorage.setItem(TMPL_KEY, JSON.stringify(templates));
+  populateTemplateSelect();
+  alert('Template "' + name.trim() + '" saved!');
+}
+
+function loadTemplate(){
+  const sel = document.getElementById('templateSelect');
+  if(!sel || !sel.value) return;
+  const templates = getTemplates();
+  const tmpl = templates[sel.value];
+  if(!tmpl) return;
+  if(tmpl.jd) document.getElementById('jdInput').value = tmpl.jd;
+  if(tmpl.role) document.getElementById('roleInput').value = tmpl.role;
+  if(tmpl.weights){
+    const w = tmpl.weights;
+    const fields = {wKw:'kw',wSk:'sk',wEx:'ex',wEd:'ed'};
+    Object.entries(fields).forEach(([id,key])=>{
+      const input = document.getElementById(id);
+      const slider = document.getElementById(id+'Slider');
+      if(input && w[key] != null){ input.value = w[key]; }
+      if(slider && w[key] != null){ slider.value = w[key]; }
+    });
+    updateWeightSum();
+  }
+}
+
+function deleteTemplate(){
+  const sel = document.getElementById('templateSelect');
+  if(!sel || !sel.value){ alert('Select a template first.'); return; }
+  if(!confirm('Delete template "' + sel.value + '"?')) return;
+  const templates = getTemplates();
+  delete templates[sel.value];
+  localStorage.setItem(TMPL_KEY, JSON.stringify(templates));
+  populateTemplateSelect();
+}
+
+function populateTemplateSelect(){
+  const sel = document.getElementById('templateSelect');
+  if(!sel) return;
+  const templates = getTemplates();
+  const keys = Object.keys(templates);
+  sel.innerHTML = '<option value="">-- Load a saved template --</option>' +
+    keys.map(k=>'<option value="'+escHtml(k)+'">'+escHtml(k)+'</option>').join('');
+}
+
+// Init on load
+document.addEventListener('DOMContentLoaded', function(){
+  populateTemplateSelect();
+  // Load saved API URL
+  const saved = localStorage.getItem('cvsprings_api');
+  if(saved){ const el=document.getElementById('apiUrl'); if(el) el.value=saved; }
+});
+function toggleBatchWhy(btn, idx){
+  const tr = btn.closest('tr');
+  if(!tr) return;
+  const existing = tr.nextElementSibling;
+  if(existing && existing.classList.contains('why-row-expand')){
+    existing.remove();
+    btn.classList.remove('open');
+    return;
+  }
+  btn.classList.toggle('open');
+  let data = {};
+  try{ data = JSON.parse(tr.getAttribute('data-recs')||'{}'); }catch(e){}
+  const html = buildWhyHTML(data);
+  const whyTr = document.createElement('tr');
+  whyTr.className = 'why-row-expand';
+  const td = document.createElement('td');
+  td.colSpan = 9;
+  td.innerHTML = '<div class="why-box open" style="margin:4px 0">' + html + '</div>';
+  whyTr.appendChild(td);
+  tr.insertAdjacentElement('afterend', whyTr);
+}
+
 </script>
 
 <!-- Footer -->
