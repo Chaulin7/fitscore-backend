@@ -437,6 +437,46 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .main{padding:10px!important}.card{box-shadow:none!important;border:1px solid #ddd!important;break-inside:avoid}.batch-summary{break-inside:avoid}.lb td,.lb th{padding:4px 6px!important;font-size:11px}}
 /* Slider */
 .w-slider{width:100%;margin-top:8px;accent-color:#0f2847;cursor:pointer;height:4px}
+/* ── Modal ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(10,31,61,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;transition:opacity .25s}
+.modal-backdrop.open{opacity:1}
+.modal-box{background:#fff;border-radius:14px;width:100%;max-width:640px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(10,31,61,0.22);transform:translateY(20px);transition:transform .25s}
+.modal-backdrop.open .modal-box{transform:translateY(0)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid #e5e7eb}
+.modal-head h3{margin:0;font-size:17px;font-weight:700;color:#0a1f3d}
+.modal-close{background:none;border:none;font-size:22px;color:#6b7280;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}
+.modal-close:hover{background:#f3f4f6;color:#0a1f3d}
+.modal-tabs{display:flex;gap:0;border-bottom:1px solid #e5e7eb;padding:0 24px;flex-shrink:0}
+.modal-tab{background:none;border:none;padding:12px 18px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;letter-spacing:.03em}
+.modal-tab.active{color:#0a1f3d;border-bottom-color:#0f2847}
+.modal-body{padding:24px;overflow-y:auto;line-height:1.65;font-size:14px;color:#374151}
+.modal-body h4{font-size:13px;font-weight:700;color:#0a1f3d;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 6px}
+.modal-body h4:first-child{margin-top:0}
+.modal-body p{margin:0 0 12px}
+.modal-body ul{margin:0 0 12px;padding-left:18px}
+.modal-body li{margin-bottom:4px}
+.score-example{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.score-example .ex-pill{padding:4px 14px;border-radius:20px;font-size:13px;font-weight:700}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.about-card{background:#f8faff;border:1px solid #e5e7eb;border-radius:10px;padding:16px}
+.about-card h5{margin:0 0 6px;font-size:13px;font-weight:700;color:#0a1f3d}
+.about-card p{margin:0;font-size:13px;color:#6b7280}
+.contact-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f3f4f6}
+.contact-row:last-child{border:none}
+.contact-row strong{min-width:80px;font-size:13px;color:#0a1f3d}
+.contact-row a,.contact-row span{font-size:13px;color:#0f2847}
+.contact-row a:hover{text-decoration:underline}
+/* ── Enhanced score banding on batch rows ── */
+.score-hi-row{border-left:3px solid #16a34a!important}
+.score-med-row{border-left:3px solid #d97706!important}
+.score-lo-row{border-left:3px solid #dc2626!important}
+/* ── Score text colour in single result ── */
+.score-hi-text{color:#15803d!important;font-weight:800}
+.score-med-text{color:#b45309!important;font-weight:800}
+.score-lo-text{color:#b91c1c!important;font-weight:800}
+/* ── Footer link style ── */
+.footer-link{background:none;border:none;color:#93c5fd;font-size:inherit;cursor:pointer;text-decoration:underline;padding:0;font-family:inherit}
+.footer-link:hover{color:#fff}
 </style>
 </head>
 <body>
@@ -902,8 +942,8 @@ function renderBatchResults(results,role){
     const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
     const rc=i===0?'r1':i===1?'r2':i===2?'r3':'rn';
     const name=r.anonymized?'Candidate #'+(i+1):(r.candidateName||r.fileName);
-    return '<tr style="animation:fadeUp .3s ease '+(i*.05)+'s both" data-score="'+(r.overall||0)+'" data-name="'+(r.candidateName||r.fileName||'')+'">' +
-      '<td><span class="rank-badge '+rc+'">'+(i+1)+'</span></td>' +
+    return '<tr class="'+(s>=70?'score-hi-row':s>=50?'score-med-row':'score-lo-row')+'" style="animation:fadeUp .3s ease '+(i*.05)+'s both" data-score="'+(r.overall||0)+'" data-name="'+(r.candidateName||r.fileName||'')+'">' +
+      '<td style="border-left:3px solid '+(s>=70?'#16a34a':s>=50?'#d97706':'#dc2626')+'">'+'<span class="rank-badge '+rc+'">'+(i+1)+'</span></td>' +
       '<td style="font-weight:600;color:#111827">'+escHtml(name)+'</td>' +
       '<td><span class="score-pill '+pill+'">'+s+'</span></td>' +
       '<td>'+( r.scores?.keywords??'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ')+'</td><td>'+(r.scores?.skills??'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ')+'</td>'+
@@ -1305,7 +1345,7 @@ function toggleBatchWhy(btn, idx){
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-section">
-      <h4>How Scores Are Calculated</h4>
+      <h4><button class="footer-link" onclick="openInfoModal(0)">How Scores Are Calculated</button></h4>
       <p>Each CV is analysed by a large language model that extracts structured data — skills, experience, education and keywords — and compares them against your job description. Four sub-scores are produced (KW, SK, EX, ED) and combined using the weights you set in the Scoring Weights panel to produce a single Overall Fit score out of 100.</p>
     </div>
     <div class="footer-section">
@@ -1314,10 +1354,82 @@ function toggleBatchWhy(btn, idx){
     </div>
   </div>
   <div class="footer-bottom">
-    <span>CVsprings &mdash; AI-powered candidate fit analysis</span>
+    <span>CVsprings &mdash; AI-powered candidate fit analysis &nbsp;|&nbsp; <button class="footer-link" onclick="openInfoModal(1)">About &amp; Contact</button></span>
     <span>Scores are AI-generated and intended as a decision aid, not a final verdict.</span>
   </div>
 </footer>
 
+
+<!-- Info Modal (How Scores + About) -->
+<div id="infoModal" class="modal-backdrop" onclick="if(event.target===this)closeInfoModal()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="infoModalTitle">How Scores Are Calculated</h3>
+      <button class="modal-close" onclick="closeInfoModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tab0" onclick="switchModalTab(0)">How Scores Work</button>
+      <button class="modal-tab" id="tab1" onclick="switchModalTab(1)">About &amp; Contact</button>
+    </div>
+    <div class="modal-body">
+      <div id="tabPanel0">
+        <h4>Overview</h4>
+        <p>Each CV is analysed by a large language model that extracts structured information and compares it against your job description across four dimensions.</p>
+        <h4>The Four Sub-scores</h4>
+        <ul>
+          <li><strong>Keywords (KW)</strong> &mdash; Key terms from the job description found in the CV.</li>
+          <li><strong>Skills (SK)</strong> &mdash; Technical and soft skills match between CV and role.</li>
+          <li><strong>Experience (EX)</strong> &mdash; Seniority, years of experience, and domain relevance.</li>
+          <li><strong>Education (ED)</strong> &mdash; Degree level, field of study, and certifications.</li>
+        </ul>
+        <h4>Overall Score</h4>
+        <p>The four sub-scores are blended using the weights you set in the Scoring Weights panel. Bias toward skills or experience depending on the role.</p>
+        <h4>Score Bands</h4>
+        <div class="score-example">
+          <span class="ex-pill" style="background:#dcfce7;color:#15803d">80+ Strong Fit</span>
+          <span class="ex-pill" style="background:#fef9c3;color:#92400e">50-79 Possible Fit</span>
+          <span class="ex-pill" style="background:#fee2e2;color:#b91c1c">0-49 Weak Fit</span>
+        </div>
+        <p style="font-size:12px;color:#9ca3af;margin-top:8px">Scores are AI-generated and should be used as a decision aid alongside human judgement.</p>
+      </div>
+      <div id="tabPanel1" style="display:none">
+        <h4>About CVsprings</h4>
+        <p>CVsprings is an AI-powered candidate fit analyser designed to help recruiters quickly identify best-fit candidates from a pool of applicants using objective, weighted fit scores.</p>
+        <div class="about-grid">
+          <div class="about-card"><h5>Fast &amp; Accurate</h5><p>Analyse a single CV or a full batch in seconds using cutting-edge AI.</p></div>
+          <div class="about-card"><h5>Privacy First</h5><p>Anonymisation mode strips PII before analysis. No data stored permanently.</p></div>
+          <div class="about-card"><h5>Customisable</h5><p>Adjust scoring weights to match your role priorities across four dimensions.</p></div>
+          <div class="about-card"><h5>Transparent</h5><p>Every score includes a breakdown and a why-this-score explanation.</p></div>
+        </div>
+        <h4>Contact</h4>
+        <div class="contact-row"><strong>Product</strong><span>CVsprings - AI Candidate Fit Analyser</span></div>
+        <div class="contact-row"><strong>Built by</strong><span>Chaulin</span></div>
+        <div class="contact-row"><strong>Feedback</strong><span>Open an issue or discussion on the GitHub repository.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function openInfoModal(tab){
+  var m=document.getElementById('infoModal');
+  m.style.display='flex';
+  requestAnimationFrame(function(){m.classList.add('open');});
+  switchModalTab(tab||0);
+  document.body.style.overflow='hidden';
+}
+function closeInfoModal(){
+  var m=document.getElementById('infoModal');
+  m.classList.remove('open');
+  setTimeout(function(){m.style.display='none';document.body.style.overflow='';},250);
+}
+function switchModalTab(idx){
+  [0,1].forEach(function(i){
+    document.getElementById('tab'+i).classList.toggle('active',i===idx);
+    document.getElementById('tabPanel'+i).style.display=i===idx?'block':'none';
+  });
+  document.getElementById('infoModalTitle').textContent=idx===0?'How Scores Are Calculated':'About & Contact';
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeInfoModal();});
+</script>
 </body>
 </html>
