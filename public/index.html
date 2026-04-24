@@ -410,12 +410,26 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .why-box{display:none;background:#f8faff;border:1px solid #dde4f7;border-radius:8px;padding:12px 14px;margin-top:10px;font-size:12px;line-height:1.65;color:#374151}
 .why-box.open{display:block}
 /* Templates */
-.template-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
-.template-bar label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;white-space:nowrap}
-.template-select{border:1px solid #e5e7eb;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:500;color:#374151;background:#fff;cursor:pointer;min-width:150px}
-.tpl-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;white-space:nowrap}
-.tpl-btn:hover{background:#0f2847;color:#fff;border-color:#0f2847}
-.tpl-btn.danger:hover{background:#dc2626;color:#fff;border-color:#dc2626}
+.tpl-trigger{display:inline-flex;align-items:center;gap:6px;background:none;border:1.5px solid #e5e7eb;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .18s}
+.tpl-trigger:hover,.tpl-trigger.open{border-color:#0a1f3d;color:#0a1f3d;background:#f0f4ff}
+.tpl-trigger svg{transition:transform .2s}
+.tpl-trigger.open svg{transform:rotate(180deg)}
+.tpl-panel{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 8px 32px rgba(10,31,61,.13);z-index:999;width:300px;padding:0;overflow:hidden}
+.tpl-panel.open{display:block}
+.tpl-panel-head{padding:14px 16px 10px;border-bottom:1px solid #f3f4f6;display:flex;justify-content:space-between;align-items:center}
+.tpl-panel-head span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af}
+.tpl-save-btn{background:#0a1f3d;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;transition:opacity .15s}
+.tpl-save-btn:hover{opacity:.85}
+.tpl-chips{padding:10px 12px;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
+.tpl-empty{padding:20px 16px;text-align:center;color:#9ca3af;font-size:12px}
+.tpl-chip{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:9px;overflow:hidden;transition:border-color .15s}
+.tpl-chip:hover{border-color:#c7d6f5}
+.tpl-chip-name{flex:1;padding:9px 13px;font-size:13px;font-weight:600;color:#0f2847;cursor:pointer;transition:background .15s;background:none;border:none;text-align:left}
+.tpl-chip-name:hover{background:#f0f4ff}
+.tpl-chip-del{padding:9px 11px;color:#d1d5db;font-size:13px;cursor:pointer;transition:all .15s;background:none;border:none;border-left:1.5px solid #f3f4f6;line-height:1}
+.tpl-chip-del:hover{color:#dc2626;background:#fff5f5}
+.tpl-panel-footer{padding:10px 16px;border-top:1px solid #f3f4f6;font-size:11px;color:#b0b8c4;font-style:italic}
+.tpl-wrap{position:relative;display:inline-block}
 /* Print */
 .print-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
 .print-btn:hover{background:#0f2847;color:#fff;border-color:#0f2847}
@@ -532,15 +546,26 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   </div>
 
   <div class="card">
-    <div class="template-bar">
-      <label>Templates</label>
-      <select class="template-select" id="templateSelect" onchange="loadTemplate()">
-        <option value="">-- Load a saved template --</option>
-      </select>
-      <button class="tpl-btn" onclick="saveTemplate()">Save Template</button>
-      <button class="tpl-btn danger" onclick="deleteTemplate()">Delete</button>
+    <div class="card-head" style="position:relative">
+      <span class="card-title">Job Description</span>
+      <div class="tpl-wrap" id="tplWrap">
+        <button class="tpl-trigger" id="tplTrigger" onclick="toggleTplPanel()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/></svg>
+          Templates
+          <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="tpl-panel" id="tplPanel">
+          <div class="tpl-panel-head">
+            <span>Saved Templates</span>
+            <button class="tpl-save-btn" onclick="saveTemplate()">+ Save Current</button>
+          </div>
+          <div class="tpl-chips" id="tplChips">
+            <div class="tpl-empty">No templates saved yet.<br>Set up a role and click &ldquo;+ Save Current&rdquo;.</div>
+          </div>
+          <div class="tpl-panel-footer">Click a template to load it instantly</div>
+        </div>
+      </div>
     </div>
-    <div class="card-head"><span class="card-title">Job Description</span></div>
     <div class="card-body">
       <textarea class="textarea" id="jdInput" rows="6" placeholder="Paste the full job description here..."></textarea>
     </div>
@@ -1165,8 +1190,44 @@ function getTemplates(){
   catch(e){ return {}; }
 }
 
+function toggleTplPanel(){
+  const trigger = document.getElementById('tplTrigger');
+  const panel = document.getElementById('tplPanel');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open',!isOpen);
+  trigger.classList.toggle('open',!isOpen);
+  if(!isOpen) renderTplChips();
+}
+
+function closeTplPanel(){
+  document.getElementById('tplPanel')?.classList.remove('open');
+  document.getElementById('tplTrigger')?.classList.remove('open');
+}
+
+document.addEventListener('click', function(e){
+  const wrap = document.getElementById('tplWrap');
+  if(wrap && !wrap.contains(e.target)) closeTplPanel();
+});
+
+function renderTplChips(){
+  const chips = document.getElementById('tplChips');
+  if(!chips) return;
+  const templates = getTemplates();
+  const keys = Object.keys(templates);
+  if(!keys.length){
+    chips.innerHTML = '<div class="tpl-empty">No templates saved yet.<br>Set up a role and click &ldquo;+ Save Current&rdquo;.</div>';
+    return;
+  }
+  chips.innerHTML = keys.map(k =>
+    '<div class="tpl-chip">' +
+      '<button class="tpl-chip-name" onclick="loadTemplate(''+escHtml(k)+'')" title="Load ''+escHtml(k)+''">'+escHtml(k)+'</button>' +
+      '<button class="tpl-chip-del" onclick="deleteTemplate(''+escHtml(k)+'')" title="Delete">&#10005;</button>' +
+    '</div>'
+  ).join('');
+}
+
 function saveTemplate(){
-  const name = prompt('Template name (e.g. "Senior Engineer"):');
+  const name = prompt('Name this template (e.g. "Senior Engineer"):');
   if(!name || !name.trim()) return;
   const templates = getTemplates();
   templates[name.trim()] = {
@@ -1175,15 +1236,12 @@ function saveTemplate(){
     weights: getWeights()
   };
   localStorage.setItem(TMPL_KEY, JSON.stringify(templates));
-  populateTemplateSelect();
-  alert('Template "' + name.trim() + '" saved!');
+  renderTplChips();
 }
 
-function loadTemplate(){
-  const sel = document.getElementById('templateSelect');
-  if(!sel || !sel.value) return;
+function loadTemplate(name){
   const templates = getTemplates();
-  const tmpl = templates[sel.value];
+  const tmpl = templates[name];
   if(!tmpl) return;
   if(tmpl.jd) document.getElementById('jdInput').value = tmpl.jd;
   if(tmpl.role) document.getElementById('roleInput').value = tmpl.role;
@@ -1191,37 +1249,29 @@ function loadTemplate(){
     const w = tmpl.weights;
     const fields = {wKw:'kw',wSk:'sk',wEx:'ex',wEd:'ed'};
     Object.entries(fields).forEach(([id,key])=>{
-      const input = document.getElementById(id);
-      const slider = document.getElementById(id+'Slider');
-      if(input && w[key] != null){ input.value = w[key]; }
-      if(slider && w[key] != null){ slider.value = w[key]; }
+      const inp = document.getElementById(id);
+      const sld = document.getElementById(id+'Slider');
+      if(inp && w[key]!=null) inp.value = w[key];
+      if(sld && w[key]!=null) sld.value = w[key];
     });
     updateWeightSum();
   }
+  closeTplPanel();
 }
 
-function deleteTemplate(){
-  const sel = document.getElementById('templateSelect');
-  if(!sel || !sel.value){ alert('Select a template first.'); return; }
-  if(!confirm('Delete template "' + sel.value + '"?')) return;
+function deleteTemplate(name){
+  if(!confirm('Delete template "'+name+'"?')) return;
   const templates = getTemplates();
-  delete templates[sel.value];
+  delete templates[name];
   localStorage.setItem(TMPL_KEY, JSON.stringify(templates));
-  populateTemplateSelect();
+  renderTplChips();
 }
 
-function populateTemplateSelect(){
-  const sel = document.getElementById('templateSelect');
-  if(!sel) return;
-  const templates = getTemplates();
-  const keys = Object.keys(templates);
-  sel.innerHTML = '<option value="">-- Load a saved template --</option>' +
-    keys.map(k=>'<option value="'+escHtml(k)+'">'+escHtml(k)+'</option>').join('');
-}
+function populateTemplateSelect(){ renderTplChips(); }
 
 // Init on load
 document.addEventListener('DOMContentLoaded', function(){
-  populateTemplateSelect();
+  renderTplChips();
   // Load saved API URL
   const saved = localStorage.getItem('cvsprings_api');
   if(saved){ const el=document.getElementById('apiUrl'); if(el) el.value=saved; }
