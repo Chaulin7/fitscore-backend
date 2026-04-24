@@ -558,9 +558,31 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 /* ── Keyboard hint ── */
 .kbd-hint{font-size:11px;color:#9ca3af;margin-left:10px}
 .kbd-hint kbd{background:#f3f4f6;border:1px solid #d1d5db;border-radius:3px;padding:1px 5px;font-size:10px;font-family:inherit}
+/* ── Splash screen ── */
+#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);
+  transition:opacity .6s ease, visibility .6s ease}
+#splash.hidden{opacity:0;visibility:hidden;pointer-events:none}
+#splash .splash-ring{width:90px;height:90px;border-radius:50%;border:2.5px solid rgba(255,255,255,0.7);
+  display:flex;align-items:center;justify-content:center;animation:splashSpin 1.4s linear infinite}
+#splash .splash-ring img{width:76px;height:76px;object-fit:contain;filter:invert(1) brightness(1.15)}
+#splash .splash-brand{font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px}
+#splash .splash-brand em{font-style:normal;color:#7dd3fc}
+#splash .splash-status{font-size:13px;color:rgba(255,255,255,0.55);letter-spacing:.04em}
+#splash .splash-dots span{animation:splashDot 1.4s infinite}
+#splash .splash-dots span:nth-child(2){animation-delay:.2s}
+#splash .splash-dots span:nth-child(3){animation-delay:.4s}
+@keyframes splashSpin{to{transform:rotate(360deg)}}
+@keyframes splashDot{0%,80%,100%{opacity:0}40%{opacity:1}}
 </style>
 </head>
 <body>
+<!-- Splash screen -->
+<div id="splash">
+  <div class="splash-ring"><img src="/logo.png" alt="CVsprings"></div>
+  <div class="splash-brand">CV<em>springs</em></div>
+  <div class="splash-status">Starting up<span class="splash-dots"><span>.</span><span>.</span><span>.</span></span></div>
+</div>
 <!-- Loading -->
 <div class="loading-overlay" id="loadingOverlay" style="display:none">
   <div class="loading-card">
@@ -1538,7 +1560,20 @@ document.addEventListener('keydown', function(e){
 });
 
 /* ── Keep-alive ping (prevent Render cold start) ── */
-(function keepAlive(){
+(function dismissSplash(){
+  var s=document.getElementById('splash');
+  if(s){s.classList.add('hidden');setTimeout(function(){s.remove()},700);}
+}
+function wakePing(){
+  fetch('/api/health',{method:'GET',cache:'no-store'})
+    .then(function(r){if(r.ok){dismissSplash();}else{setTimeout(wakePing,2000);}})
+    .catch(function(){setTimeout(wakePing,2000);});
+}
+window.addEventListener('DOMContentLoaded',function(){
+  setTimeout(wakePing, 400);
+  setTimeout(dismissSplash, 12000);
+});
+function keepAlive(){
   setInterval(function(){
     fetch('/api/health', {method:'GET'}).catch(function(){
       fetch('/', {method:'HEAD'}).catch(function(){});
