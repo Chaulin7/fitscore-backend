@@ -936,7 +936,7 @@ function ringBox(label,val,isOverall,color){
 function renderBatchResults(results,role){
   document.getElementById('batchResults').style.display='block';
   document.getElementById('singleResults').style.display='none';
-  document.getElementById('batchTitle').textContent='Ranked Results ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ '+results.length+' candidates'+(role?' / '+role:'');
+  document.getElementById('batchTitle').textContent='Ranked Results '+results.length+' candidates'+(role?' / '+role:'');
   document.getElementById('batchBody').innerHTML=results.map((r,i)=>{
     const s=r.overall||0;
     const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
