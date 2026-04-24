@@ -563,9 +563,9 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);
   transition:opacity .6s ease, visibility .6s ease}
 #splash.hidden{opacity:0;visibility:hidden;pointer-events:none}
-#splash .splash-ring{width:90px;height:90px;border-radius:50%;border:2.5px solid rgba(255,255,255,0.7);
-  display:flex;align-items:center;justify-content:center;animation:splashSpin 1.4s linear infinite}
-#splash .splash-ring img{width:76px;height:76px;object-fit:contain;filter:invert(1) brightness(1.15);mix-blend-mode:screen}
+#splash .splash-ring{width:96px;height:96px;position:relative;display:flex;align-items:center;justify-content:center}
+#splash .splash-ring svg{position:absolute;inset:0;width:100%;height:100%;animation:splashSpin 1.4s linear infinite}
+#splash .splash-ring img{width:72px;height:72px;object-fit:contain;filter:invert(1) brightness(1.2);mix-blend-mode:screen;position:relative;z-index:1}
 #splash .splash-brand{font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px}
 #splash .splash-brand em{font-style:normal;color:#7dd3fc}
 #splash .splash-status{font-size:13px;color:rgba(255,255,255,0.55);letter-spacing:.04em}
@@ -579,7 +579,13 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 <body>
 <!-- Splash screen -->
 <div id="splash">
-  <div class="splash-ring"><img src="/logo.png" alt="CVsprings"></div>
+  <div class="splash-ring">
+    <svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="48" cy="48" r="44" stroke="rgba(255,255,255,0.15)" stroke-width="2.5"/>
+      <path d="M48 4 A44 44 0 0 1 92 48" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    <img src="/logo.png" alt="CVsprings">
+  </div>
   <div class="splash-brand">CV<em>springs</em></div>
   <div class="splash-status">Starting up<span class="splash-dots"><span>.</span><span>.</span><span>.</span></span></div>
 </div>
