@@ -397,9 +397,33 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .settings-overlay{display:none;position:fixed;inset:0;z-index:9998}
 .settings-overlay.open{display:block}
 /* Hero */
-.hero-tagline{text-align:center;margin-bottom:20px;padding:4px 0}
-.hero-tagline h1{font-size:21px;font-weight:800;color:#0a1f3d;margin:0 0 4px;letter-spacing:-.3px}
-.hero-tagline p{font-size:13px;color:#6b7280;margin:0}
+.hero-section{text-align:center;padding:52px 24px 40px;background:linear-gradient(180deg,#f0f6ff 0%,#f8fafc 100%);border-bottom:1px solid #e5e7eb}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:6px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:20px}
+.hero-section h1{font-size:clamp(28px,5vw,46px);font-weight:900;color:#0a1f3d;margin:0 0 16px;letter-spacing:-.8px;line-height:1.1}
+.hero-section h1 span{color:#2563eb}
+.hero-section>p{font-size:17px;color:#4b5563;margin:0 auto 32px;max-width:520px;line-height:1.6}
+.hero-cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
+.hero-btn-primary{background:#2563eb;color:#fff;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;border:none;cursor:pointer;letter-spacing:-.02em;transition:background .18s,transform .12s;box-shadow:0 4px 14px rgba(37,99,235,0.35)}
+.hero-btn-primary:hover{background:#1d4ed8;transform:translateY(-1px)}
+.hero-btn-secondary{background:#fff;color:#374151;font-size:15px;font-weight:600;padding:14px 28px;border-radius:10px;border:1.5px solid #d1d5db;cursor:pointer;transition:border-color .18s}
+.hero-btn-secondary:hover{border-color:#2563eb;color:#2563eb;background:#eff6ff}
+.hero-stats{display:flex;gap:40px;justify-content:center;flex-wrap:wrap}
+.hero-stat-num{font-size:28px;font-weight:900;color:#0a1f3d;letter-spacing:-.5px}
+.hero-stat-lbl{font-size:12px;color:#6b7280;margin-top:2px}
+.hero-features{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:40px 0 0;max-width:860px;margin:0 auto;text-align:left}
+.hero-feat{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:22px 20px;transition:box-shadow .18s,transform .18s}
+.hero-feat:hover{box-shadow:0 8px 24px rgba(0,0,0,0.08);transform:translateY(-2px)}
+.hero-feat-icon{width:40px;height:40px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;margin-bottom:12px;color:#2563eb}
+.hero-feat h3{font-size:14px;font-weight:700;color:#0a1f3d;margin:0 0 6px}
+.hero-feat p{font-size:13px;color:#6b7280;margin:0;line-height:1.5}
+.tool-section{padding:32px 24px}
+.err-retry-card{background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:14px;margin-top:12px}
+.err-retry-icon{font-size:22px;flex-shrink:0}
+.err-retry-msg{flex:1;font-size:14px;color:#dc2626;font-weight:500}
+.err-retry-btn{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .18s}
+.err-retry-btn:hover{background:#b91c1c}
+@media(max-width:640px){.hero-features{grid-template-columns:1fr}.hero-stats{gap:24px}}
+@media(max-width:480px){.hero-section{padding:36px 16px 28px}.hero-section h1{font-size:26px}.hero-features{padding:24px 0 0}}
 /* Batch summary */
 .batch-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
 .bs-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;text-align:center}
@@ -593,7 +617,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 <div class="loading-overlay" id="loadingOverlay" style="display:none">
   <div class="loading-card">
     <div class="big-spinner"></div>
-    <div class="load-title" id="loadingMsg">Analyzing...</div>
+    <div class="load-title" id="loadingMsg">Analysing...</div>
     <div class="load-sub" id="progressLabel"></div>
     <div class="prog-track"><div class="prog-fill" id="progressBar" style="width:0%"></div></div>
   </div>
@@ -633,11 +657,42 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 <!-- ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ANALYZER ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ -->
 <div class="tab-content active main" id="tab-analyzer">
 
-  <!-- Hero -->
-  <div class="hero-tagline">
-    <h1>AI-Powered Candidate Fit Analysis</h1>
-    <p>Upload CVs, set your criteria, and instantly identify your best-fit candidates</p>
-  </div>
+  <!-- Hero / Marketing -->
+  <section class="hero-section" aria-label="CVsprings overview">
+    <div class="hero-eyebrow">
+      <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
+      AI-Powered Recruitment Tool
+    </div>
+    <h1>Screen CVs in <span>seconds</span>,<br>not hours</h1>
+    <p>Upload candidate CVs, paste a job description, and get instant AI fit scores — so you focus on people, not paperwork.</p>
+    <div class="hero-cta-row">
+      <button class="hero-btn-primary" onclick="document.getElementById('analyzer-tool').scrollIntoView({behavior:'smooth',block:'start'})" aria-label="Scroll to the analyzer tool">Get Started Free</button>
+      <button class="hero-btn-secondary" onclick="openInfoModal(0)" aria-label="Learn how scoring works">How It Works</button>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="hero-stat-num">4</div><div class="hero-stat-lbl">Scoring dimensions</div></div>
+      <div class="hero-stat"><div class="hero-stat-num">&lt;30s</div><div class="hero-stat-lbl">Per CV analysed</div></div>
+      <div class="hero-stat"><div class="hero-stat-num">PDF &amp; DOCX</div><div class="hero-stat-lbl">Formats supported</div></div>
+    </div>
+    <div class="hero-features" role="list" aria-label="Key features">
+      <div class="hero-feat" role="listitem">
+        <div class="hero-feat-icon" aria-hidden="true"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>
+        <h3>Ranked Fit Scores</h3>
+        <p>Every CV is scored across Keywords, Skills, Experience and Education — ranked best to worst fit instantly.</p>
+      </div>
+      <div class="hero-feat" role="listitem">
+        <div class="hero-feat-icon" aria-hidden="true"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
+        <h3>Batch Upload</h3>
+        <p>Drop up to 50 CVs at once and get a ranked shortlist in seconds — no manual reading required.</p>
+      </div>
+      <div class="hero-feat" role="listitem">
+        <div class="hero-feat-icon" aria-hidden="true"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+        <h3>Decision Tracking</h3>
+        <p>Shortlist, hold or reject candidates, add notes, and export results to CSV in one click.</p>
+      </div>
+    </div>
+  </section>
+  <div class="tool-section" id="analyzer-tool">
 
   <div class="mode-toggle">
     <button class="mode-btn active" id="modeSingle" onclick="setMode('single')">Single CV</button>
@@ -739,7 +794,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
     </div>
   </div>
 
-  <div class="msg msg-err" id="analyzeError"></div>
+  <div id="analyzeError" role="alert" aria-live="polite"></div>
   <div style="display:flex;gap:10px;margin-bottom:6px">
     <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -887,6 +942,8 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
     </div>
   </div>
 </div>
+  </div><!-- /tool-section -->
+</div>
 <script>
 let API=localStorage.getItem('cvsprings_api_url')||'https://cvsprings7.onrender.com';
 let mode='single',selectedFiles=[],lastResult=null,lastBatchResults=[],lastAuditRecords=[];
@@ -973,8 +1030,11 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
     if(!r.ok){showErr(errEl,data.error||'Analysis failed');return;}
     lastResult={...data,role,file:file.name};
     renderSingleResult(data,file.name,role);
-  }catch(e){showErr(errEl,'Network error: '+e.message);}
-  finally{btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Analyze';btn.disabled=false;}
+  }catch(e){
+    errEl.innerHTML='<div class="err-retry-card"><span class="err-retry-icon">⚠️</span><span class="err-retry-msg">'+( e.message.includes('fetch')||e.message.includes('network')||e.message.includes('Failed') ? 'Connection error — the server may still be waking up.' : 'Something went wrong: '+e.message)+'</span><button class="err-retry-btn" onclick="this.closest('#analyzeError').innerHTML='';analyze()">Retry</button></div>';
+    errEl.style.display='block';
+  }
+  finally{clearInterval(_stepTimer);btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Analyze';btn.disabled=false;}
 }
 
 async function analyzeBatch(files,jd,weights,anon,role,errEl){
@@ -1233,7 +1293,9 @@ function clearResults(){document.getElementById('singleResults').style.display='
 function showErr(el,msg){el.textContent=msg;el.style.display='block';}
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function escCsv(s){return String(s||'').replace(/"/g,'""');}
-function showLoading(msg){document.getElementById('loadingMsg').textContent=msg||'Processing...';document.getElementById('progressBar').style.width='0%';document.getElementById('progressLabel').textContent='';document.getElementById('loadingOverlay').style.display='flex';}
+function showLoading(msg){document.getElementById('loadingMsg').textContent=msg||'Processing...';document.getElementById('progressBar').style.width='0%';document.getElementById('progressLabel').textContent='';document.getElementById('loadingOverlay').style.display='flex';
+  var _stepIdx=0,_stepSteps=["Parsing CV...","Matching keywords...","Scoring fit...","Ranking results..."];
+  var _stepTimer=setInterval(function(){_stepIdx=(_stepIdx+1)%_stepSteps.length;var el=document.getElementById('loadingMsg');if(el)el.textContent=_stepSteps[_stepIdx];},1800);}
 function hideLoading(){document.getElementById('loadingOverlay').style.display='none';}
 function setProgress(p,l){document.getElementById('progressBar').style.width=p+'%';document.getElementById('progressLabel').textContent=l;}
 function download(fn,text,type){const b=new Blob([text],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;a.click();URL.revokeObjectURL(u);}
