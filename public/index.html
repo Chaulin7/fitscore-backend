@@ -1219,14 +1219,14 @@ function renderTplChips(){
     chips.innerHTML = '<div class="tpl-empty">No templates saved yet.<br>Set up a role and click &ldquo;+ Save Current&rdquo;.</div>';
     return;
   }
-  chips.innerHTML = keys.map(k =>
-    '<div class="tpl-chip">' +
-      '<button class="tpl-chip-name" onclick="loadTemplate(''+escHtml(k)+'')" title="Load ''+escHtml(k)+''">'+escHtml(k)+'</button>' +
-      '<button class="tpl-chip-del" onclick="deleteTemplate(''+escHtml(k)+'')" title="Delete">&#10005;</button>' +
-    '</div>'
-  ).join('');
+  chips.innerHTML = keys.map(function(k){
+    const safe = escHtml(k);
+    return '<div class="tpl-chip">' +
+      '<button class="tpl-chip-name" onclick="loadTemplate(&apos;'+safe+'&apos;)" title="Load this template">'+safe+'</button>' +
+      '<button class="tpl-chip-del" onclick="deleteTemplate(&apos;'+safe+'&apos;)" title="Delete">×</button>' +
+    '</div>';
+  }).join('');
 }
-
 function saveTemplate(){
   const name = prompt('Name this template (e.g. "Senior Engineer"):');
   if(!name || !name.trim()) return;
