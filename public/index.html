@@ -24,7 +24,8 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   flex-shrink:0
 }
 .brand-icon img{width:100%;height:100%;image-rendering:crisp-edges;filter:brightness(1.08)}
-.logo-ring{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0}
+.logo-ring{display:inline-flex;align-items:center;justify-content:center;width:62px;height:62px;border-radius:50%;border:2px solid rgba(255,255,255,0.85);flex-shrink:0}
+.logo-ring-img{width:52px;height:52px}
 .brand-name{font-size:18px;font-weight:800;color:#ffffff;letter-spacing:-.4px;text-shadow:0 0 18px rgba(255,255,255,0.35)}
 .brand-name em{font-style:normal;color:#7dd3fc}
 .topbar-nav{display:flex;gap:2px}
@@ -481,12 +482,13 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .footer-link:hover{color:#fff}
 /* ── Mobile responsiveness ── */
 @media(max-width:480px){
-  .topbar{padding:0 10px;height:56px;gap:6px;overflow:visible}
-  .logo-ring{width:44px!important;height:44px!important}
-  .logo-ring img{width:36px!important;height:36px!important}
-  .nav-btn{font-size:11px;padding:5px 7px}
-  .topbar-nav{gap:0;flex-shrink:1}
-  .brand-name{font-size:15px}
+  .topbar{padding:0 8px;height:54px;gap:4px}
+  .logo-ring{width:46px;height:46px}
+  .logo-ring-img{width:38px;height:38px}
+  .nav-btn{font-size:10px;padding:4px 6px;letter-spacing:0}
+  .topbar-nav{gap:0;flex-shrink:1;min-width:0}
+  .brand-name{font-size:13px;flex-shrink:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topbar-brand{min-width:0;flex-shrink:1;gap:4px}
   .brand-icon{width:44px!important;height:44px!important}
   .main{padding:12px}
   .card{border-radius:10px}
@@ -571,7 +573,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 <!-- Topbar -->
 <div class="topbar">
   <a class="topbar-brand" href="#">
-    <span class="logo-ring" style="display:inline-flex;align-items:center;justify-content:center;width:62px;height:62px;border-radius:50%;border:2px solid rgba(255,255,255,0.85);flex-shrink:0;"><img src="/logo.png" alt="CV Springs Logo" style="width:52px;height:52px;object-fit:contain;flex-shrink:0;filter:invert(1) brightness(1.15);mix-blend-mode:screen;"></span>
+    <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CV Springs Logo" style="object-fit:contain;flex-shrink:0;filter:invert(1) brightness(1.15);mix-blend-mode:screen;"></span>
     <span class="brand-name">CV<em>springs</em></span>
   </a>
   <nav class="topbar-nav">
