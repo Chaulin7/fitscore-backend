@@ -1633,17 +1633,17 @@ document.addEventListener('keydown', function(e){
   if(s){s.classList.add('hidden');setTimeout(function(){s.remove()},700);}
 }
 function wakePing(){
-  fetch('/api/health',{method:'GET',cache:'no-store'})
-    .then(function(r){if(r.ok){dismissSplash();}else{setTimeout(wakePing,2000);}})
-    .catch(function(){setTimeout(wakePing,2000);});
+  fetch('/',{method:'HEAD',cache:'no-store'})
+    .then(function(r){if(r.ok){dismissSplash();}else{setTimeout(wakePing,1500);}})
+    .catch(function(){setTimeout(wakePing,1500);});
 }
 window.addEventListener('DOMContentLoaded',function(){
-  setTimeout(wakePing, 400);
-  setTimeout(dismissSplash, 12000);
+  setTimeout(wakePing, 100);
+  setTimeout(dismissSplash, 15000);
 });
 function keepAlive(){
   setInterval(function(){
-    fetch('/api/health', {method:'GET'}).catch(function(){
+    fetch('/', {method:'HEAD'}).catch(function(){
       fetch('/', {method:'HEAD'}).catch(function(){});
     });
   }, 10 * 60 * 1000);
