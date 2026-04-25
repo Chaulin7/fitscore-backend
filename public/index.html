@@ -1057,7 +1057,6 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     errEl.style.display='block';
     var rb=document.getElementById('retryBtn');
     if(rb){rb.onclick=function(){errEl.innerHTML='';errEl.style.display='none';analyze();};}
-  }
   finally{hideLoading();}
 }
 
