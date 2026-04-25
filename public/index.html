@@ -1031,7 +1031,7 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
     lastResult={...data,role,file:file.name};
     renderSingleResult(data,file.name,role);
   }catch(e){
-    errEl.innerHTML='<div class="err-retry-card"><span class="err-retry-icon">⚠️</span><span class="err-retry-msg">'+( e.message.includes('fetch')||e.message.includes('network')||e.message.includes('Failed') ? 'Connection error — the server may still be waking up.' : 'Something went wrong: '+e.message)+'</span><button class="err-retry-btn" onclick="this.closest('#analyzeError').innerHTML='';analyze()">Retry</button></div>';
+    errEl.innerHTML='<div class="err-retry-card"><span class="err-retry-icon">⚠️</span><span class="err-retry-msg">'+( e.message.includes('fetch')||e.message.includes('network')||e.message.includes('Failed') ? 'Connection error — the server may still be waking up.' : 'Something went wrong: '+e.message)+'</span><button class="err-retry-btn" onclick="document.getElementById('analyzeError').innerHTML='';analyze()">Retry</button></div>';
     errEl.style.display='block';
   }
   finally{clearInterval(_stepTimer);btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Analyze';btn.disabled=false;}
@@ -1628,7 +1628,7 @@ document.addEventListener('keydown', function(e){
 });
 
 /* ── Keep-alive ping (prevent Render cold start) ── */
-(function dismissSplash(){
+function dismissSplash(){
   var s=document.getElementById('splash');
   if(s){s.classList.add('hidden');setTimeout(function(){s.remove()},700);}
 }
