@@ -1637,10 +1637,9 @@ function wakePing(){
     .then(function(r){if(r.ok){dismissSplash();}else{setTimeout(wakePing,1500);}})
     .catch(function(){setTimeout(wakePing,1500);});
 }
-window.addEventListener('DOMContentLoaded',function(){
-  setTimeout(wakePing, 100);
-  setTimeout(dismissSplash, 15000);
-});
+// Script is at bottom of body — DOM already ready, call directly
+setTimeout(wakePing, 50);
+setTimeout(dismissSplash, 15000);
 function keepAlive(){
   setInterval(function(){
     fetch('/', {method:'HEAD'}).catch(function(){
