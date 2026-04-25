@@ -1030,14 +1030,6 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
     if(!r.ok){showErr(errEl,data.error||'Analysis failed');return;}
     lastResult={...data,role,file:file.name};
     renderSingleResult(data,file.name,role);
-  }catch(e){
-    var msg=e.message&&(e.message.includes('fetch')||e.message.includes('Failed'))
-      ?'Connection error. The server may still be waking up — please retry.'
-      :'Something went wrong: '+e.message;
-    errEl.innerHTML='<div class="err-retry-card"><span class="err-retry-icon">⚠️</span><span class="err-retry-msg">'+msg+'</span><button class="err-retry-btn" id="retryBtn">Retry</button></div>';
-    errEl.style.display='block';
-    var rb=document.getElementById('retryBtn');
-    if(rb){rb.onclick=function(){errEl.innerHTML='';errEl.style.display='none';analyze();};}
     finally{clearInterval(_stepTimer);btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Analyze';btn.disabled=false;}
 }
 
@@ -1055,7 +1047,17 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     setProgress(100,'Complete');
     lastBatchResults=(data.results||[]).map(res=>({...res,role}));
     renderBatchResults(data.results,role);
-  }catch(e){showErr(errEl,'Network error: '+e.message);}
+  }catch(e){
+    var errMsg=e.message&&(e.message.includes('fetch')||e.message.includes('Failed'))
+      ?'Connection error. The server may still be waking up — please retry.'
+      :'Something went wrong: '+e.message;
+    errEl.innerHTML='<div class="err-retry-card"><span class="err-retry-icon">⚠️</span>'
+      +'<span class="err-retry-msg">'+errMsg+'</span>'
+      +'<button class="err-retry-btn" id="retryBtn">Retry</button></div>';
+    errEl.style.display='block';
+    var rb=document.getElementById('retryBtn');
+    if(rb){rb.onclick=function(){errEl.innerHTML='';errEl.style.display='none';analyze();};}
+  }
   finally{hideLoading();}
 }
 
