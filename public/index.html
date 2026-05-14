@@ -685,6 +685,13 @@ img, video, table { max-width: 100%; }
   input[type="range"] { height: 32px; }
 }
 /* === END MOBILE OVERHAUL === */
+/* === MODAL POINTER-EVENTS FIX ===
+   The .modal-backdrop uses opacity:0 to hide, but kept pointer-events:auto,
+   so it was silently blocking ALL clicks on the page beneath it. */
+.modal-backdrop { pointer-events: none; visibility: hidden; }
+.modal-backdrop.open { pointer-events: auto; visibility: visible; }
+/* === END MODAL FIX === */
+
 </style>
 </head>
 <body>
