@@ -1,9 +1,26 @@
 'use strict';
 
 const express = require('express');
-const { insertAudit, getAllAudits, deleteAudit, exportCsv, getRoles, getRoleHistory, getAuditById } = require('../services/db');
+const {
+  insertAudit,
+  getAllAudits,
+  deleteAudit,
+  exportCsv,
+  getRoles,
+  getRoleHistory,
+  getAuditById,
+  updateAudit,
+  getAuditChanges
+} = require('../services/db');
 
 const router = express.Router();
+
+// Standardised error envelope { error, code, field }
+function sendError(res, status, code, message, field) {
+  const body = { error: message, code };
+  if (field) body.field = field;
+  return res.status(status).json(body);
+}
 
 // POST /api/audit — save an audit record
 router.post('/', (req, res) => {
@@ -14,7 +31,7 @@ router.post('/', (req, res) => {
     } = req.body;
 
     if (!candidateName) {
-      return res.status(400).json({ error: 'candidateName is required.' });
+      return sendError(res, 400, 'VALIDATION_ERROR', 'candidateName is required.', 'candidateName');
     }
 
     const record = insertAudit({
@@ -24,18 +41,51 @@ router.post('/', (req, res) => {
 
     res.status(201).json(record);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
 
-// GET /api/audit — list all audit records
+// GET /api/audit — list audit records
+// Backward-compatible:
+//   - no query params      -> returns array of records (legacy)
+//   - any of role,decision,search,from,to,limit,offset present -> returns { records, total, limit, offset }
 router.get('/', (req, res) => {
   try {
-    const { decision, limit, role } = req.query;
-    const records = getAllAudits({ decision, limit, role });
-    res.json(records);
+    const { decision, role, search, from, to, limit, offset } = req.query;
+    const usingFilters = (search != null) || (from != null) || (to != null) || (limit != null) || (offset != null);
+
+    // Legacy path: no advanced filters
+    if (!usingFilters) {
+      const records = getAllAudits({ decision, limit: undefined, role });
+      return res.json(records);
+    }
+
+    // Advanced path: in-memory filter on top of getAllAudits to stay backward-compatible with the db layer.
+    let records = getAllAudits({ decision, role });
+    if (search) {
+      const q = String(search).toLowerCase();
+      records = records.filter(r =>
+        (r.candidateName || '').toLowerCase().includes(q) ||
+        (r.fileName || '').toLowerCase().includes(q) ||
+        (r.role || '').toLowerCase().includes(q) ||
+        (r.note || '').toLowerCase().includes(q)
+      );
+    }
+    if (from) {
+      const fromTs = Date.parse(from);
+      if (!Number.isNaN(fromTs)) records = records.filter(r => Date.parse(r.createdAt) >= fromTs);
+    }
+    if (to) {
+      const toTs = Date.parse(to);
+      if (!Number.isNaN(toTs)) records = records.filter(r => Date.parse(r.createdAt) <= toTs);
+    }
+    const total = records.length;
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500);
+    const off = Math.max(parseInt(offset, 10) || 0, 0);
+    const page = records.slice(off, off + lim);
+    return res.json({ records: page, total, limit: lim, offset: off });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
 
@@ -45,7 +95,7 @@ router.get('/roles', (req, res) => {
     const roles = getRoles();
     res.json(roles);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
 
@@ -55,7 +105,7 @@ router.get('/roles/:role/history', (req, res) => {
     const history = getRoleHistory(decodeURIComponent(req.params.role));
     res.json(history);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
 
@@ -67,7 +117,82 @@ router.get('/export/csv', (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="audit-log.csv"');
     res.send(csv);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// GET /api/audit/:id/changes — append-only change history for a record (newest first)
+router.get('/:id/changes', (req, res) => {
+  try {
+    const existing = getAuditById(req.params.id);
+    if (!existing) {
+      return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
+    }
+    const changes = getAuditChanges(req.params.id);
+    res.json(changes);
+  } catch (err) {
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// PATCH /api/audit/:id — partial update of an audit record
+// Accepts a subset of { decision, note, role, candidateName }. id and createdAt are silently rejected.
+// Returns 404 if missing. Writes one row per changed field to audit_changes (append-only).
+router.patch('/:id', (req, res) => {
+  try {
+    const body = req.body || {};
+    const allowed = ['decision', 'note', 'role', 'candidateName'];
+    const patch = {};
+    for (const f of allowed) {
+      if (f in body) patch[f] = body[f];
+    }
+
+    // Light validation
+    if ('decision' in patch) {
+      const v = patch.decision == null ? '' : String(patch.decision);
+      const validDecisions = ['', 'shortlist', 'hold', 'reject'];
+      if (!validDecisions.includes(v)) {
+        return sendError(res, 400, 'VALIDATION_ERROR',
+          'decision must be one of: shortlist, hold, reject, or empty.', 'decision');
+      }
+    }
+    if ('candidateName' in patch) {
+      const v = patch.candidateName == null ? '' : String(patch.candidateName).trim();
+      if (v.length === 0) {
+        return sendError(res, 400, 'VALIDATION_ERROR',
+          'candidateName cannot be empty.', 'candidateName');
+      }
+      if (v.length > 200) {
+        return sendError(res, 400, 'VALIDATION_ERROR',
+          'candidateName too long (max 200 chars).', 'candidateName');
+      }
+      patch.candidateName = v;
+    }
+    if ('role' in patch) {
+      const v = patch.role == null ? '' : String(patch.role).trim();
+      if (v.length > 200) {
+        return sendError(res, 400, 'VALIDATION_ERROR',
+          'role too long (max 200 chars).', 'role');
+      }
+      patch.role = v;
+    }
+    if ('note' in patch) {
+      const v = patch.note == null ? '' : String(patch.note);
+      if (v.length > 10000) {
+        return sendError(res, 400, 'VALIDATION_ERROR',
+          'note too long (max 10000 chars).', 'note');
+      }
+      patch.note = v;
+    }
+
+    const changedBy = (req.user && req.user.id) || null;
+    const result = updateAudit(req.params.id, patch, changedBy);
+    if (!result) {
+      return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
+    }
+    res.json(result.record);
+  } catch (err) {
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
 
@@ -76,7 +201,7 @@ router.get('/report/:id', (req, res) => {
   try {
     const record = getAuditById(req.params.id);
     if (!record) {
-      return res.status(404).json({ error: 'Record not found.' });
+      return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
     }
 
     const scoreBar = (val, color) =>
@@ -201,20 +326,21 @@ router.get('/report/:id', (req, res) => {
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
 
-// DELETE /api/audit/:id — remove a record
+// DELETE /api/audit/:id — remove a record (writes deletion log to audit_changes)
 router.delete('/:id', (req, res) => {
   try {
-    const deleted = deleteAudit(req.params.id);
+    const changedBy = (req.user && req.user.id) || null;
+    const deleted = deleteAudit(req.params.id, changedBy);
     if (!deleted) {
-      return res.status(404).json({ error: 'Record not found.' });
+      return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
     }
     res.json({ success: true, id: req.params.id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
 
