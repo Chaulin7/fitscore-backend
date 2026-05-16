@@ -692,9 +692,51 @@ img, video, table { max-width: 100%; }
 .modal-backdrop.open { pointer-events: auto; visibility: visible; }
 /* === END MODAL FIX === */
 
+/* === Phase 2A additions (Sections 1, 2, 4) === */
+#toast-stack { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; max-width: calc(100vw - 32px); pointer-events: none; }
+.toast { background: #1f2937; color: #fff; padding: 12px 16px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-size: 14px; line-height: 1.45; min-width: 240px; max-width: 380px; pointer-events: auto; opacity: 0; transform: translateY(-8px); transition: opacity .18s ease, transform .18s ease; word-break: break-word; }
+.toast.in { opacity: 1; transform: translateY(0); }
+.toast.success { background: #166534; }
+.toast.error { background: #991b1b; }
+.toast.info { background: #1e3a8a; }
+.skel { background: linear-gradient(90deg, rgba(0,0,0,0.05), rgba(0,0,0,0.12), rgba(0,0,0,0.05)); background-size: 200% 100%; animation: skel-pulse 1.2s ease-in-out infinite; border-radius: 6px; color: transparent !important; }
+@keyframes skel-pulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.field-flash { animation: field-flash 0.6s ease; }
+@keyframes field-flash { 0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); } 30%, 70% { box-shadow: 0 0 0 3px rgba(220,38,38,0.45); } }
+.history-overlay { position: fixed; inset: 0; background: rgba(12,23,48,0.55); z-index: 9990; display: none; align-items: center; justify-content: center; padding: 24px; }
+.history-overlay.open { display: flex; }
+.history-panel { background: #fff; color: #0c1730; border-radius: 12px; max-width: 560px; width: 100%; max-height: 80vh; overflow: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.35); }
+.history-panel header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e7ebf3; position: sticky; top: 0; background: #fff; }
+.history-panel header h3 { margin: 0; font-size: 16px; }
+.history-panel .x { background: transparent; border: 0; color: #5c6a8a; font-size: 22px; cursor: pointer; padding: 0 4px; }
+.history-list { padding: 8px 0; list-style: none; margin: 0; }
+.history-list li { padding: 12px 20px; border-bottom: 1px solid #f1f3f8; }
+.history-list li:last-child { border-bottom: 0; }
+.history-list .hi-field { font-weight: 600; color: #0c1730; font-size: 13px; }
+.history-list .hi-from-to { font-size: 13px; color: #5c6a8a; margin-top: 2px; }
+.history-list .hi-when { font-size: 12px; color: #9aa6c0; margin-top: 4px; }
+.audit-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 4px; font-size: 13px; color: #5c6a8a; }
+.audit-pager .ctrls { display: flex; gap: 8px; }
+.audit-pager button { border: 1px solid #e7ebf3; background: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.audit-pager button[disabled] { opacity: 0.45; cursor: not-allowed; }
+.history-btn { background: transparent; border: 0; cursor: pointer; padding: 4px 6px; color: #5c6a8a; font-size: 13px; }
+.history-btn:hover { color: #0c1730; }
+
+
 </style>
 </head>
 <body>
+<!-- Phase 2A: toast stack + audit change-history modal -->
+<div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+<div id="history-overlay" class="history-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title">
+  <div class="history-panel">
+    <header>
+      <h3 id="history-title">Change history</h3>
+      <button type="button" class="x" aria-label="Close" data-history-close>&times;</button>
+    </header>
+    <ul class="history-list" id="history-list"></ul>
+  </div>
+</div>
 <!-- Splash screen -->
 <div id="splash">
   <div class="splash-ring">
@@ -1040,6 +1082,179 @@ img, video, table { max-width: 100%; }
 </div>
 <script>
 let API=localStorage.getItem('cvsprings_api_url')||'https://cvsprings7.onrender.com';
+// === Phase 2A helpers (Sections 1 + 4 of the wireup brief) ===
+const API_BASE = API; // alias used by api()
+const RETRY_SAFE_PATHS = ['/health', '/api/audit', '/api/stats/overview', '/api/templates', '/api/analyze', '/api/audit/roles'];
+function _isRetrySafe(method, path) {
+  const m = (method || 'GET').toUpperCase();
+  if (m === 'GET') return RETRY_SAFE_PATHS.some(p => path.startsWith(p));
+  // POST /api/analyze and /api/analyze/batch are safe to retry (stateless from backend perspective)
+  if ((m === 'POST') && (path.startsWith('/api/analyze'))) return true;
+  return false;
+}
+async function api(path, options = {}) {
+  const url = path.startsWith('http') ? path : API_BASE + path;
+  const isForm = options.body && (options.body instanceof FormData);
+  const baseInit = {
+    ...options,
+    headers: {
+      'Accept': 'application/json',
+      ...(options.body && !isForm ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {}),
+    },
+  };
+  async function doFetch() {
+    const res = await fetch(url, baseInit);
+    let data = null;
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('application/json')) { try { data = await res.json(); } catch (_) { data = null; } }
+    if (!res.ok) {
+      const err = new Error((data && data.error) || ('HTTP ' + res.status));
+      err.status = res.status; err.code = data && data.code; err.field = data && data.field;
+      throw err;
+    }
+    return data;
+  }
+  try { return await doFetch(); }
+  catch (e) {
+    // Auto-retry once on 503 or network error for safe paths
+    const path0 = path.split('?')[0];
+    if (_isRetrySafe(options.method, path0) && (e.status === 503 || /Failed to fetch|NetworkError|TypeError/i.test(e.message))) {
+      try { toast('Waking up the server, hang on…', 'info', 4000); } catch (_) {}
+      await new Promise(r => setTimeout(r, 2000));
+      return await doFetch();
+    }
+    throw e;
+  }
+}
+function handleApiError(err, fallbackMsg) {
+  try {
+    if (err && err.code === 'VALIDATION_ERROR' && err.field) {
+      highlightField(err.field);
+      toast(err.message || 'Please check the highlighted field', 'error');
+      return;
+    }
+    if (err && (err.status === 503 || /Failed to fetch|NetworkError|TypeError/i.test(err.message || ''))) {
+      toast('Server is waking up. Please try again in a moment.', 'info', 4500);
+      return;
+    }
+    toast((err && err.message) || fallbackMsg || 'Something went wrong', 'error');
+  } catch (_) {
+    try { alert((err && err.message) || fallbackMsg || 'Something went wrong'); } catch (__) {}
+  }
+}
+function toast(msg, kind, duration) {
+  const stack = document.getElementById('toast-stack');
+  if (!stack) { try { console.log('[toast]', kind, msg); } catch(_){} return; }
+  const el = document.createElement('div');
+  el.className = 'toast ' + (kind === 'success' || kind === 'error' || kind === 'info' ? kind : '');
+  el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  el.textContent = msg;
+  stack.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('in'));
+  const ttl = typeof duration === 'number' ? duration : (kind === 'error' ? 5000 : 3200);
+  setTimeout(() => {
+    el.classList.remove('in');
+    setTimeout(() => { try { el.remove(); } catch (_) {} }, 220);
+  }, ttl);
+}
+const FIELD_MAP = {
+  weights: ['weights-fit', 'weights-skill', 'weights-exp', 'weights-edu'],
+  jobDescription: ['jdText', 'jd'],
+  cv: ['fileInput', 'cvFile'],
+  cvs: ['fileInput', 'cvFile'],
+  role: ['role'],
+  decision: ['decision'],
+  note: ['note'],
+};
+function highlightField(field) {
+  const ids = FIELD_MAP[field] || [field];
+  let el = null;
+  for (const id of ids) {
+    el = document.getElementById(id);
+    if (el) break;
+  }
+  if (!el) return;
+  try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+  el.classList.remove('field-flash');
+  // Force reflow then add class so the animation restarts
+  void el.offsetWidth;
+  el.classList.add('field-flash');
+  setTimeout(() => el.classList.remove('field-flash'), 800);
+  if (typeof el.focus === 'function') { try { el.focus({ preventScroll: true }); } catch (_) { try { el.focus(); } catch (__) {} } }
+}
+// Close handler for history overlay
+document.addEventListener('click', (e) => {
+  const overlay = document.getElementById('history-overlay');
+  if (!overlay) return;
+  if (e.target && (e.target.matches('[data-history-close]') || e.target === overlay)) {
+    overlay.classList.remove('open');
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('history-overlay');
+    if (overlay && overlay.classList.contains('open')) overlay.classList.remove('open');
+  }
+});
+function _formatChangeWhen(iso) {
+  const d = new Date(iso);
+  const now = Date.now();
+  const diff = (now - d.getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.round(diff / 60) + ' min ago';
+  if (diff < 86400) return Math.round(diff / 3600) + ' h ago';
+  if (diff < 7 * 86400) return Math.round(diff / 86400) + ' d ago';
+  return d.toLocaleDateString();
+}
+async function openChangeHistory(auditId) {
+  const overlay = document.getElementById('history-overlay');
+  const list = document.getElementById('history-list');
+  if (!overlay || !list) return;
+  list.innerHTML = '<li style="padding:16px 20px;color:#9aa6c0;">Loading…</li>';
+  overlay.classList.add('open');
+  try {
+    const rows = await api('/api/audit/' + encodeURIComponent(auditId) + '/changes');
+    if (!Array.isArray(rows) || !rows.length) {
+      list.innerHTML = '<li style="padding:16px 20px;color:#9aa6c0;">No changes recorded yet.</li>';
+      return;
+    }
+    list.innerHTML = rows.map(r => {
+      const fld = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.field || '');
+      const oldV = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.oldValue == null ? '—' : String(r.oldValue));
+      const newV = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.newValue == null ? '—' : String(r.newValue));
+      return '<li>'
+        + '<div class="hi-field">' + fld + '</div>'
+        + '<div class="hi-from-to">' + oldV + ' → ' + newV + '</div>'
+        + '<div class="hi-when">' + (typeof escHtml === 'function' ? escHtml : (x => String(x)))(_formatChangeWhen(r.changedAt)) + ' · ' + (typeof escHtml === 'function' ? escHtml : (x => String(x)))(new Date(r.changedAt).toLocaleString()) + '</div>'
+        + '</li>';
+    }).join('');
+  } catch (e) {
+    list.innerHTML = '<li style="padding:16px 20px;color:#991b1b;">Could not load history: ' + ((typeof escHtml === 'function' ? escHtml : (x => String(x)))(e.message || 'error')) + '</li>';
+  }
+}
+// Server-side filter state (Section 2.3)
+const auditFilter = { role: '', decision: '', search: '', limit: 50, offset: 0, total: null, paginated: false };
+let _auditFilterDebounce = null;
+function scheduleAuditReload() {
+  if (_auditFilterDebounce) clearTimeout(_auditFilterDebounce);
+  _auditFilterDebounce = setTimeout(() => { auditFilter.offset = 0; if (typeof loadAudit === 'function') loadAudit(); }, 300);
+}
+function buildAuditQuery() {
+  const p = new URLSearchParams();
+  if (auditFilter.role) p.set('role', auditFilter.role);
+  if (auditFilter.decision) p.set('decision', auditFilter.decision);
+  if (auditFilter.search) p.set('search', auditFilter.search);
+  // Only send pagination params when at least one filter is active (preserves legacy unwrapped response otherwise)
+  const hasFilters = !!(auditFilter.role || auditFilter.decision || auditFilter.search);
+  if (hasFilters) {
+    p.set('limit', String(auditFilter.limit));
+    p.set('offset', String(auditFilter.offset));
+  }
+  const qs = p.toString();
+  return qs ? ('?' + qs) : '';
+}
+
 let mode='single',selectedFiles=[],lastResult=null,lastBatchResults=[],lastAuditRecords=[];
 
 document.addEventListener('DOMContentLoaded',()=>{
