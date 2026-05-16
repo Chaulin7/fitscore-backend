@@ -1061,6 +1061,7 @@ img, video, table { max-width: 100%; }
         </tr></thead>
         <tbody id="auditBody"></tbody>
       </table>
+      <div id="auditPager"></div>
     </div>
   </div>
 </div>
@@ -1276,9 +1277,9 @@ async function connect(){
 async function ping(){
   const dot=document.getElementById('connDot'),lbl=document.getElementById('connLabel');
   dot.className='dot';lbl.textContent='Checking...';
-  try{const r=await fetch(API+'/health',{signal:AbortSignal.timeout(8000)});
-    if(r.ok){dot.className='dot ok';lbl.textContent='Connected';}else throw new Error();}
-  catch{dot.className='dot err';lbl.textContent='Not connected';}
+  try{await api('/health', {signal:AbortSignal.timeout(8000)});
+    dot.className='dot ok';lbl.textContent='Connected';}
+  catch(_){dot.className='dot err';lbl.textContent='Not connected';}
 }
 
 function setMode(m){
@@ -1334,9 +1335,9 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
   try{
     const fd=new FormData();fd.append('cv',file);fd.append('jobDescription',jd);
     fd.append('weights',JSON.stringify(weights));fd.append('anonymize',anon?'true':'false');
-    const r=await fetch(API+'/api/analyze',{method:'POST',body:fd});
-    const data=await r.json();
-    if(!r.ok){showErr(errEl,data.error||'Analysis failed');return;}
+    let data;
+    try { data = await api('/api/analyze', {method:'POST', body:fd}); }
+    catch (e) { if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field); showErr(errEl, e.message || 'Analysis failed'); return; }
     lastResult={...data,role,file:file.name};
     renderSingleResult(data,file.name,role);
   }catch(e){
@@ -1359,10 +1360,10 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     fd.append('jobDescription',jd);fd.append('weights',JSON.stringify(weights));
     fd.append('anonymize',anon?'true':'false');
     setProgress(30,'Extracting text from CV...');
-    const r=await fetch(API+'/api/analyze/batch',{method:'POST',body:fd});
+    let data;
+    try { data = await api('/api/analyze/batch', {method:'POST', body:fd}); }
+    catch (e) { if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field); showErr(errEl, e.message || 'Batch failed'); return; }
     setProgress(80,'Comparing against job description...');
-    const data=await r.json();
-    if(!r.ok){showErr(errEl,data.error||'Batch failed');return;}
     setProgress(100,'Complete');
     lastBatchResults=(data.results||[]).map(res=>({...res,role}));
     renderBatchResults(data.results,role);
@@ -1457,9 +1458,9 @@ async function saveToAudit(){
     note:document.getElementById('noteInput').value.trim(),
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:document.getElementById('roleInput').value.trim(),anonymized:lastResult.anonymized||false};
-  try{const r=await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d=await r.json();if(r.ok){lastResult._auditId=d.id;alert('Saved to audit log.');}else alert('Error: '+d.error);}
-  catch(e){alert('Network error: '+e.message);}
+  try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
+    lastResult._auditId=d.id;toast('Saved to audit log.','success');}
+  catch(e){handleApiError(e,'Network error');}
 }
 async function saveSingleBatch(i){
   if(!API||!lastBatchResults[i])return;
@@ -1470,9 +1471,9 @@ async function saveSingleBatch(i){
     decision:res._decision||'',note:'',
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:res.role||'',anonymized:res.anonymized||false};
-  try{const r=await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(r.ok)alert('Saved: '+body.candidateName);else{const d=await r.json();alert('Error: '+d.error);}}
-  catch(e){alert('Network error: '+e.message);}
+  try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
+    toast('Saved: '+body.candidateName,'success');}
+  catch(e){handleApiError(e,'Network error');}
 }
 async function saveAllToAudit(){
   if(!API||!lastBatchResults.length)return;
@@ -1485,9 +1486,9 @@ async function saveAllToAudit(){
       decision:res._decision||'',note:'',
       jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
       role:res.role||'',anonymized:res.anonymized||false};
-    try{const r=await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(r.ok)saved++;}catch(_){}
+    try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;}catch(_){}
   }
-  alert(saved+' of '+lastBatchResults.length+' records saved.');
+  toast(saved+' of '+lastBatchResults.length+' records saved.','success');
 }
 function exportBatchCsv(){
   if(!lastBatchResults.length)return;
@@ -1496,17 +1497,58 @@ function exportBatchCsv(){
   download('batch-results.csv',rows.join('\n'),'text/csv');
 }
 async function openReport(){
-  if(!lastResult?._auditId||!API){alert('Save to audit log first to generate a report.');return;}
+  if(!lastResult?._auditId||!API){toast('Save to audit log first to generate a report.','info');return;}
   window.open(API+'/api/audit/report/'+lastResult._auditId,'_blank');
 }
 
 async function loadAudit(){
   if(!API)return;
   const errEl=document.getElementById('auditError');errEl.style.display='none';
-  try{const r=await fetch(API+'/api/audit');if(!r.ok)throw new Error('HTTP '+r.status);
-    lastAuditRecords=await r.json();populateRoleFilter(lastAuditRecords);renderAuditTable(lastAuditRecords);}
-  catch(e){showErr(errEl,'Could not load: '+e.message);}
+  const tb=document.getElementById('auditBody');
+  if(tb)tb.innerHTML='<tr><td colspan="11"><div class="empty-state skel" style="height:120px;">Loading…</div></td></tr>';
+  try{
+    const resp=await api('/api/audit'+buildAuditQuery());
+    if(Array.isArray(resp)){
+      auditFilter.paginated=false;auditFilter.total=resp.length;
+      lastAuditRecords=resp;
+    } else if(resp && Array.isArray(resp.records)){
+      auditFilter.paginated=true;
+      auditFilter.total=typeof resp.total==='number'?resp.total:resp.records.length;
+      if(typeof resp.limit==='number')auditFilter.limit=resp.limit;
+      if(typeof resp.offset==='number')auditFilter.offset=resp.offset;
+      lastAuditRecords=resp.records;
+    } else {
+      lastAuditRecords=[];auditFilter.paginated=false;auditFilter.total=0;
+    }
+    populateRoleFilter(lastAuditRecords);
+    renderAuditTable(lastAuditRecords);
+    renderAuditPager();
+  }
+  catch(e){showErr(errEl,'Could not load: '+(e.message||'error'));handleApiError(e);}
 }
+function renderAuditPager(){
+  const host=document.getElementById('auditPager');
+  if(!host)return;
+  if(!auditFilter.paginated){host.innerHTML='';return;}
+  const total=auditFilter.total||0;
+  const start=total?(auditFilter.offset+1):0;
+  const end=Math.min(auditFilter.offset+auditFilter.limit,total);
+  const canPrev=auditFilter.offset>0;
+  const canNext=auditFilter.offset+auditFilter.limit<total;
+  host.innerHTML='<div class="audit-pager">'
+    +'<span>Showing '+start+'–'+end+' of '+total+'</span>'
+    +'<span class="ctrls">'
+    +'<button type="button" data-pager="prev"'+(canPrev?'':' disabled')+'>Prev</button>'
+    +'<button type="button" data-pager="next"'+(canNext?'':' disabled')+'>Next</button>'
+    +'</span></div>';
+}
+document.addEventListener('click',(e)=>{
+  const b=e.target&&e.target.closest&&e.target.closest('[data-pager]');
+  if(!b)return;
+  const dir=b.getAttribute('data-pager');
+  if(dir==='prev'&&auditFilter.offset>0){auditFilter.offset=Math.max(0,auditFilter.offset-auditFilter.limit);loadAudit();}
+  else if(dir==='next'){auditFilter.offset=auditFilter.offset+auditFilter.limit;loadAudit();}
+});
 function populateRoleFilter(records){
   const roles=[...new Set(records.map(r=>r.role).filter(Boolean))].sort();
   const sel=document.getElementById('auditRoleFilter');const cur=sel.value;
@@ -1514,14 +1556,29 @@ function populateRoleFilter(records){
   if(cur)sel.value=cur;
 }
 function filterAudit(){
-  const q=document.getElementById('auditSearch').value.toLowerCase();
-  const dec=document.getElementById('auditDecisionFilter').value;
-  const role=document.getElementById('auditRoleFilter').value;
-  renderAuditTable(lastAuditRecords.filter(r=>(r.candidateName||'').toLowerCase().includes(q)&&(!dec||r.decision===dec)&&(!role||r.role===role)));
+  const q=(document.getElementById('auditSearch').value||'').trim();
+  const dec=document.getElementById('auditDecisionFilter').value||'';
+  const role=document.getElementById('auditRoleFilter').value||'';
+  auditFilter.search=q;
+  auditFilter.decision=dec;
+  auditFilter.role=role;
+  scheduleAuditReload();
+}
+function clearAuditFilters(){
+  const sIn=document.getElementById('auditSearch');if(sIn)sIn.value='';
+  const dIn=document.getElementById('auditDecisionFilter');if(dIn)dIn.value='';
+  const rIn=document.getElementById('auditRoleFilter');if(rIn)rIn.value='';
+  auditFilter.search='';auditFilter.decision='';auditFilter.role='';auditFilter.offset=0;
+  loadAudit();
 }
 function renderAuditTable(records){
   const tb=document.getElementById('auditBody');
-  if(!records.length){tb.innerHTML='<tr><td colspan="11"><div class="empty-state">No records found</div></td></tr>';return;}
+  if(!records.length){
+    const hasFilters=!!(auditFilter.search||auditFilter.decision||auditFilter.role);
+    const msg=hasFilters?'No records match these filters':'No records yet';
+    const btn=hasFilters?' <button type="button" class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="clearAuditFilters()">Clear filters</button>':'';
+    tb.innerHTML='<tr><td colspan="11"><div class="empty-state">'+msg+btn+'</div></td></tr>';return;
+  }
   tb.innerHTML=records.map(rec=>{
     const date=rec.createdAt?new Date(rec.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ';
     const s=rec.overall||0;
@@ -1541,29 +1598,28 @@ function renderAuditTable(records){
       '</select></td>'+
       '<td><input class="note-inp" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." onblur="updateAuditNote(\''+rec.id+'\',this.value)"></td>'+
       '<td style="white-space:nowrap;display:flex;gap:4px">'+
+        '<button type="button" class="history-btn" onclick="openChangeHistory(\''+rec.id+'\')" title="Change history" aria-label="Change history">⧉</button>'+
         '<button class="btn btn-ghost btn-sm" onclick="window.open(\''+API+'/api/audit/report/'+rec.id+'\',\'_blank\')" title="Report">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>'+
         '<button class="btn btn-danger btn-sm" onclick="deleteAuditRecord(\''+rec.id+'\')">ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ</button>'+
       '</td></tr>';
   }).join('');
 }
 async function updateAuditDecision(id,decision){
-  const rec=lastAuditRecords.find(r=>r.id===id);if(!rec||!API)return;
-  try{await fetch(API+'/api/audit/'+id,{method:'DELETE'});
-    const body={...rec,decision,scores:rec.scores};delete body.id;delete body.createdAt;
-    await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    loadAudit();}catch(_){}
+  if(!API)return;
+  try{await api('/api/audit/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({decision})});
+    toast('Decision updated','success');loadAudit();}
+  catch(e){handleApiError(e,'Could not update decision');}
 }
 async function updateAuditNote(id,note){
-  const rec=lastAuditRecords.find(r=>r.id===id);if(!rec||!API)return;
-  try{await fetch(API+'/api/audit/'+id,{method:'DELETE'});
-    const body={...rec,note,scores:rec.scores};delete body.id;delete body.createdAt;
-    await fetch(API+'/api/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    loadAudit();}catch(_){}
+  if(!API)return;
+  try{await api('/api/audit/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({note})});
+    toast('Note saved','success');loadAudit();}
+  catch(e){handleApiError(e,'Could not save note');}
 }
 async function deleteAuditRecord(id){
   if(!confirm('Delete this record?')||!API)return;
-  try{await fetch(API+'/api/audit/'+id,{method:'DELETE'});loadAudit();}
-  catch(e){alert('Error: '+e.message);}
+  try{await api('/api/audit/'+encodeURIComponent(id),{method:'DELETE'});toast('Record deleted','success');loadAudit();}
+  catch(e){handleApiError(e,'Could not delete record');}
 }
 async function exportAuditCsv(){
   if(!API)return;
@@ -1572,8 +1628,8 @@ async function exportAuditCsv(){
 
 async function loadRoles(){
   if(!API)return;
-  try{const r=await fetch(API+'/api/audit/roles');if(!r.ok)return;
-    const roles=await r.json();const tabs=document.getElementById('roleTabs');
+  try{const roles=await api('/api/audit/roles');
+    const tabs=document.getElementById('roleTabs');
     if(!roles.length){tabs.innerHTML='<span style="color:#9ca3af;font-size:13px">No roles yet. Tag CVs with a role when analyzing.</span>';return;}
     tabs.innerHTML=roles.map(role=>'<button class="rtab" onclick="loadRoleHistory(\''+escHtml(role.role)+'\',this)">'+escHtml(role.role)+' <span style="opacity:.6;font-size:11px">('+role.count+')</span></button>').join('');}
   catch(_){}
@@ -1582,9 +1638,7 @@ async function loadRoleHistory(role,btn){
   document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
   const content=document.getElementById('roleHistoryContent');
   content.innerHTML='<div class="empty-state">Loading...</div>';
-  try{const r=await fetch(API+'/api/audit/roles/'+encodeURIComponent(role)+'/history');
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const history=await r.json();
+  try{const history=await api('/api/audit/roles/'+encodeURIComponent(role)+'/history');
     if(!history.length){content.innerHTML='<div class="empty-state">No records for this role</div>';return;}
     const avg=Math.round(history.reduce((s,r)=>s+(r.overall||0),0)/history.length);
     const top=history[0];const short=history.filter(r=>r.decision==='shortlist').length;
