@@ -99,6 +99,9 @@
   .status[data-state="err"] .dot { background: #dc2626; }
   .status[data-state="unknown"] .dot { background: #6b7280; }
 </style>
+<!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
+<script defer data-domain="cvsprings.onrender.com" src="https://plausible.io/js/script.tagged-events.js"></script>
+<script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
 <body>
 
@@ -312,6 +315,16 @@
       });
     });
   })();
+
+  // ----- Plausible analytics bridge: forward CustomEvents to plausible() -----
+  document.addEventListener('cv:landing_cta_clicked', function(ev){
+    var d = ev.detail || {};
+    plausible('landing_cta_clicked', { props: { plan: d.plan || 'unknown', source: d.source || 'unknown', period: d.period || 'n/a' } });
+  });
+  document.addEventListener('cv:waitlist_signup', function(ev){
+    var d = ev.detail || {};
+    plausible('waitlist_signup', { props: { plan: d.plan || 'unknown', period: d.period || 'monthly', source: d.source || 'landing' } });
+  });
 
   // ----- URL hygiene: strip ?utm_* and ?intent params from the visible URL on landing -----
   (function stripQueryParams(){
