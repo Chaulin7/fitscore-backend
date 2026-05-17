@@ -726,6 +726,10 @@ img, video, table { max-width: 100%; }
 </style>
 </head>
 <body>
+<div id="waitlistBanner" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:linear-gradient(90deg,#3554f4,#5b73f7);color:#fff;font-size:14px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+  <span style="flex:1" id="waitlistBannerText">Thanks — we'll let you know when this launches.</span>
+  <button type="button" id="waitlistBannerClose" aria-label="Dismiss" style="background:rgba(255,255,255,0.18);color:#fff;border:0;border-radius:6px;padding:4px 10px;font-weight:600;cursor:pointer;font-size:13px">Dismiss</button>
+</div>
 <!-- Phase 2A: toast stack + audit change-history modal -->
 <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
 <div id="history-overlay" class="history-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title">
@@ -1954,7 +1958,53 @@ document.addEventListener('DOMContentLoaded', async function(){
   await refreshTemplatesCache();
   renderTplChips();
   maybeShowTemplateMigrationBanner();
+  maybeShowWaitlistBanner();
 });
+
+function maybeShowWaitlistBanner(){
+  const banner = document.getElementById('waitlistBanner');
+  if (!banner) return;
+  let intent = null;
+  let fromUrl = false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('intent') === 'waitlist') {
+      const plan = params.get('plan') || 'pro';
+      try {
+        const stored = JSON.parse(localStorage.getItem('cvsprings_waitlist') || 'null');
+        intent = stored && stored.plan ? stored : { plan: plan, ts: Date.now() };
+      } catch(e) { intent = { plan: plan, ts: Date.now() }; }
+      try { localStorage.setItem('cvsprings_waitlist', JSON.stringify(intent)); } catch(e){}
+      fromUrl = true;
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('intent');
+        u.searchParams.delete('plan');
+        history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
+      } catch(e){}
+    }
+  } catch(e){}
+  if (!intent) {
+    if (localStorage.getItem('cvsprings_waitlist_dismissed_v1') === '1') return;
+    try {
+      const stored = JSON.parse(localStorage.getItem('cvsprings_waitlist') || 'null');
+      if (stored && stored.plan) intent = stored;
+    } catch(e){}
+  }
+  if (!intent) return;
+  const planLabel = intent.plan === 'team' ? 'Team' : (intent.plan === 'pro' ? 'Pro' : 'this plan');
+  const text = document.getElementById('waitlistBannerText');
+  if (text) text.textContent = "Thanks — we'll let you know when " + planLabel + " launches. Meanwhile, you have full access to the free analyzer below.";
+  banner.style.display = 'flex';
+  const closeBtn = document.getElementById('waitlistBannerClose');
+  if (closeBtn) closeBtn.onclick = function(){
+    try { localStorage.setItem('cvsprings_waitlist_dismissed_v1', '1'); } catch(e){}
+    banner.style.display = 'none';
+  };
+  if (fromUrl) {
+    document.dispatchEvent(new CustomEvent('cv:waitlist_signup', { detail: intent }));
+  }
+}
 
 function maybeShowTemplateMigrationBanner(){
   if (localStorage.getItem(TMPL_MIGRATED_KEY) === '1') return;
