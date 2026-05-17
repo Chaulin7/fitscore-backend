@@ -724,6 +724,9 @@ img, video, table { max-width: 100%; }
 
 
 </style>
+<!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
+<script defer data-domain="cvsprings.onrender.com" src="https://plausible.io/js/script.tagged-events.js"></script>
+<script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
 <body>
 <div id="waitlistBanner" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:linear-gradient(90deg,#3554f4,#5b73f7);color:#fff;font-size:14px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
@@ -1349,6 +1352,7 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
     catch (e) { if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field); showErr(errEl, e.message || 'Analysis failed'); return; }
     lastResult={...data,role,file:file.name};
     renderSingleResult(data,file.name,role);
+    document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'single', role: role || 'unknown' } }));
   }catch(e){
     var errMsg=e.message&&(e.message.includes('fetch')||e.message.includes('Failed'))
       ?'Connection error. The server may still be waking up — please retry.'
@@ -1374,6 +1378,7 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     catch (e) { if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field); showErr(errEl, e.message || 'Batch failed'); return; }
     setProgress(80,'Comparing against job description...');
     setProgress(100,'Complete');
+    document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'batch', count: (data && data.results && data.results.length) || 0, role: role || 'unknown' } }));
     lastBatchResults=(data.results||[]).map(res=>({...res,role}));
     renderBatchResults(data.results,role);
   }catch(e){
@@ -1468,7 +1473,7 @@ async function saveToAudit(){
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:document.getElementById('roleInput').value.trim(),anonymized:lastResult.anonymized||false};
   try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
-    lastResult._auditId=d.id;toast('Saved to audit log.','success');}
+    lastResult._auditId=d.id;toast('Saved to audit log.','success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'single',role:(lastResult&&lastResult.role)||'unknown'}}));}
   catch(e){handleApiError(e,'Network error');}
 }
 async function saveSingleBatch(i){
@@ -1481,7 +1486,7 @@ async function saveSingleBatch(i){
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:res.role||'',anonymized:res.anonymized||false};
   try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
-    toast('Saved: '+body.candidateName,'success');}
+    toast('Saved: '+body.candidateName,'success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'batch_row',role:(body&&body.role)||'unknown'}}));}
   catch(e){handleApiError(e,'Network error');}
 }
 async function saveAllToAudit(){
@@ -2220,6 +2225,28 @@ keepAlive();
     if (dragCounter <= 0) { dragCounter = 0; dz.classList.remove('drag'); }
   });
   document.addEventListener('drop', function(){ dragCounter = 0; dz.classList.remove('drag'); });
+})();
+</script>
+<script>
+// Plausible analytics bridge: forward in-app CustomEvents to plausible()
+(function(){
+  if (typeof plausible !== 'function') return;
+  document.addEventListener('cv:analyze_completed', function(ev){
+    var d = ev.detail || {};
+    plausible('analyze_completed', { props: { mode: d.mode || 'single', role: d.role || 'unknown', count: d.count || 1 } });
+  });
+  document.addEventListener('cv:audit_saved', function(ev){
+    var d = ev.detail || {};
+    plausible('audit_saved', { props: { mode: d.mode || 'single', role: d.role || 'unknown' } });
+  });
+  document.addEventListener('cv:template_saved', function(ev){
+    var d = ev.detail || {};
+    plausible('template_saved', { props: { name: (d.name || '').slice(0, 50), role: d.role || 'unknown' } });
+  });
+  document.addEventListener('cv:waitlist_signup', function(ev){
+    var d = ev.detail || {};
+    plausible('waitlist_signup', { props: { plan: d.plan || 'unknown', period: d.period || 'monthly', source: d.source || 'in_app' } });
+  });
 })();
 </script>
 </body>
