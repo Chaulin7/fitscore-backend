@@ -899,6 +899,11 @@ img, video, table { max-width: 100%; }
             <span>Saved Templates</span>
             <button class="tpl-save-btn" onclick="saveTemplate()">+ Save Current</button>
           </div>
+          <div class="tpl-migration-banner" id="tplMigrationBanner" style="display:none;align-items:center;gap:10px;padding:10px 12px;margin:0 0 10px 0;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:13px;color:#7c2d12">
+            <span style="flex:1">You have <strong class="tpl-mig-count">0</strong> templates saved locally. Upload them to your account?</span>
+            <button type="button" class="tpl-mig-upload" style="padding:6px 10px;background:#ea580c;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer">Upload</button>
+            <button type="button" class="tpl-mig-dismiss" style="padding:6px 10px;background:transparent;color:#7c2d12;border:0;cursor:pointer">Dismiss</button>
+          </div>
           <div class="tpl-chips" id="tplChips">
             <div class="tpl-empty">No templates saved yet.<br>Set up a role and click &ldquo;+ Save Current&rdquo;.</div>
           </div>
@@ -1772,12 +1777,58 @@ function updateBatchSummary(results){
   if(el('bsTopCandidate')) el('bsTopCandidate').textContent = topName.length > 18 ? topName.substring(0,16)+'…' : topName;
 }
 
-// ── Role template library ───────────────────────────────────────
+// — Role template library (server-backed with localStorage fallback) ——
 const TMPL_KEY = 'cvsprings_templates';
+const TMPL_MIGRATED_KEY = 'cvsprings_templates_migrated_v1';
+const TMPL_OFFLINE_KEY = 'cvsprings_templates_offline_cache';
 
+// In-memory cache. Shape: Array<{id, name, role, jobDescription, weights}>
+let _tplCache = [];
+let _tplOffline = false;
+
+function _tplFromLocalStorageLegacy(){
+  try{
+    const obj = JSON.parse(localStorage.getItem(TMPL_KEY)||'{}');
+    return Object.entries(obj).map(([name, v]) => ({
+      id: null,
+      name,
+      role: v && v.role || '',
+      jobDescription: v && v.jd || '',
+      weights: v && v.weights || null,
+    }));
+  } catch(e){ return []; }
+}
+
+function _tplToOfflineCache(arr){
+  try{ localStorage.setItem(TMPL_OFFLINE_KEY, JSON.stringify(arr)); } catch(e){}
+}
+
+function _tplFromOfflineCache(){
+  try{ return JSON.parse(localStorage.getItem(TMPL_OFFLINE_KEY)||'[]'); } catch(e){ return []; }
+}
+
+async function refreshTemplatesCache(){
+  try {
+    const list = await api('/api/templates');
+    _tplCache = Array.isArray(list) ? list : [];
+    _tplOffline = false;
+    _tplToOfflineCache(_tplCache);
+  } catch(err) {
+    const offline = _tplFromOfflineCache();
+    _tplCache = offline.length ? offline : _tplFromLocalStorageLegacy();
+    _tplOffline = true;
+    if (typeof toast === 'function') toast('Templates offline — showing cached copy', 'warn');
+  }
+  return _tplCache;
+}
+
+// Legacy-shape accessor for callers that want the old { name: {jd, role, weights} } map.
 function getTemplates(){
-  try{ return JSON.parse(localStorage.getItem(TMPL_KEY)||'{}'); }
-  catch(e){ return {}; }
+  const out = {};
+  for (const t of _tplCache) {
+    out[t.name] = { jd: t.jobDescription || '', role: t.role || '', weights: t.weights || null, _id: t.id };
+  }
+  return out;
 }
 
 function toggleTplPanel(e){
@@ -1817,17 +1868,38 @@ function renderTplChips(){
     '</div>';
   }).join('');
 }
-function saveTemplate(){
+async function saveTemplate(){
   const name = prompt('Name this template (e.g. "Senior Engineer"):');
   if(!name || !name.trim()) return;
-  const templates = getTemplates();
-  templates[name.trim()] = {
-    jd: document.getElementById('jdInput').value,
-    role: document.getElementById('roleInput').value,
+  const trimmed = name.trim();
+  const payload = {
+    name: trimmed,
+    role: document.getElementById('roleInput').value || '',
+    jobDescription: document.getElementById('jdInput').value || '',
     weights: getWeights()
   };
-  localStorage.setItem(TMPL_KEY, JSON.stringify(templates));
-  renderTplChips();
+  const existing = _tplCache.find(t => t.name === trimmed);
+  try {
+    if (existing && existing.id) {
+      await api('/api/templates/' + encodeURIComponent(existing.id), { method:'PATCH', body: JSON.stringify(payload) });
+    } else {
+      await api('/api/templates', { method:'POST', body: JSON.stringify(payload) });
+    }
+    await refreshTemplatesCache();
+    renderTplChips();
+    if (typeof toast === 'function') toast('Template saved', 'success');
+    document.dispatchEvent(new CustomEvent('cv:template_saved', { detail: { name: trimmed, role: payload.role } }));
+  } catch(err) {
+    if (_tplOffline || /Failed to fetch|NetworkError/i.test(String(err && err.message))) {
+      const legacy = JSON.parse(localStorage.getItem(TMPL_KEY) || '{}');
+      legacy[trimmed] = { jd: payload.jobDescription, role: payload.role, weights: payload.weights };
+      localStorage.setItem(TMPL_KEY, JSON.stringify(legacy));
+      _tplCache = _tplFromLocalStorageLegacy();
+      _tplToOfflineCache(_tplCache);
+      renderTplChips();
+      if (typeof toast === 'function') toast('Saved locally (offline)', 'warn');
+    }
+  }
 }
 
 function loadTemplate(name){
@@ -1850,23 +1922,78 @@ function loadTemplate(name){
   closeTplPanel();
 }
 
-function deleteTemplate(name){
+async function deleteTemplate(name){
   if(!confirm('Delete template "'+name+'"?')) return;
-  const templates = getTemplates();
-  delete templates[name];
-  localStorage.setItem(TMPL_KEY, JSON.stringify(templates));
-  renderTplChips();
+  const t = _tplCache.find(t => t.name === name);
+  try {
+    if (t && t.id) {
+      await api('/api/templates/' + encodeURIComponent(t.id), { method:'DELETE' });
+    }
+    await refreshTemplatesCache();
+    renderTplChips();
+    if (typeof toast === 'function') toast('Template deleted', 'success');
+  } catch(err) {
+    if (_tplOffline || /Failed to fetch|NetworkError/i.test(String(err && err.message))) {
+      const legacy = JSON.parse(localStorage.getItem(TMPL_KEY) || '{}');
+      delete legacy[name];
+      localStorage.setItem(TMPL_KEY, JSON.stringify(legacy));
+      _tplCache = _tplFromLocalStorageLegacy();
+      _tplToOfflineCache(_tplCache);
+      renderTplChips();
+      if (typeof toast === 'function') toast('Deleted locally (offline)', 'warn');
+    }
+  }
 }
 
 function populateTemplateSelect(){ renderTplChips(); }
 
 // Init on load
-document.addEventListener('DOMContentLoaded', function(){
-  renderTplChips();
-  // Load saved API URL
+document.addEventListener('DOMContentLoaded', async function(){
   const saved = localStorage.getItem('cvsprings_api');
   if(saved){ const el=document.getElementById('apiUrl'); if(el) el.value=saved; }
+  await refreshTemplatesCache();
+  renderTplChips();
+  maybeShowTemplateMigrationBanner();
 });
+
+function maybeShowTemplateMigrationBanner(){
+  if (localStorage.getItem(TMPL_MIGRATED_KEY) === '1') return;
+  const legacy = _tplFromLocalStorageLegacy();
+  if (!legacy.length) {
+    try { localStorage.setItem(TMPL_MIGRATED_KEY, '1'); } catch(e){}
+    return;
+  }
+  const banner = document.getElementById('tplMigrationBanner');
+  if (!banner) return;
+  banner.querySelector('.tpl-mig-count').textContent = String(legacy.length);
+  banner.style.display = 'flex';
+  banner.querySelector('.tpl-mig-upload').onclick = async () => {
+    const btn = banner.querySelector('.tpl-mig-upload');
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    let ok = 0, fail = 0;
+    for (const t of legacy) {
+      try {
+        await api('/api/templates', { method:'POST', body: JSON.stringify({
+          name: t.name, role: t.role, jobDescription: t.jobDescription, weights: t.weights
+        }) });
+        ok++;
+      } catch(e) { fail++; }
+    }
+    try { localStorage.setItem(TMPL_MIGRATED_KEY, '1'); } catch(e){}
+    await refreshTemplatesCache();
+    renderTplChips();
+    banner.style.display = 'none';
+    if (typeof toast === 'function') {
+      if (fail === 0) toast('Uploaded ' + ok + ' template' + (ok===1?'':'s'), 'success');
+      else toast('Uploaded ' + ok + ', failed ' + fail, 'warn');
+    }
+  };
+  banner.querySelector('.tpl-mig-dismiss').onclick = () => {
+    try { localStorage.setItem(TMPL_MIGRATED_KEY, '1'); } catch(e){}
+    banner.style.display = 'none';
+  };
+}
 function toggleBatchWhy(btn, idx){
   const tr = btn.closest('tr');
   if(!tr) return;
