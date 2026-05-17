@@ -1,4 +1,4 @@
-undefined<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -108,6 +108,7 @@ undefined<!doctype html>
     <nav class="top">
       <a href="#features">Features</a>
       <a href="#pricing">Pricing</a>
+      <span class="status" id="cv-status-badge" data-state="unknown" title="Backend status — checking…"><span class="dot"></span><span class="status-label" style="font-size:12px;color:rgba(255,255,255,0.55);margin-left:2px">checking…</span></span>
       <a href="/index.html" class="btn btn-ghost" data-cta-location="header">Open app</a>
     </nav>
   </div>
@@ -242,8 +243,89 @@ undefined<!doctype html>
     apply(saved);
   })();
 
-  // ----- Status badge: real /health ping with 60s sessionStorage cache will be wired in Section 4.4 -----
-  // (Intentionally not calling the API here so this setup commit stays purely visual.)
+  // ----- Status badge: ping /health, cache the result in sessionStorage for 60s -----
+  (function setupStatusBadge(){
+    var badge = document.getElementById('cv-status-badge');
+    if (!badge) return;
+    var label = badge.querySelector('.status-label');
+    var API_BASE = (function(){ try { return localStorage.getItem('cvsprings_api_url') || 'https://cvsprings7.onrender.com'; } catch(e){ return 'https://cvsprings7.onrender.com'; } })();
+    var CACHE_KEY = 'cvsprings_health_cache_v1';
+    var CACHE_TTL_MS = 60 * 1000;
+    function setState(state, copy){
+      badge.setAttribute('data-state', state);
+      badge.setAttribute('title', 'Backend status — ' + copy);
+      if (label) label.textContent = copy;
+    }
+    function readCache(){
+      try {
+        var raw = sessionStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        var p = JSON.parse(raw);
+        if (!p || typeof p.ts !== 'number') return null;
+        if (Date.now() - p.ts > CACHE_TTL_MS) return null;
+        return p;
+      } catch(e) { return null; }
+    }
+    function writeCache(state, copy){
+      try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ state: state, copy: copy, ts: Date.now() })); } catch(e){}
+    }
+    var cached = readCache();
+    if (cached) { setState(cached.state, cached.copy); return; }
+    var controller = (typeof AbortController === 'function') ? new AbortController() : null;
+    var timer = setTimeout(function(){ if (controller) controller.abort(); }, 5000);
+    fetch(API_BASE + '/health', { signal: controller ? controller.signal : undefined, cache: 'no-store' })
+      .then(function(r){
+        clearTimeout(timer);
+        if (r.ok) { setState('ok', 'online'); writeCache('ok', 'online'); }
+        else { setState('warn', 'degraded'); writeCache('warn', 'degraded'); }
+      })
+      .catch(function(){
+        clearTimeout(timer);
+        setState('err', 'offline');
+        writeCache('err', 'offline');
+      });
+  })();
+
+  // ----- CTA intent capture: Pro & Team CTAs save waitlist intent then redirect -----
+  (function setupWaitlistIntercept(){
+    var paid = document.querySelectorAll('a.btn[data-plan="pro"], a.btn[data-plan="team"]');
+    Array.prototype.forEach.call(paid, function(a){
+      a.addEventListener('click', function(ev){
+        var plan = a.getAttribute('data-plan');
+        var loc = a.getAttribute('data-cta-location') || 'unknown';
+        var period = 'monthly';
+        try { period = localStorage.getItem('cvsprings_price_period') || 'monthly'; } catch(e){}
+        var intent = { plan: plan, period: period, source: loc, ts: Date.now() };
+        try { localStorage.setItem('cvsprings_waitlist', JSON.stringify(intent)); } catch(e){}
+        document.dispatchEvent(new CustomEvent('cv:landing_cta_clicked', { detail: intent }));
+        document.dispatchEvent(new CustomEvent('cv:waitlist_signup', { detail: intent }));
+        ev.preventDefault();
+        window.location.href = '/index.html?intent=waitlist&plan=' + encodeURIComponent(plan);
+      });
+    });
+    var free = document.querySelectorAll('a.btn[data-plan="starter"], a.btn[data-cta-location="hero"]:not([data-plan="pro"]):not([data-plan="team"]), a.btn[data-cta-location="header"]');
+    Array.prototype.forEach.call(free, function(a){
+      a.addEventListener('click', function(){
+        document.dispatchEvent(new CustomEvent('cv:landing_cta_clicked', {
+          detail: { plan: a.getAttribute('data-plan') || 'free', source: a.getAttribute('data-cta-location') || 'unknown' }
+        }));
+      });
+    });
+  })();
+
+  // ----- URL hygiene: strip ?utm_* and ?intent params from the visible URL on landing -----
+  (function stripQueryParams(){
+    try {
+      var u = new URL(window.location.href);
+      var changed = false;
+      var toRemove = [];
+      u.searchParams.forEach(function(_, k){
+        if (k.indexOf('utm_') === 0 || k === 'intent' || k === 'plan') { toRemove.push(k); }
+      });
+      toRemove.forEach(function(k){ u.searchParams.delete(k); changed = true; });
+      if (changed) history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
+    } catch(e){}
+  })();
 </script>
 
 </body>
