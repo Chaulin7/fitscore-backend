@@ -344,6 +344,22 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 
 /* ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Misc ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ */
 .empty-state{text-align:center;padding:48px 20px;color:#9ca3af;font-size:13px}
+.empty-state-rich{display:flex;flex-direction:column;align-items:center;gap:8px;padding:64px 20px;color:#9ca3af}
+.empty-state-rich .empty-icon{width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:rgba(255,255,255,0.06);color:#9ca3af}
+.empty-state-rich .empty-icon svg{width:32px;height:32px;stroke:currentColor;fill:none;stroke-width:1.6}
+.empty-state-rich .empty-title{font-size:15px;font-weight:600;color:#111827;margin-top:4px}
+.empty-state-rich .empty-sub{font-size:13px;color:#6b7280;max-width:340px;text-align:center;line-height:1.45}
+.audit-tb-stack{display:flex;flex-direction:column;gap:10px;align-items:stretch;margin-bottom:14px}
+.audit-tb-stack .audit-tb-row{width:100%}
+.audit-tb-stack .audit-tb-actions{display:flex;gap:8px}
+.audit-tb-stack .audit-tb-actions .btn{flex:0 0 auto}
+.nav-status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,0.08);color:#cbd5e1;font-size:12px;line-height:1;margin:0 6px}
+.nav-status-pill .dot{width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block}
+.nav-status-pill .dot.ok{background:#22c55e}
+.nav-status-pill .dot.err{background:#ef4444}
+.nav-search-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.06);color:#cbd5e1;cursor:pointer;border:0;margin:0 4px}
+.nav-search-btn:hover{background:rgba(255,255,255,0.12)}
+.nav-search-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
 
 @media(max-width:760px){
@@ -777,6 +793,10 @@ img, video, table { max-width: 100%; }
     <button class="nav-btn" onclick="switchTab('audit',this)">Audit Log</button>
     <button class="nav-btn" onclick="switchTab('history',this)">Role History</button>
   </nav>
+  <span class="nav-status-pill" id="navStatusPill" title="Backend status"><span class="dot" id="navStatusDot"></span><span id="navStatusLabel">Not connected</span></span>
+  <button type="button" class="nav-search-btn" id="navSearchBtn" onclick="focusAuditSearch()" title="Search audit log" aria-label="Search audit log">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+  </button>
   <button class="settings-btn" onclick="toggleSettings()" title="Settings">&#9881;</button>
 </div>
 
@@ -795,6 +815,13 @@ img, video, table { max-width: 100%; }
     <span class="dot" id="connDot"></span>
     <span id="connLabel" style="font-size:12px;color:#6b7280">Not connected</span>
   </div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3 style="margin-top:0">Preferences</h3>
+  <label class="settings-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#374151">
+    <input type="checkbox" id="autosaveBatchToggle" onchange="setAutosaveBatch(this.checked)">
+    <span>Auto-save batch results to audit log</span>
+  </label>
+  <div style="font-size:11px;color:#6b7280;margin-top:4px;margin-left:24px">When enabled, every CV in a batch is saved to the audit log automatically once analysis completes.</div>
 </div>
 
 <!-- ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ANALYZER ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ -->
@@ -1049,19 +1076,21 @@ img, video, table { max-width: 100%; }
 
 <!-- ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ AUDIT LOG ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ -->
 <div class="tab-content main" id="tab-audit">
-  <div class="audit-tb">
-    <input class="text-input" type="text" id="auditSearch" placeholder="Search candidate..." oninput="filterAudit()" style="min-width:180px">
-    <select class="text-input" id="auditDecisionFilter" onchange="filterAudit()" style="min-width:130px">
-      <option value="">All Decisions</option>
+  <div class="audit-tb audit-tb-stack">
+    <div class="audit-tb-row"><input class="text-input" type="text" id="auditSearch" placeholder="Search candidate..." oninput="filterAudit()" style="width:100%"></div>
+    <div class="audit-tb-row"><select class="text-input" id="auditDecisionFilter" onchange="filterAudit()" style="width:100%">
+      <option value="">All decisions</option>
       <option value="shortlist">Shortlist</option>
       <option value="hold">Hold</option>
       <option value="reject">Reject</option>
-    </select>
-    <select class="text-input" id="auditRoleFilter" onchange="filterAudit()" style="min-width:140px">
-      <option value="">All Roles</option>
-    </select>
-    <button class="btn btn-ghost btn-sm" onclick="loadAudit()">&#8635; Refresh</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportAuditCsv()">Export CSV</button>
+    </select></div>
+    <div class="audit-tb-row"><select class="text-input" id="auditRoleFilter" onchange="filterAudit()" style="width:100%">
+      <option value="">All roles</option>
+    </select></div>
+    <div class="audit-tb-row audit-tb-actions">
+      <button class="btn btn-ghost btn-sm" onclick="loadAudit()">&#8635; Refresh</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportAuditCsv()">Export CSV</button>
+    </div>
   </div>
   <div class="msg msg-err" id="auditError"></div>
   <div class="card" style="margin-bottom:0">
@@ -1289,10 +1318,14 @@ async function connect(){
 }
 async function ping(){
   const dot=document.getElementById('connDot'),lbl=document.getElementById('connLabel');
+  const nd=document.getElementById('navStatusDot'),nl=document.getElementById('navStatusLabel');
   dot.className='dot';lbl.textContent='Checking...';
+  if(nd){nd.className='dot';}if(nl){nl.textContent='Checking...';}
   try{await api('/health', {signal:AbortSignal.timeout(8000)});
-    dot.className='dot ok';lbl.textContent='Connected';}
-  catch(_){dot.className='dot err';lbl.textContent='Not connected';}
+    dot.className='dot ok';lbl.textContent='Connected';
+    if(nd){nd.className='dot ok';}if(nl){nl.textContent='Connected';}}
+  catch(_){dot.className='dot err';lbl.textContent='Not connected';
+    if(nd){nd.className='dot err';}if(nl){nl.textContent='Not connected';}}
 }
 
 function setMode(m){
@@ -1462,6 +1495,21 @@ function renderBatchResults(results,role){
       '<td><button class="btn btn-ghost btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td><td><textarea class="row-notes" placeholder="Notes..." rows="1" oninput="saveBatchNote('+i+',this.value)" onblur="saveBatchNote('+i+',this.value)">'+getBatchNote('+i+')+'</textarea></td></tr>';
   }).join('');
   updateBatchSummary(results);
+  if(getAutosaveBatch()){autosaveBatchToAudit();}
+}
+function getAutosaveBatch(){try{return localStorage.getItem('cvsprings_autosave_batch')==='1';}catch(_){return false;}}
+function setAutosaveBatch(v){try{localStorage.setItem('cvsprings_autosave_batch',v?'1':'0');}catch(_){}}
+async function autosaveBatchToAudit(){
+  if(!Array.isArray(lastBatchResults)||!lastBatchResults.length||!API)return;
+  let saved=0;
+  for(let i=0;i<lastBatchResults.length;i++){
+    try{await saveSingleBatch(i);saved++;}catch(_){}
+  }
+  if(typeof plausible==='function'){try{plausible('audit_saved',{props:{source:'batch_autosave',count:saved}});}catch(_){}}
+}
+function focusAuditSearch(){
+  try{switchTab('audit',document.querySelector('.nav-btn[onclick*="audit"]'));}catch(_){}
+  setTimeout(function(){const el=document.getElementById('auditSearch');if(el){el.focus();el.select&&el.select();}},60);
 }
 function setBatchDecision(i,v){if(lastBatchResults[i])lastBatchResults[i]._decision=v;}
 async function saveToAudit(){
@@ -1590,9 +1638,11 @@ function renderAuditTable(records){
   const tb=document.getElementById('auditBody');
   if(!records.length){
     const hasFilters=!!(auditFilter.search||auditFilter.decision||auditFilter.role);
-    const msg=hasFilters?'No records match these filters':'No records yet';
-    const btn=hasFilters?' <button type="button" class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="clearAuditFilters()">Clear filters</button>':'';
-    tb.innerHTML='<tr><td colspan="11"><div class="empty-state">'+msg+btn+'</div></td></tr>';return;
+    const msg=hasFilters?'No audit records match these filters':'No audit records yet';
+    const sub=hasFilters?'Try clearing your filters or adjust the search.':'Analyse a CV and click "Save to audit" to start tracking decisions.';
+    const btn=hasFilters?'<button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="clearAuditFilters()">Clear filters</button>':'';
+    const icon='<div class="empty-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
+    tb.innerHTML='<tr><td colspan="11"><div class="empty-state-rich">'+icon+'<div class="empty-title">'+msg+'</div><div class="empty-sub">'+sub+'</div>'+btn+'</div></td></tr>';return;
   }
   tb.innerHTML=records.map(rec=>{
     const date=rec.createdAt?new Date(rec.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ';
@@ -1733,6 +1783,10 @@ function toggleSettings(){
   const isOpen = panel.classList.contains('open');
   panel.classList.toggle('open', !isOpen);
   overlay.classList.toggle('open', !isOpen);
+  if(!isOpen){
+    const cb=document.getElementById('autosaveBatchToggle');
+    if(cb){cb.checked=(typeof getAutosaveBatch==='function')?getAutosaveBatch():false;}
+  }
 }
 
 // ── Slider sync ────────────────────────────────────────────────
