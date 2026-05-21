@@ -710,7 +710,21 @@ img, video, table { max-width: 100%; }
 .history-btn { background: transparent; border: 0; cursor: pointer; padding: 4px 6px; color: #5c6a8a; font-size: 13px; }
 .history-btn:hover { color: #0c1730; }
 
-
+/* Welcome banner (shown when apiUrl is unset) */
+.welcome-banner{margin:0 16px 18px;border:1px solid #f59e0b;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border-radius:12px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.welcome-banner[hidden]{display:none}
+.welcome-banner-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.welcome-banner-icon{flex:0 0 auto;width:40px;height:40px;border-radius:10px;background:#fde68a;display:flex;align-items:center;justify-content:center;color:#92400e}
+.welcome-banner-text{flex:1 1 240px;min-width:200px}
+.welcome-banner-title{font-size:15px;font-weight:700;color:#78350f;line-height:1.2;margin:0 0 2px}
+.welcome-banner-subtitle{font-size:13px;color:#92400e;line-height:1.4}
+.welcome-banner-form{flex:1 1 320px;display:flex;align-items:stretch;gap:8px;min-width:260px}
+.welcome-banner-input{flex:1 1 auto;min-width:0;padding:8px 12px;border:1px solid #f59e0b;border-radius:8px;background:#fff;color:#1f2937;font-size:13px;outline:none}
+.welcome-banner-input:focus{border-color:#0b1e3d;box-shadow:0 0 0 3px rgba(11,30,61,.15)}
+.welcome-banner-btn{flex:0 0 auto;padding:8px 18px;border:none;border-radius:8px;background:#0b1e3d;color:#fff;font-weight:600;font-size:13px;cursor:pointer;transition:background .15s ease}
+.welcome-banner-btn:hover{background:#1d3a72}
+.welcome-banner-btn:active{background:#0b1e3d}
+@media(max-width:760px){.welcome-banner-form{flex-basis:100%}.welcome-banner-text{flex-basis:100%}}
 </style>
 <!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
 <script defer data-domain="cvsprings.onrender.com" src="https://plausible.io/js/script.tagged-events.js"></script>
@@ -798,7 +812,21 @@ img, video, table { max-width: 100%; }
 
 <!-- ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ANALYZER ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ -->
 <div class="tab-content active main" id="tab-analyzer">
-
+<div id="welcomeBanner" class="welcome-banner" role="region" aria-label="Welcome — connect backend" hidden>
+    <div class="welcome-banner-inner">
+      <div class="welcome-banner-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="welcome-banner-text">
+        <div class="welcome-banner-title">Welcome to CVsprings</div>
+        <div class="welcome-banner-subtitle">Connect your backend to start analysing CVs</div>
+      </div>
+      <div class="welcome-banner-form">
+        <input class="welcome-banner-input" type="url" id="apiUrlWelcome" placeholder="https://your-api.onrender.com" aria-label="Backend API URL">
+        <button class="welcome-banner-btn" type="button" onclick="connectFromWelcomeBanner()">Connect</button>
+      </div>
+    </div>
+  </div>
   <div class="tool-section" id="analyzer-tool">
 
   <div class="mode-toggle">
@@ -2064,7 +2092,43 @@ function toggleBatchWhy(btn, idx){
 }
 
 </script>
-
+<script>
+// Welcome banner: shown when apiUrl is unset, auto-hides when set
+(function(){
+  function refreshWelcomeBanner(){
+    var banner = document.getElementById('welcomeBanner');
+    if (!banner) return;
+    var apiUrl = '';
+    try { apiUrl = (localStorage.getItem('apiUrl') || '').trim(); } catch(e) {}
+    banner.hidden = apiUrl.length > 0;
+  }
+  window.refreshWelcomeBanner = refreshWelcomeBanner;
+  window.connectFromWelcomeBanner = function(){
+    var inputWelcome = document.getElementById('apiUrlWelcome');
+    var inputMain = document.getElementById('apiUrl');
+    if (inputWelcome && inputMain) {
+      inputMain.value = (inputWelcome.value || '').trim();
+      try { inputMain.dispatchEvent(new Event('input', {bubbles:true})); } catch(e) {}
+      try { inputMain.dispatchEvent(new Event('change', {bubbles:true})); } catch(e) {}
+    }
+    if (typeof window.connect === 'function') {
+      try { window.connect(); } catch(e) { console.error(e); }
+    }
+    setTimeout(refreshWelcomeBanner, 300);
+    setTimeout(refreshWelcomeBanner, 1500);
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', refreshWelcomeBanner);
+  } else {
+    refreshWelcomeBanner();
+  }
+  window.addEventListener('storage', function(e){
+    if (e.key === 'apiUrl') refreshWelcomeBanner();
+  });
+  // Same-tab safety: re-check every 2 seconds (cheap, no-op when nothing changes)
+  setInterval(refreshWelcomeBanner, 2000);
+})();
+</script>
 <!-- Footer -->
 <footer class="site-footer">
   <div class="footer-inner">
