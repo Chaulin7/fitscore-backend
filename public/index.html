@@ -412,34 +412,13 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .settings-close:hover{color:#374151;background:#f3f4f6}
 .settings-overlay{display:none;position:fixed;inset:0;z-index:9998}
 .settings-overlay.open{display:block}
-/* Hero */
-.hero-section{text-align:center;padding:52px 24px 40px;background:linear-gradient(180deg,#f0f6ff 0%,#f8fafc 100%);border-bottom:1px solid #e5e7eb}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:6px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:20px}
-.hero-section h1{font-size:clamp(28px,5vw,46px);font-weight:900;color:#0a1f3d;margin:0 0 16px;letter-spacing:-.8px;line-height:1.1}
-.hero-section h1 span{color:#2563eb}
-.hero-section>p{font-size:17px;color:#4b5563;margin:0 auto 32px;max-width:520px;line-height:1.6}
-.hero-cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
-.hero-btn-primary{background:#2563eb;color:#fff;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;border:none;cursor:pointer;letter-spacing:-.02em;transition:background .18s,transform .12s;box-shadow:0 4px 14px rgba(37,99,235,0.35)}
-.hero-btn-primary:hover{background:#1d4ed8;transform:translateY(-1px)}
-.hero-btn-secondary{background:#fff;color:#374151;font-size:15px;font-weight:600;padding:14px 28px;border-radius:10px;border:1.5px solid #d1d5db;cursor:pointer;transition:border-color .18s}
-.hero-btn-secondary:hover{border-color:#2563eb;color:#2563eb;background:#eff6ff}
-.hero-stats{display:flex;gap:40px;justify-content:center;flex-wrap:wrap}
-.hero-stat-num{font-size:28px;font-weight:900;color:#0a1f3d;letter-spacing:-.5px}
-.hero-stat-lbl{font-size:12px;color:#6b7280;margin-top:2px}
-.hero-features{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:40px 0 0;max-width:860px;margin:0 auto;text-align:left}
-.hero-feat{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:22px 20px;transition:box-shadow .18s,transform .18s}
-.hero-feat:hover{box-shadow:0 8px 24px rgba(0,0,0,0.08);transform:translateY(-2px)}
-.hero-feat-icon{width:40px;height:40px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;margin-bottom:12px;color:#2563eb}
-.hero-feat h3{font-size:14px;font-weight:700;color:#0a1f3d;margin:0 0 6px}
-.hero-feat p{font-size:13px;color:#6b7280;margin:0;line-height:1.5}
 .tool-section{padding:32px 24px}
 .err-retry-card{background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:14px;margin-top:12px}
 .err-retry-icon{font-size:22px;flex-shrink:0}
 .err-retry-msg{flex:1;font-size:14px;color:#dc2626;font-weight:500}
 .err-retry-btn{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .18s}
 .err-retry-btn:hover{background:#b91c1c}
-@media(max-width:640px){.hero-features{grid-template-columns:1fr}.hero-stats{gap:24px}}
-@media(max-width:480px){.hero-section{padding:36px 16px 28px}.hero-section h1{font-size:26px}.hero-features{padding:24px 0 0}}
+
 /* Batch summary */
 .batch-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
 .bs-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;text-align:center}
@@ -647,10 +626,6 @@ img, video, table { max-width: 100%; }
     display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch;
   }
   .options-row > *, .role-input-row > *, .action-row > * { flex: 1 1 auto; min-width: 0; }
-  .hero-section { padding: 32px 16px 24px; }
-  .hero-section h1 { font-size: 24px; line-height: 1.2; }
-  .hero-features { grid-template-columns: 1fr !important; }
-  .hero-stats { gap: 12px; flex-wrap: wrap; justify-content: center; }
   .about-grid, .footer-inner { grid-template-columns: 1fr !important; }
   .footer-bottom { flex-direction: column; gap: 6px; text-align: center; }
   .modal-box { max-width: 94vw; max-height: 92vh; }
@@ -673,9 +648,6 @@ img, video, table { max-width: 100%; }
   .weight-card { padding: 10px; }
   .batch-summary { grid-template-columns: 1fr 1fr !important; }
   .how-banner { display: none; }
-  .hero-section { padding: 24px 14px 20px; }
-  .hero-section h1 { font-size: 20px; }
-  .hero-section p { font-size: 14px; }
   .mode-toggle { width: 100%; }
   .mode-btn { flex: 1 1 0; font-size: 12px; padding: 8px 6px; }
   .action-row { flex-direction: column; }
@@ -692,7 +664,7 @@ img, video, table { max-width: 100%; }
   .batch-summary { grid-template-columns: 1fr !important; }
   .topbar-nav .nav-btn { font-size: 10px; padding: 4px 4px; }
   .brand-name { max-width: 90px; }
-  .hero-section h1 { font-size: 18px; }
+  
 }
 
 /* Touch-friendly targets */
@@ -738,7 +710,21 @@ img, video, table { max-width: 100%; }
 .history-btn { background: transparent; border: 0; cursor: pointer; padding: 4px 6px; color: #5c6a8a; font-size: 13px; }
 .history-btn:hover { color: #0c1730; }
 
-
+/* Welcome banner (shown when apiUrl is unset) */
+.welcome-banner{margin:0 16px 18px;border:1px solid #f59e0b;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border-radius:12px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.welcome-banner[hidden]{display:none}
+.welcome-banner-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.welcome-banner-icon{flex:0 0 auto;width:40px;height:40px;border-radius:10px;background:#fde68a;display:flex;align-items:center;justify-content:center;color:#92400e}
+.welcome-banner-text{flex:1 1 240px;min-width:200px}
+.welcome-banner-title{font-size:15px;font-weight:700;color:#78350f;line-height:1.2;margin:0 0 2px}
+.welcome-banner-subtitle{font-size:13px;color:#92400e;line-height:1.4}
+.welcome-banner-form{flex:1 1 320px;display:flex;align-items:stretch;gap:8px;min-width:260px}
+.welcome-banner-input{flex:1 1 auto;min-width:0;padding:8px 12px;border:1px solid #f59e0b;border-radius:8px;background:#fff;color:#1f2937;font-size:13px;outline:none}
+.welcome-banner-input:focus{border-color:#0b1e3d;box-shadow:0 0 0 3px rgba(11,30,61,.15)}
+.welcome-banner-btn{flex:0 0 auto;padding:8px 18px;border:none;border-radius:8px;background:#0b1e3d;color:#fff;font-weight:600;font-size:13px;cursor:pointer;transition:background .15s ease}
+.welcome-banner-btn:hover{background:#1d3a72}
+.welcome-banner-btn:active{background:#0b1e3d}
+@media(max-width:760px){.welcome-banner-form{flex-basis:100%}.welcome-banner-text{flex-basis:100%}}
 </style>
 <!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
 <script defer data-domain="cvsprings.onrender.com" src="https://plausible.io/js/script.tagged-events.js"></script>
@@ -784,7 +770,7 @@ img, video, table { max-width: 100%; }
 
 <!-- Topbar -->
 <div class="topbar">
-  <a class="topbar-brand" href="#">
+  <a class="topbar-brand" href="/">
     <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CV Springs Logo" style="object-fit:contain;flex-shrink:0;filter:invert(1) brightness(1.15);mix-blend-mode:screen;"></span>
     <span class="brand-name">CV<em>springs</em></span>
   </a>
@@ -826,42 +812,21 @@ img, video, table { max-width: 100%; }
 
 <!-- ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ANALYZER ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ -->
 <div class="tab-content active main" id="tab-analyzer">
-
-  <!-- Hero / Marketing -->
-  <section class="hero-section" aria-label="CVsprings overview">
-    <div class="hero-eyebrow">
-      <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
-      AI-Powered Recruitment Tool
-    </div>
-    <h1>Screen CVs in <span>seconds</span>,<br>not hours</h1>
-    <p>Upload candidate CVs, paste a job description, and get instant AI fit scores — so you focus on people, not paperwork.</p>
-    <div class="hero-cta-row">
-      <button class="hero-btn-primary" onclick="document.getElementById('analyzer-tool').scrollIntoView({behavior:'smooth',block:'start'})" aria-label="Scroll to the analyzer tool">Get Started Free</button>
-      <button class="hero-btn-secondary" onclick="openInfoModal(0)" aria-label="Learn how scoring works">How It Works</button>
-    </div>
-    <div class="hero-stats">
-      <div class="hero-stat"><div class="hero-stat-num">4</div><div class="hero-stat-lbl">Scoring dimensions</div></div>
-      <div class="hero-stat"><div class="hero-stat-num">&lt;30s</div><div class="hero-stat-lbl">Per CV analysed</div></div>
-      <div class="hero-stat"><div class="hero-stat-num">PDF &amp; DOCX</div><div class="hero-stat-lbl">Formats supported</div></div>
-    </div>
-    <div class="hero-features" role="list" aria-label="Key features">
-      <div class="hero-feat" role="listitem">
-        <div class="hero-feat-icon" aria-hidden="true"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>
-        <h3>Ranked Fit Scores</h3>
-        <p>Every CV is scored across Keywords, Skills, Experience and Education — ranked best to worst fit instantly.</p>
+<div id="welcomeBanner" class="welcome-banner" role="region" aria-label="Welcome — connect backend" hidden>
+    <div class="welcome-banner-inner">
+      <div class="welcome-banner-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       </div>
-      <div class="hero-feat" role="listitem">
-        <div class="hero-feat-icon" aria-hidden="true"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
-        <h3>Batch Upload</h3>
-        <p>Drop up to 50 CVs at once and get a ranked shortlist in seconds — no manual reading required.</p>
+      <div class="welcome-banner-text">
+        <div class="welcome-banner-title">Welcome to CVsprings</div>
+        <div class="welcome-banner-subtitle">Connect your backend to start analysing CVs</div>
       </div>
-      <div class="hero-feat" role="listitem">
-        <div class="hero-feat-icon" aria-hidden="true"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-        <h3>Decision Tracking</h3>
-        <p>Shortlist, hold or reject candidates, add notes, and export results to CSV in one click.</p>
+      <div class="welcome-banner-form">
+        <input class="welcome-banner-input" type="url" id="apiUrlWelcome" placeholder="https://your-api.onrender.com" aria-label="Backend API URL">
+        <button class="welcome-banner-btn" type="button" onclick="connectFromWelcomeBanner()">Connect</button>
       </div>
     </div>
-  </section>
+  </div>
   <div class="tool-section" id="analyzer-tool">
 
   <div class="mode-toggle">
@@ -2127,7 +2092,43 @@ function toggleBatchWhy(btn, idx){
 }
 
 </script>
-
+<script>
+// Welcome banner: shown when apiUrl is unset, auto-hides when set
+(function(){
+  function refreshWelcomeBanner(){
+    var banner = document.getElementById('welcomeBanner');
+    if (!banner) return;
+    var apiUrl = '';
+    try { apiUrl = (localStorage.getItem('apiUrl') || '').trim(); } catch(e) {}
+    banner.hidden = apiUrl.length > 0;
+  }
+  window.refreshWelcomeBanner = refreshWelcomeBanner;
+  window.connectFromWelcomeBanner = function(){
+    var inputWelcome = document.getElementById('apiUrlWelcome');
+    var inputMain = document.getElementById('apiUrl');
+    if (inputWelcome && inputMain) {
+      inputMain.value = (inputWelcome.value || '').trim();
+      try { inputMain.dispatchEvent(new Event('input', {bubbles:true})); } catch(e) {}
+      try { inputMain.dispatchEvent(new Event('change', {bubbles:true})); } catch(e) {}
+    }
+    if (typeof window.connect === 'function') {
+      try { window.connect(); } catch(e) { console.error(e); }
+    }
+    setTimeout(refreshWelcomeBanner, 300);
+    setTimeout(refreshWelcomeBanner, 1500);
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', refreshWelcomeBanner);
+  } else {
+    refreshWelcomeBanner();
+  }
+  window.addEventListener('storage', function(e){
+    if (e.key === 'apiUrl') refreshWelcomeBanner();
+  });
+  // Same-tab safety: re-check every 2 seconds (cheap, no-op when nothing changes)
+  setInterval(refreshWelcomeBanner, 2000);
+})();
+</script>
 <!-- Footer -->
 <footer class="site-footer">
   <div class="footer-inner">
