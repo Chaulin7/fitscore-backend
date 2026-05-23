@@ -777,7 +777,7 @@ img, video, table { max-width: 100%; }
       <div class="hero-feat" role="listitem">
         <div class="hero-feat-icon" aria-hidden="true"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
         <h3>Batch Upload</h3>
-        <p>Drop up to 50 CVs at once and get a ranked shortlist in seconds — no manual reading required.</p>
+        <p>Drop up to 200 CVs at once and get a ranked shortlist in seconds — no manual reading required.</p>
       </div>
       <div class="hero-feat" role="listitem">
         <div class="hero-feat-icon" aria-hidden="true"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
@@ -1070,7 +1070,7 @@ function setMode(m){
   mode=m;
   document.getElementById('modeSingle').classList.toggle('active',m==='single');
   document.getElementById('modeBatch').classList.toggle('active',m==='batch');
-  document.getElementById('uploadCardTitle').textContent=m==='single'?'Upload CV':'Upload CVs (up to 50)';
+  document.getElementById('uploadCardTitle').textContent=m==='single'?'Upload CV':'Upload CVs (up to 200)';
   document.getElementById('dropLabel').textContent=m==='single'?'Drop PDF or DOCX here, or click to browse':'Drop multiple CVs here, or click to browse';
   document.getElementById('cvInput').multiple=m==='batch';
   clearResults();selectedFiles=[];renderFileList();
