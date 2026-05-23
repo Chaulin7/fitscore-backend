@@ -143,7 +143,7 @@ app.listen(PORT, () => {
   const log = logger ? (m) => logger.info(m) : console.log;
   log('CVsprings API listening on http://localhost:' + PORT);
   log('  POST   /api/analyze              - Score a CV against a job description');
-  log('  POST   /api/analyze/batch        - Batch analyze up to 50 CVs');
+  log('  POST   /api/analyze/batch        - Batch analyze up to 200 CVs');
   log('  POST   /api/audit                - Save an audit record');
   log('  GET    /api/audit                - List audit records (?role&decision&search&from&to&limit&offset)');
   log('  PATCH  /api/audit/:id            - Update {decision,note,role,candidateName}');
