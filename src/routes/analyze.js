@@ -37,7 +37,7 @@ const fileFilter = (req, file, cb) => {
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/octet-stream'
-  ];
+  ]
   if (file.mimetype && !okMimes.includes(file.mimetype) && !/pdf|word|octet/i.test(file.mimetype)) {
     return cb(Object.assign(new Error('File mimetype does not match accepted types.'),
       { statusCode: 415, code: 'UNSUPPORTED_TYPE', field: 'cv' }));
@@ -46,7 +46,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_BATCH = 50;
+const MAX_BATCH =200;
 const upload = multer({ storage, fileFilter, limits: { fileSize: MAX_FILE_BYTES, files: MAX_BATCH } });
 
 function sniffOk(filePath, ext) {
