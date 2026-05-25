@@ -318,6 +318,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .msg{border-radius:8px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:16px;display:none}
 .msg-err{background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626}
 .msg-ok{background:#f0fdf4;border:1.5px solid #bbf7d0;color:#15803d}
+.msg-warn{background:#fffbeb;border:1.5px solid #fde68a;color:#92400e}
 
 /* ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Loading overlay ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ */
 .loading-overlay{
@@ -1085,7 +1086,7 @@ function handleFiles(files){
     if(selectedFiles.length>200){
       const removed=selectedFiles.length-200;
       selectedFiles=selectedFiles.slice(0,200);
-      if(errEl)showErr(errEl,'Batch limit is 200 CVs. '+removed+' file'+(removed===1?'':'s')+' ignored — only the first 200 were kept.');
+      if(errEl)showWarn(errEl,'Batch limit is 200 CVs. '+removed+' file'+(removed===1?'':'s')+' ignored — only the first 200 were kept.');
     }else if(errEl){
       errEl.style.display='none';
     }
@@ -1410,7 +1411,8 @@ async function loadRoleHistory(role,btn){
 }
 
 function clearResults(){document.getElementById('singleResults').style.display='none';document.getElementById('batchResults').style.display='none';lastResult=null;lastBatchResults=[];}
-function showErr(el,msg){el.textContent=msg;el.style.display='block';}
+function showErr(el,msg){el.className='msg msg-err';el.textContent=msg;el.style.display='block';}
+function showWarn(el,msg){el.className='msg msg-warn';el.textContent=msg;el.style.display='block';}
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function escCsv(s){return String(s||'').replace(/"/g,'""');}
 function showLoading(msg){document.getElementById('loadingMsg').textContent=msg||'Processing...';document.getElementById('progressBar').style.width='0%';document.getElementById('progressLabel').textContent='';document.getElementById('loadingOverlay').style.display='flex';
