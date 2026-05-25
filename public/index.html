@@ -1079,7 +1079,17 @@ function setMode(m){
 function handleFiles(files){
   const arr=Array.from(files);
   if(mode==='single'){selectedFiles=arr.slice(0,1);}
-  else{for(const f of arr)if(!selectedFiles.find(x=>x.name===f.name))selectedFiles.push(f);}
+  else{
+    const errEl=document.getElementById('analyzeError');
+    for(const f of arr)if(!selectedFiles.find(x=>x.name===f.name))selectedFiles.push(f);
+    if(selectedFiles.length>200){
+      const removed=selectedFiles.length-200;
+      selectedFiles=selectedFiles.slice(0,200);
+      if(errEl)showErr(errEl,'Batch limit is 200 CVs. '+removed+' file'+(removed===1?'':'s')+' ignored — only the first 200 were kept.');
+    }else if(errEl){
+      errEl.style.display='none';
+    }
+  }
   renderFileList();
 }
 function handleDrop(ev){ev.preventDefault();document.getElementById('dropzone').classList.remove('drag');handleFiles(ev.dataTransfer.files);}
@@ -1103,6 +1113,7 @@ async function analyze(){
   const errEl=document.getElementById('analyzeError');errEl.style.display='none';
   if(!API){showErr(errEl,'Set API endpoint first.');return;}
   if(!selectedFiles.length){showErr(errEl,'Upload at least one CV file.');return;}
+  if(mode!=='single' && selectedFiles.length>200){showErr(errEl,'You can upload up to 200 CVs at once. Please remove '+(selectedFiles.length-200)+' file(s).');return;}
   const jd=document.getElementById('jdInput').value.trim();
   if(!jd){showErr(errEl,'Job description is required.');return;}
   const w=getWeights();
