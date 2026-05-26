@@ -318,6 +318,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .msg{border-radius:8px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:16px;display:none}
 .msg-err{background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626}
 .msg-ok{background:#f0fdf4;border:1.5px solid #bbf7d0;color:#15803d}
+.msg-warn{background:#fffbeb;border:1.5px solid #fde68a;color:#92400e}
 
 /* ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Loading overlay ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ */
 .loading-overlay{
@@ -1297,7 +1298,7 @@ function setMode(m){
   mode=m;
   document.getElementById('modeSingle').classList.toggle('active',m==='single');
   document.getElementById('modeBatch').classList.toggle('active',m==='batch');
-  document.getElementById('uploadCardTitle').textContent=m==='single'?'Upload CV':'Upload CVs (up to 50)';
+  document.getElementById('uploadCardTitle').textContent=m==='single'?'Upload CV':'Upload CVs (up to 200)';
   document.getElementById('dropLabel').textContent=m==='single'?'Drop PDF or DOCX here, or click to browse':'Drop multiple CVs here, or click to browse';
   document.getElementById('cvInput').multiple=m==='batch';
   clearResults();selectedFiles=[];renderFileList();
@@ -1306,7 +1307,17 @@ function setMode(m){
 function handleFiles(files){
   const arr=Array.from(files);
   if(mode==='single'){selectedFiles=arr.slice(0,1);}
-  else{for(const f of arr)if(!selectedFiles.find(x=>x.name===f.name))selectedFiles.push(f);}
+  else{
+    const errEl=document.getElementById('analyzeError');
+    for(const f of arr)if(!selectedFiles.find(x=>x.name===f.name))selectedFiles.push(f);
+    if(selectedFiles.length>200){
+      const removed=selectedFiles.length-200;
+      selectedFiles=selectedFiles.slice(0,200);
+      if(errEl)showWarn(errEl,'Batch limit is 200 CVs. '+removed+' file'+(removed===1?'':'s')+' ignored — only the first 200 were kept.');
+    }else if(errEl){
+      errEl.style.display='none';
+    }
+  }
   renderFileList();
 }
 function handleDrop(ev){ev.preventDefault();document.getElementById('dropzone').classList.remove('drag');handleFiles(ev.dataTransfer.files);}
@@ -1330,6 +1341,7 @@ async function analyze(){
   const errEl=document.getElementById('analyzeError');errEl.style.display='none';
   if(!API){showErr(errEl,'Set API endpoint first.');return;}
   if(!selectedFiles.length){showErr(errEl,'Upload at least one CV file.');return;}
+  if(mode!=='single' && selectedFiles.length>200){showErr(errEl,'You can upload up to 200 CVs at once. Please remove '+(selectedFiles.length-200)+' file(s).');return;}
   const jd=document.getElementById('jdInput').value.trim();
   if(!jd){showErr(errEl,'Job description is required.');return;}
   const w=getWeights();
@@ -1698,7 +1710,8 @@ async function loadRoleHistory(role,btn){
 }
 
 function clearResults(){document.getElementById('singleResults').style.display='none';document.getElementById('batchResults').style.display='none';lastResult=null;lastBatchResults=[];}
-function showErr(el,msg){el.textContent=msg;el.style.display='block';}
+function showErr(el,msg){el.className='msg msg-err';el.textContent=msg;el.style.display='block';}
+function showWarn(el,msg){el.className='msg msg-warn';el.textContent=msg;el.style.display='block';}
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function escCsv(s){return String(s||'').replace(/"/g,'""');}
 function showLoading(msg){document.getElementById('loadingMsg').textContent=msg||'Processing...';document.getElementById('progressBar').style.width='0%';document.getElementById('progressLabel').textContent='';document.getElementById('loadingOverlay').style.display='flex';
