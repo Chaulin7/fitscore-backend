@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CVsprings — Screen CVs in seconds, not hours</title>
+<meta name="description" content="AI-powered candidate fit scoring. Upload CVs, paste a job description, get instant ranked shortlists. GDPR-friendly EU recruitment tool." />
+<style>
+  :root {
+    --bg: #0c1730;
+    --bg-2: #0a1228;
+    --panel: #ffffff;
+    --ink: #0c1730;
+    --muted: #5c6a8a;
+    --line: rgba(255,255,255,0.08);
+    --line-2: #e7ebf3;
+    --primary: #3554f4;
+    --primary-2: #5b73f7;
+    --ok: #16a34a;
+    --warn: #d97706;
+    --err: #dc2626;
+    --radius: 14px;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: var(--font); background: var(--bg); color: #fff; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header */
+  header.site {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(12,23,48,0.85); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  header.site .row { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -0.01em; }
+  .logo-dot { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#fff 0%,#dde4ff 100%); display: grid; place-items: center; color: var(--primary); font-weight: 800; font-size: 14px; }
+  nav.top a { color: rgba(255,255,255,0.78); margin-left: 22px; font-size: 14px; font-weight: 500; }
+  nav.top a:hover { color: #fff; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 14px; border: 1px solid transparent; cursor: pointer; transition: transform .08s ease, background .15s ease; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-2); }
+  .btn-ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,0.18); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.08); }
+
+  /* Hero */
+  section.hero { padding: 96px 0 56px; text-align: center; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgba(91,115,247,0.18); color: #b6c5ff; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 22px; }
+  .eyebrow .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--primary-2); box-shadow: 0 0 0 0 rgba(91,115,247,0.6); animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(91,115,247,0.6); } 70% { box-shadow: 0 0 0 10px rgba(91,115,247,0); } 100% { box-shadow: 0 0 0 0 rgba(91,115,247,0); } }
+  h1.title { font-size: clamp(36px, 6vw, 64px); line-height: 1.05; letter-spacing: -0.025em; margin: 0 0 18px; font-weight: 800; }
+  h1.title .grad { background: linear-gradient(135deg,#5b73f7 0%,#9bb1ff 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  p.lede { font-size: clamp(16px, 1.6vw, 19px); color: rgba(255,255,255,0.72); max-width: 640px; margin: 0 auto 32px; line-height: 1.6; }
+  .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 56px; }
+  .stats { display: flex; gap: 56px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+  .stat .n { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; }
+  .stat .l { color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 4px; }
+
+  /* Features */
+  section.features { padding: 64px 0; }
+  .feature-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+  .feature { background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+  .feature .icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(91,115,247,0.18); color: #b6c5ff; display: grid; place-items: center; margin-bottom: 16px; font-size: 20px; }
+  .feature h3 { margin: 0 0 8px; font-size: 17px; }
+  .feature p { margin: 0; color: rgba(255,255,255,0.7); font-size: 14px; line-height: 1.6; }
+  @media (max-width: 820px) { .feature-grid { grid-template-columns: 1fr; } }
+
+  /* Pricing */
+  section.pricing { padding: 64px 0 80px; }
+  .pricing-head { text-align: center; margin-bottom: 36px; }
+  .pricing-head h2 { font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.02em; margin: 0 0 12px; font-weight: 800; }
+  .pricing-head p { color: rgba(255,255,255,0.65); margin: 0; }
+  .toggle { display: inline-flex; background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 999px; padding: 4px; margin: 18px 0 4px; }
+  .toggle button { background: transparent; color: rgba(255,255,255,0.7); border: 0; padding: 8px 18px; border-radius: 999px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .toggle button.on { background: var(--primary); color: #fff; }
+  .save-note { display: block; color: #b6c5ff; font-size: 12px; margin-top: 8px; }
+
+  .plans { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; margin-top: 28px; }
+  .plan { background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; position: relative; }
+  .plan.featured { border-color: rgba(91,115,247,0.5); background: rgba(91,115,247,0.08); }
+  .plan .pill { position: absolute; top: -10px; right: 22px; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .plan h3 { margin: 0 0 6px; font-size: 16px; color: rgba(255,255,255,0.8); }
+  .plan .price { font-size: 38px; font-weight: 800; letter-spacing: -0.02em; }
+  .plan .price small { font-size: 14px; color: rgba(255,255,255,0.55); font-weight: 500; }
+  .plan ul { list-style: none; padding: 0; margin: 18px 0 24px; }
+  .plan li { padding: 6px 0; font-size: 14px; color: rgba(255,255,255,0.78); display: flex; gap: 8px; align-items: flex-start; }
+  .plan li::before { content: '✓'; color: #b6c5ff; font-weight: 700; }
+  .plan .btn { width: 100%; }
+  @media (max-width: 820px) { .plans { grid-template-columns: 1fr; } }
+
+  /* Footer */
+  footer.site { border-top: 1px solid var(--line); padding: 32px 0; color: rgba(255,255,255,0.55); font-size: 13px; }
+  footer.site .row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+  .status { display: inline-flex; align-items: center; gap: 8px; }
+  .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; }
+  .status[data-state="warn"] .dot { background: #d97706; }
+  .status[data-state="err"] .dot { background: #dc2626; }
+  .status[data-state="unknown"] .dot { background: #6b7280; }
+</style>
+<!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
+<script defer data-domain="cvsprings.onrender.com" src="https://plausible.io/js/script.tagged-events.js"></script>
+<script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+</head>
+<body>
+
+<header class="site">
+  <div class="container row">
+    <a class="logo" href="/"><span class="logo-dot">CV</span> CVsprings</a>
+    <nav class="top">
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <span class="status" id="cv-status-badge" data-state="unknown" title="Backend status — checking…"><span class="dot"></span><span class="status-label" style="font-size:12px;color:rgba(255,255,255,0.55);margin-left:2px">checking…</span></span>
+      <a href="/app" class="btn btn-ghost" data-cta-location="header">Open app</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <div class="eyebrow"><span class="pulse"></span> AI-POWERED RECRUITMENT</div>
+    <h1 class="title">Screen CVs in <span class="grad">seconds</span>,<br>not hours</h1>
+    <p class="lede">Upload candidate CVs, paste a job description, and get instant AI fit scores — so you focus on people, not paperwork.</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="/app" data-cta-location="hero">Get Started Free</a>
+      <a class="btn btn-ghost" href="#features">How It Works</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="n">4</div><div class="l">Scoring dimensions</div></div>
+      <div class="stat"><div class="n">&lt;30s</div><div class="l">Per CV analysed</div></div>
+      <div class="stat"><div class="n">PDF &amp; DOCX</div><div class="l">Formats supported</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="features" id="features">
+  <div class="container">
+    <div class="feature-grid">
+      <div class="feature">
+        <div class="icon">☰</div>
+        <h3>Ranked Fit Scores</h3>
+        <p>Every CV is scored across Keywords, Skills, Experience and Education — ranked best to worst fit instantly.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">⇯</div>
+        <h3>Batch Upload</h3>
+        <p>Drop up to 50 CVs at once and get a ranked shortlist in seconds — no manual reading required.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">✓</div>
+        <h3>Decision Tracking</h3>
+        <p>Shortlist, hold or reject candidates, add notes, and export results to CSV in one click. Full immutable audit history for GDPR compliance.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pricing" id="pricing">
+  <div class="container">
+    <div class="pricing-head">
+      <h2>Simple pricing. Cancel anytime.</h2>
+      <p>Start free. Upgrade when you outgrow it.</p>
+      <div class="toggle" role="tablist" aria-label="Billing period">
+        <button id="period-monthly" class="on" type="button">Monthly</button>
+        <button id="period-yearly" type="button">Yearly</button>
+      </div>
+      <span class="save-note" id="save-note">Save 20% with yearly billing</span>
+    </div>
+
+    <div class="plans">
+      <div class="plan">
+        <h3>Starter</h3>
+        <div class="price">Free <small>/ forever</small></div>
+        <ul>
+          <li>20 CV analyses per month</li>
+          <li>Single &amp; batch upload</li>
+          <li>CSV export</li>
+          <li>Audit log + change history</li>
+        </ul>
+        <a class="btn btn-ghost" href="/app" data-cta-location="pricing" data-plan="starter">Start free</a>
+      </div>
+
+      <div class="plan featured">
+        <span class="pill">MOST POPULAR</span>
+        <h3>Pro</h3>
+        <div class="price" data-base="49"><span class="amount">€49</span> <small>/ month</small></div>
+        <ul>
+          <li>Unlimited CV analyses</li>
+          <li>Priority compute (faster)</li>
+          <li>Role templates &amp; presets</li>
+          <li>Email support</li>
+        </ul>
+        <a class="btn btn-primary" href="/app" data-cta-location="pricing" data-plan="pro">Start 14-day trial</a>
+      </div>
+
+      <div class="plan">
+        <h3>Team</h3>
+        <div class="price" data-base="199"><span class="amount">€199</span> <small>/ month</small></div>
+        <ul>
+          <li>Everything in Pro</li>
+          <li>5 seats included</li>
+          <li>Shared templates</li>
+          <li>Priority support &amp; onboarding</li>
+        </ul>
+        <a class="btn btn-ghost" href="/app" data-cta-location="pricing" data-plan="team">Start 14-day trial</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site">
+  <div class="container row">
+    <div>© 2026 CVsprings. Built for compliance-first recruitment in the EU.</div>
+    <div class="status" id="status-badge" data-state="unknown"><span class="dot"></span><span class="label">Checking status…</span></div>
+  </div>
+</footer>
+
+<script>
+  // ----- Pricing period toggle (persisted; intent flow wired in Phase 2A Section 5 commit) -----
+  (function () {
+    const mBtn = document.getElementById('period-monthly');
+    const yBtn = document.getElementById('period-yearly');
+    const saved = localStorage.getItem('cvsprings_price_period') || 'monthly';
+    function apply(period) {
+      const yearly = period === 'yearly';
+      mBtn.classList.toggle('on', !yearly);
+      yBtn.classList.toggle('on', yearly);
+      document.querySelectorAll('.price[data-base]').forEach(el => {
+        const base = parseInt(el.getAttribute('data-base'), 10);
+        const amt = el.querySelector('.amount');
+        const small = el.querySelector('small');
+        if (yearly) {
+          const yearlyMonthly = Math.round(base * 0.8);
+          amt.textContent = '€' + yearlyMonthly;
+          small.textContent = '/ month, billed yearly';
+        } else {
+          amt.textContent = '€' + base;
+          small.textContent = '/ month';
+        }
+      });
+      localStorage.setItem('cvsprings_price_period', period);
+    }
+    mBtn.addEventListener('click', () => apply('monthly'));
+    yBtn.addEventListener('click', () => apply('yearly'));
+    apply(saved);
+  })();
+
+  // ----- Status badge: ping /health, cache the result in sessionStorage for 60s -----
+  (function setupStatusBadge(){
+    var badge = document.getElementById('cv-status-badge');
+    if (!badge) return;
+    var label = badge.querySelector('.status-label');
+    var API_BASE = (function(){ try { return localStorage.getItem('cvsprings_api_url') || 'https://cvsprings7.onrender.com'; } catch(e){ return 'https://cvsprings7.onrender.com'; } })();
+    var CACHE_KEY = 'cvsprings_health_cache_v1';
+    var CACHE_TTL_MS = 60 * 1000;
+    function setState(state, copy){
+      badge.setAttribute('data-state', state);
+      badge.setAttribute('title', 'Backend status — ' + copy);
+      if (label) label.textContent = copy;
+    }
+    function readCache(){
+      try {
+        var raw = sessionStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        var p = JSON.parse(raw);
+        if (!p || typeof p.ts !== 'number') return null;
+        if (Date.now() - p.ts > CACHE_TTL_MS) return null;
+        return p;
+      } catch(e) { return null; }
+    }
+    function writeCache(state, copy){
+      try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ state: state, copy: copy, ts: Date.now() })); } catch(e){}
+    }
+    var cached = readCache();
+    if (cached) { setState(cached.state, cached.copy); return; }
+    var controller = (typeof AbortController === 'function') ? new AbortController() : null;
+    var timer = setTimeout(function(){ if (controller) controller.abort(); }, 5000);
+    fetch(API_BASE + '/health', { signal: controller ? controller.signal : undefined, cache: 'no-store' })
+      .then(function(r){
+        clearTimeout(timer);
+        if (r.ok) { setState('ok', 'online'); writeCache('ok', 'online'); }
+        else { setState('warn', 'degraded'); writeCache('warn', 'degraded'); }
+      })
+      .catch(function(){
+        clearTimeout(timer);
+        setState('err', 'offline');
+        writeCache('err', 'offline');
+      });
+  })();
+
+  // ----- CTA intent capture: Pro & Team CTAs save waitlist intent then redirect -----
+  (function setupWaitlistIntercept(){
+    var paid = document.querySelectorAll('a.btn[data-plan="pro"], a.btn[data-plan="team"]');
+    Array.prototype.forEach.call(paid, function(a){
+      a.addEventListener('click', function(ev){
+        var plan = a.getAttribute('data-plan');
+        var loc = a.getAttribute('data-cta-location') || 'unknown';
+        var period = 'monthly';
+        try { period = localStorage.getItem('cvsprings_price_period') || 'monthly'; } catch(e){}
+        var intent = { plan: plan, period: period, source: loc, ts: Date.now() };
+        try { localStorage.setItem('cvsprings_waitlist', JSON.stringify(intent)); } catch(e){}
+        document.dispatchEvent(new CustomEvent('cv:landing_cta_clicked', { detail: intent }));
+        document.dispatchEvent(new CustomEvent('cv:waitlist_signup', { detail: intent }));
+        ev.preventDefault();
+        window.location.href = '/index.html?intent=waitlist&plan=' + encodeURIComponent(plan);
+      });
+    });
+    var free = document.querySelectorAll('a.btn[data-plan="starter"], a.btn[data-cta-location="hero"]:not([data-plan="pro"]):not([data-plan="team"]), a.btn[data-cta-location="header"]');
+    Array.prototype.forEach.call(free, function(a){
+      a.addEventListener('click', function(){
+        document.dispatchEvent(new CustomEvent('cv:landing_cta_clicked', {
+          detail: { plan: a.getAttribute('data-plan') || 'free', source: a.getAttribute('data-cta-location') || 'unknown' }
+        }));
+      });
+    });
+  })();
+
+  // ----- Plausible analytics bridge: forward CustomEvents to plausible() -----
+  document.addEventListener('cv:landing_cta_clicked', function(ev){
+    var d = ev.detail || {};
+    plausible('landing_cta_clicked', { props: { plan: d.plan || 'unknown', source: d.source || 'unknown', period: d.period || 'n/a' } });
+  });
+  document.addEventListener('cv:waitlist_signup', function(ev){
+    var d = ev.detail || {};
+    plausible('waitlist_signup', { props: { plan: d.plan || 'unknown', period: d.period || 'monthly', source: d.source || 'landing' } });
+  });
+
+  // ----- URL hygiene: strip ?utm_* and ?intent params from the visible URL on landing -----
+  (function stripQueryParams(){
+    try {
+      var u = new URL(window.location.href);
+      var changed = false;
+      var toRemove = [];
+      u.searchParams.forEach(function(_, k){
+        if (k.indexOf('utm_') === 0 || k === 'intent' || k === 'plan') { toRemove.push(k); }
+      });
+      toRemove.forEach(function(k){ u.searchParams.delete(k); changed = true; });
+      if (changed) history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
+    } catch(e){}
+  })();
+</script>
+
+</body>
+</html>
