@@ -28,6 +28,7 @@ function initSchema() {
   getDb().exec(`
     CREATE TABLE IF NOT EXISTS audit_log (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL DEFAULT 'legacy',
       candidate_name TEXT NOT NULL,
       file_name TEXT,
       overall INTEGER,
@@ -46,13 +47,15 @@ function initSchema() {
       updated_at TEXT
     )
   `);
+
   // Backward-compatible column additions
-  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN role TEXT DEFAULT ''"); } catch(_) {}
-  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN anonymized INTEGER DEFAULT 0"); } catch(_) {}
-  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN updated_at TEXT"); } catch(_) {}
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN role TEXT DEFAULT ''"); } catch (_) {}
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN anonymized INTEGER DEFAULT 0"); } catch (_) {}
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN updated_at TEXT"); } catch (_) {}
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN user_id TEXT NOT NULL DEFAULT 'legacy'"); } catch (_) {}
 
   // Backfill updated_at for existing rows
-  try { getDb().exec("UPDATE audit_log SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''"); } catch(_) {}
+  try { getDb().exec("UPDATE audit_log SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''"); } catch (_) {}
 
   // Append-only change log for audit_log
   getDb().exec(`
@@ -66,6 +69,7 @@ function initSchema() {
       changed_by TEXT
     )
   `);
+
   // Enforce append-only at DB level: block UPDATE/DELETE via triggers
   try {
     getDb().exec(`
@@ -78,46 +82,47 @@ function initSchema() {
       BEFORE DELETE ON audit_changes
       BEGIN SELECT RAISE(ABORT, 'audit_changes is append-only'); END;
     `);
-  } catch(_) {}
+  } catch (_) {}
 
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_changes_audit_id ON audit_changes(audit_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_log_role ON audit_log(role)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_log_decision ON audit_log(decision)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id)');
 }
 
 // Insert an audit record
-function insertAudit(data) {
+function insertAudit(data, userId) {
   const id = uuidv4();
   const now = nowIso();
   const stmt = getDb().prepare(`
     INSERT INTO audit_log
-      (id, candidate_name, file_name, overall, keywords_score, skills_score,
-       experience_score, education_score, weights, verdict, decision, note, jd_snippet, role, anonymized, created_at, updated_at)
+    (id, user_id, candidate_name, file_name, overall, keywords_score, skills_score,
+     experience_score, education_score, weights, verdict, decision, note, jd_snippet, role, anonymized, created_at, updated_at)
     VALUES
-      (@id, @candidateName, @fileName, @overall, @keywords, @skills,
-       @experience, @education, @weights, @verdict, @decision, @note, @jdSnippet, @role, @anonymized, @createdAt, @updatedAt)
+    (@id, @userId, @candidateName, @fileName, @overall, @keywords, @skills,
+     @experience, @education, @weights, @verdict, @decision, @note, @jdSnippet, @role, @anonymized, @createdAt, @updatedAt)
   `);
   stmt.run({
     id,
+    userId: userId || 'legacy',
     candidateName: data.candidateName,
-    fileName: data.fileName || '',
-    overall: data.overall || 0,
-    keywords: data.scores?.keywords || 0,
-    skills: data.scores?.skills || 0,
-    experience: data.scores?.experience || 0,
-    education: data.scores?.education || 0,
+    fileName: data.fileName,
+    overall: data.overall,
+    keywords: data.scores && data.scores.keywords,
+    skills: data.scores && data.scores.skills,
+    experience: data.scores && data.scores.experience,
+    education: data.scores && data.scores.education,
     weights: data.weights ? JSON.stringify(data.weights) : null,
-    verdict: data.verdict || '',
-    decision: data.decision || '',
-    note: data.note || '',
-    jdSnippet: data.jdSnippet || '',
-    role: data.role || '',
+    verdict: data.verdict,
+    decision: data.decision,
+    note: data.note,
+    jdSnippet: data.jdSnippet,
+    role: data.role,
     anonymized: data.anonymized ? 1 : 0,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   });
-
   return getAuditById(id);
 }
 
@@ -125,14 +130,24 @@ function insertAudit(data) {
 function getAllAudits({ decision, limit, role } = {}) {
   let sql = 'SELECT * FROM audit_log WHERE 1=1';
   const params = [];
-
   if (decision) { sql += ' AND decision = ?'; params.push(decision); }
   if (role) { sql += ' AND role = ?'; params.push(role); }
-
   sql += ' ORDER BY created_at DESC';
-
   if (limit) { sql += ' LIMIT ?'; params.push(Number(limit)); }
+  const rows = getDb().prepare(sql).all(...params);
+  return rows.map(formatRow);
+}
 
+// Get all audit records scoped to a specific tenant (userId).
+// Supports optional role and date-range filters.
+// Returns formatted records sorted newest-first.
+function getAuditsByTenant(userId, { role, from, to } = {}) {
+  let sql = 'SELECT * FROM audit_log WHERE user_id = ?';
+  const params = [userId];
+  if (role) { sql += ' AND role = ?'; params.push(role); }
+  if (from) { sql += ' AND created_at >= ?'; params.push(from); }
+  if (to) { sql += ' AND created_at <= ?'; params.push(to); }
+  sql += ' ORDER BY created_at DESC';
   const rows = getDb().prepare(sql).all(...params);
   return rows.map(formatRow);
 }
@@ -146,9 +161,14 @@ function getAuditById(id) {
 // PATCH-style update: only mutates allowed fields, returns updated record + array of changes
 // Returns { record, changes } or null if not found.
 const PATCHABLE_FIELDS = ['decision', 'note', 'role', 'candidateName'];
-const DB_FIELD_MAP = { decision: 'decision', note: 'note', role: 'role', candidateName: 'candidate_name' };
+const DB_FIELD_MAP = {
+  decision: 'decision',
+  note: 'note',
+  role: 'role',
+  candidateName: 'candidate_name',
+};
 
-function updateAudit(id, patch, changedBy) {
+function updateAudit({ id, ...patch }, changedBy) {
   const existing = getDb().prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
   if (!existing) return null;
 
@@ -160,8 +180,8 @@ function updateAudit(id, patch, changedBy) {
   for (const field of PATCHABLE_FIELDS) {
     if (!(field in patch)) continue;
     const dbField = DB_FIELD_MAP[field];
-    const newVal = patch[field] == null ? '' : String(patch[field]);
-    const oldVal = existing[dbField] == null ? '' : String(existing[dbField]);
+    const newVal = patch[field] == null ? null : String(patch[field]);
+    const oldVal = existing[dbField] == null ? null : String(existing[dbField]);
     if (newVal === oldVal) continue;
     sets.push(`${dbField} = @${field}`);
     params[field] = newVal;
@@ -169,7 +189,7 @@ function updateAudit(id, patch, changedBy) {
   }
 
   if (sets.length === 0) {
-    return { record: formatRow(existing), changes: [] };
+    return { record: formatRow(existing), changes };
   }
 
   sets.push('updated_at = @updatedAt');
@@ -184,37 +204,31 @@ function updateAudit(id, patch, changedBy) {
     INSERT INTO audit_changes (id, audit_id, field, old_value, new_value, changed_at, changed_by)
     VALUES (@id, @auditId, @field, @oldValue, @newValue, @changedAt, @changedBy)
   `);
-  const tx = getDb().transaction((entries) => {
+
+  const writeChanges = getDb().transaction((entries) => {
     for (const c of entries) {
-      insertChange.run({
-        id: uuidv4(),
-        auditId: id,
-        field: c.field,
-        oldValue: c.oldValue,
-        newValue: c.newValue,
-        changedAt,
-        changedBy: changedBy || null
-      });
+      insertChange.run({ id: uuidv4(), auditId: id, field: c.field, oldValue: c.oldValue, newValue: c.newValue, changedAt, changedBy: changedBy || null });
     }
   });
-  tx(changes);
+  writeChanges(changes);
 
   return { record: getAuditById(id), changes };
 }
 
 // Delete an audit record and log the deletion in audit_changes
-function deleteAudit(id, changedBy) {
+function deleteAudit({ id }, changedBy) {
   const existing = getDb().prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
   if (!existing) return false;
+
   const changedAt = nowIso();
-  const tx = getDb().transaction(() => {
+  const doDelete = getDb().transaction(() => {
     getDb().prepare(`
       INSERT INTO audit_changes (id, audit_id, field, old_value, new_value, changed_at, changed_by)
       VALUES (?, ?, '__deleted__', ?, NULL, ?, ?)
     `).run(uuidv4(), id, JSON.stringify(formatRow(existing)), changedAt, changedBy || null);
     getDb().prepare('DELETE FROM audit_log WHERE id = ?').run(id);
   });
-  tx();
+  doDelete();
   return true;
 }
 
@@ -230,39 +244,38 @@ function getAuditChanges(auditId) {
   return rows;
 }
 
-// Get list of distinct roles
-function getRoles() {
-  const rows = getDb().prepare("SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE role != '' GROUP BY role ORDER BY role").all();
+// Get list of distinct roles (tenant-scoped)
+function getRoles(userId) {
+  const sql = userId
+    ? "SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE user_id = ? AND role != '' GROUP BY role ORDER BY role ASC"
+    : "SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE role != '' GROUP BY role ORDER BY role ASC";
+  const rows = userId
+    ? getDb().prepare(sql).all(userId)
+    : getDb().prepare(sql).all();
   return rows;
 }
 
-// Get score history for a specific role
-function getRoleHistory(role) {
-  const rows = getDb().prepare(`
-    SELECT id, candidate_name, overall, decision, created_at
-    FROM audit_log
-    WHERE role = ?
-    ORDER BY created_at DESC
-    LIMIT 100
-  `).all(role);
-  return rows.map(r => ({
+// Get score history for a specific role (tenant-scoped)
+function getRoleHistory(role, userId) {
+  const sql = userId
+    ? 'SELECT id, candidate_name, overall, decision, created_at FROM audit_log WHERE role = ? AND user_id = ? ORDER BY created_at DESC LIMIT 100'
+    : 'SELECT id, candidate_name, overall, decision, created_at FROM audit_log WHERE role = ? ORDER BY created_at DESC LIMIT 100';
+  const rows = userId
+    ? getDb().prepare(sql).all(role, userId)
+    : getDb().prepare(sql).all(role);
+  return rows.map((r) => ({
     id: r.id,
     candidateName: r.candidate_name,
     overall: r.overall,
     decision: r.decision,
-    createdAt: r.created_at
+    createdAt: r.created_at,
   }));
 }
 
-// Export as CSV
-function exportCsv(filters = {}) {
+// Export as CSV (tenant-scoped)
+function exportCsv(filters) {
   const rows = getAllAudits(filters);
-
-  const headers = [
-    'id','candidateName','fileName','overall','keywords','skills','experience','education',
-    'weights','verdict','decision','note','jdSnippet','role','anonymized','createdAt','updatedAt'
-  ];
-
+  const headers = ['id','candidateName','fileName','overall','keywords','skills','experience','education','weights','verdict','decision','note','jdSnippet','role','anonymized','createdAt','updatedAt'];
   const csvRows = [headers.join(',')];
   for (const row of rows) {
     const formatted = formatRow(row);
@@ -271,22 +284,21 @@ function exportCsv(filters = {}) {
       esc(formatted.candidateName),
       esc(formatted.fileName),
       formatted.overall,
-      formatted.scores?.keywords,
-      formatted.scores?.skills,
-      formatted.scores?.experience,
-      formatted.scores?.education,
+      formatted.scores.keywords,
+      formatted.scores.skills,
+      formatted.scores.experience,
+      formatted.scores.education,
       esc(JSON.stringify(formatted.weights)),
       esc(formatted.verdict),
       esc(formatted.decision),
       esc(formatted.note),
       esc(formatted.jdSnippet),
-      esc(formatted.role || ''),
+      esc(formatted.role),
       formatted.anonymized ? 1 : 0,
       esc(formatted.createdAt),
-      esc(formatted.updatedAt || '')
+      esc(formatted.updatedAt),
     ].join(','));
   }
-
   return csvRows.join('\n');
 }
 
@@ -297,9 +309,11 @@ function esc(v) {
 
 function formatRow(row) {
   // Tolerant: accepts both DB rows and already-formatted records
-  if (row && row.scores) return row;
+  if (!row) return row;
+  if (row.scores) return row;
   return {
     id: row.id,
+    userId: row.user_id,
     candidateName: row.candidate_name,
     fileName: row.file_name,
     overall: row.overall,
@@ -307,28 +321,29 @@ function formatRow(row) {
       keywords: row.keywords_score,
       skills: row.skills_score,
       experience: row.experience_score,
-      education: row.education_score
+      education: row.education_score,
     },
-    weights: row.weights ? JSON.parse(row.weights) : null,
+    weights: row.weights ? (() => { try { return JSON.parse(row.weights); } catch { return null; } })() : null,
     verdict: row.verdict,
     decision: row.decision,
     note: row.note,
     jdSnippet: row.jd_snippet,
-    role: row.role || '',
+    role: row.role,
     anonymized: row.anonymized === 1,
     createdAt: row.created_at,
-    updatedAt: row.updated_at || row.created_at
+    updatedAt: row.updated_at || row.created_at,
   };
 }
 
 module.exports = {
   insertAudit,
   getAllAudits,
+  getAuditsByTenant,
   getAuditById,
   updateAudit,
   deleteAudit,
   getAuditChanges,
   exportCsv,
   getRoles,
-  getRoleHistory
+  getRoleHistory,
 };
