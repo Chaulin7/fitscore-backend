@@ -757,6 +757,37 @@ img, video, table { max-width: 100%; }
     <span class="dot" id="connDot"></span>
     <span id="connLabel" style="font-size:12px;color:#6b7280">Not connected</span>
   </div>
+
+  <h3 style="margin-top:18px">Default Scoring Weights</h3>
+  <div class="settings-row" style="margin-top:6px;gap:8px;flex-wrap:wrap">
+    <label class="opt-label" style="min-width:70px">Keywords</label>
+    <input class="text-input" type="number" id="setWKw" min="0" max="100" style="width:70px">
+    <label class="opt-label" style="min-width:60px">Skills</label>
+    <input class="text-input" type="number" id="setWSk" min="0" max="100" style="width:70px">
+  </div>
+  <div class="settings-row" style="margin-top:6px;gap:8px;flex-wrap:wrap">
+    <label class="opt-label" style="min-width:70px">Experience</label>
+    <input class="text-input" type="number" id="setWEx" min="0" max="100" style="width:70px">
+    <label class="opt-label" style="min-width:60px">Education</label>
+    <input class="text-input" type="number" id="setWEd" min="0" max="100" style="width:70px">
+  </div>
+  <h3 style="margin-top:18px">Defaults</h3>
+  <div class="settings-row" style="margin-top:6px">
+    <label class="toggle-wrap" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="setAnonymizeDefault"> <span class="tog-label">Anonymize by default</span>
+    </label>
+  </div>
+  <div class="settings-row" style="margin-top:6px">
+    <input class="text-input" type="text" id="setDefaultRole" placeholder="Default role / position" style="flex:1">
+  </div>
+  <div class="settings-row" style="margin-top:6px;gap:8px;align-items:center">
+    <label class="opt-label" style="min-width:130px">Strong fit threshold</label>
+    <input class="text-input" type="number" id="setScoreThreshold" min="1" max="99" style="width:80px">
+  </div>
+  <div class="settings-row" style="margin-top:10px;align-items:center;gap:10px">
+    <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save Settings</button>
+    <span id="settingsSavedMsg" style="font-size:12px;color:#059669;font-weight:700;display:none">Settings saved</span>
+  </div>
 </div>
 
 <!-- ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ANALYZER ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ -->
@@ -981,7 +1012,7 @@ img, video, table { max-width: 100%; }
       <div class="batch-summary" id="batchSummary" style="display:none">
         <div class="bs-card"><div class="bs-val" id="bsTotalCVs">0</div><div class="bs-label">CVs Analysed</div></div>
         <div class="bs-card"><div class="bs-val" id="bsAvgScore">—</div><div class="bs-label">Avg Score</div><div class="bs-sub">out of 100</div></div>
-        <div class="bs-card"><div class="bs-val" id="bsShortlisted">0</div><div class="bs-label">Shortlisted</div><div class="bs-sub">score &ge; 70</div></div>
+        <div class="bs-card"><div class="bs-val" id="bsShortlisted">0</div><div class="bs-label">Shortlisted</div><div class="bs-sub" id="bsSubThreshold">score &ge; 70</div></div>
         <div class="bs-card"><div class="bs-val" id="bsTopCandidate" style="font-size:14px;padding-top:4px">—</div><div class="bs-label">Top Candidate</div></div>
       </div>
       <div style="overflow-x:auto">
@@ -1052,6 +1083,64 @@ img, video, table { max-width: 100%; }
 <script>
 let API=localStorage.getItem('cvsprings_api_url')||'https://cvsprings7.onrender.com';
 let mode='single',selectedFiles=[],lastResult=null,lastBatchResults=[],lastAuditRecords=[];
+
+// ── Persisted settings helpers (cvsprings_ prefixed) ───────────────
+function getDefaultWeights(){
+  try{
+    const raw=localStorage.getItem('cvsprings_weights');
+    if(raw){ const w=JSON.parse(raw); if(w&&typeof w.kw==='number') return w; }
+  }catch(e){}
+  return {kw:40,sk:30,ex:20,ed:10};
+}
+function getDefaultAnonymize(){ return localStorage.getItem('cvsprings_anonymize_default')==='1'; }
+function getDefaultRole(){ return localStorage.getItem('cvsprings_default_role')||''; }
+function getScoreThreshold(){
+  const v=parseInt(localStorage.getItem('cvsprings_score_threshold'),10);
+  return (isNaN(v)||v<1||v>99)?70:v;
+}
+function saveSettings(){
+  const kw=+document.getElementById('setWKw').value, sk=+document.getElementById('setWSk').value,
+        ex=+document.getElementById('setWEx').value, ed=+document.getElementById('setWEd').value;
+  if([kw,sk,ex,ed].some(n=>isNaN(n)||n<0||n>100)){ alert('Weights must each be between 0 and 100.'); return; }
+  if(Math.abs((kw+sk+ex+ed)-100)>0.01){ alert('Scoring weights must sum to 100 (currently '+(kw+sk+ex+ed)+').'); return; }
+  let thr=parseInt(document.getElementById('setScoreThreshold').value,10);
+  if(isNaN(thr)||thr<1||thr>99){ alert('Strong fit threshold must be between 1 and 99.'); return; }
+  localStorage.setItem('cvsprings_weights', JSON.stringify({kw,sk,ex,ed}));
+  localStorage.setItem('cvsprings_anonymize_default', document.getElementById('setAnonymizeDefault').checked?'1':'0');
+  localStorage.setItem('cvsprings_default_role', document.getElementById('setDefaultRole').value.trim());
+  localStorage.setItem('cvsprings_score_threshold', String(thr));
+  applySavedSettings();
+  const msg=document.getElementById('settingsSavedMsg');
+  if(msg){ msg.style.display='inline'; setTimeout(()=>{ msg.style.display='none'; }, 2500); }
+}
+function applySavedSettings(){
+  // Weights -> main inputs + sliders
+  const w=getDefaultWeights();
+  const map={wKw:w.kw,wSk:w.sk,wEx:w.ex,wEd:w.ed};
+  Object.keys(map).forEach(id=>{
+    const inp=document.getElementById(id), sld=document.getElementById(id+'Slider');
+    if(inp) inp.value=map[id];
+    if(sld) sld.value=map[id];
+  });
+  if(typeof updateWeightSum==='function') updateWeightSum();
+  // Anonymize default
+  const an=document.getElementById('anonymizeToggle');
+  if(an) an.checked=getDefaultAnonymize();
+  // Default role (only if empty)
+  const role=document.getElementById('roleInput');
+  if(role && !role.value.trim()){ const dr=getDefaultRole(); if(dr) role.value=dr; }
+  // Strong-fit sub label
+  const sub=document.getElementById('bsSubThreshold');
+  if(sub) sub.innerHTML='score &ge; '+getScoreThreshold();
+}
+function loadSettingsIntoPanel(){
+  const w=getDefaultWeights();
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.value=v; };
+  set('setWKw',w.kw); set('setWSk',w.sk); set('setWEx',w.ex); set('setWEd',w.ed);
+  const an=document.getElementById('setAnonymizeDefault'); if(an) an.checked=getDefaultAnonymize();
+  set('setDefaultRole', getDefaultRole());
+  set('setScoreThreshold', getScoreThreshold());
+}
 
 document.addEventListener('DOMContentLoaded',()=>{
   if(API){document.getElementById('apiUrl').value=API;ping();}
@@ -1191,7 +1280,7 @@ function renderSingleResult(data,fileName,role){
   document.getElementById('batchResults').style.display='none';
   const name=data.anonymized?'Anonymous Candidate':(data.candidateName||fileName.replace(/\.[^.]+$/,''));
   document.getElementById('resultName').textContent=name+(role?' ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ '+role:'');
-  const c=s=>s>=70?'#059669':s>=50?'#d97706':'#dc2626';
+  const c=s=>s>=getScoreThreshold()?'#059669':s>=50?'#d97706':'#dc2626';
   const sr=document.getElementById('scoreRow');
   sr.innerHTML=
     ringBox('Overall',data.overall,true,c(data.overall))+
@@ -1240,11 +1329,11 @@ function renderBatchResults(results,role){
   document.getElementById('batchTitle').textContent='Ranked Results '+results.length+' candidates'+(role?' / '+role:'');
   document.getElementById('batchBody').innerHTML=results.map((r,i)=>{
     const s=r.overall||0;
-    const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
+    const pill=s>=getScoreThreshold()?'pill-hi':s>=50?'pill-med':'pill-lo';
     const rc=i===0?'r1':i===1?'r2':i===2?'r3':'rn';
     const name=r.anonymized?'Candidate #'+(i+1):(r.candidateName||r.fileName);
-    return '<tr class="'+(s>=70?'score-hi-row':s>=50?'score-med-row':'score-lo-row')+'" style="animation:fadeUp .3s ease '+(i*.05)+'s both" data-score="'+(r.overall||0)+'" data-name="'+(r.candidateName||r.fileName||'')+'">' +
-      '<td style="border-left:3px solid '+(s>=70?'#16a34a':s>=50?'#d97706':'#dc2626')+'">'+'<span class="rank-badge '+rc+'">'+(i+1)+'</span></td>' +
+    return '<tr class="'+(s>=getScoreThreshold()?'score-hi-row':s>=50?'score-med-row':'score-lo-row')+'" style="animation:fadeUp .3s ease '+(i*.05)+'s both" data-score="'+(r.overall||0)+'" data-name="'+(r.candidateName||r.fileName||'')+'">' +
+      '<td style="border-left:3px solid '+(s>=getScoreThreshold()?'#16a34a':s>=50?'#d97706':'#dc2626')+'">'+'<span class="rank-badge '+rc+'">'+(i+1)+'</span></td>' +
       '<td style="font-weight:600;color:#111827">'+escHtml(name)+'</td>' +
       '<td><span class="score-pill '+pill+'">'+s+'</span></td>' +
       '<td>'+( r.scores?.keywords??'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ')+'</td><td>'+(r.scores?.skills??'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ')+'</td>'+
@@ -1332,7 +1421,7 @@ function renderAuditTable(records){
   tb.innerHTML=records.map(rec=>{
     const date=rec.createdAt?new Date(rec.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ';
     const s=rec.overall||0;
-    const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
+    const pill=s>=getScoreThreshold()?'pill-hi':s>=50?'pill-med':'pill-lo';
     return '<tr>'+
       '<td style="font-size:11px;color:#9ca3af;white-space:nowrap">'+date+'</td>'+
       '<td style="font-weight:600;color:#111827">'+escHtml(rec.candidateName)+(rec.anonymized?' <span style="font-size:10px;color:#9ca3af">(anon)</span>':'')+'</td>'+
@@ -1401,13 +1490,13 @@ async function loadRoleHistory(role,btn){
     content.innerHTML=
       '<div style="display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap">'+
         statC('Candidates',history.length,'#0f2847')+
-        statC('Avg Score',avg,avg>=70?'#059669':avg>=50?'#d97706':'#dc2626')+
+        statC('Avg Score',avg,avg>=getScoreThreshold()?'#059669':avg>=50?'#d97706':'#dc2626')+
         statC('Top Score',top.overall||0,'#059669')+
         statC('Shortlisted',short,'#7c3aed')+
       '</div>'+
       '<table class="data-table"><thead><tr><th>#</th><th>Candidate</th><th>Overall</th><th>KW</th><th>SK</th><th>EX</th><th>ED</th><th>Decision</th><th class="notes-th" style="min-width:120px">Notes</th></tr></thead><tbody>'+
       history.map((r,i)=>{
-        const s=r.overall||0;const pill=s>=70?'pill-hi':s>=50?'pill-med':'pill-lo';
+        const s=r.overall||0;const pill=s>=getScoreThreshold()?'pill-hi':s>=50?'pill-med':'pill-lo';
         const dc=r.decision==='shortlist'?'#15803d':r.decision==='reject'?'#b91c1c':'#a16207';
         return '<tr style="animation:fadeUp .25s ease '+(i*.04)+'s both">'+
           '<td style="color:#9ca3af;font-size:12px">'+(i+1)+'</td>'+
@@ -1516,13 +1605,14 @@ function updateBatchSummary(results){
   if(summary) summary.style.display = 'grid';
   const total = results.length;
   const avg = Math.round(results.reduce((s,r)=>s+(r.overall||0),0)/total);
-  const shortlisted = results.filter(r=>(r.overall||0)>=70).length;
+  const shortlisted = results.filter(r=>(r.overall||0)>=getScoreThreshold()).length;
   const top = results.reduce((a,b)=>(a.overall||0)>=(b.overall||0)?a:b, results[0]);
   const topName = top.candidateName || top.fileName || 'N/A';
   const el = id=>document.getElementById(id);
   if(el('bsTotalCVs')) el('bsTotalCVs').textContent = total;
   if(el('bsAvgScore')) el('bsAvgScore').textContent = avg;
   if(el('bsShortlisted')) el('bsShortlisted').textContent = shortlisted;
+  if(el('bsSubThreshold')) el('bsSubThreshold').innerHTML = 'score &ge; '+getScoreThreshold();
   if(el('bsTopCandidate')) el('bsTopCandidate').textContent = topName.length > 18 ? topName.substring(0,16)+'…' : topName;
 }
 
@@ -1617,6 +1707,8 @@ function populateTemplateSelect(){ renderTplChips(); }
 // Init on load
 document.addEventListener('DOMContentLoaded', function(){
   renderTplChips();
+  loadSettingsIntoPanel();
+  applySavedSettings();
   // Load saved API URL
   const saved = localStorage.getItem('cvsprings_api');
   if(saved){ const el=document.getElementById('apiUrl'); if(el) el.value=saved; }
