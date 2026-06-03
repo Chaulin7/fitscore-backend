@@ -785,7 +785,7 @@ img, video, table { max-width: 100%; }
   <button type="button" class="nav-search-btn" id="navSearchBtn" onclick="focusAuditSearch()" title="Search audit log" aria-label="Search audit log">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
   </button>
-  <button class="settings-btn" onclick="toggleSettings()" title="Settings">&#9881;</button>
+  <button class="settings-btn" onclick="toggleSettings()" title="Settings" aria-label="Open settings">&#9881;</button>
 </div>
 
 <!-- Config bar -->
@@ -793,7 +793,7 @@ img, video, table { max-width: 100%; }
 <div class="settings-overlay" id="settingsOverlay" onclick="toggleSettings()"></div>
 <!-- Settings panel -->
 <div class="settings-panel" id="settingsPanel">
-  <button class="settings-close" onclick="toggleSettings()">&#215;</button>
+  <button class="settings-close" onclick="toggleSettings()" aria-label="Close settings">&#215;</button>
   <h3>Connection Settings</h3>
   <div class="settings-row" style="margin-top:6px">
     <input class="text-input" type="text" id="apiUrl" placeholder="https://your-api.onrender.com" style="flex:1">
@@ -813,15 +813,15 @@ img, video, table { max-width: 100%; }
   <h3 style="margin-top:18px">Default Scoring Weights</h3>
   <div class="settings-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
     <span style="min-width:70px;font-size:13px;color:#374151">Keywords</span>
-    <input class="text-input" type="number" id="setWKw" min="0" max="100" style="width:70px">
+    <input class="text-input" type="number" id="setWKw" min="0" max="100" style="width:70px" aria-label="Default keyword weight">
     <span style="min-width:55px;font-size:13px;color:#374151">Skills</span>
-    <input class="text-input" type="number" id="setWSk" min="0" max="100" style="width:70px">
+    <input class="text-input" type="number" id="setWSk" min="0" max="100" style="width:70px" aria-label="Default skills weight">
   </div>
   <div class="settings-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
     <span style="min-width:70px;font-size:13px;color:#374151">Experience</span>
-    <input class="text-input" type="number" id="setWEx" min="0" max="100" style="width:70px">
+    <input class="text-input" type="number" id="setWEx" min="0" max="100" style="width:70px" aria-label="Default experience weight">
     <span style="min-width:55px;font-size:13px;color:#374151">Education</span>
-    <input class="text-input" type="number" id="setWEd" min="0" max="100" style="width:70px">
+    <input class="text-input" type="number" id="setWEd" min="0" max="100" style="width:70px" aria-label="Default education weight">
   </div>
   <div style="font-size:11px;color:#6b7280;margin-top:4px">Must sum to 100. Applied to the main weight sliders.</div>
   <h3 style="margin-top:18px">Defaults</h3>
@@ -830,11 +830,11 @@ img, video, table { max-width: 100%; }
     <span>Anonymize by default</span>
   </label>
   <div class="settings-row" style="margin-top:8px">
-    <input class="text-input" type="text" id="setDefaultRole" placeholder="Default role / position" style="flex:1">
+    <input class="text-input" type="text" id="setDefaultRole" placeholder="Default role / position" style="flex:1" aria-label="Default role or position">
   </div>
   <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:8px">
     <span style="font-size:13px;color:#374151">Strong fit threshold</span>
-    <input class="text-input" type="number" id="setScoreThreshold" min="1" max="99" style="width:80px">
+    <input class="text-input" type="number" id="setScoreThreshold" min="1" max="99" style="width:80px" aria-label="Strong fit score threshold">
   </div>
   <div class="settings-row" style="display:flex;align-items:center;gap:10px;margin-top:12px">
     <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save Settings</button>
@@ -1852,6 +1852,13 @@ function toggleSettings(){
     if(cb){cb.checked=(typeof getAutosaveBatch==='function')?getAutosaveBatch():false;}
   }
 }
+    // Accessibility: close the settings panel with the Escape key
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape'){
+        var sp = document.getElementById('settingsPanel');
+        if(sp && sp.classList.contains('open')){ toggleSettings(); }
+      }
+    });
 
 // ── Slider sync ────────────────────────────────────────────────
 function syncSlider(id){
