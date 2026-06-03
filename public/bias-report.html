@@ -115,13 +115,28 @@ tbody tr:hover td{background:#f9fafb}
 .empty-state{text-align:center;padding:60px 20px;color:#9ca3af}
 .empty-state .empty-icon{font-size:40px;margin-bottom:12px}
 .empty-state p{font-size:14px}
+
+/* === Topbar consistency with main app === */
+.topbar-logo{display:flex;align-items:center;gap:5px;margin-right:auto;text-decoration:none}
+.logo-ring{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:50%;border:2px solid rgba(255,255,255,0.85);flex-shrink:0}
+.logo-ring-img{width:48px;height:48px;object-fit:contain;flex-shrink:0;filter:invert(1) brightness(1.15);mix-blend-mode:screen}
+.brand{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.4px;text-shadow:0 0 18px rgba(255,255,255,0.35)}
+.brand span{color:#7dd3fc}
+.topbar-nav{display:flex;gap:2px;margin-left:32px}
+.topbar-nav a{color:rgba(255,255,255,0.65);text-decoration:none;font:600 13px 'Inter',sans-serif;letter-spacing:.03em;padding:7px 15px;border-radius:6px;transition:all .18s;border-bottom:0}
+.topbar-nav a:hover{color:#fff;background:rgba(255,255,255,0.1)}
+.topbar-nav a.active{color:#fff;background:rgba(255,255,255,0.14);border-bottom:0}
+.topbar-right{margin-left:0;display:flex;align-items:center;gap:12px}
+.status-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,0.08);color:#cbd5e1;font-size:12px;font-weight:500;line-height:1}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#94a3b8;box-shadow:none;display:inline-block}
+.status-badge.connected .status-dot, .status-dot.ok{background:#22c55e;box-shadow:0 0 7px rgba(34,197,94,0.7)}
 </style>
 </head>
 <body>
 <nav class="topbar">
   <a href="/index.html" class="topbar-logo">
-    <img src="/logo.png" alt="CVsprings logo">
-    <span class="brand"><span>CV</span>springs</span>
+    <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CVsprings logo"></span>
+    <span class="brand">CV<span>springs</span></span>
   </a>
   <div class="topbar-nav">
     <a href="/index.html">Analyzer</a>
@@ -176,7 +191,7 @@ tbody tr:hover td{background:#f9fafb}
 
   <!-- Empty placeholder -->
   <div class="empty-state" id="empty-state">
-    <div class="empty-icon">\uD83D\uDCC8</div>
+    <div class="empty-icon">📈</div>
     <p>Connect your backend and click <strong>Generate Report</strong> to view the bias monitoring analysis.</p>
   </div>
 
@@ -294,8 +309,8 @@ tbody tr:hover td{background:#f9fafb}
   function setConnected() {
     connectBanner.style.display = 'none';
     generateBtn.disabled = false;
-    statusDot.style.background = '#4ade80';
-    statusDot.style.boxShadow = '0 0 6px rgba(74,222,128,0.6)';
+    statusDot.style.background = '#22c55e';
+    statusDot.style.boxShadow = '0 0 7px rgba(34,197,94,0.7)';
     statusLabel.textContent = 'Connected';
   }
 
