@@ -277,7 +277,7 @@ tbody tr:hover td{background:#f9fafb}
   'use strict';
 
   // ---- State ----
-  let apiBase = localStorage.getItem('cvs_api_base') || '';
+  let apiBase = (localStorage.getItem('cvs_api_base')||localStorage.getItem('cvsprings_api_url')) || '';
   let apiKey  = localStorage.getItem('cvs_api_key')  || '';
 
   // ---- DOM refs ----
