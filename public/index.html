@@ -1296,6 +1296,7 @@ function buildAuditQuery() {
 }
 
 let mode='single',selectedFiles=[],lastResult=null,lastBatchResults=[],lastAuditRecords=[];
+let _stepTimer = null;
 
 // ── Persisted settings helpers (cvsprings_ prefixed) ───────────────
 function getDefaultWeights(){
@@ -1555,7 +1556,7 @@ function renderBatchResults(results,role){
       '<td>'+( r.scores?.keywords??'—')+'</td><td>'+(r.scores?.skills??'—')+'</td>'+
       '<td>'+(r.scores?.experience??'—')+'</td><td>'+(r.scores?.education??'—')+'</td>' +
       '<td><select class="dec-sel" onchange="setBatchDecision('+i+',this.value)"><option value="">— Decision —</option><option value="shortlist">Shortlist</option><option value="hold">On Hold</option><option value="reject">Reject</option></select></td>' +
-      '<td><button class="btn btn-ghost btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td><td><textarea class="row-notes" placeholder="Notes..." rows="1" oninput="saveBatchNote('+i+',this.value)" onblur="saveBatchNote('+i+',this.value)">'+getBatchNote('+i+')+'</textarea></td></tr>';
+      '<td><button class="btn btn-ghost btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td><td><textarea class="row-notes" placeholder="Notes..." rows="1" oninput="saveBatchNote('+i+',this.value)" onblur="saveBatchNote('+i+',this.value)">'+getBatchNote(i)+'</textarea></td></tr>';
   }).join('');
   updateBatchSummary(results);
   if(getAutosaveBatch()){autosaveBatchToAudit();}
@@ -1727,7 +1728,7 @@ function renderAuditTable(records){
       '<td><input class="note-inp" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." onblur="updateAuditNote(\''+rec.id+'\',this.value)"></td>'+
       '<td style="white-space:nowrap;display:flex;gap:4px">'+
         '<button type="button" class="history-btn" onclick="openChangeHistory(\''+rec.id+'\')" title="Change history" aria-label="Change history">⧉</button>'+
-        '<button class="btn btn-ghost btn-sm" onclick="window.open(\''+API+'/api/audit/report/'+rec.id+'\',\'_blank\')" title="Report">📊°📊</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="window.open(\''+API+'/api/audit/report/'+rec.id+'\',\'_blank\')" title="Report">📊</button>'+
         '<button class="btn btn-danger btn-sm" onclick="deleteAuditRecord(\''+rec.id+'\')">🗑</button>'+
       '</td></tr>';
   }).join('');
@@ -1802,8 +1803,9 @@ function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt
 function escCsv(s){return String(s||'').replace(/"/g,'""');}
 function showLoading(msg){document.getElementById('loadingMsg').textContent=msg||'Processing...';document.getElementById('progressBar').style.width='0%';document.getElementById('progressLabel').textContent='';document.getElementById('loadingOverlay').style.display='flex';
   var _stepIdx=0,_stepSteps=["Parsing CV...","Matching keywords...","Scoring fit...","Ranking results..."];
-  var _stepTimer=setInterval(function(){_stepIdx=(_stepIdx+1)%_stepSteps.length;var el=document.getElementById('loadingMsg');if(el)el.textContent=_stepSteps[_stepIdx];},1800);}
-function hideLoading(){document.getElementById('loadingOverlay').style.display='none';}
+  if(_stepTimer) clearInterval(_stepTimer);
+  _stepTimer=setInterval(function(){_stepIdx=(_stepIdx+1)%_stepSteps.length;var el=document.getElementById('loadingMsg');if(el)el.textContent=_stepSteps[_stepIdx];},1800);}
+function hideLoading(){if(_stepTimer){ clearInterval(_stepTimer); _stepTimer=null; }document.getElementById('loadingOverlay').style.display='none';}
 function setProgress(p,l){document.getElementById('progressBar').style.width=p+'%';document.getElementById('progressLabel').textContent=l;}
 function download(fn,text,type){const b=new Blob([text],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;a.click();URL.revokeObjectURL(u);}
 
@@ -2085,7 +2087,7 @@ function populateTemplateSelect(){ renderTplChips(); }
 
 // Init on load
 document.addEventListener('DOMContentLoaded', async function(){
-  const saved = localStorage.getItem('cvsprings_api');
+  const saved = localStorage.getItem('cvsprings_api_url');
   if(saved){ const el=document.getElementById('apiUrl'); if(el) el.value=saved; }
   await refreshTemplatesCache();
   renderTplChips();
@@ -2230,7 +2232,7 @@ function toggleBatchWhy(btn, idx){
     refreshWelcomeBanner();
   }
   window.addEventListener('storage', function(e){
-    if (e.key === 'apiUrl') refreshWelcomeBanner();
+    if (e.key === 'cvsprings_api_url') refreshWelcomeBanner();
   });
   // Same-tab safety: re-check every 2 seconds (cheap, no-op when nothing changes)
   setInterval(refreshWelcomeBanner, 2000);
