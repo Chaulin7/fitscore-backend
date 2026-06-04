@@ -1515,13 +1515,13 @@ function renderSingleResult(data,fileName,role){
     });
   });
   const found=data.keywords?.found||[],missing=data.keywords?.missing||[];
-  document.getElementById('foundChips').innerHTML=found.length?found.map(k=>'<span class="chip chip-found">'+k+'</span>').join(''):'<span style="color:#9ca3af;font-size:13px">None found</span>';
-  document.getElementById('missingChips').innerHTML=missing.length?missing.map(k=>'<span class="chip chip-miss">'+k+'</span>').join(''):'<span style="color:#059669;font-size:13px">✓ None missing</span>';
+  document.getElementById('foundChips').innerHTML=found.length?found.map(k=>'<span class="chip chip-found">'+escHtml(k)+'</span>').join(''):'<span style="color:#9ca3af;font-size:13px">None found</span>';
+  document.getElementById('missingChips').innerHTML=missing.length?missing.map(k=>'<span class="chip chip-miss">'+escHtml(k)+'</span>').join(''):'<span style="color:#059669;font-size:13px">✓ None missing</span>';
   document.getElementById('skillsTable').querySelector('tbody').innerHTML=(data.skills||[]).map(s=>
-    '<tr><td style="font-weight:600">'+s.name+'</td><td><span class="badge '+(s.found?'badge-green':'badge-red')+'">'+(s.found?'✓ Found':'✗ Missing')+'</span></td></tr>'
+    '<tr><td style="font-weight:600">'+escHtml(s.name)+'</td><td><span class="badge '+(s.found?'badge-green':'badge-red')+'">'+(s.found?'✓ Found':'✗ Missing')+'</span></td></tr>'
   ).join('')||'<tr><td colspan="2" class="empty-state" style="padding:20px">No skills data</td></tr>';
   document.getElementById('recsTable').querySelector('tbody').innerHTML=(data.recommendations||[]).map(r=>
-    '<tr><td style="font-weight:700;color:#0f2847;white-space:nowrap">'+r.icon+'</td><td style="color:#374151">'+r.text+'</td></tr>'
+    '<tr><td style="font-weight:700;color:#0f2847;white-space:nowrap">'+escHtml(r.icon)+'</td><td style="color:#374151">'+escHtml(r.text)+'</td></tr>'
   ).join('')||'<tr><td colspan="2" class="empty-state" style="padding:20px">No recommendations</td></tr>';
 }
 
