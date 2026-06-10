@@ -726,6 +726,14 @@ img, video, table { max-width: 100%; }
 .welcome-banner-btn:hover{background:#1d3a72}
 .welcome-banner-btn:active{background:#0b1e3d}
 @media(max-width:760px){.welcome-banner-form{flex-basis:100%}.welcome-banner-text{flex-basis:100%}}
+    /* === Mobile top-bar fix (added) === */
+    .mobile-menu-button{display:none;background:none;border:none;color:rgba(255,255,255,0.85);font-size:22px;line-height:1;padding:6px 10px;border-radius:6px;cursor:pointer;align-items:center;justify-content:center}
+    @media (max-width: 640px){
+      .topbar-nav{display:none}
+      .mobile-menu-button{display:flex}
+      .topbar-nav.mobile-open{display:flex;flex-direction:column;position:absolute;top:54px;left:0;right:0;background:#0f2847;padding:8px;gap:4px;z-index:200;box-shadow:0 8px 20px rgba(0,0,0,0.35)}
+      .topbar-nav.mobile-open .nav-btn{font-size:14px;padding:10px 12px;text-align:left}
+    }
 </style>
 <!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
 <script defer data-domain="cvsprings.onrender.com" src="https://plausible.io/js/script.tagged-events.js"></script>
@@ -775,6 +783,7 @@ img, video, table { max-width: 100%; }
     <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CV Springs Logo" style="object-fit:contain;flex-shrink:0;filter:invert(1) brightness(1.15);mix-blend-mode:screen;"></span>
     <span class="brand-name">CV<em>springs</em></span>
   </a>
+  <button class="mobile-menu-button" type="button" aria-label="Open menu" aria-expanded="false" onclick="var n=document.querySelector('nav.topbar-nav');var o=n.classList.toggle('mobile-open');this.setAttribute('aria-expanded',o);">☰</button>
   <nav class="topbar-nav">
     <button class="nav-btn active" onclick="switchTab('analyzer',this)">Analyzer</button>
     <button class="nav-btn" onclick="switchTab('audit',this)">Audit Log</button>
