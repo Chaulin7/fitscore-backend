@@ -28,6 +28,7 @@ function initSchema() {
   getDb().exec(`
     CREATE TABLE IF NOT EXISTS audit_log (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL DEFAULT 'legacy',
       candidate_name TEXT NOT NULL,
       file_name TEXT,
       overall INTEGER,
@@ -46,13 +47,16 @@ function initSchema() {
       updated_at TEXT
     )
   `);
+
   // Backward-compatible column additions
-  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN role TEXT DEFAULT ''"); } catch(_) {}
-  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN anonymized INTEGER DEFAULT 0"); } catch(_) {}
-  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN updated_at TEXT"); } catch(_) {}
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN role TEXT DEFAULT ''"); } catch (_) {}
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN anonymized INTEGER DEFAULT 0"); } catch (_) {}
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN updated_at TEXT"); } catch (_) {}
+  try { getDb().exec("ALTER TABLE audit_log ADD COLUMN user_id TEXT NOT NULL DEFAULT 'legacy'"); } catch (_) {}
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN org_id TEXT'); } catch (_) {}
 
   // Backfill updated_at for existing rows
-  try { getDb().exec("UPDATE audit_log SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''"); } catch(_) {}
+  try { getDb().exec("UPDATE audit_log SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''"); } catch (_) {}
 
   // Append-only change log for audit_log
   getDb().exec(`
@@ -66,6 +70,8 @@ function initSchema() {
       changed_by TEXT
     )
   `);
+  try { getDb().exec('ALTER TABLE audit_changes ADD COLUMN org_id TEXT'); } catch (_) {}
+
   // Enforce append-only at DB level: block UPDATE/DELETE via triggers
   try {
     getDb().exec(`
@@ -78,78 +84,162 @@ function initSchema() {
       BEFORE DELETE ON audit_changes
       BEGIN SELECT RAISE(ABORT, 'audit_changes is append-only'); END;
     `);
-  } catch(_) {}
+  } catch (_) {}
 
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_changes_audit_id ON audit_changes(audit_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_log_role ON audit_log(role)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_log_decision ON audit_log(decision)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_audit_log_org_id ON audit_log(org_id)');
+
+  // --- Auth / multi-tenancy tables -----------------------------------------
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS organizations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      org_id TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      created_at TEXT NOT NULL,
+      last_login_at TEXT,
+      failed_logins INTEGER NOT NULL DEFAULT 0,
+      locked_until TEXT
+    )
+  `);
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token_hash TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL
+    )
+  `);
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id)');
+
+  // templates is also created by routes/templates.js; ensure it exists here so
+  // the org_id migration can run regardless of module load order.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      role TEXT,
+      job_description TEXT,
+      weights TEXT,
+      owner_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  try { getDb().exec('ALTER TABLE templates ADD COLUMN org_id TEXT'); } catch (_) {}
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_templates_org_id ON templates(org_id)');
 }
 
-// Insert an audit record
-function insertAudit(data) {
+// Insert an audit record (org-scoped)
+function insertAudit(data, orgId, userId) {
   const id = uuidv4();
   const now = nowIso();
   const stmt = getDb().prepare(`
     INSERT INTO audit_log
-      (id, candidate_name, file_name, overall, keywords_score, skills_score,
-       experience_score, education_score, weights, verdict, decision, note, jd_snippet, role, anonymized, created_at, updated_at)
+    (id, user_id, org_id, candidate_name, file_name, overall, keywords_score, skills_score,
+     experience_score, education_score, weights, verdict, decision, note, jd_snippet, role, anonymized, created_at, updated_at)
     VALUES
-      (@id, @candidateName, @fileName, @overall, @keywords, @skills,
-       @experience, @education, @weights, @verdict, @decision, @note, @jdSnippet, @role, @anonymized, @createdAt, @updatedAt)
+    (@id, @userId, @orgId, @candidateName, @fileName, @overall, @keywords, @skills,
+     @experience, @education, @weights, @verdict, @decision, @note, @jdSnippet, @role, @anonymized, @createdAt, @updatedAt)
   `);
   stmt.run({
     id,
+    userId: userId || 'legacy',
+    orgId: orgId || null,
     candidateName: data.candidateName,
-    fileName: data.fileName || '',
-    overall: data.overall || 0,
-    keywords: data.scores?.keywords || 0,
-    skills: data.scores?.skills || 0,
-    experience: data.scores?.experience || 0,
-    education: data.scores?.education || 0,
+    fileName: data.fileName,
+    overall: data.overall,
+    keywords: data.scores && data.scores.keywords,
+    skills: data.scores && data.scores.skills,
+    experience: data.scores && data.scores.experience,
+    education: data.scores && data.scores.education,
     weights: data.weights ? JSON.stringify(data.weights) : null,
-    verdict: data.verdict || '',
-    decision: data.decision || '',
-    note: data.note || '',
-    jdSnippet: data.jdSnippet || '',
-    role: data.role || '',
+    verdict: data.verdict,
+    decision: data.decision,
+    note: data.note,
+    jdSnippet: data.jdSnippet,
+    role: data.role,
     anonymized: data.anonymized ? 1 : 0,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   });
-
-  return getAuditById(id);
+  return getAuditById(id, orgId);
 }
 
-// Get all audit records (legacy signature kept for backward compat)
-function getAllAudits({ decision, limit, role } = {}) {
+// Get all audit records, scoped to an organization
+function getAllAudits({ decision, limit, role, orgId } = {}) {
   let sql = 'SELECT * FROM audit_log WHERE 1=1';
   const params = [];
-
+  if (orgId) { sql += ' AND org_id = ?'; params.push(orgId); }
   if (decision) { sql += ' AND decision = ?'; params.push(decision); }
   if (role) { sql += ' AND role = ?'; params.push(role); }
-
   sql += ' ORDER BY created_at DESC';
-
   if (limit) { sql += ' LIMIT ?'; params.push(Number(limit)); }
-
   const rows = getDb().prepare(sql).all(...params);
   return rows.map(formatRow);
 }
 
-// Get single audit by ID
-function getAuditById(id) {
-  const row = getDb().prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
+// Get all audit records scoped to a specific organization.
+// Supports optional role and date-range filters.
+// Returns formatted records sorted newest-first.
+function getAuditsByTenant(orgId, { role, from, to } = {}) {
+  let sql = 'SELECT * FROM audit_log WHERE org_id = ?';
+  const params = [orgId];
+  if (role) { sql += ' AND role = ?'; params.push(role); }
+  if (from) { sql += ' AND created_at >= ?'; params.push(from); }
+  if (to) { sql += ' AND created_at <= ?'; params.push(to); }
+  sql += ' ORDER BY created_at DESC';
+  const rows = getDb().prepare(sql).all(...params);
+  return rows.map(formatRow);
+}
+
+// Get single audit by ID. When orgId is given, a record belonging to another
+// org is treated as not found (no existence leak across tenants).
+function getAuditById(id, orgId) {
+  const row = orgId
+    ? getDb().prepare('SELECT * FROM audit_log WHERE id = ? AND org_id = ?').get(id, orgId)
+    : getDb().prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
   return row ? formatRow(row) : null;
 }
 
 // PATCH-style update: only mutates allowed fields, returns updated record + array of changes
 // Returns { record, changes } or null if not found.
 const PATCHABLE_FIELDS = ['decision', 'note', 'role', 'candidateName'];
-const DB_FIELD_MAP = { decision: 'decision', note: 'note', role: 'role', candidateName: 'candidate_name' };
+const DB_FIELD_MAP = {
+  decision: 'decision',
+  note: 'note',
+  role: 'role',
+  candidateName: 'candidate_name',
+};
 
-function updateAudit(id, patch, changedBy) {
-  const existing = getDb().prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
+function updateAudit({ id, ...patch }, changedBy, orgId) {
+  const existing = orgId
+    ? getDb().prepare('SELECT * FROM audit_log WHERE id = ? AND org_id = ?').get(id, orgId)
+    : getDb().prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
   if (!existing) return null;
 
   const changes = [];
@@ -160,8 +250,8 @@ function updateAudit(id, patch, changedBy) {
   for (const field of PATCHABLE_FIELDS) {
     if (!(field in patch)) continue;
     const dbField = DB_FIELD_MAP[field];
-    const newVal = patch[field] == null ? '' : String(patch[field]);
-    const oldVal = existing[dbField] == null ? '' : String(existing[dbField]);
+    const newVal = patch[field] == null ? null : String(patch[field]);
+    const oldVal = existing[dbField] == null ? null : String(existing[dbField]);
     if (newVal === oldVal) continue;
     sets.push(`${dbField} = @${field}`);
     params[field] = newVal;
@@ -169,7 +259,7 @@ function updateAudit(id, patch, changedBy) {
   }
 
   if (sets.length === 0) {
-    return { record: formatRow(existing), changes: [] };
+    return { record: formatRow(existing), changes };
   }
 
   sets.push('updated_at = @updatedAt');
@@ -181,88 +271,84 @@ function updateAudit(id, patch, changedBy) {
 
   // Write append-only change log entries
   const insertChange = getDb().prepare(`
-    INSERT INTO audit_changes (id, audit_id, field, old_value, new_value, changed_at, changed_by)
-    VALUES (@id, @auditId, @field, @oldValue, @newValue, @changedAt, @changedBy)
+    INSERT INTO audit_changes (id, audit_id, org_id, field, old_value, new_value, changed_at, changed_by)
+    VALUES (@id, @auditId, @orgId, @field, @oldValue, @newValue, @changedAt, @changedBy)
   `);
-  const tx = getDb().transaction((entries) => {
+
+  const writeChanges = getDb().transaction((entries) => {
     for (const c of entries) {
-      insertChange.run({
-        id: uuidv4(),
-        auditId: id,
-        field: c.field,
-        oldValue: c.oldValue,
-        newValue: c.newValue,
-        changedAt,
-        changedBy: changedBy || null
-      });
+      insertChange.run({ id: uuidv4(), auditId: id, orgId: existing.org_id || orgId || null, field: c.field, oldValue: c.oldValue, newValue: c.newValue, changedAt, changedBy: changedBy || null });
     }
   });
-  tx(changes);
+  writeChanges(changes);
 
-  return { record: getAuditById(id), changes };
+  return { record: getAuditById(id, orgId), changes };
 }
 
 // Delete an audit record and log the deletion in audit_changes
-function deleteAudit(id, changedBy) {
-  const existing = getDb().prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
+function deleteAudit({ id }, changedBy, orgId) {
+  const existing = orgId
+    ? getDb().prepare('SELECT * FROM audit_log WHERE id = ? AND org_id = ?').get(id, orgId)
+    : getDb().prepare('SELECT * FROM audit_log WHERE id = ?').get(id);
   if (!existing) return false;
+
   const changedAt = nowIso();
-  const tx = getDb().transaction(() => {
+  const doDelete = getDb().transaction(() => {
     getDb().prepare(`
-      INSERT INTO audit_changes (id, audit_id, field, old_value, new_value, changed_at, changed_by)
-      VALUES (?, ?, '__deleted__', ?, NULL, ?, ?)
-    `).run(uuidv4(), id, JSON.stringify(formatRow(existing)), changedAt, changedBy || null);
+      INSERT INTO audit_changes (id, audit_id, org_id, field, old_value, new_value, changed_at, changed_by)
+      VALUES (?, ?, ?, '__deleted__', ?, NULL, ?, ?)
+    `).run(uuidv4(), id, existing.org_id || orgId || null, JSON.stringify(formatRow(existing)), changedAt, changedBy || null);
     getDb().prepare('DELETE FROM audit_log WHERE id = ?').run(id);
   });
-  tx();
+  doDelete();
   return true;
 }
 
-// Get change history for an audit record (newest first)
-function getAuditChanges(auditId) {
-  const rows = getDb().prepare(`
+// Get change history for an audit record (newest first, org-scoped)
+function getAuditChanges(auditId, orgId) {
+  let sql = `
     SELECT id, audit_id as auditId, field, old_value as oldValue, new_value as newValue,
            changed_at as changedAt, changed_by as changedBy
     FROM audit_changes
-    WHERE audit_id = ?
-    ORDER BY changed_at DESC, id DESC
-  `).all(auditId);
+    WHERE audit_id = ?`;
+  const params = [auditId];
+  if (orgId) { sql += ' AND org_id = ?'; params.push(orgId); }
+  sql += ' ORDER BY changed_at DESC, id DESC';
+  return getDb().prepare(sql).all(...params);
+}
+
+// Get list of distinct roles (org-scoped)
+function getRoles(orgId) {
+  const sql = orgId
+    ? "SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE org_id = ? AND role != '' GROUP BY role ORDER BY role ASC"
+    : "SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE role != '' GROUP BY role ORDER BY role ASC";
+  const rows = orgId
+    ? getDb().prepare(sql).all(orgId)
+    : getDb().prepare(sql).all();
   return rows;
 }
 
-// Get list of distinct roles
-function getRoles() {
-  const rows = getDb().prepare("SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE role != '' GROUP BY role ORDER BY role").all();
-  return rows;
-}
-
-// Get score history for a specific role
-function getRoleHistory(role) {
-  const rows = getDb().prepare(`
-    SELECT id, candidate_name, overall, decision, created_at
-    FROM audit_log
-    WHERE role = ?
-    ORDER BY created_at DESC
-    LIMIT 100
-  `).all(role);
-  return rows.map(r => ({
+// Get score history for a specific role (org-scoped)
+function getRoleHistory(role, orgId) {
+  const sql = orgId
+    ? 'SELECT id, candidate_name, overall, decision, created_at FROM audit_log WHERE role = ? AND org_id = ? ORDER BY created_at DESC LIMIT 100'
+    : 'SELECT id, candidate_name, overall, decision, created_at FROM audit_log WHERE role = ? ORDER BY created_at DESC LIMIT 100';
+  const rows = orgId
+    ? getDb().prepare(sql).all(role, orgId)
+    : getDb().prepare(sql).all(role);
+  return rows.map((r) => ({
     id: r.id,
     candidateName: r.candidate_name,
     overall: r.overall,
     decision: r.decision,
-    createdAt: r.created_at
+    createdAt: r.created_at,
   }));
 }
 
-// Export as CSV
+// Export as CSV (org-scoped)
 function exportCsv(filters = {}) {
   const rows = getAllAudits(filters);
-
-  const headers = [
-    'id','candidateName','fileName','overall','keywords','skills','experience','education',
-    'weights','verdict','decision','note','jdSnippet','role','anonymized','createdAt','updatedAt'
-  ];
-
+  const headers = ['id','candidateName','fileName','overall','keywords','skills','experience','education','weights','verdict','decision','note','jdSnippet','role','anonymized','createdAt','updatedAt'];
   const csvRows = [headers.join(',')];
   for (const row of rows) {
     const formatted = formatRow(row);
@@ -271,22 +357,21 @@ function exportCsv(filters = {}) {
       esc(formatted.candidateName),
       esc(formatted.fileName),
       formatted.overall,
-      formatted.scores?.keywords,
-      formatted.scores?.skills,
-      formatted.scores?.experience,
-      formatted.scores?.education,
+      formatted.scores.keywords,
+      formatted.scores.skills,
+      formatted.scores.experience,
+      formatted.scores.education,
       esc(JSON.stringify(formatted.weights)),
       esc(formatted.verdict),
       esc(formatted.decision),
       esc(formatted.note),
       esc(formatted.jdSnippet),
-      esc(formatted.role || ''),
+      esc(formatted.role),
       formatted.anonymized ? 1 : 0,
       esc(formatted.createdAt),
-      esc(formatted.updatedAt || '')
+      esc(formatted.updatedAt),
     ].join(','));
   }
-
   return csvRows.join('\n');
 }
 
@@ -297,9 +382,11 @@ function esc(v) {
 
 function formatRow(row) {
   // Tolerant: accepts both DB rows and already-formatted records
-  if (row && row.scores) return row;
+  if (!row) return row;
+  if (row.scores) return row;
   return {
     id: row.id,
+    userId: row.user_id,
     candidateName: row.candidate_name,
     fileName: row.file_name,
     overall: row.overall,
@@ -307,28 +394,31 @@ function formatRow(row) {
       keywords: row.keywords_score,
       skills: row.skills_score,
       experience: row.experience_score,
-      education: row.education_score
+      education: row.education_score,
     },
-    weights: row.weights ? JSON.parse(row.weights) : null,
+    weights: row.weights ? (() => { try { return JSON.parse(row.weights); } catch { return null; } })() : null,
     verdict: row.verdict,
     decision: row.decision,
     note: row.note,
     jdSnippet: row.jd_snippet,
-    role: row.role || '',
+    role: row.role,
     anonymized: row.anonymized === 1,
     createdAt: row.created_at,
-    updatedAt: row.updated_at || row.created_at
+    updatedAt: row.updated_at || row.created_at,
   };
 }
 
 module.exports = {
+  getDb,
+  nowIso,
   insertAudit,
   getAllAudits,
+  getAuditsByTenant,
   getAuditById,
   updateAudit,
   deleteAudit,
   getAuditChanges,
   exportCsv,
   getRoles,
-  getRoleHistory
+  getRoleHistory,
 };

@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="/logo.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CVsprings · Bias Monitoring Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
+/* ===== TOPBAR ===== */
+.topbar{background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);padding:0 32px;height:60px;display:flex;align-items:center;gap:20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);position:sticky;top:0;z-index:100}
+.topbar-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.topbar-logo img{width:46px;height:48px;object-fit:contain;border-radius:0}
+.topbar-logo .brand{font-size:18px;font-weight:700;color:#fff;letter-spacing:-0.3px}.brand span{color:#4da6ff}
+.topbar-nav{display:flex;gap:4px;margin-left:32px}
+.topbar-nav a{color:rgba(255,255,255,0.75);text-decoration:none;font-size:14px;font-weight:500;padding:6px 14px;border-radius:6px;transition:background .15s,color .15s}
+.topbar-nav a:hover{background:rgba(255,255,255,0.1);color:#fff}
+.topbar-nav a.active{background:rgba(255,255,255,0.15);color:#fff;border-bottom:2px solid #4da6ff}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.status-badge{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:rgba(255,255,255,0.8)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,0.6)}
+/* ===== MAIN ===== */
+.main{max-width:960px;margin:32px auto;padding:0 24px}
+/* ===== PANEL ===== */
+.panel{background:#fff;border-radius:12px;border:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:28px;margin-bottom:24px}
+.panel-title{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:20px}
+/* ===== CONTROLS ===== */
+.controls-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group label{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#6b7280}
+.form-group input,.form-group select{padding:9px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Inter',sans-serif;font-size:14px;color:#111827;background:#fff;outline:none;transition:border-color .15s}
+.form-group input:focus,.form-group select:focus{border-color:#0f2847}
+.btn-primary{padding:10px 22px;background:linear-gradient(135deg,#0a1f3d,#153360);color:#fff;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s;align-self:flex-end;min-height:40px}
+.btn-primary:hover{opacity:.88}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{padding:10px 16px;background:#fff;color:#374151;border:1.5px solid #d1d5db;border-radius:8px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s;align-self:flex-end;min-height:40px}
+.btn-secondary:hover{background:#f9fafb}
+/* ===== CONNECT BANNER ===== */
+.connect-banner{background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:14px;margin-bottom:24px}
+.connect-banner svg{flex-shrink:0;color:#d97706}
+.connect-banner-text strong{display:block;font-size:14px;font-weight:700;color:#92400e}
+.connect-banner-text span{font-size:13px;color:#b45309}
+.connect-banner input{flex:1;padding:8px 12px;border:1.5px solid #d1d5db;border-radius:7px;font-family:'Inter',sans-serif;font-size:13px}
+.connect-banner .btn-primary{padding:8px 16px;font-size:13px;white-space:nowrap}
+/* ===== REPORT AREA ===== */
+#report-area{display:none}
+#report-area.visible{display:block}
+/* ===== DISCLAIMER ===== */
+.disclaimer-box{background:#fef9c3;border:2px solid #eab308;border-radius:10px;padding:18px 22px;margin-bottom:24px}
+.disclaimer-box .disc-title{font-size:13px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#854d0e;margin-bottom:6px}
+.disclaimer-box p{font-size:13px;color:#713f12;line-height:1.55}
+/* ===== RELIABILITY BANNER ===== */
+.reliability-banner{border-radius:10px;padding:16px 22px;margin-bottom:24px;display:flex;align-items:center;gap:14px}
+.reliability-banner.high{background:#f0fdf4;border:2px solid #22c55e}
+.reliability-banner.moderate{background:#fefce8;border:2px solid #eab308}
+.reliability-banner.low{background:#fff7ed;border:2px solid #f97316}
+.reliability-banner.insufficient{background:#fef2f2;border:2px solid #ef4444}
+.reliability-badge{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.reliability-banner.high .reliability-badge{background:#22c55e;color:#fff}
+.reliability-banner.moderate .reliability-badge{background:#eab308;color:#fff}
+.reliability-banner.low .reliability-badge{background:#f97316;color:#fff}
+.reliability-banner.insufficient .reliability-badge{background:#ef4444;color:#fff}
+.reliability-text{font-size:13px;color:#374151;line-height:1.5}
+.reliability-text strong{font-weight:700}
+/* ===== SCOPE META ===== */
+.scope-meta{display:flex;flex-wrap:wrap;gap:20px;margin-bottom:24px;font-size:13px;color:#6b7280}
+.scope-meta span strong{color:#111827;font-weight:600}
+/* ===== STAT CARDS ===== */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:8px}
+.stat-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;text-align:center}
+.stat-card .stat-label{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#9ca3af;margin-bottom:4px}
+.stat-card .stat-value{font-size:22px;font-weight:700;color:#111827}
+.stat-card .stat-sub{font-size:11px;color:#6b7280;margin-top:2px}
+/* ===== ANON COMPARISON ===== */
+.anon-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:600px){.anon-grid{grid-template-columns:1fr}}
+.anon-card{border-radius:10px;padding:18px}
+.anon-card.anon{background:#eff6ff;border:1.5px solid #bfdbfe}
+.anon-card.nonanon{background:#f5f3ff;border:1.5px solid #ddd6fe}
+.anon-card-title{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px}
+.anon-card.anon .anon-card-title{color:#1d4ed8}
+.anon-card.nonanon .anon-card-title{color:#6d28d9}
+.anon-card .metric-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+.anon-card .metric-row:last-child{border-bottom:none}
+.anon-card .metric-row .metric-label{color:#6b7280}
+.anon-card .metric-row .metric-val{font-weight:600;color:#111827}
+.comparison-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin-top:4px}
+.comparison-box .comp-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7280;margin-bottom:8px}
+.comparison-box .comp-text{font-size:13px;color:#374151;line-height:1.6}
+.comparison-box .comp-text em{font-style:italic;color:#9ca3af}
+.unreliable-note{background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;font-size:12px;color:#92400e;margin-top:8px}
+/* ===== TABLES ===== */
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb;background:#f9fafb}
+tbody td{padding:9px 12px;border-bottom:1px solid #f3f4f6;color:#374151}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#f9fafb}
+/* ===== BAR ===== */
+.bar-wrap{display:flex;align-items:center;gap:8px}
+.bar-bg{flex:1;background:#e5e7eb;border-radius:3px;height:8px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#0a1f3d,#4da6ff);transition:width .4s}
+/* ===== LIMITATIONS ===== */
+.limitations-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.limitations-list li{display:flex;gap:10px;font-size:13px;color:#374151;line-height:1.55}
+.limitations-list li::before{content:'\2022';color:#6b7280;font-weight:700;flex-shrink:0;padding-top:1px}
+/* ===== FOOTER ===== */
+.report-footer{text-align:center;font-size:12px;color:#9ca3af;padding:20px 0 4px;border-top:1px solid #e5e7eb;margin-top:8px}
+/* ===== LOADING / ERROR ===== */
+.spinner{display:inline-block;width:18px;height:18px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-banner{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;padding:14px 18px;color:#991b1b;font-size:13px;margin-bottom:20px}
+.empty-state{text-align:center;padding:60px 20px;color:#9ca3af}
+.empty-state .empty-icon{font-size:40px;margin-bottom:12px}
+.empty-state p{font-size:14px}
+
+/* === Topbar consistency with main app === */
+.topbar-logo{display:flex;align-items:center;gap:5px;margin-right:auto;text-decoration:none}
+.logo-ring{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:50%;border:2px solid rgba(255,255,255,0.85);flex-shrink:0}
+.logo-ring-img{width:48px;height:48px;object-fit:contain;flex-shrink:0;filter:invert(1) brightness(1.15);mix-blend-mode:screen}
+.brand{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.4px;text-shadow:0 0 18px rgba(255,255,255,0.35)}
+.brand span{color:#7dd3fc}
+.topbar-nav{display:flex;gap:2px;margin-left:32px}
+.topbar-nav a{color:rgba(255,255,255,0.65);text-decoration:none;font:600 13px 'Inter',sans-serif;letter-spacing:.03em;padding:7px 15px;border-radius:6px;transition:all .18s;border-bottom:0}
+.topbar-nav a:hover{color:#fff;background:rgba(255,255,255,0.1)}
+.topbar-nav a.active{color:#fff;background:rgba(255,255,255,0.14);border-bottom:0}
+.topbar-right{margin-left:0;display:flex;align-items:center;gap:12px}
+.status-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,0.08);color:#cbd5e1;font-size:12px;font-weight:500;line-height:1}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#94a3b8;box-shadow:none;display:inline-block}
+.status-badge.connected .status-dot, .status-dot.ok{background:#22c55e;box-shadow:0 0 7px rgba(34,197,94,0.7)}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <a href="/index.html" class="topbar-logo">
+    <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CVsprings logo"></span>
+    <span class="brand">CV<span>springs</span></span>
+  </a>
+  <div class="topbar-nav">
+    <a href="/index.html">Analyzer</a>
+    <a href="/index.html#audit">Audit Log</a>
+    <a href="/index.html#roles">Role History</a>
+    <a href="/bias-report.html" class="active">Bias Report</a>
+  </div>
+  <div class="topbar-right">
+    <div class="status-badge" id="status-badge">
+      <span class="status-dot" id="status-dot" style="background:#9ca3af;box-shadow:none"></span>
+      <span id="status-label">Not connected</span>
+    </div>
+  </div>
+</nav>
+
+<main class="main">
+  <!-- Connect banner (shown when no API URL is set) -->
+  <div class="connect-banner" id="connect-banner">
+    <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <div class="connect-banner-text">
+      <strong>Backend not connected</strong>
+      <span>Enter your Render API URL to generate bias monitoring reports</span>
+    </div>
+    <input type="text" id="api-url-input" placeholder="https://your-api.onrender.com" autocomplete="off">
+    <input type="password" id="api-key-input" placeholder="API key (optional)" autocomplete="off" style="width:180px">
+    <button class="btn-primary" id="connect-btn">Connect</button>
+  </div>
+
+  <!-- Filters -->
+  <div class="panel">
+    <div class="panel-title">Bias Monitoring Report</div>
+    <div class="controls-row">
+      <div class="form-group">
+        <label>Role / Position</label>
+        <input type="text" id="filter-role" placeholder="All roles" style="width:200px">
+      </div>
+      <div class="form-group">
+        <label>From</label>
+        <input type="date" id="filter-from" style="width:160px">
+      </div>
+      <div class="form-group">
+        <label>To</label>
+        <input type="date" id="filter-to" style="width:160px">
+      </div>
+      <button class="btn-primary" id="generate-btn" disabled>Generate Report</button>
+      <button class="btn-secondary" id="print-btn" disabled>Print / Save PDF</button>
+    </div>
+  </div>
+
+  <!-- Error banner -->
+  <div class="error-banner" id="error-banner" style="display:none"></div>
+
+  <!-- Empty placeholder -->
+  <div class="empty-state" id="empty-state">
+    <div class="empty-icon">📈</div>
+    <p>Connect your backend and click <strong>Generate Report</strong> to view the bias monitoring analysis.</p>
+  </div>
+
+  <!-- Report output -->
+  <div id="report-area">
+
+    <!-- Disclaimer (always first, always prominent) -->
+    <div class="disclaimer-box">
+      <div class="disc-title">Decision-Support Tool — Not a Compliance Certificate</div>
+      <p>This report is a monitoring aid to support human review. It does <strong>not</strong> certify legal compliance, guarantee the absence of bias, or constitute a Data Protection Impact Assessment. CVsprings does not hold or infer protected characteristics (age, gender, race, disability, etc.). The only dimension compared here is anonymised vs non-anonymised screening, because that flag was explicitly set by the user. All statistical findings are observational: they describe patterns in the data provided and do not establish causation.</p>
+    </div>
+
+    <!-- Reliability banner -->
+    <div class="reliability-banner" id="reliability-banner">
+      <div class="reliability-badge" id="reliability-badge">-</div>
+      <div class="reliability-text" id="reliability-text"></div>
+    </div>
+
+    <!-- Scope meta -->
+    <div class="scope-meta" id="scope-meta"></div>
+
+    <!-- Anonymisation comparison -->
+    <div class="panel" id="section-anon">
+      <div class="panel-title">Anonymisation Comparison</div>
+      <div class="anon-grid">
+        <div class="anon-card anon">
+          <div class="anon-card-title">Anonymised CVs</div>
+          <div id="anon-metrics"></div>
+        </div>
+        <div class="anon-card nonanon">
+          <div class="anon-card-title">Non-Anonymised CVs</div>
+          <div id="nonanon-metrics"></div>
+        </div>
+      </div>
+      <div class="comparison-box">
+        <div class="comp-title">Statistical Comparison</div>
+        <div class="comp-text" id="anon-comparison-text"></div>
+      </div>
+    </div>
+
+    <!-- Score distribution -->
+    <div class="panel" id="section-dist">
+      <div class="panel-title">Score Distribution</div>
+      <div class="stat-grid" id="dist-summary"></div>
+      <table id="dist-table">
+        <thead><tr><th>Band</th><th>Count</th><th>% of total</th><th>Distribution</th></tr></thead>
+        <tbody id="dist-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Decision consistency -->
+    <div class="panel" id="section-decisions">
+      <div class="panel-title">Decision Consistency by Score Band</div>
+      <table id="decision-table">
+        <thead><tr><th>Score Band</th><th>Shortlisted</th><th>Rejected</th><th>Pending</th><th>Total</th></tr></thead>
+        <tbody id="decision-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Per-role comparison (shown only when role is null / all roles) -->
+    <div class="panel" id="section-roles" style="display:none">
+      <div class="panel-title">Per-Role Comparison</div>
+      <table id="role-table">
+        <thead><tr><th>Role</th><th>Count</th><th>Mean Score</th><th>Shortlist Rate</th><th>Reject Rate</th><th>Anon %</th></tr></thead>
+        <tbody id="role-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Limitations -->
+    <div class="panel">
+      <div class="panel-title">Limitations &amp; Caveats</div>
+      <ul class="limitations-list" id="limitations-list"></ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="report-footer">Generated by CVsprings · This is a decision-support artifact, not a legal compliance certification.</div>
+
+  </div><!-- /report-area -->
+</main>
+
+<script>
+(function() {
+  'use strict';
+
+  // ---- State ----
+  let apiBase = (localStorage.getItem('cvs_api_base')||localStorage.getItem('cvsprings_api_url')) || '';
+  let apiKey  = localStorage.getItem('cvs_api_key')  || '';
+
+  // ---- DOM refs ----
+  const connectBanner  = document.getElementById('connect-banner');
+  const apiUrlInput    = document.getElementById('api-url-input');
+  const apiKeyInput    = document.getElementById('api-key-input');
+  const connectBtn     = document.getElementById('connect-btn');
+  const generateBtn    = document.getElementById('generate-btn');
+  const printBtn       = document.getElementById('print-btn');
+  const filterRole     = document.getElementById('filter-role');
+  const filterFrom     = document.getElementById('filter-from');
+  const filterTo       = document.getElementById('filter-to');
+  const errorBanner    = document.getElementById('error-banner');
+  const emptyState     = document.getElementById('empty-state');
+  const reportArea     = document.getElementById('report-area');
+  const statusDot      = document.getElementById('status-dot');
+  const statusLabel    = document.getElementById('status-label');
+
+  // ---- Init ----
+  if (apiBase) {
+    apiUrlInput.value = apiBase;
+    setConnected();
+  }
+  if (apiKey) {
+    apiKeyInput.value = apiKey;
+  }
+
+  // ---- Helpers ----
+  function setConnected() {
+    connectBanner.style.display = 'none';
+    generateBtn.disabled = false;
+    statusDot.style.background = '#22c55e';
+    statusDot.style.boxShadow = '0 0 7px rgba(34,197,94,0.7)';
+    statusLabel.textContent = 'Connected';
+  }
+
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.style.display = 'block';
+  }
+
+  function hideError() {
+    errorBanner.style.display = 'none';
+  }
+
+  function pct(n) { return n + '%'; }
+  function score(n) { return typeof n === 'number' ? n.toFixed(1) : '-'; }
+
+  function metricRow(label, value) {
+    return '<div class="metric-row"><span class="metric-label">' + label + '</span><span class="metric-val">' + value + '</span></div>';
+  }
+
+  // ---- Connect ----
+  connectBtn.addEventListener('click', function() {
+    const url = apiUrlInput.value.trim().replace(/\/$/, '');
+    const key = apiKeyInput.value.trim();
+    if (!url) { showError('Please enter the backend URL.'); return; }
+    apiBase = url;
+    apiKey  = key;
+    localStorage.setItem('cvs_api_base', url);
+    if (key) localStorage.setItem('cvs_api_key', key);
+    setConnected();
+    hideError();
+  });
+
+  // ---- Print ----
+  printBtn.addEventListener('click', function() { window.print(); });
+
+  // ---- Generate ----
+  generateBtn.addEventListener('click', async function() {
+    if (!apiBase) return;
+    hideError();
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<span class="spinner"></span>Generating…';
+
+    const params = new URLSearchParams();
+    if (filterRole.value.trim()) params.set('role', filterRole.value.trim());
+    if (filterFrom.value) params.set('from', filterFrom.value);
+    if (filterTo.value)   params.set('to',   filterTo.value);
+
+    const url = apiBase + '/api/audit/bias-report' + (params.toString() ? '?' + params.toString() : '');
+    const headers = { 'Content-Type': 'application/json' };
+    if (apiKey) headers['X-Api-Key'] = apiKey;
+    // Session auth (set by the main app after login)
+    try {
+      const sessionToken = localStorage.getItem('cvsprings_session_token');
+      if (sessionToken) headers['Authorization'] = 'Bearer ' + sessionToken;
+    } catch (_) {}
+
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'HTTP ' + res.status);
+      }
+      const report = await res.json();
+      renderReport(report);
+    } catch (err) {
+      showError('Could not fetch report: ' + err.message);
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generate Report';
+    }
+  });
+
+  // ---- Render ----
+  function renderReport(r) {
+    // Show report area, hide empty state
+    emptyState.style.display = 'none';
+    reportArea.style.display = 'block';
+    printBtn.disabled = false;
+
+    // Reliability banner
+    const rb = document.getElementById('reliability-banner');
+    const badge = document.getElementById('reliability-badge');
+    const rtext = document.getElementById('reliability-text');
+    const rel = (r.reliability || 'insufficient').toLowerCase();
+    rb.className = 'reliability-banner ' + rel;
+    badge.textContent = rel.charAt(0).toUpperCase() + rel.slice(1);
+    const msgs = {
+      high:         '<strong>High reliability</strong> — ' + r.scope.totalRecords + ' records. Statistical patterns are meaningful at this sample size, though they remain observational.',
+      moderate:     '<strong>Moderate reliability</strong> — ' + r.scope.totalRecords + ' records. Patterns are indicative but should be interpreted with caution.',
+      low:          '<strong>Low reliability</strong> — ' + r.scope.totalRecords + ' records. Sample size is small; treat all findings as preliminary observations only.',
+      insufficient: '<strong>Insufficient data</strong> — ' + r.scope.totalRecords + ' records. Fewer than 20 records were found for this filter. No meaningful statistical analysis is possible; figures are shown for completeness only.'
+    };
+    rtext.innerHTML = msgs[rel] || msgs.insufficient;
+
+    // Scope meta
+    const sm = document.getElementById('scope-meta');
+    const scopeRole = r.scope.role && r.scope.role !== 'null (all roles)' ? r.scope.role : 'All roles';
+    const scopeFrom = r.scope.from ? r.scope.from.slice(0,10) : 'All time';
+    const scopeTo   = r.scope.to   ? r.scope.to.slice(0,10)   : 'All time';
+    sm.innerHTML =
+      '<span><strong>Role:</strong> ' + scopeRole + '</span>' +
+      '<span><strong>From:</strong> ' + scopeFrom + '</span>' +
+      '<span><strong>To:</strong> '   + scopeTo   + '</span>' +
+      '<span><strong>Records:</strong> ' + r.scope.totalRecords + '</span>' +
+      '<span><strong>Generated:</strong> ' + new Date(r.generatedAt).toLocaleString() + '</span>';
+
+    // Anonymisation
+    const anon    = r.anonymisation.anonymised;
+    const nonanon = r.anonymisation.nonAnonymised;
+    const comp    = r.anonymisation.comparison;
+
+    document.getElementById('anon-metrics').innerHTML =
+      metricRow('Count', anon.count) +
+      metricRow('Mean score', score(anon.meanScore)) +
+      metricRow('Median score', anon.medianScore !== undefined ? anon.medianScore : '-') +
+      metricRow('Shortlist rate', pct(anon.shortlistRate)) +
+      metricRow('Reject rate', pct(anon.rejectRate));
+
+    document.getElementById('nonanon-metrics').innerHTML =
+      metricRow('Count', nonanon.count) +
+      metricRow('Mean score', score(nonanon.meanScore)) +
+      metricRow('Median score', nonanon.medianScore !== undefined ? nonanon.medianScore : '-') +
+      metricRow('Shortlist rate', pct(nonanon.shortlistRate)) +
+      metricRow('Reject rate', pct(nonanon.rejectRate));
+
+    let compHtml = '';
+    if (!comp.reliable) {
+      compHtml = '<div class="unreliable-note">' + (comp.note || 'Sample too small to draw statistical conclusions.') + '</div>';
+    } else {
+      compHtml = '<p>' + comp.interpretation + '</p>';
+      if (comp.pValueScore !== undefined)    compHtml += ' <em>Score p-value: ' + comp.pValueScore + '</em>';
+      if (comp.pValueShortlist !== undefined) compHtml += ' &nbsp;&middot;&nbsp; <em>Shortlist p-value: ' + comp.pValueShortlist + '</em>';
+    }
+    document.getElementById('anon-comparison-text').innerHTML = compHtml;
+
+    // Score distribution summary
+    const dist = r.scoreDistribution;
+    document.getElementById('dist-summary').innerHTML =
+      '<div class="stat-card"><div class="stat-label">Mean</div><div class="stat-value">' + score(dist.mean) + '</div><div class="stat-sub">overall score</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Median</div><div class="stat-value">' + (dist.median !== undefined ? dist.median : '-') + '</div><div class="stat-sub">overall score</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Std Dev</div><div class="stat-value">' + score(dist.stdDev) + '</div><div class="stat-sub">spread</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Records</div><div class="stat-value">' + r.scope.totalRecords + '</div><div class="stat-sub">total</div></div>';
+
+    // Score distribution table
+    const distTbody = document.getElementById('dist-tbody');
+    distTbody.innerHTML = '';
+    const maxCount = Math.max.apply(null, dist.bands.map(function(b){return b.count;})) || 1;
+    dist.bands.forEach(function(b) {
+      const barPct = Math.round((b.count / maxCount) * 100);
+      const totalPct = r.scope.totalRecords > 0 ? Math.round((b.count / r.scope.totalRecords) * 100) : 0;
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + b.band + '</td>' +
+        '<td>' + b.count + '</td>' +
+        '<td>' + totalPct + '%</td>' +
+        '<td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:' + barPct + '%"></div></div></div></td>';
+      distTbody.appendChild(tr);
+    });
+
+    // Decision consistency
+    const decTbody = document.getElementById('decision-tbody');
+    decTbody.innerHTML = '';
+    r.decisionConsistency.bands.forEach(function(b) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + b.band + '</td>' +
+        '<td>' + b.shortlisted + ' (' + b.shortlistRate + '%)</td>' +
+        '<td>' + b.rejected   + ' (' + b.rejectRate   + '%)</td>' +
+        '<td>' + (b.pending || 0) + '</td>' +
+        '<td>' + b.total + '</td>';
+      decTbody.appendChild(tr);
+    });
+
+    // Per-role comparison
+    const roleSection = document.getElementById('section-roles');
+    if (r.roleComparison && r.roleComparison.length > 1) {
+      roleSection.style.display = 'block';
+      const roleTbody = document.getElementById('role-tbody');
+      roleTbody.innerHTML = '';
+      r.roleComparison.forEach(function(row) {
+        const tr = document.createElement('tr');
+        const anonPct = row.count > 0 ? Math.round((row.anonymisedCount / row.count) * 100) : 0;
+        tr.innerHTML = '<td>' + row.role + '</td>' +
+          '<td>' + row.count + '</td>' +
+          '<td>' + score(row.meanScore) + '</td>' +
+          '<td>' + pct(row.shortlistRate) + '</td>' +
+          '<td>' + pct(row.rejectRate) + '</td>' +
+          '<td>' + anonPct + '%</td>';
+        roleTbody.appendChild(tr);
+      });
+    } else {
+      roleSection.style.display = 'none';
+    }
+
+    // Limitations
+    const limList = document.getElementById('limitations-list');
+    limList.innerHTML = '';
+    (r.limitations || []).forEach(function(lim) {
+      const li = document.createElement('li');
+      li.textContent = lim;
+      limList.appendChild(li);
+    });
+
+    // Scroll to report
+    reportArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+})();
+</script>
+</body>
+</html>
