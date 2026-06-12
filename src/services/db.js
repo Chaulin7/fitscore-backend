@@ -54,6 +54,11 @@ function initSchema() {
   try { getDb().exec("ALTER TABLE audit_log ADD COLUMN updated_at TEXT"); } catch (_) {}
   try { getDb().exec("ALTER TABLE audit_log ADD COLUMN user_id TEXT NOT NULL DEFAULT 'legacy'"); } catch (_) {}
   try { getDb().exec('ALTER TABLE audit_log ADD COLUMN org_id TEXT'); } catch (_) {}
+  // Provenance fields (EU AI Act Art. 12 record-keeping)
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN app_version TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN model_id TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN analysis_timestamp TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN reviewed_by TEXT'); } catch (_) {}
 
   // Backfill updated_at for existing rows
   try { getDb().exec("UPDATE audit_log SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''"); } catch (_) {}
@@ -161,15 +166,21 @@ function insertAudit(data, orgId, userId) {
   const stmt = getDb().prepare(`
     INSERT INTO audit_log
     (id, user_id, org_id, candidate_name, file_name, overall, keywords_score, skills_score,
-     experience_score, education_score, weights, verdict, decision, note, jd_snippet, role, anonymized, created_at, updated_at)
+     experience_score, education_score, weights, verdict, decision, note, jd_snippet, role, anonymized,
+     app_version, model_id, analysis_timestamp, reviewed_by, created_at, updated_at)
     VALUES
     (@id, @userId, @orgId, @candidateName, @fileName, @overall, @keywords, @skills,
-     @experience, @education, @weights, @verdict, @decision, @note, @jdSnippet, @role, @anonymized, @createdAt, @updatedAt)
+     @experience, @education, @weights, @verdict, @decision, @note, @jdSnippet, @role, @anonymized,
+     @appVersion, @modelId, @analysisTimestamp, @reviewedBy, @createdAt, @updatedAt)
   `);
   stmt.run({
     id,
     userId: userId || 'legacy',
     orgId: orgId || null,
+    appVersion: data.appVersion || null,
+    modelId: data.modelId || null,
+    analysisTimestamp: data.analysisTimestamp || null,
+    reviewedBy: data.reviewedBy || null,
     candidateName: data.candidateName,
     fileName: data.fileName,
     overall: data.overall,
@@ -228,12 +239,12 @@ function getAuditById(id, orgId) {
 
 // PATCH-style update: only mutates allowed fields, returns updated record + array of changes
 // Returns { record, changes } or null if not found.
-const PATCHABLE_FIELDS = ['decision', 'note', 'role', 'candidateName'];
+// Audit records are append-only for scoring data (EU AI Act Art. 12): only the
+// recruiter's decision and note may change after creation.
+const PATCHABLE_FIELDS = ['decision', 'note'];
 const DB_FIELD_MAP = {
   decision: 'decision',
   note: 'note',
-  role: 'role',
-  candidateName: 'candidate_name',
 };
 
 function updateAudit({ id, ...patch }, changedBy, orgId) {
@@ -348,7 +359,7 @@ function getRoleHistory(role, orgId) {
 // Export as CSV (org-scoped)
 function exportCsv(filters = {}) {
   const rows = getAllAudits(filters);
-  const headers = ['id','candidateName','fileName','overall','keywords','skills','experience','education','weights','verdict','decision','note','jdSnippet','role','anonymized','createdAt','updatedAt'];
+  const headers = ['id','candidateName','fileName','overall','keywords','skills','experience','education','weights','verdict','decision','note','jdSnippet','role','anonymized','appVersion','modelId','analysisTimestamp','reviewedBy','createdAt','updatedAt'];
   const csvRows = [headers.join(',')];
   for (const row of rows) {
     const formatted = formatRow(row);
@@ -368,6 +379,10 @@ function exportCsv(filters = {}) {
       esc(formatted.jdSnippet),
       esc(formatted.role),
       formatted.anonymized ? 1 : 0,
+      esc(formatted.appVersion),
+      esc(formatted.modelId),
+      esc(formatted.analysisTimestamp),
+      esc(formatted.reviewedBy),
       esc(formatted.createdAt),
       esc(formatted.updatedAt),
     ].join(','));
@@ -403,6 +418,10 @@ function formatRow(row) {
     jdSnippet: row.jd_snippet,
     role: row.role,
     anonymized: row.anonymized === 1,
+    appVersion: row.app_version || null,
+    modelId: row.model_id || null,
+    analysisTimestamp: row.analysis_timestamp || null,
+    reviewedBy: row.reviewed_by || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at || row.created_at,
   };

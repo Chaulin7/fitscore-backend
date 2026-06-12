@@ -9,6 +9,11 @@ const { scoreCV, anonymizeText } = require('../services/scorer');
 
 const router = express.Router();
 
+// Identifies the scoring engine version for provenance records (Art. 12).
+// The scorer is a deterministic lexical matcher, not an LLM; its behaviour
+// changes only with releases, so it is versioned with the package.
+const MODEL_ID = 'cvsprings-lexical-scorer@' + require('../../package.json').version;
+
 function sendError(res, status, code, message, field) {
   const body = { error: message, code };
   if (field) body.field = field;
@@ -134,7 +139,7 @@ router.post('/', upload.single('cv'), async (req, res) => {
       : path.basename(req.file.originalname, path.extname(req.file.originalname));
 
     recordUsage(req, 'analyze_single', 1);
-    res.json({ candidateName, anonymized: anonymize, ...results });
+    res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), ...results });
   } catch (err) {
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
@@ -186,7 +191,7 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
         const candidateName = anonymize
           ? 'Candidate #' + (results.length + 1)
           : path.basename(file.originalname, path.extname(file.originalname));
-        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, ...scored });
+        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), ...scored });
       } catch (fileErr) {
         results.push({
           candidateName: path.basename(file.originalname, path.extname(file.originalname)),
@@ -198,7 +203,7 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
 
     results.sort((a, b) => (b.overall || 0) - (a.overall || 0));
     recordUsage(req, 'analyze_batch', req.files.length);
-    res.json({ count: results.length, results });
+    res.json({ count: results.length, modelId: MODEL_ID, results });
   } catch (err) {
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
