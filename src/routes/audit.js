@@ -17,9 +17,18 @@ function sendError(res, status, code, message, field) {
 // POST /api/audit - save an audit record
 router.post('/', async (req, res) => {
   try {
-    const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized } = req.body;
+    const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized, appVersion, modelId, analysisTimestamp } = req.body;
     if (!candidateName) return sendError(res, 400, 'VALIDATION_ERROR', 'candidateName is required.', 'candidateName');
-    const record = insertAudit({ candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized }, req.orgId, req.userId || null);
+    // Provenance (Art. 12): reviewedBy comes from the authenticated session,
+    // never from the client payload.
+    const reviewedBy = (req.user && req.user.email) || null;
+    const record = insertAudit({
+      candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized,
+      appVersion: appVersion ? String(appVersion).slice(0, 50) : null,
+      modelId: modelId ? String(modelId).slice(0, 100) : null,
+      analysisTimestamp: analysisTimestamp ? String(analysisTimestamp).slice(0, 40) : null,
+      reviewedBy,
+    }, req.orgId, req.userId || null);
     res.status(201).json(record);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -325,10 +334,13 @@ router.get('/:id/changes', async (req, res) => {
 });
 
 // PATCH /api/audit/:id - partial update
+// Append-only rule (EU AI Act Art. 12): only the recruiter's decision and
+// note are mutable. Scores, weights, candidate data, and provenance fields
+// are immutable after creation — any other field in the body is ignored.
 router.patch('/:id', async (req, res) => {
   try {
     const body = req.body;
-    const allowed = ['decision', 'note', 'role', 'candidateName'];
+    const allowed = ['decision', 'note'];
     const patch = {};
     for (const f of allowed) { if (f in body) patch[f] = body[f]; }
 
@@ -337,17 +349,6 @@ router.patch('/:id', async (req, res) => {
       const validDecisions = ['shortlist', 'hold', 'reject'];
       if (d !== null && !validDecisions.includes(d)) return sendError(res, 400, 'VALIDATION_ERROR', 'decision must be one of: shortlist, hold, reject, or empty.', 'decision');
       patch.decision = d;
-    }
-    if ('candidateName' in patch) {
-      const n = patch.candidateName == null ? null : String(patch.candidateName).trim();
-      if (!n || n.length === 0) return sendError(res, 400, 'VALIDATION_ERROR', 'candidateName cannot be empty.', 'candidateName');
-      if (n.length > 200) return sendError(res, 400, 'VALIDATION_ERROR', 'candidateName too long (max 200 chars).', 'candidateName');
-      patch.candidateName = n;
-    }
-    if ('role' in patch) {
-      const r = patch.role == null ? null : String(patch.role).trim();
-      if (r && r.length > 200) return sendError(res, 400, 'VALIDATION_ERROR', 'role too long (max 200 chars).', 'role');
-      patch.role = r;
     }
     if ('note' in patch) {
       const no = patch.note == null ? null : String(patch.note);

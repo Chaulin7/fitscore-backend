@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="/logo.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CVsprings · EU AI Act Compliance</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
+.topbar{background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);padding:0 32px;height:60px;display:flex;align-items:center;gap:20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);position:sticky;top:0;z-index:100}
+.topbar-brand{display:flex;align-items:center;gap:5px;margin-right:auto;text-decoration:none}
+.logo-ring{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:50%;border:2px solid rgba(255,255,255,0.85);flex-shrink:0}
+.logo-ring-img{width:48px;height:48px;object-fit:contain;filter:invert(1) brightness(1.15);mix-blend-mode:screen}
+.brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.4px}
+.brand-name em{font-style:normal;color:#7dd3fc}
+.nav-btn{background:none;border:none;color:rgba(255,255,255,0.65);font:600 13px 'Inter',sans-serif;padding:7px 15px;border-radius:6px;cursor:pointer;letter-spacing:.03em;transition:all .18s;text-decoration:none}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,0.1)}
+.page{max-width:860px;margin:0 auto;padding:32px 20px 60px}
+.hero{background:linear-gradient(135deg,#0a1f3d,#153360);color:#fff;border-radius:14px;padding:34px 36px;margin-bottom:26px}
+.hero h1{font-size:24px;font-weight:800;letter-spacing:-.3px;margin-bottom:10px}
+.hero p{font-size:14px;line-height:1.65;color:rgba(255,255,255,.82);max-width:640px}
+.hero .tag{display:inline-block;background:rgba(125,211,252,.15);border:1px solid rgba(125,211,252,.4);color:#7dd3fc;border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:22px;box-shadow:0 1px 6px rgba(0,0,0,0.05);overflow:hidden}
+.card-head{padding:16px 24px;border-bottom:1px solid #f3f4f6}
+.card-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#0a1f3d}
+.card-body{padding:22px 24px;line-height:1.7;color:#374151}
+.card-body p{margin-bottom:12px}
+.card-body p:last-child{margin-bottom:0}
+.card-body ul{padding-left:20px;margin-bottom:12px}
+.card-body li{margin-bottom:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6;vertical-align:top}
+td{padding:12px 14px;border-bottom:1px solid #f3f4f6;color:#374151;vertical-align:top;line-height:1.55}
+tr:last-child td{border-bottom:none}
+td:first-child{font-weight:600;color:#0f2847;white-space:nowrap}
+.notice-box{background:#f8faff;border:1.5px solid #dde4f7;border-radius:10px;padding:16px 18px;font-size:13px;line-height:1.7;color:#374151;margin-bottom:10px;position:relative}
+.notice-lang{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px}
+.copy-btn{position:absolute;top:12px;right:12px;background:#0f2847;color:#fff;border:none;border-radius:7px;padding:6px 14px;font:600 12px 'Inter',sans-serif;cursor:pointer;transition:opacity .15s}
+.copy-btn:hover{opacity:.85}
+.disclaimer{background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:14px 18px;font-size:12px;line-height:1.6;color:#92400e;margin-top:8px}
+.doc-list{list-style:none;padding:0}
+.doc-list li{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #f3f4f6;margin:0}
+.doc-list li:last-child{border-bottom:none}
+.doc-icon{flex-shrink:0;width:34px;height:34px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;font-size:15px}
+.doc-name{font-weight:700;color:#0f2847;font-size:13px}
+.doc-desc{font-size:12.5px;color:#6b7280;line-height:1.5}
+.site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
+.site-footer a{color:#93c5fd}
+@media(max-width:640px){.topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}td:first-child{white-space:normal}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="topbar-brand" href="/">
+    <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CVsprings logo"></span>
+    <span class="brand-name">CV<em>springs</em></span>
+  </a>
+  <a class="nav-btn" href="/">App</a>
+  <a class="nav-btn" href="/bias-report.html">Bias &amp; Monitoring</a>
+</div>
+
+<div class="page">
+  <div class="hero">
+    <div class="tag">EU AI Act &middot; High-risk AI (Annex III, point 4)</div>
+    <h1>How CVsprings approaches the EU AI Act</h1>
+    <p>AI systems used for recruitment and candidate filtering are classified as <strong>high-risk</strong> under Annex III, point 4 of the EU AI Act. Provider obligations (Articles 9&ndash;15) apply from <strong>2 December 2027</strong>. CVsprings is building toward full conformity ahead of that date: the features and documents on this page describe what the product does today, and what remains in progress.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">What this means in practice</span></div>
+    <div class="card-body">
+      <p>CVsprings is an advisory candidate-fit scoring tool. It produces scores that support a recruiter's screening work; it never makes or executes a hiring decision. Our design approach maps each relevant AI Act obligation to a concrete product behaviour &mdash; the table below lists only what is actually implemented.</p>
+      <p>Formal conformity assessment (including a quality management system, test protocols, and technical documentation per Annex IV) is in progress &mdash; items not yet complete are explicitly labelled <em>Roadmap</em> in our documentation rather than claimed.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Feature &rarr; obligation mapping</span></div>
+    <table>
+      <thead><tr><th>Obligation</th><th>What CVsprings does today</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Risk management<br>(Art. 9)</td>
+          <td>A documented risk log with identified risks, mitigations and review dates; an anonymization option that strips contact details and name lines before scoring; a human-decision-only design (no score is ever converted into a decision automatically).</td>
+        </tr>
+        <tr>
+          <td>Data governance<br>(Art. 10)</td>
+          <td>Uploaded CV files are deleted from the server immediately after text extraction &mdash; no permanent CV storage. When Anonymize is enabled, contact details, URLs, address lines, early years and standalone name lines are stripped from the text before scoring. No demographic data is collected.</td>
+        </tr>
+        <tr>
+          <td>Record-keeping<br>(Art. 12)</td>
+          <td>An audit log in which scoring data is immutable after creation (only the recruiter's decision and note can change, and every change is recorded in an append-only change history). Each record stores the scores, weights, app version, scoring-engine version, analysis timestamp, and the email of the reviewer who saved it.</td>
+        </tr>
+        <tr>
+          <td>Transparency<br>(Art. 13)</td>
+          <td>Published instructions for use; an in-app &ldquo;Why this score?&rdquo; explanation for every analysis; a published scoring methodology; and a candidate notice template (below) that clients can give to applicants.</td>
+        </tr>
+        <tr>
+          <td>Human oversight<br>(Art. 14)</td>
+          <td>No automated decisions anywhere in the product: decisions exist only as an explicit recruiter input. The UI labels every score as a decision aid, and each saved record attributes the decision to the signed-in reviewer.</td>
+        </tr>
+        <tr>
+          <td>Accuracy &amp; robustness<br>(Art. 15)</td>
+          <td>A published scoring methodology (deterministic rules applied identically to every CV in a batch), recruiter-configurable weights that are stored with each record, and a per-organization scoring-consistency monitor on the bias &amp; monitoring page.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">What we provide to clients</span></div>
+    <div class="card-body">
+      <p>Alongside the in-product features, CVsprings maintains a compliance document pack for clients and their advisers:</p>
+      <ul class="doc-list">
+        <li><span class="doc-icon">&#128214;</span><span><span class="doc-name">Instructions for use</span><br><span class="doc-desc">Intended purpose, correct operation, the human-oversight requirement, known limitations, and the deployer's own duties (Art. 13).</span></span></li>
+        <li><span class="doc-icon">&#9888;&#65039;</span><span><span class="doc-name">Risk management log</span><br><span class="doc-desc">Identified risks, mitigations, residual risks and review dates (Art. 9).</span></span></li>
+        <li><span class="doc-icon">&#128295;</span><span><span class="doc-name">Technical documentation outline</span><br><span class="doc-desc">Annex IV working document: architecture, scoring pipeline and logging design, with open items explicitly marked TODO.</span></span></li>
+        <li><span class="doc-icon">&#128221;</span><span><span class="doc-name">Candidate notice (EN + NL)</span><br><span class="doc-desc">Ready-to-paste text informing applicants that an AI-based tool supports the screening process.</span></span></li>
+        <li><span class="doc-icon">&#128196;</span><span><span class="doc-name">Compliance pack cover</span><br><span class="doc-desc">One-page summary of the product, its risk classification, the 2027 timeline and the included documents.</span></span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Candidate notice template</span></div>
+    <div class="card-body">
+      <p>Clients can paste this into job postings or applicant communications to meet their own transparency duties:</p>
+      <div class="notice-box">
+        <div class="notice-lang">English</div>
+        <button class="copy-btn" onclick="copyNotice('noticeEn',this)">Copy</button>
+        <span id="noticeEn">As part of our selection process, applications may be assessed with the support of an AI-based tool (CVsprings) that compares CV content against the job requirements. The tool produces an advisory score only; all decisions are made by our recruiters. You may request information about this process or ask for a human-only review by contacting us.</span>
+      </div>
+      <div class="notice-box">
+        <div class="notice-lang">Nederlands</div>
+        <button class="copy-btn" onclick="copyNotice('noticeNl',this)">Copy</button>
+        <span id="noticeNl">Als onderdeel van onze selectieprocedure kunnen sollicitaties worden beoordeeld met ondersteuning van een AI-tool (CVsprings) die de inhoud van het cv vergelijkt met de functie-eisen. De tool geeft uitsluitend een adviserende score; alle beslissingen worden genomen door onze recruiters. U kunt informatie over dit proces opvragen of verzoeken om een beoordeling door uitsluitend een mens door contact met ons op te nemen.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    This page describes CVsprings&rsquo; design approach and is not legal advice. Formal conformity assessment is in progress toward the December 2027 deadline.
+  </div>
+</div>
+
+<footer class="site-footer">
+  CVsprings &mdash; AI-powered candidate fit analysis &nbsp;&middot;&nbsp; <a href="/">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/bias-report.html">Bias &amp; monitoring</a>
+</footer>
+
+<script>
+function copyNotice(id, btn){
+  var text = document.getElementById(id).textContent;
+  function done(ok){
+    var prev = btn.textContent;
+    btn.textContent = ok ? 'Copied!' : 'Copy failed';
+    setTimeout(function(){ btn.textContent = prev; }, 1800);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });
+  } else {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      done(ok);
+    } catch (e) { done(false); }
+  }
+}
+</script>
+</body>
+</html>

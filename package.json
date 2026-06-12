@@ -1,6 +1,6 @@
 {
   "name": "fitscore-backend",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "REST API backend for CV Job Fit Analyzer (CVsprings)",
   "main": "src/index.js",
   "scripts": {
