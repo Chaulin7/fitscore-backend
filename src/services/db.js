@@ -106,6 +106,8 @@ function initSchema() {
       created_at TEXT NOT NULL
     )
   `);
+  // Org-wide audit retention in days; 0 = keep until manually deleted.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN retention_days INTEGER NOT NULL DEFAULT 365'); } catch (_) {}
   getDb().exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -395,6 +397,68 @@ function esc(v) {
   return '"' + String(v).replace(/"/g, '""') + '"';
 }
 
+// --- Retention (GDPR storage limitation) -----------------------------------
+// audit_changes is guarded by append-only triggers; retention/erasure jobs are
+// the two legitimate hard-delete paths, so they lift the DELETE trigger for
+// the duration of the transaction and restore it afterwards.
+
+const AUDIT_CHANGES_NO_DELETE_TRIGGER = `
+  CREATE TRIGGER IF NOT EXISTS audit_changes_no_delete
+  BEFORE DELETE ON audit_changes
+  BEGIN SELECT RAISE(ABORT, 'audit_changes is append-only'); END;
+`;
+
+// Hard-deletes audit records older than each org's retention_days (0 = keep
+// forever), including their change-history rows and any change rows older
+// than the cutoff (e.g. deletion snapshots of already-removed records).
+// Returns counts only — never record contents.
+function purgeExpiredAudits() {
+  const db = getDb();
+  const orgs = db.prepare('SELECT id, retention_days FROM organizations WHERE retention_days > 0').all();
+  let recordsDeleted = 0;
+  let changesDeleted = 0;
+  if (!orgs.length) return { recordsDeleted, changesDeleted, orgsChecked: 0 };
+
+  db.exec('DROP TRIGGER IF EXISTS audit_changes_no_delete');
+  try {
+    const purgeOrg = db.transaction((orgId, cutoffIso) => {
+      const ids = db.prepare('SELECT id FROM audit_log WHERE org_id = ? AND created_at < ?').all(orgId, cutoffIso).map((r) => r.id);
+      for (const id of ids) {
+        changesDeleted += db.prepare('DELETE FROM audit_changes WHERE audit_id = ?').run(id).changes;
+      }
+      recordsDeleted += db.prepare('DELETE FROM audit_log WHERE org_id = ? AND created_at < ?').run(orgId, cutoffIso).changes;
+      // Orphaned change rows (e.g. __deleted__ snapshots) age out on the same clock
+      changesDeleted += db.prepare('DELETE FROM audit_changes WHERE org_id = ? AND changed_at < ?').run(orgId, cutoffIso).changes;
+    });
+    for (const org of orgs) {
+      const cutoffIso = new Date(Date.now() - org.retention_days * 24 * 60 * 60 * 1000).toISOString();
+      purgeOrg(org.id, cutoffIso);
+    }
+  } finally {
+    db.exec(AUDIT_CHANGES_NO_DELETE_TRIGGER);
+  }
+  return { recordsDeleted, changesDeleted, orgsChecked: orgs.length };
+}
+
+// Org-wide erasure: hard-deletes ALL audit records and change history for an
+// organization (owner-confirmed). Returns counts only.
+function deleteAllOrgAuditData(orgId) {
+  const db = getDb();
+  let recordsDeleted = 0;
+  let changesDeleted = 0;
+  db.exec('DROP TRIGGER IF EXISTS audit_changes_no_delete');
+  try {
+    const wipe = db.transaction(() => {
+      changesDeleted = db.prepare('DELETE FROM audit_changes WHERE org_id = ?').run(orgId).changes;
+      recordsDeleted = db.prepare('DELETE FROM audit_log WHERE org_id = ?').run(orgId).changes;
+    });
+    wipe();
+  } finally {
+    db.exec(AUDIT_CHANGES_NO_DELETE_TRIGGER);
+  }
+  return { recordsDeleted, changesDeleted };
+}
+
 function formatRow(row) {
   // Tolerant: accepts both DB rows and already-formatted records
   if (!row) return row;
@@ -430,6 +494,8 @@ function formatRow(row) {
 module.exports = {
   getDb,
   nowIso,
+  purgeExpiredAudits,
+  deleteAllOrgAuditData,
   insertAudit,
   getAllAudits,
   getAuditsByTenant,

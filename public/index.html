@@ -927,6 +927,21 @@ img, video, table { max-width: 100%; }
     <button class="btn btn-primary btn-sm" id="cpSaveBtn" onclick="changePassword()">Update Password</button>
   </div>
   <div style="font-size:11px;color:#6b7280;margin-top:4px">Updating your password signs you out on all other devices.</div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3>Data Retention</h3>
+  <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:6px">
+    <input class="text-input" type="number" id="setRetentionDays" min="0" max="1095" style="width:90px" aria-label="Audit retention in days">
+    <span style="font-size:13px;color:#374151">days</span>
+    <button class="btn btn-primary btn-sm" id="retSaveBtn" onclick="saveRetention()">Save</button>
+  </div>
+  <div style="font-size:11px;color:#6b7280;margin-top:4px">Audit records older than this are <strong>permanently deleted</strong> by a daily job (including their change history). Allowed: 30&ndash;1095, or 0 to keep records until manually deleted. Applies to your whole organization.</div>
+  <div id="retOwnerNote" style="display:none;font-size:11px;color:#9ca3af;margin-top:4px">Only the organization owner can change retention and use the controls below.</div>
+  <h3 style="margin-top:18px">Organization Data</h3>
+  <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:6px">
+    <button class="btn btn-ghost btn-sm" id="orgExportBtn" onclick="exportOrgData()">Export all data (JSON)</button>
+    <button class="btn btn-danger btn-sm" id="orgDeleteBtn" onclick="deleteAllOrgData()">Delete all audit data</button>
+  </div>
+  <div style="font-size:11px;color:#6b7280;margin-top:4px">Export downloads every audit record (incl. change history) and template in your organization. Delete permanently removes all audit records and change history &mdash; it cannot be undone.</div>
 </div>
 
 <!-- === ANALYZER === -->
@@ -998,7 +1013,7 @@ img, video, table { max-width: 100%; }
       <span class="tog-label">Anonymize</span>
       <span class="anon-tooltip-wrap">
         <span class="anon-tooltip-icon">?</span>
-        <span class="anon-tooltip-box"><strong style="display:block;margin-bottom:4px">What is Anonymize?</strong>Strips names, contact details, and other personally identifiable information from CVs before analysis — helping reduce unconscious bias and ensuring candidates are evaluated on skills and experience alone.</span>
+        <span class="anon-tooltip-box"><strong style="display:block;margin-bottom:4px">What is Anonymize?</strong>Strips contact details (emails, phone numbers, links, address lines), years 1940&ndash;2015 and stand-alone name lines from the CV text before scoring, to help reduce unconscious bias. Indirect identifiers (e.g. employers, universities, names mid-sentence) are not removed.</span>
       </span>
     </div>
   </div>
@@ -2201,7 +2216,54 @@ function toggleSettings(){
   if(!isOpen){
     const cb=document.getElementById('autosaveBatchToggle');
     if(cb){cb.checked=(typeof getAutosaveBatch==='function')?getAutosaveBatch():false;}
+    populateOrgSettings();
   }
+}
+
+// ── Org data retention + data controls (server-side, owner-only) ──
+async function populateOrgSettings(){
+  if(!getSessionToken())return;
+  try{
+    const me=await api('/api/auth/me');
+    const isOwner=!!(me&&me.user&&me.user.role==='owner');
+    const inp=document.getElementById('setRetentionDays');
+    if(inp&&me.org&&me.org.retentionDays!=null)inp.value=me.org.retentionDays;
+    ['setRetentionDays','retSaveBtn','orgExportBtn','orgDeleteBtn'].forEach(function(id){
+      const el=document.getElementById(id);if(el)el.disabled=!isOwner;
+    });
+    const note=document.getElementById('retOwnerNote');
+    if(note)note.style.display=isOwner?'none':'block';
+  }catch(_){}
+}
+async function saveRetention(){
+  const inp=document.getElementById('setRetentionDays');
+  const days=parseInt(inp&&inp.value,10);
+  if(isNaN(days)||(days!==0&&(days<30||days>1095))){toast('Retention must be 0 (keep until deleted) or between 30 and 1095 days.','error');return;}
+  const btn=document.getElementById('retSaveBtn');if(btn)btn.disabled=true;
+  try{
+    await api('/api/org',{method:'PATCH',body:JSON.stringify({retentionDays:days})});
+    toast(days===0?'Retention set: keep until manually deleted.':'Retention set to '+days+' days.','success');
+  }catch(e){handleApiError(e,'Could not save retention');}
+  finally{if(btn)btn.disabled=false;}
+}
+async function exportOrgData(){
+  if(!API)return;
+  try{
+    const d=await api('/api/auth/download-token',{method:'POST'});
+    const a=document.createElement('a');a.href=API+'/api/org/export?dt='+encodeURIComponent(d.token);a.download='cvsprings-org-export.json';a.click();
+  }catch(e){handleApiError(e,'Could not export organization data');}
+}
+async function deleteAllOrgData(){
+  let orgName='';try{orgName=localStorage.getItem('cvsprings_org_name')||'';}catch(_){}
+  const typed=prompt('This permanently deletes ALL audit records and change history for your organization.\n\nType your organization name'+(orgName?' ("'+orgName+'")':'')+' to confirm:');
+  if(typed===null)return;
+  const btn=document.getElementById('orgDeleteBtn');if(btn)btn.disabled=true;
+  try{
+    const r=await api('/api/org/audit-data',{method:'DELETE',body:JSON.stringify({confirm:typed})});
+    toast('Deleted '+r.recordsDeleted+' record(s) and '+r.changesDeleted+' change row(s).','success');
+    loadAudit();loadRoles();
+  }catch(e){handleApiError(e,'Could not delete organization data');}
+  finally{if(btn)btn.disabled=false;}
 }
     // Accessibility: close the settings panel with the Escape key
     document.addEventListener('keydown', function(e){
@@ -2593,11 +2655,11 @@ function toggleBatchWhy(btn, idx){
     </div>
     <div class="footer-section">
       <h4>Privacy &amp; Anonymisation</h4>
-      <p>When Anonymise is enabled, names, contact details and other personally identifiable information are stripped from the CV text before it is sent for analysis. No CV data is stored permanently — results are held in your browser session only and cleared when you leave the page.</p>
+      <p>Two data flows: <strong>CV content</strong> is processed transiently — files are deleted from the server as soon as text extraction and scoring complete, and scoring runs inside CVsprings (no CV content is sent to any third-party AI service). <strong>Audit records</strong> are different: when you click Save to Audit (or have autosave on), the candidate name, file name, scores, your decision and notes, a 300-character job-description snippet and your reviewer email are stored in your organization's account until deleted or until your retention period expires. When Anonymise is enabled, contact details, links, address lines, early year numbers and stand-alone name lines are stripped from the CV text before scoring. Full details in the <a class="footer-link" href="/privacy.html">Privacy Policy</a>.</p>
     </div>
   </div>
   <div class="footer-bottom">
-    <span>CVsprings &mdash; AI-powered candidate fit analysis &nbsp;|&nbsp; <button class="footer-link" onclick="openInfoModal(1)">About &amp; Contact</button> &nbsp;|&nbsp; <a class="footer-link" href="/compliance.html">EU AI Act compliance</a> &nbsp;|&nbsp; <a class="footer-link" href="/bias-report.html">Bias &amp; monitoring</a></span>
+    <span>CVsprings &mdash; AI-powered candidate fit analysis &nbsp;|&nbsp; <button class="footer-link" onclick="openInfoModal(1)">About &amp; Contact</button> &nbsp;|&nbsp; <a class="footer-link" href="/privacy.html">Privacy Policy</a> &nbsp;|&nbsp; <a class="footer-link" href="/compliance.html">EU AI Act compliance</a> &nbsp;|&nbsp; <a class="footer-link" href="/bias-report.html">Bias &amp; monitoring</a></span>
     <span>Scores are AI-generated and intended as a decision aid, not a final verdict.</span>
   </div>
 </footer>
@@ -2640,7 +2702,7 @@ function toggleBatchWhy(btn, idx){
         <p>CVsprings is an AI-powered candidate fit analyser designed to help recruiters quickly identify best-fit candidates from a pool of applicants using objective, weighted fit scores.</p>
         <div class="about-grid">
           <div class="about-card"><h5>Fast &amp; Accurate</h5><p>Analyse a single CV or a full batch in seconds using cutting-edge AI.</p></div>
-          <div class="about-card"><h5>Privacy First</h5><p>Anonymisation mode strips PII before analysis. No data stored permanently.</p></div>
+          <div class="about-card"><h5>Privacy First</h5><p>CVs are processed transiently and deleted after analysis. Saved audit records stay in your org's account under your retention settings. See the <a href="/privacy.html" style="color:#0a1f3d">Privacy Policy</a>.</p></div>
           <div class="about-card"><h5>Customisable</h5><p>Adjust scoring weights to match your role priorities across four dimensions.</p></div>
           <div class="about-card"><h5>Transparent</h5><p>Every score includes a breakdown and a why-this-score explanation.</p></div>
         </div>

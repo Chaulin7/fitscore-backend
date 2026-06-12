@@ -74,8 +74,13 @@ function createOrganization(name) {
 }
 
 function getOrganizationById(id) {
-  const row = getDb().prepare('SELECT id, name, created_at as createdAt FROM organizations WHERE id = ?').get(id);
+  const row = getDb().prepare('SELECT id, name, created_at as createdAt, retention_days as retentionDays FROM organizations WHERE id = ?').get(id);
   return row || null;
+}
+
+// Org-wide audit retention. 0 = keep until manually deleted; otherwise 30-1095 days.
+function setOrganizationRetention(id, days) {
+  getDb().prepare('UPDATE organizations SET retention_days = ? WHERE id = ?').run(days, id);
 }
 
 // --- Users -------------------------------------------------------------------
@@ -291,6 +296,7 @@ module.exports = {
   verifyPassword,
   createOrganization,
   getOrganizationById,
+  setOrganizationRetention,
   findUserByEmail,
   findUserById,
   createUser,

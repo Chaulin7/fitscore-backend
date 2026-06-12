@@ -11,7 +11,9 @@ const auditRouter = require('./routes/audit');
 const statsRouter = require('./routes/stats');
 const templatesRouter = require('./routes/templates');
 const authRouter = require('./routes/auth');
+const orgRouter = require('./routes/org');
 const { migrateLegacyData } = require('./services/authService');
+const { purgeExpiredAudits } = require('./services/db');
 
 // Optional pino logger (graceful fallback if not installed yet)
 let pinoHttp = null;
@@ -34,7 +36,17 @@ app.set('trust proxy', 1); // Render runs behind a proxy
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 
 if (pinoHttp && logger) {
-  app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/health' } }));
+  app.use(pinoHttp({
+    logger,
+    autoLogging: { ignore: (req) => req.url === '/health' },
+    // Privacy: never log query strings — audit search params can contain
+    // candidate names (e.g. /api/audit?search=...). Bodies are never logged.
+    serializers: {
+      req(req) {
+        return { id: req.id, method: req.method, url: String(req.url || '').split('?')[0] };
+      },
+    },
+  }));
 }
 
 // --- CORS lockdown ---------------------------------------------------------
@@ -75,6 +87,12 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // /api/audit uses requireSessionOrDownloadToken so the browser-opened HTML
 // report and CSV export can authenticate via a single-use ?dt= token.
 app.use('/api/auth', generalLimiter, authRouter);
+app.use('/api/org', generalLimiter, orgRouter);
+
+// Public, non-personal metadata for static pages (privacy contact address)
+app.get('/api/meta', generalLimiter, (req, res) => {
+  res.json({ privacyContact: process.env.PRIVACY_CONTACT_EMAIL || null });
+});
 app.use('/api/analyze', analyzeLimiter, requireSession, analyzeRouter);
 app.use('/api/audit', generalLimiter, requireSessionOrDownloadToken, auditRouter);
 app.use('/api/stats', generalLimiter, requireSession, statsRouter);
@@ -116,6 +134,24 @@ migrateLegacyData(logger ? logger.info.bind(logger) : console.log)
     if (logger) logger.error({ err: err.message }, 'legacy data migration failed');
     else console.error('[error] legacy data migration failed:', err.message);
   });
+
+// --- Retention purge (GDPR storage limitation) ------------------------------
+// Daily job: hard-deletes audit records (and change history) older than each
+// org's retention setting. Logs counts only — never record contents.
+function runRetentionPurge() {
+  const log = logger ? logger.info.bind(logger) : console.log;
+  try {
+    const { recordsDeleted, changesDeleted, orgsChecked } = purgeExpiredAudits();
+    if (recordsDeleted || changesDeleted) {
+      log(`[retention] Purged ${recordsDeleted} audit record(s) and ${changesDeleted} change row(s) across ${orgsChecked} org(s)`);
+    }
+  } catch (err) {
+    if (logger) logger.error({ err: err.message }, 'retention purge failed');
+    else console.error('[error] retention purge failed:', err.message);
+  }
+}
+runRetentionPurge();
+setInterval(runRetentionPurge, 24 * 60 * 60 * 1000).unref();
 
 app.listen(PORT, () => {
   const log = logger ? logger.info.bind(logger) : console.log;
