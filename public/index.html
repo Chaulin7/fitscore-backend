@@ -595,6 +595,29 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 @keyframes splashSpin{to{transform:rotate(360deg)}}
 @keyframes splashDot{0%,80%,100%{opacity:0}40%{opacity:1}}
 
+/* ── Auth screen ── */
+#authScreen{position:fixed;inset:0;z-index:9500;display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:20px;
+  background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);overflow:auto}
+#authScreen .auth-brand-wrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+.auth-card{background:#fff;border-radius:14px;padding:28px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.35)}
+.auth-card h2{font-size:18px;font-weight:800;color:#0a1f3d;margin:0 0 4px}
+.auth-card form{display:flex;flex-direction:column;gap:12px}
+.auth-card .text-input{width:100%;height:42px}
+.auth-card .btn{justify-content:center;height:42px;width:100%}
+.auth-links{display:flex;justify-content:space-between;gap:8px;margin-top:2px;flex-wrap:wrap}
+.auth-link{background:none;border:none;color:#0f2847;font:600 12px 'Inter',sans-serif;cursor:pointer;padding:0;text-decoration:underline}
+.auth-link:hover{color:#1a3d6e}
+.auth-note{font-size:12px;color:#6b7280;margin:0}
+#authError{margin-bottom:14px}
+
+/* ── Topbar account chip ── */
+.account-chip{display:none;align-items:center;gap:8px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;padding:4px 6px 4px 13px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.85);max-width:230px}
+.account-chip .acct-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+.account-chip button{background:rgba(255,255,255,0.12);border:none;border-radius:14px;color:#fff;font:600 11px 'Inter',sans-serif;padding:4px 10px;cursor:pointer;transition:background .15s}
+.account-chip button:hover{background:rgba(255,255,255,0.25)}
+@media(max-width:640px){.account-chip .acct-email{display:none}.account-chip{padding-left:6px}}
+
 /* === MOBILE RESPONSIVENESS OVERHAUL === */
 html, body { max-width: 100%; overflow-x: hidden; }
 img, video, table { max-width: 100%; }
@@ -767,6 +790,46 @@ img, video, table { max-width: 100%; }
   <div class="splash-brand">CV<em>springs</em></div>
   <div class="splash-status">Starting up<span class="splash-dots"><span>.</span><span>.</span><span>.</span></span></div>
 </div>
+<!-- Auth screen (login / signup / reset) -->
+<div id="authScreen" role="dialog" aria-modal="true" aria-label="Sign in to CVsprings">
+  <div class="auth-brand-wrap">
+    <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="" style="object-fit:contain;filter:invert(1) brightness(1.15);mix-blend-mode:screen;"></span>
+    <div class="splash-brand">CV<em>springs</em></div>
+  </div>
+  <div class="auth-card">
+    <div class="msg msg-err" id="authError" role="alert" aria-live="polite"></div>
+    <form id="authLoginForm" autocomplete="on">
+      <h2>Sign in</h2>
+      <input class="text-input" type="email" id="authEmail" placeholder="Email" autocomplete="email" required>
+      <input class="text-input" type="password" id="authPassword" placeholder="Password" autocomplete="current-password" required>
+      <button class="btn btn-primary" type="submit" id="authLoginBtn">Sign in</button>
+      <div class="auth-links">
+        <button type="button" class="auth-link" id="authForgotLink">Forgot password?</button>
+        <button type="button" class="auth-link" id="authToSignup">Create an account</button>
+      </div>
+    </form>
+    <form id="authSignupForm" style="display:none">
+      <h2>Create your account</h2>
+      <input class="text-input" type="email" id="suEmail" placeholder="Work email" autocomplete="email" required>
+      <input class="text-input" type="password" id="suPassword" placeholder="Password (min 10 characters)" autocomplete="new-password" required>
+      <input class="text-input" type="text" id="suOrgName" placeholder="Company / team name" autocomplete="organization">
+      <button class="btn btn-primary" type="submit" id="suCreateBtn">Create account</button>
+      <div class="auth-links"><button type="button" class="auth-link" id="authToLogin">Back to sign in</button></div>
+    </form>
+    <form id="authForgotForm" style="display:none">
+      <h2>Reset your password</h2>
+      <p class="auth-note">Enter your email and we&rsquo;ll send you a reset link.</p>
+      <input class="text-input" type="email" id="frEmail" placeholder="Email" autocomplete="email" required>
+      <button class="btn btn-primary" type="submit" id="frSubmitBtn">Send reset link</button>
+      <div class="auth-links"><button type="button" class="auth-link" id="frBackToLogin">Back to sign in</button></div>
+    </form>
+    <form id="authResetForm" style="display:none">
+      <h2>Set a new password</h2>
+      <input class="text-input" type="password" id="rpPassword" placeholder="New password (min 10 characters)" autocomplete="new-password" required>
+      <button class="btn btn-primary" type="submit" id="rpSubmitBtn">Set new password</button>
+    </form>
+  </div>
+</div>
 <!-- Loading -->
 <div class="loading-overlay" id="loadingOverlay" style="display:none">
   <div class="loading-card">
@@ -794,6 +857,7 @@ img, video, table { max-width: 100%; }
   <button type="button" class="nav-search-btn" id="navSearchBtn" onclick="focusAuditSearch()" title="Search audit log" aria-label="Search audit log">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
   </button>
+  <span class="account-chip" id="accountChip"><span class="acct-email" id="accountEmail"></span><button type="button" id="logoutBtn" onclick="doLogout()">Logout</button></span>
   <button class="settings-btn" onclick="toggleSettings()" title="Settings" aria-label="Open settings">&#9881;</button>
 </div>
 
@@ -849,6 +913,18 @@ img, video, table { max-width: 100%; }
     <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save Settings</button>
     <span id="settingsSavedMsg" style="font-size:12px;color:#059669;font-weight:700;display:none">Settings saved</span>
   </div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3>Change Password</h3>
+  <div class="settings-row" style="margin-top:6px">
+    <input class="text-input" type="password" id="cpCurrent" placeholder="Current password" autocomplete="current-password" style="flex:1" aria-label="Current password">
+  </div>
+  <div class="settings-row" style="margin-top:8px">
+    <input class="text-input" type="password" id="cpNew" placeholder="New password (min 10 characters)" autocomplete="new-password" style="flex:1" aria-label="New password">
+  </div>
+  <div class="settings-row" style="margin-top:10px">
+    <button class="btn btn-primary btn-sm" id="cpSaveBtn" onclick="changePassword()">Update Password</button>
+  </div>
+  <div style="font-size:11px;color:#6b7280;margin-top:4px">Updating your password signs you out on all other devices.</div>
 </div>
 
 <!-- === ANALYZER === -->
@@ -1144,11 +1220,13 @@ function _isRetrySafe(method, path) {
 async function api(path, options = {}) {
   const url = path.startsWith('http') ? path : API_BASE + path;
   const isForm = options.body && (options.body instanceof FormData);
+  const sessionToken = getSessionToken();
   const baseInit = {
     ...options,
     headers: {
       'Accept': 'application/json',
       ...(options.body && !isForm ? { 'Content-Type': 'application/json' } : {}),
+      ...(sessionToken ? { 'Authorization': 'Bearer ' + sessionToken } : {}),
       ...(options.headers || {}),
     },
   };
@@ -1158,6 +1236,9 @@ async function api(path, options = {}) {
     const ct = res.headers.get('content-type') || '';
     if (ct.includes('application/json')) { try { data = await res.json(); } catch (_) { data = null; } }
     if (!res.ok) {
+      // Session missing/expired: drop the stored session and show the auth screen.
+      // (Login failures return 401 without the AUTH_REQUIRED code, so they don't land here.)
+      if (res.status === 401 && data && data.code === 'AUTH_REQUIRED') { try { handleUnauthorized(); } catch (_) {} }
       const err = new Error((data && data.error) || ('HTTP ' + res.status));
       err.status = res.status; err.code = data && data.code; err.field = data && data.field;
       throw err;
@@ -1192,6 +1273,250 @@ function handleApiError(err, fallbackMsg) {
     try { alert((err && err.message) || fallbackMsg || 'Something went wrong'); } catch (__) {}
   }
 }
+
+// === Auth: email + password sessions =======================================
+const SESSION_KEY = 'cvsprings_session_token';
+const USER_EMAIL_KEY = 'cvsprings_user_email';
+const ORG_NAME_KEY = 'cvsprings_org_name';
+let _pendingResetToken = null;
+
+function getSessionToken(){ try { return localStorage.getItem(SESSION_KEY) || ''; } catch (_) { return ''; } }
+function clearSessionKeys(){
+  try {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(USER_EMAIL_KEY);
+    localStorage.removeItem(ORG_NAME_KEY);
+  } catch (_) {}
+}
+function handleUnauthorized(){ clearSessionKeys(); updateAccountChip(); showAuthScreen(); }
+
+function showAuthScreen(mode){
+  const s = document.getElementById('authScreen');
+  if (s) s.style.display = 'flex';
+  setAuthMode(mode || 'login');
+}
+function hideAuthScreen(){ const s = document.getElementById('authScreen'); if (s) s.style.display = 'none'; }
+function setAuthMode(mode){
+  clearAuthError();
+  const forms = { login: 'authLoginForm', signup: 'authSignupForm', forgot: 'authForgotForm', reset: 'authResetForm' };
+  Object.keys(forms).forEach(function(m){
+    const f = document.getElementById(forms[m]);
+    if (f) f.style.display = (m === mode ? 'flex' : 'none');
+  });
+}
+function showAuthError(msg, kind){
+  const el = document.getElementById('authError');
+  if (!el) return;
+  el.className = 'msg ' + (kind === 'ok' ? 'msg-ok' : 'msg-err');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function clearAuthError(){
+  const el = document.getElementById('authError');
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+}
+function setAuthBusy(btnId, busy){
+  const b = document.getElementById(btnId);
+  if (!b) return;
+  if (busy) {
+    if (!b.dataset.label) b.dataset.label = b.textContent;
+    b.disabled = true;
+    b.innerHTML = '<span class="spinner"></span>';
+  } else {
+    b.disabled = false;
+    b.textContent = b.dataset.label || b.textContent;
+  }
+}
+
+function updateAccountChip(){
+  const chip = document.getElementById('accountChip');
+  if (!chip) return;
+  let email = '', orgName = '';
+  try { email = localStorage.getItem(USER_EMAIL_KEY) || ''; orgName = localStorage.getItem(ORG_NAME_KEY) || ''; } catch (_) {}
+  const authed = !!(getSessionToken() && email);
+  chip.style.display = authed ? 'flex' : 'none';
+  const el = document.getElementById('accountEmail');
+  if (el) { el.textContent = email; el.title = orgName ? (email + ' · ' + orgName) : email; }
+}
+
+function onAuthed(d){
+  try {
+    if (d && d.user && d.user.email) localStorage.setItem(USER_EMAIL_KEY, d.user.email);
+    if (d && d.org && d.org.name) localStorage.setItem(ORG_NAME_KEY, d.org.name);
+  } catch (_) {}
+  updateAccountChip();
+  hideAuthScreen();
+  initApp();
+}
+
+async function doLogin(){
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!email || !password) { showAuthError('Enter your email and password.'); return; }
+  clearAuthError();
+  setAuthBusy('authLoginBtn', true);
+  try {
+    const d = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    try { localStorage.setItem(SESSION_KEY, d.sessionToken); } catch (_) {}
+    document.getElementById('authPassword').value = '';
+    onAuthed(d);
+  } catch (e) {
+    showAuthError(e.message || 'Login failed. Please try again.');
+  } finally {
+    setAuthBusy('authLoginBtn', false);
+  }
+}
+
+async function doSignup(){
+  const email = document.getElementById('suEmail').value.trim();
+  const password = document.getElementById('suPassword').value;
+  const orgName = document.getElementById('suOrgName').value.trim();
+  if (!email || !password) { showAuthError('Enter an email and a password (min 10 characters).'); return; }
+  clearAuthError();
+  setAuthBusy('suCreateBtn', true);
+  try {
+    const d = await api('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, orgName: orgName || undefined }) });
+    try { localStorage.setItem(SESSION_KEY, d.sessionToken); } catch (_) {}
+    document.getElementById('suPassword').value = '';
+    onAuthed(d);
+  } catch (e) {
+    showAuthError(e.message || 'Could not create the account.');
+  } finally {
+    setAuthBusy('suCreateBtn', false);
+  }
+}
+
+async function doForgotRequest(){
+  const email = document.getElementById('frEmail').value.trim();
+  if (!email) { showAuthError('Enter your email address.'); return; }
+  clearAuthError();
+  setAuthBusy('frSubmitBtn', true);
+  try {
+    await api('/api/auth/request-reset', { method: 'POST', body: JSON.stringify({ email }) });
+    showAuthError('If an account exists for that email, a reset link is on its way.', 'ok');
+  } catch (e) {
+    showAuthError(e.message || 'Could not request a reset link.');
+  } finally {
+    setAuthBusy('frSubmitBtn', false);
+  }
+}
+
+async function doResetPassword(){
+  const newPassword = document.getElementById('rpPassword').value;
+  if (!newPassword) { showAuthError('Enter a new password (min 10 characters).'); return; }
+  clearAuthError();
+  setAuthBusy('rpSubmitBtn', true);
+  try {
+    await api('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: _pendingResetToken, newPassword }) });
+    _pendingResetToken = null;
+    document.getElementById('rpPassword').value = '';
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.delete('reset_token');
+      history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
+    } catch (_) {}
+    setAuthMode('login');
+    showAuthError('Password updated — please sign in.', 'ok');
+  } catch (e) {
+    showAuthError(e.message || 'Could not reset the password.');
+  } finally {
+    setAuthBusy('rpSubmitBtn', false);
+  }
+}
+
+async function doLogout(){
+  try { await api('/api/auth/logout', { method: 'POST' }); } catch (_) {}
+  clearSessionKeys();
+  updateAccountChip();
+  showAuthScreen();
+}
+
+async function changePassword(){
+  const cur = document.getElementById('cpCurrent').value;
+  const nw = document.getElementById('cpNew').value;
+  if (!cur || !nw) { toast('Enter your current and new password.', 'error'); return; }
+  const btn = document.getElementById('cpSaveBtn');
+  if (btn) btn.disabled = true;
+  try {
+    await api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: cur, newPassword: nw }) });
+    document.getElementById('cpCurrent').value = '';
+    document.getElementById('cpNew').value = '';
+    toast('Password updated. Other devices were signed out.', 'success');
+  } catch (e) {
+    handleApiError(e, 'Could not change the password');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Data loading only happens here — i.e. only after a successful auth check.
+function initApp(){
+  loadAudit();
+  loadRoles();
+  refreshTemplatesCache()
+    .then(function(){ renderTplChips(); maybeShowTemplateMigrationBanner(); })
+    .catch(function(){});
+}
+
+async function bootAuth(){
+  const wire = function(formId, fn){
+    const f = document.getElementById(formId);
+    if (f) f.addEventListener('submit', function(e){ e.preventDefault(); fn(); });
+  };
+  wire('authLoginForm', doLogin);
+  wire('authSignupForm', doSignup);
+  wire('authForgotForm', doForgotRequest);
+  wire('authResetForm', doResetPassword);
+  const on = function(id, fn){ const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+  on('authToSignup', function(){ setAuthMode('signup'); });
+  on('authToLogin', function(){ setAuthMode('login'); });
+  on('authForgotLink', function(){ setAuthMode('forgot'); });
+  on('frBackToLogin', function(){ setAuthMode('login'); });
+  updateAccountChip();
+
+  // 1) Arriving from a password-reset email link
+  let resetToken = null;
+  try { resetToken = new URLSearchParams(window.location.search).get('reset_token'); } catch (_) {}
+  if (resetToken) {
+    _pendingResetToken = resetToken;
+    showAuthScreen('reset');
+    return;
+  }
+  // 2) Existing session: validate it before initializing the app
+  if (getSessionToken()) {
+    try {
+      const me = await api('/api/auth/me');
+      onAuthed(me);
+    } catch (_) {
+      // 401 already cleared the keys via handleUnauthorized; network errors land here too
+      showAuthScreen();
+    }
+    return;
+  }
+  // 3) Fresh visitor
+  showAuthScreen();
+}
+
+// Single-use download token for browser-opened URLs (report HTML, CSV export)
+// that cannot carry an Authorization header.
+async function openWithDownloadToken(url){
+  // Open the window synchronously to stay inside the user-gesture popup allowance
+  let w = null;
+  try { w = window.open('about:blank', '_blank'); } catch (_) {}
+  try {
+    const d = await api('/api/auth/download-token', { method: 'POST' });
+    const full = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'dt=' + encodeURIComponent(d.token);
+    if (w && !w.closed) { w.location = full; } else { window.open(full, '_blank'); }
+  } catch (e) {
+    if (w) { try { w.close(); } catch (_) {} }
+    handleApiError(e, 'Could not authorize the download');
+  }
+}
+function openAuditReport(id){
+  if (!API) return;
+  openWithDownloadToken(API + '/api/audit/report/' + encodeURIComponent(id));
+}
+// === End auth ===============================================================
 function toast(msg, kind, duration) {
   const stack = document.getElementById('toast-stack');
   if (!stack) { try { console.log('[toast]', kind, msg); } catch(_){} return; }
@@ -1363,8 +1688,10 @@ function loadSettingsIntoPanel(){
 
 document.addEventListener('DOMContentLoaded',()=>{
   if(API){document.getElementById('apiUrl').value=API;ping();}
-  loadAudit();loadRoles();
   loadSettingsIntoPanel();applySavedSettings();
+  // Auth gate: no data loads (loadAudit/loadRoles/templates) run until
+  // bootAuth() has confirmed a valid session — see initApp().
+  bootAuth();
 });
 
 function switchTab(n,btn){
@@ -1634,7 +1961,7 @@ function exportBatchCsv(){
 }
 async function openReport(){
   if(!lastResult?._auditId||!API){toast('Save to audit log first to generate a report.','info');return;}
-  window.open(API+'/api/audit/report/'+lastResult._auditId,'_blank');
+  openWithDownloadToken(API+'/api/audit/report/'+lastResult._auditId);
 }
 
 async function loadAudit(){
@@ -1737,7 +2064,7 @@ function renderAuditTable(records){
       '<td><input class="note-inp" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." onblur="updateAuditNote(\''+rec.id+'\',this.value)"></td>'+
       '<td style="white-space:nowrap;display:flex;gap:4px">'+
         '<button type="button" class="history-btn" onclick="openChangeHistory(\''+rec.id+'\')" title="Change history" aria-label="Change history">⧉</button>'+
-        '<button class="btn btn-ghost btn-sm" onclick="window.open(\''+API+'/api/audit/report/'+rec.id+'\',\'_blank\')" title="Report">📊</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="openAuditReport(\''+rec.id+'\')" title="Report">📊</button>'+
         '<button class="btn btn-danger btn-sm" onclick="deleteAuditRecord(\''+rec.id+'\')">🗑</button>'+
       '</td></tr>';
   }).join('');
@@ -1761,7 +2088,10 @@ async function deleteAuditRecord(id){
 }
 async function exportAuditCsv(){
   if(!API)return;
-  const a=document.createElement('a');a.href=API+'/api/audit/export/csv';a.download='audit-log.csv';a.click();
+  try{
+    const d=await api('/api/auth/download-token',{method:'POST'});
+    const a=document.createElement('a');a.href=API+'/api/audit/export/csv?dt='+encodeURIComponent(d.token);a.download='audit-log.csv';a.click();
+  }catch(e){handleApiError(e,'Could not export CSV');}
 }
 
 async function loadRoles(){
@@ -2094,13 +2424,10 @@ async function deleteTemplate(name){
 
 function populateTemplateSelect(){ renderTplChips(); }
 
-// Init on load
+// Init on load (template loading moved to initApp() — runs only after auth)
 document.addEventListener('DOMContentLoaded', async function(){
   const saved = localStorage.getItem('cvsprings_api_url');
   if(saved){ const el=document.getElementById('apiUrl'); if(el) el.value=saved; }
-  await refreshTemplatesCache();
-  renderTplChips();
-  maybeShowTemplateMigrationBanner();
   maybeShowWaitlistBanner();
 });
 

@@ -19,8 +19,7 @@ router.post('/', async (req, res) => {
   try {
     const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized } = req.body;
     if (!candidateName) return sendError(res, 400, 'VALIDATION_ERROR', 'candidateName is required.', 'candidateName');
-    const userId = req.userId || null;
-    const record = insertAudit({ candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized }, userId);
+    const record = insertAudit({ candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized }, req.orgId, req.userId || null);
     res.status(201).json(record);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -38,12 +37,12 @@ router.get('/', async (req, res) => {
 
     // Legacy path: no advanced filters
     if (!usingFilters && !decision && !role) {
-      const records = getAllAudits({ limit: undefined });
+      const records = getAllAudits({ limit: undefined, orgId: req.orgId });
       return res.json(records);
     }
 
     // Advanced path: in-memory filter on top of getAllAudits
-    let records = getAllAudits({ decision, role });
+    let records = getAllAudits({ decision, role, orgId: req.orgId });
 
     if (search) {
       const s = String(search).toLowerCase();
@@ -76,7 +75,7 @@ router.get('/', async (req, res) => {
 // GET /api/audit/roles - list distinct roles with counts
 router.get('/roles', async (req, res) => {
   try {
-    const roles = getRoles(req.userId || null);
+    const roles = getRoles(req.orgId);
     res.json(roles);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -86,7 +85,7 @@ router.get('/roles', async (req, res) => {
 // GET /api/audit/roles/:role/history - score history for a role
 router.get('/roles/:role/history', async (req, res) => {
   try {
-    const history = getRoleHistory(decodeURIComponent(req.params.role), req.userId || null);
+    const history = getRoleHistory(decodeURIComponent(req.params.role), req.orgId);
     res.json(history);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -96,7 +95,7 @@ router.get('/roles/:role/history', async (req, res) => {
 // GET /api/audit/export/csv - download CSV
 router.get('/export/csv', async (req, res) => {
   try {
-    const csv = exportCsv();
+    const csv = exportCsv({ orgId: req.orgId });
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="audit-log.csv"');
     res.send(csv);
@@ -112,13 +111,12 @@ router.get('/export/csv', async (req, res) => {
 // ---------------------------------------------------------------------------
 router.get('/bias-report', async (req, res) => {
   try {
-    const userId = req.userId;
-    if (!userId) return sendError(res, 401, 'UNAUTHORIZED', 'Authentication required.');
+    if (!req.orgId) return sendError(res, 401, 'AUTH_REQUIRED', 'Unauthorized');
 
     const { role, from, to } = req.query;
 
-    // Fetch tenant-scoped records with optional filters
-    const records = getAuditsByTenant(userId, {
+    // Fetch org-scoped records with optional filters
+    const records = getAuditsByTenant(req.orgId, {
       role: role || undefined,
       from: from || undefined,
       to: to || undefined,
@@ -139,12 +137,11 @@ router.get('/bias-report', async (req, res) => {
 // ---------------------------------------------------------------------------
 router.get('/bias-report/pdf', async (req, res) => {
   try {
-    const userId = req.userId;
-    if (!userId) return sendError(res, 401, 'UNAUTHORIZED', 'Authentication required.');
+    if (!req.orgId) return sendError(res, 401, 'AUTH_REQUIRED', 'Unauthorized');
 
     const { role, from, to } = req.query;
 
-    const records = getAuditsByTenant(userId, {
+    const records = getAuditsByTenant(req.orgId, {
       role: role || undefined,
       from: from || undefined,
       to: to || undefined,
@@ -318,9 +315,9 @@ function renderBiasReportHtml(report) {
 // GET /api/audit/:id/changes - append-only change history
 router.get('/:id/changes', async (req, res) => {
   try {
-    const existing = await getAuditById(req.params);
+    const existing = getAuditById(req.params.id, req.orgId);
     if (!existing) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
-    const changes = getAuditChanges(req.params);
+    const changes = getAuditChanges(req.params.id, req.orgId);
     res.json(changes);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -358,8 +355,8 @@ router.patch('/:id', async (req, res) => {
       patch.note = no;
     }
 
-    const changedBy = req.user ? req.user.id : null;
-    const result = updateAudit({ id: req.params.id, ...patch }, changedBy);
+    const changedBy = req.userId || null;
+    const result = updateAudit({ id: req.params.id, ...patch }, changedBy, req.orgId);
     if (!result) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
     res.json(result);
   } catch (err) {
@@ -370,7 +367,7 @@ router.patch('/:id', async (req, res) => {
 // GET /api/audit/report/:id - HTML candidate report
 router.get('/report/:id', async (req, res) => {
   try {
-    const record = getAuditById(req.params);
+    const record = getAuditById(req.params.id, req.orgId);
     if (!record) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
     const scoreBar = (val, color) => '<div style="background:#e5e7eb;border-radius:4px;height:8px;margin-top:4px"><div style="width:' + val + '%;background:' + color + ';height:8px;border-radius:4px"></div></div>';
     const badgeClass = record.decision === 'shortlist' ? 'badge-green' : record.decision === 'reject' ? 'badge-red' : 'badge-yellow';
@@ -385,8 +382,8 @@ router.get('/report/:id', async (req, res) => {
 // DELETE /api/audit/:id - remove a record
 router.delete('/:id', async (req, res) => {
   try {
-    const changedBy = req.user ? req.user.id : null;
-    const deleted = deleteAudit(req.params, changedBy);
+    const changedBy = req.userId || null;
+    const deleted = deleteAudit({ id: req.params.id }, changedBy, req.orgId);
     if (!deleted) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
     res.json({ success: true, id: req.params.id });
   } catch (err) {

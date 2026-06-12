@@ -21,7 +21,7 @@ function startOfDayIso(d) {
 // Returns dashboard summary metrics.
 router.get('/overview', (req, res) => {
   try {
-    const records = getAllAudits();
+    const records = getAllAudits({ orgId: req.orgId });
 
     const totalAnalyses = records.length;
     let totalShortlisted = 0, totalRejected = 0, totalOnHold = 0;

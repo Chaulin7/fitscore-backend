@@ -35,6 +35,8 @@ function initTemplatesSchema() {
     )
   `);
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_templates_owner ON templates(owner_id)');
+  try { getDb().exec('ALTER TABLE templates ADD COLUMN org_id TEXT'); } catch (_) {}
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_templates_org_id ON templates(org_id)');
 }
 
 function nowIso() { return new Date().toISOString(); }
@@ -59,16 +61,9 @@ function formatTemplate(row) {
   };
 }
 
-function ownerScope(req) {
-  return (req.user && req.user.id) || null;
-}
-
 router.get('/', (req, res) => {
   try {
-    const owner = ownerScope(req);
-    const rows = owner
-      ? getDb().prepare('SELECT * FROM templates WHERE owner_id = ? OR owner_id IS NULL ORDER BY updated_at DESC').all(owner)
-      : getDb().prepare('SELECT * FROM templates WHERE owner_id IS NULL ORDER BY updated_at DESC').all();
+    const rows = getDb().prepare('SELECT * FROM templates WHERE org_id = ? ORDER BY updated_at DESC').all(req.orgId);
     res.json(rows.map(formatTemplate));
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -77,7 +72,7 @@ router.get('/', (req, res) => {
 
 router.get('/:id', (req, res) => {
   try {
-    const row = getDb().prepare('SELECT * FROM templates WHERE id = ?').get(req.params.id);
+    const row = getDb().prepare('SELECT * FROM templates WHERE id = ? AND org_id = ?').get(req.params.id, req.orgId);
     if (!row) return sendError(res, 404, 'NOT_FOUND', 'Template not found.', 'id');
     res.json(formatTemplate(row));
   } catch (err) {
@@ -104,15 +99,16 @@ router.post('/', (req, res) => {
     const id = uuidv4();
     const now = nowIso();
     getDb().prepare(`
-      INSERT INTO templates (id, name, role, job_description, weights, owner_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO templates (id, name, role, job_description, weights, owner_id, org_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       name.trim(),
       (role || '').toString().slice(0, 200),
       jobDescription || '',
       weights ? JSON.stringify(weights) : null,
-      ownerScope(req),
+      req.userId || null,
+      req.orgId,
       now,
       now
     );
@@ -125,7 +121,7 @@ router.post('/', (req, res) => {
 
 router.patch('/:id', (req, res) => {
   try {
-    const existing = getDb().prepare('SELECT * FROM templates WHERE id = ?').get(req.params.id);
+    const existing = getDb().prepare('SELECT * FROM templates WHERE id = ? AND org_id = ?').get(req.params.id, req.orgId);
     if (!existing) return sendError(res, 404, 'NOT_FOUND', 'Template not found.', 'id');
 
     const allowed = ['name', 'role', 'jobDescription', 'weights'];
@@ -168,7 +164,7 @@ router.patch('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
-    const result = getDb().prepare('DELETE FROM templates WHERE id = ?').run(req.params.id);
+    const result = getDb().prepare('DELETE FROM templates WHERE id = ? AND org_id = ?').run(req.params.id, req.orgId);
     if (result.changes === 0) return sendError(res, 404, 'NOT_FOUND', 'Template not found.', 'id');
     res.json({ success: true, id: req.params.id });
   } catch (err) {

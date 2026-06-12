@@ -361,6 +361,11 @@ tbody tr:hover td{background:#f9fafb}
     const url = apiBase + '/api/audit/bias-report' + (params.toString() ? '?' + params.toString() : '');
     const headers = { 'Content-Type': 'application/json' };
     if (apiKey) headers['X-Api-Key'] = apiKey;
+    // Session auth (set by the main app after login)
+    try {
+      const sessionToken = localStorage.getItem('cvsprings_session_token');
+      if (sessionToken) headers['Authorization'] = 'Bearer ' + sessionToken;
+    } catch (_) {}
 
     try {
       const res = await fetch(url, { headers });

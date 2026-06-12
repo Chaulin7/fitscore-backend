@@ -5,11 +5,13 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const { requireApiKey } = require('./middleware/auth');
+const { requireSession, requireSessionOrDownloadToken } = require('./middleware/auth');
 const analyzeRouter = require('./routes/analyze');
 const auditRouter = require('./routes/audit');
 const statsRouter = require('./routes/stats');
 const templatesRouter = require('./routes/templates');
+const authRouter = require('./routes/auth');
+const { migrateLegacyData } = require('./services/authService');
 
 // Optional pino logger (graceful fallback if not installed yet)
 let pinoHttp = null;
@@ -66,13 +68,17 @@ const path = require('path');
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // --- Routes ---------------------------------------------------------------
-// The analyze endpoint does not require API key auth (keeps the existing behaviour).
-// All audit and related endpoints now require a valid API key, which sets req.userId
-// for tenant scoping.
-app.use('/api/analyze', analyzeLimiter, analyzeRouter);
-app.use('/api/audit', generalLimiter, requireApiKey, auditRouter);
-app.use('/api/stats', generalLimiter, requireApiKey, statsRouter);
-app.use('/api/templates', generalLimiter, requireApiKey, templatesRouter);
+// Session auth (Authorization: Bearer {sessionToken}) protects every /api/*
+// route except /health and the public /api/auth endpoints (signup, login,
+// request-reset, reset-password — the auth router guards its private ones).
+// The middleware sets req.userId + req.orgId; all data access is org-scoped.
+// /api/audit uses requireSessionOrDownloadToken so the browser-opened HTML
+// report and CSV export can authenticate via a single-use ?dt= token.
+app.use('/api/auth', generalLimiter, authRouter);
+app.use('/api/analyze', analyzeLimiter, requireSession, analyzeRouter);
+app.use('/api/audit', generalLimiter, requireSessionOrDownloadToken, auditRouter);
+app.use('/api/stats', generalLimiter, requireSession, statsRouter);
+app.use('/api/templates', generalLimiter, requireSession, templatesRouter);
 
 // --- /health (DB ping) ----------------------------------------------------
 app.get('/health', async (req, res) => {
@@ -102,9 +108,26 @@ app.use((err, req, res, next) => {
   res.status(status).json(body);
 });
 
+// One-time legacy data migration: assigns pre-auth records to the
+// "Chaulin (legacy)" organization and creates the owner user from
+// OWNER_EMAIL + OWNER_PASSWORD. Idempotent on every boot.
+migrateLegacyData(logger ? logger.info.bind(logger) : console.log)
+  .catch((err) => {
+    if (logger) logger.error({ err: err.message }, 'legacy data migration failed');
+    else console.error('[error] legacy data migration failed:', err.message);
+  });
+
 app.listen(PORT, () => {
   const log = logger ? logger.info.bind(logger) : console.log;
   log('CVsprings API listening on http://localhost:' + PORT);
+  log(' POST /api/auth/signup        - Create an organization + owner account');
+  log(' POST /api/auth/login         - Email + password login (returns session token)');
+  log(' POST /api/auth/logout        - Invalidate the current session');
+  log(' GET  /api/auth/me            - Current user + organization');
+  log(' POST /api/auth/change-password - Change password (invalidates other sessions)');
+  log(' POST /api/auth/request-reset - Request a password reset link');
+  log(' POST /api/auth/reset-password - Set a new password via reset token');
+  log(' POST /api/auth/download-token - Single-use token for report/CSV downloads');
   log(' POST /api/analyze            - Score a CV against a job description');
   log(' POST /api/analyze/batch      - Batch analyze up to 200 CVs');
   log(' POST /api/audit              - Save an audit record (auth required)');

@@ -3,104 +3,65 @@
 /**
  * src/middleware/auth.js
  *
- * Lightweight API-key authentication middleware.
-*
- * Every request must carry an X-Api-Key header.  The key is hashed with
- * SHA-256 and compared against a list of known keys stored in the
- * API_KEYS environment variable (comma-separated, pre-hashed SHA-256 hex
- * values OR raw keys when HASH_KEYS=false for local dev).
+ * Session-token authentication middleware (replaces the old X-Api-Key scheme).
  *
- * req.userId is set to the SHA-256 hex of the raw key — this is the
- * stable, opaque tenant identifier that scopes all data access.
+ * Requests must carry:  Authorization: Bearer {sessionToken}
+ * The token is hashed with SHA-256 and looked up in the sessions table
+ * (expiry checked). On success the request context gets:
+ *   req.userId    - the authenticated user's id
+ *   req.orgId     - the user's organization id (used for ALL data scoping)
+ *   req.sessionId - the session row id (used by /logout and change-password)
+ *   req.user      - the full user row (password_hash stripped)
  *
- * In single-key deployments (one recruiter, one key) set API_KEYS to a
- * single SHA-256 hex string.  The userId will be that hash.
+ * On failure: 401 { error: 'Unauthorized', code: 'AUTH_REQUIRED' }.
  *
- * Security notes:
- *   - Keys are never logged or returned in responses.
- *   - Timing-safe comparison is used to prevent timing attacks.
- *   - The header name is case-insensitive (Express normalises to lower).
+ * requireSessionOrDownloadToken additionally accepts ?dt={downloadToken}
+ * on GET requests for the two browser-opened endpoints (HTML report, CSV
+ * export) that cannot send an Authorization header. Download tokens are
+ * single-use, 60-second tokens bound to the issuing session's org.
  */
 
-const crypto = require('crypto');
+const authService = require('../services/authService');
 
-function sha256hex(str) {
-    return crypto.createHash('sha256').update(str, 'utf8').digest('hex');
+function unauthorized(res) {
+  return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_REQUIRED' });
 }
 
-// Timing-safe string equality
-function safeEqual(a, b) {
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
+function extractBearerToken(req) {
+  const header = req.headers.authorization || '';
+  const match = /^Bearer\s+(.+)$/i.exec(header);
+  return match ? match[1].trim() : null;
 }
 
-/**
- * Build the set of allowed key hashes from the environment.
- * API_KEYS is a comma-separated list of *already-hashed* SHA-256 hex strings.
- * If API_KEYS is not set, auth is disabled in development mode only.
- */
-function getAllowedHashes() {
-    const raw = (process.env.API_KEYS || '').split(',').map((s) => s.trim()).filter(Boolean);
-    return raw;
+function requireSession(req, res, next) {
+  const rawToken = extractBearerToken(req);
+  if (!rawToken) return unauthorized(res);
+
+  const found = authService.findSessionByToken(rawToken);
+  if (!found) return unauthorized(res);
+
+  const { session, user } = found;
+  req.userId = user.id;
+  req.orgId = user.org_id;
+  req.sessionId = session.id;
+  const { password_hash, ...safeUser } = user;
+  req.user = safeUser;
+  return next();
 }
 
-/**
- * requireApiKey(req, res, next)
- *
- * Sets req.userId to the SHA-256 hex of the presented key on success.
- * Returns 401 on missing key or 403 on unrecognised key.
- *
- * DEV BYPASS: when NODE_ENV === 'development' AND API_KEYS is unset,
- * the middleware is skipped and req.userId is set to 'dev-default'.
- * This makes local development possible without configuring keys while
- * ensuring production always enforces auth.
- */
-function requireApiKey(req, res, next) {
-    const allowedHashes = getAllowedHashes();
+// Paths (relative to the /api/audit mount) that may authenticate via ?dt=
+const DOWNLOAD_TOKEN_PATHS = [/^\/report\/[^/]+$/, /^\/export\/csv$/];
 
-  // Dev bypass — only active when no keys are configured at all
-  if (allowedHashes.length === 0) {
-        if (process.env.NODE_ENV !== 'production') {
-                req.userId = 'dev-default';
-                return next();
-        }
-        // Production with no keys configured is a misconfiguration — block all
-      return res.status(503).json({
-              error: 'Service misconfigured: API_KEYS environment variable is not set.',
-              code: 'MISCONFIGURED',
-      });
-  }
-
-  const presented = req.headers['x-api-key'];
-    if (!presented) {
-          return res.status(401).json({
-                  error: 'Missing X-Api-Key header.',
-                  code: 'UNAUTHORIZED',
-          });
-    }
-
-  const presentedHash = sha256hex(presented);
-
-  // Check against each allowed hash
-  const matched = allowedHashes.find((h) => {
-        if (h.length !== 64) return false; // not a valid sha256 hex
-                                         try {
-                                                 return safeEqual(presentedHash, h);
-                                         } catch {
-                                                 return false;
-                                         }
-  });
-
-  if (!matched) {
-        return res.status(403).json({
-                error: 'Invalid API key.',
-                code: 'FORBIDDEN',
-        });
-  }
-
-  // userId is the hash of the key — stable, opaque, never the raw key
-  req.userId = presentedHash;
+function requireSessionOrDownloadToken(req, res, next) {
+  const dt = req.query && req.query.dt;
+  if (dt && req.method === 'GET' && DOWNLOAD_TOKEN_PATHS.some((re) => re.test(req.path))) {
+    const grant = authService.consumeDownloadToken(String(dt));
+    if (!grant) return unauthorized(res);
+    req.userId = grant.userId;
+    req.orgId = grant.orgId;
     return next();
+  }
+  return requireSession(req, res, next);
 }
 
-module.exports = { requireApiKey, sha256hex };
+module.exports = { requireSession, requireSessionOrDownloadToken };
