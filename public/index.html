@@ -869,16 +869,6 @@ img, video, table { max-width: 100%; }
 <!-- Settings panel -->
 <div class="settings-panel" id="settingsPanel">
   <button class="settings-close" onclick="toggleSettings()" aria-label="Close settings">&#215;</button>
-  <h3>Connection Settings</h3>
-  <div class="settings-row" style="margin-top:6px">
-    <input class="text-input" type="text" id="apiUrl" placeholder="https://your-api.onrender.com" style="flex:1">
-    <button class="btn btn-primary btn-sm" onclick="connect()">Connect</button>
-  </div>
-  <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
-    <span class="dot" id="connDot"></span>
-    <span id="connLabel" style="font-size:12px;color:#6b7280">Not connected</span>
-  </div>
-  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3 style="margin-top:0">Preferences</h3>
   <label class="settings-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#374151">
     <input type="checkbox" id="autosaveBatchToggle" onchange="setAutosaveBatch(this.checked)">
@@ -946,21 +936,6 @@ img, video, table { max-width: 100%; }
 
 <!-- === ANALYZER === -->
 <div class="tab-content active main" id="tab-analyzer">
-<div id="welcomeBanner" class="welcome-banner" role="region" aria-label="Welcome — connect backend" hidden>
-    <div class="welcome-banner-inner">
-      <div class="welcome-banner-icon" aria-hidden="true">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      </div>
-      <div class="welcome-banner-text">
-        <div class="welcome-banner-title">Welcome to CVsprings</div>
-        <div class="welcome-banner-subtitle">Connect your backend to start analysing CVs</div>
-      </div>
-      <div class="welcome-banner-form">
-        <input class="welcome-banner-input" type="url" id="apiUrlWelcome" placeholder="https://your-api.onrender.com" aria-label="Backend API URL">
-        <button class="welcome-banner-btn" type="button" onclick="connectFromWelcomeBanner()">Connect</button>
-      </div>
-    </div>
-  </div>
   <div class="tool-section" id="analyzer-tool">
 
   <div class="mode-toggle">
@@ -1228,9 +1203,26 @@ img, video, table { max-width: 100%; }
 <script>
 // Frontend version recorded on every audit record (EU AI Act Art. 12 provenance)
 const CVSPRINGS_VERSION = '1.3.0';
-let API=localStorage.getItem('cvsprings_api_url')||'https://cvsprings7.onrender.com';
+// Backend base. Set to '' to use same-origin relative paths (post-domain-merge).
+const CVSPRINGS_API_BASE = 'https://cvsprings7.onrender.com';
+
+// Hidden developer override — NOT exposed in any UI. Set in console:
+//   localStorage.setItem('cvsprings_api_override', 'https://staging.example.com')
+// then reload. Remove the key to revert.
+function resolveApiBase() {
+  try {
+    const o = (localStorage.getItem('cvsprings_api_override') || '').trim();
+    if (o) return o.replace(/\/+$/, '');
+  } catch (e) {}
+  return CVSPRINGS_API_BASE.replace(/\/+$/, '');
+}
+
+const API = resolveApiBase();   // single shared backend; org separation is server-side
+const API_BASE = API;           // alias used by api()
+
+// One-time cleanup of the deprecated user-set backend URL key.
+try { localStorage.removeItem('cvsprings_api_url'); } catch (e) {}
 // === Phase 2A helpers (Sections 1 + 4 of the wireup brief) ===
-const API_BASE = API; // alias used by api()
 const RETRY_SAFE_PATHS = ['/health', '/api/audit', '/api/stats/overview', '/api/templates', '/api/analyze', '/api/audit/roles'];
 function _isRetrySafe(method, path) {
   const m = (method || 'GET').toUpperCase();
@@ -1709,7 +1701,7 @@ function loadSettingsIntoPanel(){
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
-  if(API){document.getElementById('apiUrl').value=API;ping();}
+  ping();
   loadSettingsIntoPanel();applySavedSettings();
   // Auth gate: no data loads (loadAudit/loadRoles/templates) run until
   // bootAuth() has confirmed a valid session — see initApp().
@@ -1723,19 +1715,12 @@ function switchTab(n,btn){
   if(n==='audit')loadAudit();if(n==='history')loadRoles();
 }
 
-async function connect(){
-  const url=document.getElementById('apiUrl').value.trim().replace(/\/+$/,'');
-  if(!url)return;API=url;localStorage.setItem('cvsprings_api_url',API);await ping();
-}
 async function ping(){
-  const dot=document.getElementById('connDot'),lbl=document.getElementById('connLabel');
   const nd=document.getElementById('navStatusDot'),nl=document.getElementById('navStatusLabel');
-  dot.className='dot';lbl.textContent='Checking...';
   if(nd){nd.className='dot';}if(nl){nl.textContent='Checking...';}
   try{await api('/health', {signal:AbortSignal.timeout(8000)});
-    dot.className='dot ok';lbl.textContent='Connected';
     if(nd){nd.className='dot ok';}if(nl){nl.textContent='Connected';}}
-  catch(_){dot.className='dot err';lbl.textContent='Not connected';
+  catch(_){
     if(nd){nd.className='dot err';}if(nl){nl.textContent='Not connected';}}
 }
 
@@ -2498,8 +2483,6 @@ function populateTemplateSelect(){ renderTplChips(); }
 
 // Init on load (template loading moved to initApp() — runs only after auth)
 document.addEventListener('DOMContentLoaded', async function(){
-  const saved = localStorage.getItem('cvsprings_api_url');
-  if(saved){ const el=document.getElementById('apiUrl'); if(el) el.value=saved; }
   maybeShowWaitlistBanner();
 });
 
@@ -2608,43 +2591,6 @@ function toggleBatchWhy(btn, idx){
   tr.insertAdjacentElement('afterend', whyTr);
 }
 
-</script>
-<script>
-// Welcome banner: shown when apiUrl is unset, auto-hides when set
-(function(){
-  function refreshWelcomeBanner(){
-    var banner = document.getElementById('welcomeBanner');
-    if (!banner) return;
-    var apiUrl = '';
-    try { apiUrl = ((localStorage.getItem('cvsprings_api_url')||localStorage.getItem('cvsprings_api')||localStorage.getItem('apiUrl')||'') || '').trim(); } catch(e) {}
-    banner.hidden = apiUrl.length > 0;
-  }
-  window.refreshWelcomeBanner = refreshWelcomeBanner;
-  window.connectFromWelcomeBanner = function(){
-    var inputWelcome = document.getElementById('apiUrlWelcome');
-    var inputMain = document.getElementById('apiUrl');
-    if (inputWelcome && inputMain) {
-      inputMain.value = (inputWelcome.value || '').trim();
-      try { inputMain.dispatchEvent(new Event('input', {bubbles:true})); } catch(e) {}
-      try { inputMain.dispatchEvent(new Event('change', {bubbles:true})); } catch(e) {}
-    }
-    if (typeof window.connect === 'function') {
-      try { window.connect(); } catch(e) { console.error(e); }
-    }
-    setTimeout(refreshWelcomeBanner, 300);
-    setTimeout(refreshWelcomeBanner, 1500);
-  };
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', refreshWelcomeBanner);
-  } else {
-    refreshWelcomeBanner();
-  }
-  window.addEventListener('storage', function(e){
-    if (e.key === 'cvsprings_api_url') refreshWelcomeBanner();
-  });
-  // Same-tab safety: re-check every 2 seconds (cheap, no-op when nothing changes)
-  setInterval(refreshWelcomeBanner, 2000);
-})();
 </script>
 <!-- Footer -->
 <footer class="site-footer">
