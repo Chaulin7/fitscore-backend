@@ -6,8 +6,29 @@ const path = require('path');
 const fs = require('fs');
 const { extractText } = require('../services/parser');
 const { scoreCV, anonymizeText } = require('../services/scorer');
+const { getOrgBilling, getUsageCount, incrementUsage } = require('../services/db');
+const { checkQuota } = require('../services/billing');
 
 const router = express.Router();
+
+// Plan gate: may this org run `requested` more analyses this period?
+// Returns the quota result; on block, writes a 402 and returns null.
+function enforceQuota(req, res, requested) {
+  const billing = getOrgBilling(req.orgId);
+  const used = getUsageCount(req.orgId);
+  const q = checkQuota(billing, used, requested);
+  if (!q.allowed) {
+    res.status(402).json({
+      error: 'Monthly analysis limit reached. Upgrade to continue.',
+      code: 'QUOTA_EXCEEDED',
+      limit: q.limit,
+      used: q.used,
+      plan: q.plan,
+    });
+    return null;
+  }
+  return q;
+}
 
 // Identifies the scoring engine version for provenance records (Art. 12).
 // The scorer is a deterministic lexical matcher, not an LLM; its behaviour
@@ -130,6 +151,9 @@ router.post('/', upload.single('cv'), async (req, res) => {
 
     const anonymize = req.body.anonymize === 'true' || req.body.anonymize === true;
 
+    // Plan gate (server-side): single CV = 1 analysis.
+    if (!enforceQuota(req, res, 1)) return;
+
     let cvText = await extractText(filePath, req.file.mimetype);
     if (anonymize) cvText = anonymizeText(cvText);
 
@@ -138,6 +162,8 @@ router.post('/', upload.single('cv'), async (req, res) => {
       ? 'Candidate ' + path.basename(req.file.originalname, path.extname(req.file.originalname)).slice(0, 4).toUpperCase()
       : path.basename(req.file.originalname, path.extname(req.file.originalname));
 
+    // Meter only after a successful analysis, so failures don't burn quota.
+    incrementUsage(req.orgId, 1);
     recordUsage(req, 'analyze_single', 1);
     res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), ...results });
   } catch (err) {
@@ -170,6 +196,11 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     }
 
     const anonymize = req.body.anonymize === 'true' || req.body.anonymize === true;
+
+    // Plan gate (server-side): a batch that would exceed the cap is rejected
+    // whole — we never analyze a partial batch.
+    if (!enforceQuota(req, res, req.files.length)) return;
+
     const results = [];
 
     for (const file of req.files) {
@@ -202,7 +233,10 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     }
 
     results.sort((a, b) => (b.overall || 0) - (a.overall || 0));
-    recordUsage(req, 'analyze_batch', req.files.length);
+    // Meter only CVs that were actually scored (errored files don't burn quota).
+    const scoredCount = results.filter((r) => !r.error).length;
+    if (scoredCount > 0) incrementUsage(req.orgId, scoredCount);
+    recordUsage(req, 'analyze_batch', scoredCount);
     res.json({ count: results.length, modelId: MODEL_ID, results });
   } catch (err) {
     const status = err.statusCode || 500;

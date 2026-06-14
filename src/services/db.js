@@ -108,6 +108,23 @@ function initSchema() {
   `);
   // Org-wide audit retention in days; 0 = keep until manually deleted.
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN retention_days INTEGER NOT NULL DEFAULT 365'); } catch (_) {}
+  // Billing (Stripe subscriptions, attached to the organization)
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_customer_id TEXT'); } catch (_) {}
+  try { getDb().exec("ALTER TABLE organizations ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'"); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN subscription_status TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN current_period_end TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN plan_updated_at TEXT'); } catch (_) {}
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
+
+  // Per-org monthly usage counters (analyses run; periodKey = YYYY-MM)
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS usage_counters (
+      org_id TEXT NOT NULL,
+      period_key TEXT NOT NULL,
+      analysis_count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (org_id, period_key)
+    )
+  `);
   getDb().exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -491,9 +508,66 @@ function formatRow(row) {
   };
 }
 
+// --- Usage metering (per org, per calendar month) --------------------------
+
+// Current period key in UTC, YYYY-MM.
+function currentPeriodKey(date = new Date()) {
+  return date.toISOString().slice(0, 7);
+}
+
+// Analyses used by an org in a given period (defaults to current month).
+function getUsageCount(orgId, periodKey = currentPeriodKey()) {
+  const row = getDb().prepare('SELECT analysis_count AS c FROM usage_counters WHERE org_id = ? AND period_key = ?').get(orgId, periodKey);
+  return row ? row.c : 0;
+}
+
+// Atomically add `n` to an org's counter for the current period; returns the new total.
+function incrementUsage(orgId, n, periodKey = currentPeriodKey()) {
+  getDb().prepare(`
+    INSERT INTO usage_counters (org_id, period_key, analysis_count) VALUES (?, ?, ?)
+    ON CONFLICT(org_id, period_key) DO UPDATE SET analysis_count = analysis_count + excluded.analysis_count
+  `).run(orgId, periodKey, n);
+  return getUsageCount(orgId, periodKey);
+}
+
+// --- Billing state (Stripe; attached to the organization) ------------------
+
+function getOrgBilling(orgId) {
+  const row = getDb().prepare(`
+    SELECT stripe_customer_id AS stripeCustomerId, plan, subscription_status AS subscriptionStatus,
+           current_period_end AS currentPeriodEnd, plan_updated_at AS planUpdatedAt
+    FROM organizations WHERE id = ?
+  `).get(orgId);
+  return row || null;
+}
+
+function setOrgStripeCustomerId(orgId, customerId) {
+  getDb().prepare('UPDATE organizations SET stripe_customer_id = ? WHERE id = ?').run(customerId, orgId);
+}
+
+function findOrgByStripeCustomerId(customerId) {
+  return getDb().prepare('SELECT id FROM organizations WHERE stripe_customer_id = ?').get(customerId) || null;
+}
+
+// Sets plan state from a webhook event (idempotent — always sets, never toggles).
+function setOrgPlan(orgId, { plan, subscriptionStatus, currentPeriodEnd }) {
+  getDb().prepare(`
+    UPDATE organizations
+    SET plan = ?, subscription_status = ?, current_period_end = ?, plan_updated_at = ?
+    WHERE id = ?
+  `).run(plan, subscriptionStatus || null, currentPeriodEnd || null, nowIso(), orgId);
+}
+
 module.exports = {
   getDb,
   nowIso,
+  currentPeriodKey,
+  getUsageCount,
+  incrementUsage,
+  getOrgBilling,
+  setOrgStripeCustomerId,
+  findOrgByStripeCustomerId,
+  setOrgPlan,
   purgeExpiredAudits,
   deleteAllOrgAuditData,
   insertAudit,
