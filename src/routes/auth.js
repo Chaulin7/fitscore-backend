@@ -152,7 +152,7 @@ router.get('/me', requireSession, (req, res) => {
   const org = auth.getOrganizationById(req.orgId);
   res.json({
     user: { email: req.user.email, orgId: req.orgId, role: req.user.role },
-    org: { name: org ? org.name : null },
+    org: { name: org ? org.name : null, retentionDays: org ? org.retentionDays : null },
   });
 });
 
