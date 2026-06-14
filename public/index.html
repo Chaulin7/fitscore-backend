@@ -404,7 +404,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 /* Settings panel */
 .settings-btn{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:6px 10px;cursor:pointer;color:rgba(255,255,255,0.8);font-size:18px;line-height:1;transition:all .18s;position:relative}
 .settings-btn:hover{background:rgba(255,255,255,0.2);color:#fff}
-.settings-panel{display:none;position:fixed;top:54px;right:16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:9999;min-width:340px}
+.settings-panel{display:none;position:fixed;top:54px;right:16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:9999;min-width:340px;max-height:calc(100vh - 70px);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .settings-panel.open{display:block}
 .settings-panel h3{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin:0 0 10px}
 .settings-row{display:flex;align-items:center;gap:8px}
@@ -2372,6 +2372,7 @@ function toggleSettings(){
   const isOpen = panel.classList.contains('open');
   panel.classList.toggle('open', !isOpen);
   overlay.classList.toggle('open', !isOpen);
+  document.body.style.overflow = !isOpen ? 'hidden' : '';
   if(!isOpen){
     const cb=document.getElementById('autosaveBatchToggle');
     if(cb){cb.checked=(typeof getAutosaveBatch==='function')?getAutosaveBatch():false;}
