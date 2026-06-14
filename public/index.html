@@ -620,6 +620,20 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .account-chip button:hover{background:rgba(255,255,255,0.25)}
 @media(max-width:640px){.account-chip .acct-email{display:none}.account-chip{padding-left:6px}}
 
+/* ── Topbar plan/usage chip ── */
+.plan-chip{display:none;align-items:center;gap:6px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);white-space:nowrap;cursor:default}
+.plan-chip .plan-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,0.7)}
+.plan-chip.warn{background:rgba(245,158,11,0.18);border-color:rgba(245,158,11,0.5);color:#fde68a}
+.plan-chip.warn .plan-dot{background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,0.7)}
+.plan-chip.clickable{cursor:pointer}
+.plan-chip.clickable:hover{background:rgba(255,255,255,0.16)}
+@media(max-width:640px){.plan-chip{padding:4px 9px}}
+/* Plan & Billing settings buttons */
+.plan-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.plan-status-line{font-size:12px;color:#374151;margin-top:4px}
+.plan-status-line .past-due{color:#b45309;font-weight:700}
+
 /* === MOBILE RESPONSIVENESS OVERHAUL === */
 html, body { max-width: 100%; overflow-x: hidden; }
 img, video, table { max-width: 100%; }
@@ -765,10 +779,6 @@ img, video, table { max-width: 100%; }
 <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
 <body>
-<div id="waitlistBanner" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:linear-gradient(90deg,#3554f4,#5b73f7);color:#fff;font-size:14px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
-  <span style="flex:1" id="waitlistBannerText">Thanks — we'll let you know when this launches.</span>
-  <button type="button" id="waitlistBannerClose" aria-label="Dismiss" style="background:rgba(255,255,255,0.18);color:#fff;border:0;border-radius:6px;padding:4px 10px;font-weight:600;cursor:pointer;font-size:13px">Dismiss</button>
-</div>
 <!-- Phase 2A: toast stack + audit change-history modal -->
 <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
 <div id="history-overlay" class="history-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title">
@@ -859,6 +869,7 @@ img, video, table { max-width: 100%; }
   <button type="button" class="nav-search-btn" id="navSearchBtn" onclick="focusAuditSearch()" title="Search audit log" aria-label="Search audit log">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
   </button>
+  <span class="plan-chip" id="planChip" title="Your plan"><span class="plan-dot"></span><span id="planChipLabel"></span></span>
   <span class="account-chip" id="accountChip"><span class="acct-email" id="accountEmail"></span><button type="button" id="logoutBtn" onclick="doLogout()">Logout</button></span>
   <button class="settings-btn" onclick="toggleSettings()" title="Settings" aria-label="Open settings">&#9881;</button>
 </div>
@@ -932,6 +943,15 @@ img, video, table { max-width: 100%; }
     <button class="btn btn-danger btn-sm" id="orgDeleteBtn" onclick="deleteAllOrgData()">Delete all audit data</button>
   </div>
   <div style="font-size:11px;color:#6b7280;margin-top:4px">Export downloads every audit record (incl. change history) and template in your organization. Delete permanently removes all audit records and change history &mdash; it cannot be undone.</div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3>Plan &amp; Billing</h3>
+  <div class="plan-status-line" id="planStatusLine">Loading plan&hellip;</div>
+  <div class="plan-row" id="planOwnerControls" style="display:none">
+    <button class="btn btn-primary btn-sm" id="upgradeProBtn" onclick="startCheckout('pro')">Upgrade to Pro</button>
+    <button class="btn btn-primary btn-sm" id="upgradeTeamBtn" onclick="startCheckout('team')">Upgrade to Team</button>
+    <button class="btn btn-ghost btn-sm" id="manageBillingBtn" onclick="openBillingPortal()" style="display:none">Manage billing</button>
+  </div>
+  <div class="plan-status-line" id="planMemberNote" style="display:none;color:#9ca3af">Your plan is managed by your organization&rsquo;s owner.</div>
 </div>
 
 <!-- === ANALYZER === -->
@@ -1273,6 +1293,10 @@ async function api(path, options = {}) {
 }
 function handleApiError(err, fallbackMsg) {
   try {
+    if (err && err.code === 'QUOTA_EXCEEDED') {
+      toast(err.message || 'Monthly analysis limit reached. Upgrade to continue.', 'error', 6000);
+      return;
+    }
     if (err && err.code === 'VALIDATION_ERROR' && err.field) {
       highlightField(err.field);
       toast(err.message || 'Please check the highlighted field', 'error');
@@ -1351,6 +1375,8 @@ function updateAccountChip(){
   chip.style.display = authed ? 'flex' : 'none';
   const el = document.getElementById('accountEmail');
   if (el) { el.textContent = email; el.title = orgName ? (email + ' · ' + orgName) : email; }
+  // Hide the plan chip whenever we're not authenticated.
+  if (!authed) { const pc = document.getElementById('planChip'); if (pc) pc.style.display = 'none'; }
 }
 
 function onAuthed(d){
@@ -1470,7 +1496,147 @@ function initApp(){
   refreshTemplatesCache()
     .then(function(){ renderTplChips(); maybeShowTemplateMigrationBanner(); })
     .catch(function(){});
+  refreshUsage();
+  handleBillingReturn();
 }
+
+// === Billing / plan (server-enforced; client display only) =================
+let _billing = null; // last GET /api/billing/usage result
+
+async function refreshUsage(){
+  if(!getSessionToken())return null;
+  try{
+    _billing = await api('/api/billing/usage');
+    renderPlanChip(_billing);
+    return _billing;
+  }catch(_){ return null; }
+}
+
+function renderPlanChip(b){
+  const chip=document.getElementById('planChip');
+  const label=document.getElementById('planChipLabel');
+  if(!chip||!label||!b){ if(chip)chip.style.display='none'; return; }
+  chip.classList.remove('warn','clickable');
+  chip.onclick=null;
+  if(b.subscriptionStatus==='past_due'){
+    label.textContent='Payment issue';
+    chip.classList.add('warn','clickable');
+    chip.title='Payment failed — click to manage billing';
+    chip.onclick=openBillingPortal;
+  }else if(b.plan==='pro'||b.plan==='team'){
+    label.textContent=b.plan==='team'?'Team':'Pro';
+    chip.title='Active subscription';
+  }else{
+    const used=b.used||0, limit=b.limit;
+    label.textContent='Free · '+used+'/'+(limit==null?'∞':limit);
+    chip.title='Free plan usage this month';
+    if(limit && used/limit>=0.8) chip.classList.add('warn');
+  }
+  chip.style.display='inline-flex';
+}
+
+async function populatePlanBilling(){
+  const line=document.getElementById('planStatusLine');
+  const ownerControls=document.getElementById('planOwnerControls');
+  const memberNote=document.getElementById('planMemberNote');
+  if(!line)return;
+  let me=null;
+  try{ me=await api('/api/auth/me'); }catch(_){}
+  const b = _billing || await refreshUsage();
+  const isOwner = !!(me&&me.user&&me.user.role==='owner');
+  const plan = (b&&b.plan)||'free';
+  const planName = plan==='team'?'Team':plan==='pro'?'Pro':'Free';
+  let txt = 'Current plan: <strong>'+planName+'</strong>';
+  if(plan==='free' && b && b.limit!=null){ txt += ' &middot; '+(b.used||0)+'/'+b.limit+' analyses used this month'; }
+  if(b && b.subscriptionStatus==='past_due'){ txt += ' &middot; <span class="past-due">payment issue — please update your card</span>'; }
+  else if((plan==='pro'||plan==='team')){ txt += ' &middot; unlimited analyses'; }
+  line.innerHTML = txt;
+
+  if(!isOwner){
+    if(ownerControls)ownerControls.style.display='none';
+    if(memberNote)memberNote.style.display='block';
+    return;
+  }
+  if(memberNote)memberNote.style.display='none';
+  if(ownerControls)ownerControls.style.display='flex';
+  const paid = (plan==='pro'||plan==='team');
+  const pro=document.getElementById('upgradeProBtn'), team=document.getElementById('upgradeTeamBtn'), manage=document.getElementById('manageBillingBtn');
+  if(pro)pro.style.display=paid?'none':'inline-flex';
+  if(team)team.style.display=paid?'none':'inline-flex';
+  // Show "Manage billing" whenever a Stripe customer exists (paid, or past_due/canceled).
+  if(manage)manage.style.display=(paid||b&&b.subscriptionStatus)?'inline-flex':'none';
+}
+
+async function startCheckout(plan){
+  const btn=document.getElementById(plan==='team'?'upgradeTeamBtn':'upgradeProBtn');
+  if(btn)btn.disabled=true;
+  try{
+    const d=await api('/api/billing/checkout',{method:'POST',body:JSON.stringify({plan})});
+    if(d&&d.url){ window.location = d.url; return; }
+    toast('Could not start checkout.','error');
+  }catch(e){ handleApiError(e,'Could not start checkout'); }
+  finally{ if(btn)btn.disabled=false; }
+}
+
+async function openBillingPortal(){
+  try{
+    const d=await api('/api/billing/portal',{method:'POST'});
+    if(d&&d.url){ window.location = d.url; return; }
+    toast('Could not open billing portal.','error');
+  }catch(e){ handleApiError(e,'Could not open billing portal'); }
+}
+
+// Quota-exceeded upgrade prompt shown inline in #analyzeError.
+function showQuotaPrompt(errEl, e){
+  const limit = e && e.limit!=null ? e.limit : (_billing&&_billing.limit);
+  const isOwner = _billing ? undefined : undefined; // resolved async below
+  const msg = 'You’ve used all '+(limit!=null?limit:'')+' free analyses this month.';
+  errEl.innerHTML = '<div class="err-retry-card" style="background:#fffbeb;border-color:#fde68a">'
+    + '<span class="err-retry-icon">⚠️</span>'
+    + '<span class="err-retry-msg" style="color:#92400e">'+msg+' <span id="quotaUpgradeHint">Upgrade for unlimited analyses.</span></span>'
+    + '<button class="err-retry-btn" id="quotaUpgradeBtn" style="background:#0f2847">Upgrade</button></div>';
+  errEl.style.display='block';
+  toast(e&&e.message?e.message:'Monthly analysis limit reached. Upgrade to continue.','error',6000);
+  // Owner gets an Upgrade button; members get a "ask your owner" hint.
+  api('/api/auth/me').then(function(me){
+    const isOwner = !!(me&&me.user&&me.user.role==='owner');
+    const btn=document.getElementById('quotaUpgradeBtn');
+    const hint=document.getElementById('quotaUpgradeHint');
+    if(!isOwner){
+      if(btn)btn.style.display='none';
+      if(hint)hint.textContent='Ask your organization’s owner to upgrade.';
+    }else if(btn){
+      btn.onclick=function(){ startCheckout('pro'); };
+    }
+  }).catch(function(){});
+}
+
+// Post-Checkout return: ?billing=success → strip param, re-poll usage briefly.
+function handleBillingReturn(){
+  let params;
+  try{ params=new URLSearchParams(window.location.search); }catch(_){ return; }
+  const status=params.get('billing');
+  if(!status)return;
+  try{
+    const u=new URL(window.location.href);
+    u.searchParams.delete('billing');
+    history.replaceState({}, '', u.pathname+(u.search||'')+(u.hash||''));
+  }catch(_){}
+  if(status!=='success'){ return; }
+  // Webhook is the source of truth and may lag — poll a few times over ~10s.
+  let tries=0;
+  (function poll(){
+    refreshUsage().then(function(b){
+      const paid = b && (b.plan==='pro'||b.plan==='team');
+      if(paid){ toast('You’re on the '+(b.plan==='team'?'Team':'Pro')+' plan.','success'); return; }
+      if(++tries<5){ setTimeout(poll, 2000); }
+      else { toast('Payment received — your plan will update shortly.','info',5000); }
+    });
+  })();
+}
+
+// Keep the usage chip fresh after each completed analysis.
+document.addEventListener('cv:analyze_completed', function(){ refreshUsage(); });
 
 async function bootAuth(){
   const wire = function(formId, fn){
@@ -1790,7 +1956,11 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
     fd.append('weights',JSON.stringify(weights));fd.append('anonymize',anon?'true':'false');
     let data;
     try { data = await api('/api/analyze', {method:'POST', body:fd}); }
-    catch (e) { if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field); showErr(errEl, e.message || 'Analysis failed'); return; }
+    catch (e) {
+      if (e.code === 'QUOTA_EXCEEDED') { showQuotaPrompt(errEl, e); return; }
+      if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field);
+      showErr(errEl, e.message || 'Analysis failed'); return;
+    }
     lastResult={...data,role,file:file.name};
     renderSingleResult(data,file.name,role);
     document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'single', role: role || 'unknown' } }));
@@ -1816,7 +1986,11 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     setProgress(30,'Extracting text from CV...');
     let data;
     try { data = await api('/api/analyze/batch', {method:'POST', body:fd}); }
-    catch (e) { if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field); showErr(errEl, e.message || 'Batch failed'); return; }
+    catch (e) {
+      if (e.code === 'QUOTA_EXCEEDED') { hideLoading(); showQuotaPrompt(errEl, e); return; }
+      if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field);
+      showErr(errEl, e.message || 'Batch failed'); return;
+    }
     setProgress(80,'Comparing against job description...');
     setProgress(100,'Complete');
     document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'batch', count: (data && data.results && data.results.length) || 0, role: role || 'unknown' } }));
@@ -2202,6 +2376,7 @@ function toggleSettings(){
     const cb=document.getElementById('autosaveBatchToggle');
     if(cb){cb.checked=(typeof getAutosaveBatch==='function')?getAutosaveBatch():false;}
     populateOrgSettings();
+    populatePlanBilling();
   }
 }
 
@@ -2481,56 +2656,6 @@ async function deleteTemplate(name){
 
 function populateTemplateSelect(){ renderTplChips(); }
 
-// Init on load (template loading moved to initApp() — runs only after auth)
-document.addEventListener('DOMContentLoaded', async function(){
-  maybeShowWaitlistBanner();
-});
-
-function maybeShowWaitlistBanner(){
-  const banner = document.getElementById('waitlistBanner');
-  if (!banner) return;
-  let intent = null;
-  let fromUrl = false;
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('intent') === 'waitlist') {
-      const plan = params.get('plan') || 'pro';
-      try {
-        const stored = JSON.parse(localStorage.getItem('cvsprings_waitlist') || 'null');
-        intent = stored && stored.plan ? stored : { plan: plan, ts: Date.now() };
-      } catch(e) { intent = { plan: plan, ts: Date.now() }; }
-      try { localStorage.setItem('cvsprings_waitlist', JSON.stringify(intent)); } catch(e){}
-      fromUrl = true;
-      try {
-        const u = new URL(window.location.href);
-        u.searchParams.delete('intent');
-        u.searchParams.delete('plan');
-        history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
-      } catch(e){}
-    }
-  } catch(e){}
-  if (!intent) {
-    if (localStorage.getItem('cvsprings_waitlist_dismissed_v1') === '1') return;
-    try {
-      const stored = JSON.parse(localStorage.getItem('cvsprings_waitlist') || 'null');
-      if (stored && stored.plan) intent = stored;
-    } catch(e){}
-  }
-  if (!intent) return;
-  const planLabel = intent.plan === 'team' ? 'Team' : (intent.plan === 'pro' ? 'Pro' : 'this plan');
-  const text = document.getElementById('waitlistBannerText');
-  if (text) text.textContent = "Thanks — we'll let you know when " + planLabel + " launches. Meanwhile, you have full access to the free analyzer below.";
-  banner.style.display = 'flex';
-  const closeBtn = document.getElementById('waitlistBannerClose');
-  if (closeBtn) closeBtn.onclick = function(){
-    try { localStorage.setItem('cvsprings_waitlist_dismissed_v1', '1'); } catch(e){}
-    banner.style.display = 'none';
-  };
-  if (fromUrl) {
-    document.dispatchEvent(new CustomEvent('cv:waitlist_signup', { detail: intent }));
-  }
-}
-
 function maybeShowTemplateMigrationBanner(){
   if (localStorage.getItem(TMPL_MIGRATED_KEY) === '1') return;
   const legacy = _tplFromLocalStorageLegacy();
@@ -2761,10 +2886,6 @@ keepAlive();
   document.addEventListener('cv:template_saved', function(ev){
     var d = ev.detail || {};
     plausible('template_saved', { props: { name: (d.name || '').slice(0, 50), role: d.role || 'unknown' } });
-  });
-  document.addEventListener('cv:waitlist_signup', function(ev){
-    var d = ev.detail || {};
-    plausible('waitlist_signup', { props: { plan: d.plan || 'unknown', period: d.period || 'monthly', source: d.source || 'in_app' } });
   });
 })();
 </script>

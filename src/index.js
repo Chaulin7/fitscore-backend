@@ -12,6 +12,7 @@ const statsRouter = require('./routes/stats');
 const templatesRouter = require('./routes/templates');
 const authRouter = require('./routes/auth');
 const orgRouter = require('./routes/org');
+const billingRouter = require('./routes/billing');
 const { migrateLegacyData } = require('./services/authService');
 const { purgeExpiredAudits } = require('./services/db');
 
@@ -68,6 +69,11 @@ app.use(cors({
   credentials: true,
 }));
 
+// Stripe webhook MUST receive the raw body for signature verification, so it
+// is mounted before the JSON parser and is exempt from session auth (Stripe
+// sends no session token). Verification uses STRIPE_WEBHOOK_SECRET.
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), billingRouter.handleWebhook);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
@@ -88,6 +94,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // report and CSV export can authenticate via a single-use ?dt= token.
 app.use('/api/auth', generalLimiter, authRouter);
 app.use('/api/org', generalLimiter, orgRouter);
+app.use('/api/billing', generalLimiter, billingRouter);
 
 // Public, non-personal metadata for static pages (privacy contact address)
 app.get('/api/meta', generalLimiter, (req, res) => {
