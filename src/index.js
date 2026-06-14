@@ -138,9 +138,18 @@ app.use('/api/auth', generalLimiter, authRouter);
 app.use('/api/org', generalLimiter, mutationLimiter, orgRouter);
 app.use('/api/billing', generalLimiter, billingRouter);
 
-// Public, non-personal metadata for static pages (privacy contact address)
+// Public, non-personal metadata for static pages (contact + company details
+// from env so the operator sets real values without code edits).
 app.get('/api/meta', generalLimiter, (req, res) => {
-  res.json({ privacyContact: process.env.PRIVACY_CONTACT_EMAIL || null });
+  res.json({
+    privacyContact: process.env.PRIVACY_CONTACT_EMAIL || null,
+    supportEmail: process.env.SUPPORT_EMAIL || null,
+    company: {
+      legalName: process.env.COMPANY_LEGAL_NAME || null,
+      address: process.env.COMPANY_ADDRESS || null,
+      country: process.env.COMPANY_COUNTRY || null,
+    },
+  });
 });
 app.use('/api/analyze', analyzeLimiter, requireSession, analyzeRouter);
 app.use('/api/audit', generalLimiter, requireSessionOrDownloadToken, mutationLimiter, auditRouter);
