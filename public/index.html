@@ -579,6 +579,15 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .kbd-hint{font-size:11px;color:#9ca3af;margin-left:10px}
 /* ── Human-oversight hint (EU AI Act Art. 14) ── */
 .oversight-hint{font-size:11px;color:#9ca3af;font-style:italic;line-height:1.4}
+
+/* ── First-run onboarding: sample button + nudge ── */
+.sample-row{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.sample-tip{display:none;font-size:12px;font-weight:600;color:#1d4ed8}
+.sample-row.nudge .sample-tip{display:inline}
+.sample-row.nudge #trySampleBtn{border-color:#1d4ed8;color:#0f2847;animation:samplePulse 1.6s ease-in-out infinite}
+@keyframes samplePulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,0)}50%{box-shadow:0 0 0 5px rgba(29,78,216,0.18)}}
+.file-chip.sample-chip{background:#eef2ff;border-color:#c7d2fe;color:#4338ca}
+.file-chip.sample-chip .sample-tag{opacity:.7;font-weight:500;margin-left:2px}
 .kbd-hint kbd{background:#f3f4f6;border:1px solid #d1d5db;border-radius:3px;padding:1px 5px;font-size:10px;font-family:inherit}
 /* ── Splash screen ── */
 #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
@@ -979,6 +988,21 @@ img, video, table { max-width: 100%; }
     </div>
   </div>
 
+
+  <!-- First-run onboarding: try with a sample (no upload/JD needed) -->
+  <div class="sample-row">
+    <button class="btn btn-ghost" id="trySampleBtn" onclick="trySample()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/></svg>
+      <span>Try with a sample CV</span>
+    </button>
+    <span class="sample-tip" id="sampleTip">New here? See it in action &rarr;</span>
+  </div>
+
+  <!-- Sample result notice (shown above results when viewing the sample) -->
+  <div class="msg msg-warn" id="sampleBanner" style="display:none;align-items:center;gap:10px">
+    <span style="flex:1">This is a sample result. Upload your own CV and job description to analyse for real.</span>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="clearSample()">Clear sample</button>
+  </div>
 
   <div class="card">
     <div class="card-head"><span class="card-title" id="uploadCardTitle">Upload CV</span></div>
@@ -1502,6 +1526,7 @@ function initApp(){
     .catch(function(){});
   refreshUsage();
   handleBillingReturn();
+  maybeShowOnboardingNudge();
 }
 
 // === Billing / plan (server-enforced; client display only) =================
@@ -1938,6 +1963,9 @@ function updateWeightSum(){
 function getWeights(){return{kw:+document.getElementById('wKw').value,sk:+document.getElementById('wSk').value,ex:+document.getElementById('wEx').value,ed:+document.getElementById('wEd').value};}
 
 async function analyze(){
+  markOnboarded();
+  // A real analysis supersedes any sample on screen.
+  _sampleActive=false; var _sb=document.getElementById('sampleBanner'); if(_sb)_sb.style.display='none';
   const errEl=document.getElementById('analyzeError');errEl.style.display='none';
   if(!API){showErr(errEl,'Set API endpoint first.');return;}
   if(!selectedFiles.length){showErr(errEl,'Upload at least one CV file.');return;}
@@ -2039,7 +2067,7 @@ function renderSingleResult(data,fileName,role){
       requestAnimationFrame(()=>{el.style.strokeDashoffset=circ*(1-v/100);});
     });
   });
-  const found=data.keywords?.found||[],missing=data.keywords?.missing||[];
+  const found=data.found||data.keywords?.found||[],missing=data.missing||data.keywords?.missing||[];
   document.getElementById('foundChips').innerHTML=found.length?found.map(k=>'<span class="chip chip-found">'+escHtml(k)+'</span>').join(''):'<span style="color:#9ca3af;font-size:13px">None found</span>';
   document.getElementById('missingChips').innerHTML=missing.length?missing.map(k=>'<span class="chip chip-miss">'+escHtml(k)+'</span>').join(''):'<span style="color:#059669;font-size:13px">✓ None missing</span>';
   document.getElementById('skillsTable').querySelector('tbody').innerHTML=(data.skills||[]).map(s=>
@@ -2102,6 +2130,7 @@ function focusAuditSearch(){
 }
 function setBatchDecision(i,v){if(lastBatchResults[i])lastBatchResults[i]._decision=v;}
 async function saveToAudit(){
+  if(_sampleActive||(lastResult&&lastResult._isSample)){toast("Sample results can't be saved — upload a real CV to save to the audit log.",'info');return;}
   if(!lastResult||!API)return;
   const body={candidateName:lastResult.candidateName||lastResult.file.replace(/\.[^.]+$/,''),fileName:lastResult.file,
     overall:lastResult.overall,scores:lastResult.scores,weights:getWeights(),
@@ -2327,7 +2356,62 @@ async function loadRoleHistory(role,btn){
   catch(e){content.innerHTML='<div class="empty-state">Error: '+e.message+'</div>';}
 }
 
-function clearResults(){document.getElementById('singleResults').style.display='none';document.getElementById('batchResults').style.display='none';lastResult=null;lastBatchResults=[];}
+function clearResults(){
+  document.getElementById('singleResults').style.display='none';
+  document.getElementById('batchResults').style.display='none';
+  lastResult=null;lastBatchResults=[];
+  var sb=document.getElementById('sampleBanner');if(sb)sb.style.display='none';
+  if(_sampleActive){_sampleActive=false;if(typeof renderFileList==='function')renderFileList();}
+}
+
+// ── First-run onboarding: sample analysis (display-only, never quota-counted) ──
+let _sampleActive=false;
+function markOnboarded(){
+  try{localStorage.setItem('cvsprings_onboarded','1');}catch(_){}
+  var row=document.querySelector('.sample-row');if(row)row.classList.remove('nudge');
+}
+function maybeShowOnboardingNudge(){
+  let onboarded='0';try{onboarded=localStorage.getItem('cvsprings_onboarded')||'0';}catch(_){}
+  if(onboarded!=='1'){var row=document.querySelector('.sample-row');if(row)row.classList.add('nudge');}
+}
+async function trySample(){
+  markOnboarded();
+  const btn=document.getElementById('trySampleBtn');
+  const orig=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Loading sample…';}
+  try{
+    const data=await api('/api/analyze/sample');
+    // Populate the form so the user sees what good input looks like.
+    if(data.sampleJd!=null)document.getElementById('jdInput').value=data.sampleJd;
+    if(data.sampleRole!=null)document.getElementById('roleInput').value=data.sampleRole;
+    if(data.sampleWeights){
+      const w=data.sampleWeights,map={wKw:'kw',wSk:'sk',wEx:'ex',wEd:'ed'};
+      Object.entries(map).forEach(([id,key])=>{
+        const inp=document.getElementById(id),sld=document.getElementById(id+'Slider');
+        if(inp&&w[key]!=null)inp.value=w[key];
+        if(sld&&w[key]!=null)sld.value=w[key];
+      });
+      if(typeof updateWeightSum==='function')updateWeightSum();
+    }
+    // Non-removable sample file chip.
+    const fl=document.getElementById('fileList');
+    if(fl)fl.innerHTML='<div class="file-chip sample-chip"><span>sample-cv.pdf <span class="sample-tag">(example)</span></span></div>';
+    // Render via the exact same path as a real analysis; flag as sample.
+    _sampleActive=true;
+    lastResult={...data,_isSample:true};
+    renderSingleResult(data,'sample-cv.pdf',data.sampleRole||'');
+    const sb=document.getElementById('sampleBanner');if(sb)sb.style.display='flex';
+    // Distinct analytics event — do NOT inflate real analysis metrics.
+    document.dispatchEvent(new CustomEvent('cv:sample_viewed',{detail:{}}));
+  }catch(e){handleApiError(e,'Could not load the sample');}
+  finally{if(btn){btn.disabled=false;btn.innerHTML=orig;}}
+}
+function clearSample(){
+  clearResults();
+  const jd=document.getElementById('jdInput');if(jd)jd.value='';
+  const role=document.getElementById('roleInput');if(role)role.value='';
+  selectedFiles=[];if(typeof renderFileList==='function')renderFileList();
+}
 function showErr(el,msg){el.className='msg msg-err';el.textContent=msg;el.style.display='block';}
 function showWarn(el,msg){el.className='msg msg-warn';el.textContent=msg;el.style.display='block';}
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -2984,6 +3068,9 @@ keepAlive();
   document.addEventListener('cv:template_saved', function(ev){
     var d = ev.detail || {};
     plausible('template_saved', { props: { name: (d.name || '').slice(0, 50), role: d.role || 'unknown' } });
+  });
+  document.addEventListener('cv:sample_viewed', function(){
+    plausible('sample_viewed');
   });
 })();
 </script>

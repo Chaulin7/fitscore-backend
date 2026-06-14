@@ -9,9 +9,16 @@ const { scoreCV, anonymizeText } = require('../services/scorer');
 const { getOrgBilling, getUsageCount, incrementUsage } = require('../services/db');
 const { checkQuota } = require('../services/billing');
 const fileSec = require('../services/fileSecurity');
-const { enforceAnalyzeRate } = require('../middleware/rateLimits');
+const { enforceAnalyzeRate, sampleLimiter } = require('../middleware/rateLimits');
+const { SAMPLE_VERSION, SAMPLE_ROLE, SAMPLE_WEIGHTS, SAMPLE_CV, SAMPLE_JD } = require('../data/sample');
 
 const router = express.Router();
+
+// Cached sample analysis (onboarding). Computed once through the real scoring
+// pipeline and reused; recomputed only if the sample or model version changes.
+// Never counts against quota.
+let _sampleCache = null;
+let _sampleCacheKey = null;
 
 // Authoritative server-side checks: content-sniff the type, run the optional
 // AV scan, then extract text under a hard per-file timeout. Returns the
@@ -129,6 +136,36 @@ function recordUsage(req, event, cvCount) {
     }
   } catch (_) {}
 }
+
+// GET /api/analyze/sample — cached sample analysis for first-run onboarding.
+// Auth required (mounted behind requireSession), NOT quota-counted, light
+// rate limit as a safety net. Returns the same shape as POST /api/analyze,
+// plus the sample JD/role/weights so the frontend can mirror the input.
+router.get('/sample', sampleLimiter, (req, res) => {
+  try {
+    const key = SAMPLE_VERSION + ':' + MODEL_ID;
+    if (!_sampleCache || _sampleCacheKey !== key) {
+      const results = scoreCV(SAMPLE_CV, SAMPLE_JD, SAMPLE_WEIGHTS);
+      _sampleCache = {
+        candidateName: 'Alex Morgan (sample)',
+        fileName: 'sample-cv.pdf',
+        anonymized: false,
+        sample: true,
+        modelId: MODEL_ID,
+        analysisTimestamp: new Date().toISOString(),
+        ...results,
+        // Echo the input so the frontend can populate the form to match.
+        sampleJd: SAMPLE_JD,
+        sampleRole: SAMPLE_ROLE,
+        sampleWeights: SAMPLE_WEIGHTS,
+      };
+      _sampleCacheKey = key;
+    }
+    res.json(_sampleCache);
+  } catch (err) {
+    sendError(res, 500, 'INTERNAL_ERROR', 'Could not generate the sample.');
+  }
+});
 
 router.post('/', upload.single('cv'), async (req, res) => {
   let filePath = null;
