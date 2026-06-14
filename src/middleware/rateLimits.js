@@ -80,9 +80,25 @@ const mutationLimiter = rateLimit({
   },
 });
 
+// --- Sample/onboarding limiter (org-keyed safety net) ----------------------
+// The sample endpoint is cached and not quota-counted; this just guards abuse.
+const sampleLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: intEnv('SAMPLE_RATE', 20),
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: orgKey,
+  handler: (req, res) => {
+    const retryAfter = 60 * 60;
+    res.set('Retry-After', String(retryAfter));
+    res.status(429).json({ error: 'Too many requests, please slow down.', code: 'RATE_LIMITED', retryAfter });
+  },
+});
+
 module.exports = {
   ANALYZE_RATE,
   MUTATION_RATE,
   enforceAnalyzeRate,
   mutationLimiter,
+  sampleLimiter,
 };
