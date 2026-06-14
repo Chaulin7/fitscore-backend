@@ -2797,7 +2797,7 @@ function toggleBatchWhy(btn, idx){
     </div>
   </div>
   <div class="footer-bottom">
-    <span>CVsprings &mdash; AI-powered candidate fit analysis &nbsp;|&nbsp; <button class="footer-link" onclick="openInfoModal(1)">About &amp; Contact</button> &nbsp;|&nbsp; <a class="footer-link" href="/privacy.html">Privacy Policy</a> &nbsp;|&nbsp; <a class="footer-link" href="/compliance.html">EU AI Act compliance</a> &nbsp;|&nbsp; <a class="footer-link" href="/bias-report.html">Bias &amp; monitoring</a></span>
+    <span>CVsprings &mdash; AI-powered candidate fit analysis &nbsp;|&nbsp; <button class="footer-link" onclick="openInfoModal(1)">About &amp; Contact</button> &nbsp;|&nbsp; <a class="footer-link" href="/terms.html">Terms</a> &nbsp;|&nbsp; <a class="footer-link" href="/privacy.html">Privacy Policy</a> &nbsp;|&nbsp; <a class="footer-link" href="/compliance.html">EU AI Act compliance</a> &nbsp;|&nbsp; <a class="footer-link" href="/bias-report.html">Bias &amp; monitoring</a></span>
     <span>Scores are AI-generated and intended as a decision aid, not a final verdict.</span>
   </div>
 </footer>
@@ -2845,20 +2845,51 @@ function toggleBatchWhy(btn, idx){
           <div class="about-card"><h5>Transparent</h5><p>Every score includes a breakdown and a why-this-score explanation.</p></div>
         </div>
         <h4>Contact</h4>
-        <div class="contact-row"><strong>Product</strong><span>CVsprings - AI Candidate Fit Analyser</span></div>
+        <div class="contact-row"><strong>Support</strong><span id="contactSupport">&hellip;</span></div>
+        <div class="contact-row"><strong>Product</strong><span>CVsprings &mdash; AI Candidate Fit Analyser</span></div>
         <div class="contact-row"><strong>Built by</strong><span>Chaulin</span></div>
-        <div class="contact-row"><strong>Feedback</strong><span>Open an issue or discussion on the GitHub repository.</span></div>
+        <div class="contact-row"><strong>Legal</strong><span><a href="/terms.html">Terms of Service</a> &middot; <a href="/privacy.html">Privacy Policy</a></span></div>
       </div>
     </div>
   </div>
 </div>
 <script>
+// Populate the Support contact row from server config (env), as a mailto with
+// org context prefilled in the subject. No address is hardcoded into the page.
+var _metaPromise = null;
+function loadMeta(){
+  if (!_metaPromise) {
+    var base = (typeof API_BASE === 'string') ? API_BASE : '';
+    _metaPromise = fetch(base + '/api/meta', { headers: { 'Accept': 'application/json' } })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; });
+  }
+  return _metaPromise;
+}
+function populateSupportContact(){
+  var el = document.getElementById('contactSupport');
+  if (!el) return;
+  loadMeta().then(function(meta){
+    var email = meta && meta.supportEmail;
+    if (!email) { el.textContent = 'Support contact coming soon.'; return; }
+    var orgName = '';
+    try { orgName = localStorage.getItem('cvsprings_org_name') || ''; } catch (e) {}
+    var subject = 'CVsprings support' + (orgName ? ' — ' + orgName : '');
+    var a = document.createElement('a');
+    a.href = 'mailto:' + email + '?subject=' + encodeURIComponent(subject);
+    a.textContent = email;
+    el.innerHTML = '';
+    el.appendChild(a);
+  });
+}
+document.addEventListener('DOMContentLoaded', populateSupportContact);
 function openInfoModal(tab){
   var m=document.getElementById('infoModal');
   m.style.display='flex';
   requestAnimationFrame(function(){m.classList.add('open');});
   switchModalTab(tab||0);
   document.body.style.overflow='hidden';
+  if ((tab||0) === 1) populateSupportContact();
 }
 function closeInfoModal(){
   var m=document.getElementById('infoModal');
