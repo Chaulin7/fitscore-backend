@@ -32,7 +32,24 @@ const loginLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many login attempts. Please try again later.', code: 'RATE_LIMITED' },
+  handler: (req, res) => {
+    const retryAfter = 15 * 60;
+    res.set('Retry-After', String(retryAfter));
+    res.status(429).json({ error: 'Too many login attempts. Please try again later.', code: 'RATE_LIMITED', retryAfter });
+  },
+});
+
+// Max 5 signups per IP per hour.
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    const retryAfter = 60 * 60;
+    res.set('Retry-After', String(retryAfter));
+    res.status(429).json({ error: 'Too many sign-up attempts. Please try again later.', code: 'RATE_LIMITED', retryAfter });
+  },
 });
 
 // Max 3 reset requests per email per hour (in-memory sliding window).
@@ -75,7 +92,7 @@ async function deliverResetLink(email, resetLink) {
 
 // --- POST /api/auth/signup ------------------------------------------------------
 
-router.post('/signup', async (req, res) => {
+router.post('/signup', signupLimiter, async (req, res) => {
   try {
     const { email, password, orgName } = req.body || {};
     const normEmail = auth.normalizeEmail(email);

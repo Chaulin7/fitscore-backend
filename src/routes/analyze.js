@@ -8,8 +8,23 @@ const { extractText } = require('../services/parser');
 const { scoreCV, anonymizeText } = require('../services/scorer');
 const { getOrgBilling, getUsageCount, incrementUsage } = require('../services/db');
 const { checkQuota } = require('../services/billing');
+const fileSec = require('../services/fileSecurity');
+const { enforceAnalyzeRate } = require('../middleware/rateLimits');
 
 const router = express.Router();
+
+// Authoritative server-side checks: content-sniff the type, run the optional
+// AV scan, then extract text under a hard per-file timeout. Returns the
+// extracted text. Throws INVALID_FILE / FILE_REJECTED / PROCESSING_TIMEOUT.
+async function validateAndExtract(file, field) {
+  fileSec.validateUploadedFile(file, field);            // magic bytes + size
+  const scan = await fileSec.scanFile(file.path);       // no-op unless ENABLE_AV_SCAN
+  if (!scan.clean) {
+    throw Object.assign(new Error('This file was rejected by a security scan.'),
+      { statusCode: 400, code: 'FILE_REJECTED', field });
+  }
+  return fileSec.withTimeout(extractText(file.path, file.mimetype), fileSec.PROCESS_TIMEOUT_MS, 'CV processing');
+}
 
 // Plan gate: may this org run `requested` more analyses this period?
 // Returns the quota result; on block, writes a 402 and returns null.
@@ -71,21 +86,9 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_BATCH =200;
+const MAX_FILE_BYTES = fileSec.MAX_FILE_BYTES;
+const MAX_BATCH = fileSec.MAX_BATCH_FILES;
 const upload = multer({ storage, fileFilter, limits: { fileSize: MAX_FILE_BYTES, files: MAX_BATCH } });
-
-function sniffOk(filePath, ext) {
-  try {
-    const fd = fs.openSync(filePath, 'r');
-    const buf = Buffer.alloc(8);
-    fs.readSync(fd, buf, 0, 8, 0);
-    fs.closeSync(fd);
-    if (ext === '.pdf') return buf.slice(0, 4).toString('utf8') === '%PDF';
-    if (ext === '.docx') return buf[0] === 0x50 && buf[1] === 0x4B && (buf[2] === 0x03 || buf[2] === 0x05 || buf[2] === 0x07);
-    return false;
-  } catch (_) { return false; }
-}
 
 function parseWeights(input) {
   if (!input) return null;
@@ -134,10 +137,6 @@ router.post('/', upload.single('cv'), async (req, res) => {
       return sendError(res, 400, 'NO_FILE', 'No CV file uploaded. Include a file with field name "cv".', 'cv');
     }
     filePath = req.file.path;
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    if (!sniffOk(filePath, ext)) {
-      return sendError(res, 415, 'UNSUPPORTED_TYPE', 'File content does not match a valid PDF or DOCX.', 'cv');
-    }
 
     let jobDescription;
     try { jobDescription = validateJobDescription(req.body.jobDescription); }
@@ -151,10 +150,18 @@ router.post('/', upload.single('cv'), async (req, res) => {
 
     const anonymize = req.body.anonymize === 'true' || req.body.anonymize === true;
 
+    // Abuse/cost rate guard (per org), layered on top of the billing quota.
+    if (!enforceAnalyzeRate(req, res, 1)) return;
     // Plan gate (server-side): single CV = 1 analysis.
     if (!enforceQuota(req, res, 1)) return;
 
-    let cvText = await extractText(filePath, req.file.mimetype);
+    // Authoritative content validation + optional AV scan + bounded extraction.
+    let cvText;
+    try { cvText = await validateAndExtract(req.file, 'cv'); }
+    catch (e) {
+      if (e.code === 'FILE_REJECTED') console.warn('[security] upload rejected by AV scan', { org: req.orgId, file: req.file.originalname });
+      return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'cv');
+    }
     if (anonymize) cvText = anonymizeText(cvText);
 
     const results = scoreCV(cvText, jobDescription, weights);
@@ -169,7 +176,9 @@ router.post('/', upload.single('cv'), async (req, res) => {
   } catch (err) {
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
-    sendError(res, status, code, err.message || 'Internal server error', err.field);
+    // Don't leak internals on a 500; keep specific messages for handled statuses.
+    const message = status === 500 ? 'Something went wrong. Please try again.' : (err.message || 'Request failed');
+    sendError(res, status, code, message, err.field);
   } finally {
     if (filePath) fs.unlink(filePath, () => {});
   }
@@ -181,9 +190,9 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     if (!req.files || req.files.length === 0) {
       return sendError(res, 400, 'NO_FILES', 'No CV files uploaded. Use field name "cvs" for multiple files.', 'cvs');
     }
-    if (req.files.length > MAX_BATCH) {
-      return sendError(res, 400, 'BATCH_TOO_LARGE', `Maximum ${MAX_BATCH} files per batch.`, 'cvs');
-    }
+    // Authoritative count + aggregate-size caps (server-side).
+    try { fileSec.validateBatch(req.files, 'cvs'); }
+    catch (e) { return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'cvs'); }
 
     let jobDescription;
     try { jobDescription = validateJobDescription(req.body.jobDescription); }
@@ -197,6 +206,8 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
 
     const anonymize = req.body.anonymize === 'true' || req.body.anonymize === true;
 
+    // Abuse/cost rate guard (per org): a batch costs its CV count.
+    if (!enforceAnalyzeRate(req, res, req.files.length)) return;
     // Plan gate (server-side): a batch that would exceed the cap is rejected
     // whole — we never analyze a partial batch.
     if (!enforceQuota(req, res, req.files.length)) return;
@@ -206,17 +217,19 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     for (const file of req.files) {
       filePaths.push(file.path);
       try {
-        const ext = path.extname(file.originalname).toLowerCase();
-        if (!sniffOk(file.path, ext)) {
+        // Per-file authoritative validation + AV scan + bounded extraction.
+        let cvText;
+        try { cvText = await validateAndExtract(file, 'cvs'); }
+        catch (ve) {
+          if (ve.code === 'FILE_REJECTED') console.warn('[security] upload rejected by AV scan', { org: req.orgId, file: file.originalname });
           results.push({
             candidateName: path.basename(file.originalname, path.extname(file.originalname)),
             fileName: file.originalname,
-            error: 'File content does not match a valid PDF or DOCX.',
-            code: 'UNSUPPORTED_TYPE'
+            error: ve.message,
+            code: ve.code || 'INVALID_FILE'
           });
           continue;
         }
-        let cvText = await extractText(file.path, file.mimetype);
         if (anonymize) cvText = anonymizeText(cvText);
         const scored = scoreCV(cvText, jobDescription, weights);
         const candidateName = anonymize
@@ -241,24 +254,30 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
   } catch (err) {
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
-    sendError(res, status, code, err.message || 'Internal server error', err.field);
+    // Don't leak internals on a 500; keep specific messages for handled statuses.
+    const message = status === 500 ? 'Something went wrong. Please try again.' : (err.message || 'Request failed');
+    sendError(res, status, code, message, err.field);
   } finally {
     for (const fp of filePaths) fs.unlink(fp, () => {});
   }
 });
 
 router.use((err, req, res, next) => {
+  // Map multer's hard limits to the unified INVALID_FILE code the frontend
+  // already understands (field-aware). These fire before route handlers.
   if (err && err.code === 'LIMIT_FILE_SIZE') {
-    return sendError(res, 413, 'FILE_TOO_LARGE',
-      `File exceeds maximum size of ${MAX_FILE_BYTES} bytes (10MB).`, 'cv');
+    const mb = Math.round(MAX_FILE_BYTES / (1024 * 1024));
+    return sendError(res, 400, 'INVALID_FILE', `A file exceeds the ${mb} MB per-file limit.`, err.field || 'cv');
   }
   if (err && (err.code === 'LIMIT_UNEXPECTED_FILE' || err.code === 'LIMIT_FILE_COUNT')) {
-    return sendError(res, 400, 'UPLOAD_LIMIT', err.message, 'cv');
+    return sendError(res, 400, 'INVALID_FILE', `Too many files: maximum ${MAX_BATCH} per batch.`, err.field || 'cvs');
   }
   if (err) {
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
-    return sendError(res, status, code, err.message || 'Upload error', err.field);
+    // Never leak internals on a 500.
+    const message = status === 500 ? 'Something went wrong processing the upload.' : (err.message || 'Upload error');
+    return sendError(res, status, code, message, err.field);
   }
   next();
 });

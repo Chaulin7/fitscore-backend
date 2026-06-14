@@ -15,6 +15,7 @@ const orgRouter = require('./routes/org');
 const billingRouter = require('./routes/billing');
 const { migrateLegacyData } = require('./services/authService');
 const { purgeExpiredAudits } = require('./services/db');
+const { mutationLimiter } = require('./middleware/rateLimits');
 
 // Optional pino logger (graceful fallback if not installed yet)
 let pinoHttp = null;
@@ -34,7 +35,38 @@ const PORT = process.env.PORT || 3000;
 app.disable('x-powered-by');
 app.set('trust proxy', 1); // Render runs behind a proxy
 
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+// --- Security headers ------------------------------------------------------
+// CSP lists exactly the origins the app loads. The single HTML file relies on
+// inline scripts/styles, so 'unsafe-inline' is required for script/style; we
+// still lock everything else down (object-src none, frame-ancestors none) and
+// allow only the fonts/analytics/Stripe origins actually used. HSTS is enabled
+// only once served over HTTPS (Render/custom domain).
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      // Inline handlers/scripts in the single-file app require 'unsafe-inline'.
+      // Stripe.js is loaded only if Checkout redirects in-page; allow its host.
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://plausible.io', 'https://js.stripe.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:'],
+      // XHR/fetch targets: same-origin, the API host, and Plausible.
+      connectSrc: ["'self'", 'https://plausible.io', 'https://cvsprings7.onrender.com'],
+      frameSrc: ['https://js.stripe.com', 'https://hooks.stripe.com'],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  // helmet sets X-Content-Type-Options: nosniff by default. HSTS is sent only
+  // on HTTPS responses, so it's a no-op on plain-HTTP local dev.
+  hsts: { maxAge: 15552000, includeSubDomains: true },
+}));
 
 if (pinoHttp && logger) {
   app.use(pinoHttp({
@@ -51,22 +83,30 @@ if (pinoHttp && logger) {
 }
 
 // --- CORS lockdown ---------------------------------------------------------
-const allowedOriginsRaw = (process.env.ALLOWED_ORIGINS || '*').split(',').map((s) => s.trim()).filter(Boolean);
-const allowedOrigins = allowedOriginsRaw;
+// Allowlist from env (CORS_ALLOWED_ORIGINS, comma-separated). This list is the
+// only thing that changes when the custom domain lands (task #5) — no code
+// change. ALLOWED_ORIGINS is accepted as a legacy alias.
+const corsAllowlist = (process.env.CORS_ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS || '')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+const isProd = process.env.NODE_ENV === 'production';
 
 function isAllowedOrigin(origin) {
+  // Non-browser / same-origin requests (no Origin header) are allowed; the
+  // Stripe webhook and curl fall here and are unaffected by CORS.
   if (!origin) return true;
-  if (allowedOrigins.includes('*')) return true;
-  if (allowedOrigins.includes(origin)) return true;
-  if (/^http:\/\/localhost(:\d+)?$/.test(origin) && allowedOrigins.some((o) => o.startsWith('http://localhost'))) return true;
+  if (corsAllowlist.includes('*')) return !isProd; // wildcard only outside production
+  if (corsAllowlist.includes(origin)) return true;
+  // Convenience for local dev only (never in production).
+  if (!isProd && /^http:\/\/localhost(:\d+)?$/.test(origin)) return true;
   return false;
 }
 
 app.use(cors({
   origin: (origin, cb) => isAllowedOrigin(origin) ? cb(null, true) : cb(new Error('CORS: origin not allowed')),
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Api-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
+  maxAge: 600,
 }));
 
 // Stripe webhook MUST receive the raw body for signature verification, so it
@@ -93,7 +133,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // /api/audit uses requireSessionOrDownloadToken so the browser-opened HTML
 // report and CSV export can authenticate via a single-use ?dt= token.
 app.use('/api/auth', generalLimiter, authRouter);
-app.use('/api/org', generalLimiter, orgRouter);
+// org routes do their own per-route auth (export uses a download token), so the
+// mutation limiter sits at the mount and keys by IP until orgId is set.
+app.use('/api/org', generalLimiter, mutationLimiter, orgRouter);
 app.use('/api/billing', generalLimiter, billingRouter);
 
 // Public, non-personal metadata for static pages (privacy contact address)
@@ -101,9 +143,9 @@ app.get('/api/meta', generalLimiter, (req, res) => {
   res.json({ privacyContact: process.env.PRIVACY_CONTACT_EMAIL || null });
 });
 app.use('/api/analyze', analyzeLimiter, requireSession, analyzeRouter);
-app.use('/api/audit', generalLimiter, requireSessionOrDownloadToken, auditRouter);
+app.use('/api/audit', generalLimiter, requireSessionOrDownloadToken, mutationLimiter, auditRouter);
 app.use('/api/stats', generalLimiter, requireSession, statsRouter);
-app.use('/api/templates', generalLimiter, requireSession, templatesRouter);
+app.use('/api/templates', generalLimiter, requireSession, mutationLimiter, templatesRouter);
 
 // --- /health (DB ping) ----------------------------------------------------
 app.get('/health', async (req, res) => {
@@ -114,7 +156,8 @@ app.get('/health', async (req, res) => {
     out.db = 'ok';
   } catch (err) {
     out.status = 'degraded';
-    out.dbError = err.message;
+    out.db = 'error'; // detail is logged server-side, not exposed
+    if (logger) logger.error({ err: err.message }, 'health DB check failed');
     return res.status(503).json(out);
   }
   res.json(out);
@@ -123,13 +166,19 @@ app.get('/health', async (req, res) => {
 // 404 fallthrough
 app.use((req, res) => { res.status(404).json({ error: 'Not found', code: 'NOT_FOUND', path: req.path }); });
 
-// Final error handler
+// Final error handler. Full detail is logged server-side; the client gets a
+// generic message on 5xx (no stack traces, internal paths, or messages leak).
 app.use((err, req, res, next) => {
   const status = err.statusCode || err.status || 500;
-  if (logger) { logger.error({ path: req.path }, 'unhandled error'); }
-  else { console.error('[error]', status, req.path, err.message); }
-  const body = { error: err.message || 'Internal server error', code: err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST') };
-  if (err.field) body.field = err.field;
+  if (logger) { logger.error({ path: req.path, err: err.message, stack: err.stack }, 'unhandled error'); }
+  else { console.error('[error]', status, req.path, err.message, err.stack); }
+  // CORS rejections surface as errors here — return a clean 403.
+  if (err && /^CORS:/.test(err.message || '')) {
+    return res.status(403).json({ error: 'Origin not allowed.', code: 'CORS_DENIED' });
+  }
+  const clientMessage = status >= 500 ? 'Something went wrong. Please try again.' : (err.message || 'Request failed');
+  const body = { error: clientMessage, code: err.code || (status >= 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST') };
+  if (err.field && status < 500) body.field = err.field;
   res.status(status).json(body);
 });
 

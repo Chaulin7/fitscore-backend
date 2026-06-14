@@ -1293,6 +1293,10 @@ async function api(path, options = {}) {
 }
 function handleApiError(err, fallbackMsg) {
   try {
+    if (err && (err.status === 429 || err.code === 'RATE_LIMITED')) {
+      toast("You're going a bit fast — try again in a moment.", 'info', 4500);
+      return;
+    }
     if (err && err.code === 'QUOTA_EXCEEDED') {
       toast(err.message || 'Monthly analysis limit reached. Upgrade to continue.', 'error', 6000);
       return;
@@ -1715,8 +1719,8 @@ function toast(msg, kind, duration) {
 const FIELD_MAP = {
   weights: ['weights-fit', 'weights-skill', 'weights-exp', 'weights-edu'],
   jobDescription: ['jdText', 'jd'],
-  cv: ['fileInput', 'cvFile'],
-  cvs: ['fileInput', 'cvFile'],
+  cv: ['cvInput', 'fileInput', 'cvFile'],
+  cvs: ['cvInput', 'fileInput', 'cvFile'],
   role: ['role'],
   decision: ['decision'],
   note: ['note'],
@@ -1957,8 +1961,10 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
     let data;
     try { data = await api('/api/analyze', {method:'POST', body:fd}); }
     catch (e) {
+      if (e.status === 429 || e.code === 'RATE_LIMITED') { handleApiError(e); return; }
       if (e.code === 'QUOTA_EXCEEDED') { showQuotaPrompt(errEl, e); return; }
       if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field);
+      if (e.code === 'INVALID_FILE' || e.code === 'FILE_REJECTED') { if (e.field) highlightField(e.field); }
       showErr(errEl, e.message || 'Analysis failed'); return;
     }
     lastResult={...data,role,file:file.name};
@@ -1987,8 +1993,10 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     let data;
     try { data = await api('/api/analyze/batch', {method:'POST', body:fd}); }
     catch (e) {
+      if (e.status === 429 || e.code === 'RATE_LIMITED') { hideLoading(); handleApiError(e); return; }
       if (e.code === 'QUOTA_EXCEEDED') { hideLoading(); showQuotaPrompt(errEl, e); return; }
       if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field);
+      if (e.code === 'INVALID_FILE' || e.code === 'FILE_REJECTED') { if (e.field) highlightField(e.field); }
       showErr(errEl, e.message || 'Batch failed'); return;
     }
     setProgress(80,'Comparing against job description...');
@@ -2072,8 +2080,8 @@ function renderBatchResults(results,role){
       '<td><span class="score-pill '+pill+'">'+s+'</span></td>' +
       '<td>'+( r.scores?.keywords??'—')+'</td><td>'+(r.scores?.skills??'—')+'</td>'+
       '<td>'+(r.scores?.experience??'—')+'</td><td>'+(r.scores?.education??'—')+'</td>' +
-      '<td><select class="dec-sel" onchange="setBatchDecision('+i+',this.value)"><option value="">— Decision —</option><option value="shortlist">Shortlist</option><option value="hold">On Hold</option><option value="reject">Reject</option></select></td>' +
-      '<td><button class="btn btn-ghost btn-sm" onclick="saveSingleBatch('+i+')">Save</button></td><td><textarea class="row-notes" placeholder="Notes..." rows="1" oninput="saveBatchNote('+i+',this.value)" onblur="saveBatchNote('+i+',this.value)">'+getBatchNote(i)+'</textarea></td></tr>';
+      '<td><select class="dec-sel" data-action="batch-decision" data-idx="'+i+'"><option value="">— Decision —</option><option value="shortlist">Shortlist</option><option value="hold">On Hold</option><option value="reject">Reject</option></select></td>' +
+      '<td><button class="btn btn-ghost btn-sm" data-action="batch-save" data-idx="'+i+'">Save</button></td><td><textarea class="row-notes" placeholder="Notes..." rows="1" data-action="batch-note" data-idx="'+i+'">'+getBatchNote(i)+'</textarea></td></tr>';
   }).join('');
   updateBatchSummary(results);
   if(getAutosaveBatch()){autosaveBatchToAudit();}
@@ -2239,17 +2247,17 @@ function renderAuditTable(records){
       '<td><span class="score-pill '+pill+'">'+s+'</span></td>'+
       '<td>'+(rec.scores?.keywords??'—')+'</td><td>'+(rec.scores?.skills??'—')+'</td>'+
       '<td>'+(rec.scores?.experience??'—')+'</td><td>'+(rec.scores?.education??'—')+'</td>'+
-      '<td><select class="dec-sel" onchange="updateAuditDecision(\''+rec.id+'\',this.value)">'+
+      '<td><select class="dec-sel" data-action="audit-decision" data-id="'+escHtml(rec.id)+'">'+
         '<option value=""'+((!rec.decision)?' selected':'')+'>—</option>'+
         '<option value="shortlist"'+(rec.decision==='shortlist'?' selected':'')+'>Shortlist</option>'+
         '<option value="hold"'+(rec.decision==='hold'?' selected':'')+'>Hold</option>'+
         '<option value="reject"'+(rec.decision==='reject'?' selected':'')+'>Reject</option>'+
       '</select></td>'+
-      '<td><input class="note-inp" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." onblur="updateAuditNote(\''+rec.id+'\',this.value)"></td>'+
+      '<td><input class="note-inp" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." data-action="audit-note" data-id="'+escHtml(rec.id)+'"></td>'+
       '<td style="white-space:nowrap;display:flex;gap:4px">'+
-        '<button type="button" class="history-btn" onclick="openChangeHistory(\''+rec.id+'\')" title="Change history" aria-label="Change history">⧉</button>'+
-        '<button class="btn btn-ghost btn-sm" onclick="openAuditReport(\''+rec.id+'\')" title="Report">📊</button>'+
-        '<button class="btn btn-danger btn-sm" onclick="deleteAuditRecord(\''+rec.id+'\')">🗑</button>'+
+        '<button type="button" class="history-btn" data-action="audit-history" data-id="'+escHtml(rec.id)+'" title="Change history" aria-label="Change history">⧉</button>'+
+        '<button class="btn btn-ghost btn-sm" data-action="audit-report" data-id="'+escHtml(rec.id)+'" title="Report">📊</button>'+
+        '<button class="btn btn-danger btn-sm" data-action="audit-delete" data-id="'+escHtml(rec.id)+'">🗑</button>'+
       '</td></tr>';
   }).join('');
 }
@@ -2283,7 +2291,7 @@ async function loadRoles(){
   try{const roles=await api('/api/audit/roles');
     const tabs=document.getElementById('roleTabs');
     if(!roles.length){tabs.innerHTML='<span style="color:#9ca3af;font-size:13px">No roles yet. Tag CVs with a role when analyzing.</span>';return;}
-    tabs.innerHTML=roles.map(role=>'<button class="rtab" onclick="loadRoleHistory(\''+escHtml(role.role)+'\',this)">'+escHtml(role.role)+' <span style="opacity:.6;font-size:11px">('+role.count+')</span></button>').join('');}
+    tabs.innerHTML=roles.map(role=>'<button class="rtab" data-action="load-role" data-role="'+escHtml(role.role)+'">'+escHtml(role.role)+' <span style="opacity:.6;font-size:11px">('+role.count+')</span></button>').join('');}
   catch(_){}
 }
 async function loadRoleHistory(role,btn){
@@ -2571,13 +2579,71 @@ function renderTplChips(){
     return;
   }
   chips.innerHTML = keys.map(function(k){
-    const safe = escHtml(k);
+    const safe = escHtml(k); // escapes quotes too, so it's safe in an attribute
     return '<div class="tpl-chip">' +
-      '<button class="tpl-chip-name" onclick="loadTemplate(&apos;'+safe+'&apos;)" title="Load this template">'+safe+'</button>' +
-      '<button class="tpl-chip-del" onclick="deleteTemplate(&apos;'+safe+'&apos;)" title="Delete">×</button>' +
+      '<button class="tpl-chip-name" data-action="load-template" data-name="'+safe+'" title="Load this template">'+safe+'</button>' +
+      '<button class="tpl-chip-del" data-action="delete-template" data-name="'+safe+'" title="Delete">×</button>' +
     '</div>';
   }).join('');
 }
+
+// ── Event delegation (XSS-safe): user/candidate/role/template values live in
+// data- attributes (HTML-escaped) and are read here, never concatenated into
+// executable JS. One listener per container; survives innerHTML re-renders.
+function setupDelegatedHandlers(){
+  const batchBody = document.getElementById('batchBody');
+  if (batchBody && !batchBody._delegated) {
+    batchBody._delegated = true;
+    batchBody.addEventListener('change', function(e){
+      const el = e.target.closest('[data-action="batch-decision"]');
+      if (el) setBatchDecision(parseInt(el.dataset.idx, 10), el.value);
+    });
+    batchBody.addEventListener('click', function(e){
+      const el = e.target.closest('[data-action="batch-save"]');
+      if (el) saveSingleBatch(parseInt(el.dataset.idx, 10));
+    });
+    const noteFn = function(e){
+      const el = e.target.closest('[data-action="batch-note"]');
+      if (el) saveBatchNote(parseInt(el.dataset.idx, 10), el.value);
+    };
+    batchBody.addEventListener('input', noteFn);
+    batchBody.addEventListener('focusout', noteFn);
+  }
+  const auditBody = document.getElementById('auditBody');
+  if (auditBody && !auditBody._delegated) {
+    auditBody._delegated = true;
+    auditBody.addEventListener('change', function(e){
+      const el = e.target.closest('[data-action="audit-decision"]');
+      if (el) updateAuditDecision(el.dataset.id, el.value);
+    });
+    auditBody.addEventListener('focusout', function(e){
+      const el = e.target.closest('[data-action="audit-note"]');
+      if (el) updateAuditNote(el.dataset.id, el.value);
+    });
+    auditBody.addEventListener('click', function(e){
+      const h = e.target.closest('[data-action="audit-history"]'); if (h) { openChangeHistory(h.dataset.id); return; }
+      const r = e.target.closest('[data-action="audit-report"]'); if (r) { openAuditReport(r.dataset.id); return; }
+      const d = e.target.closest('[data-action="audit-delete"]'); if (d) { deleteAuditRecord(d.dataset.id); return; }
+    });
+  }
+  const roleTabs = document.getElementById('roleTabs');
+  if (roleTabs && !roleTabs._delegated) {
+    roleTabs._delegated = true;
+    roleTabs.addEventListener('click', function(e){
+      const el = e.target.closest('[data-action="load-role"]');
+      if (el) loadRoleHistory(el.dataset.role, el);
+    });
+  }
+  const tplChips = document.getElementById('tplChips');
+  if (tplChips && !tplChips._delegated) {
+    tplChips._delegated = true;
+    tplChips.addEventListener('click', function(e){
+      const l = e.target.closest('[data-action="load-template"]'); if (l) { loadTemplate(l.dataset.name); return; }
+      const d = e.target.closest('[data-action="delete-template"]'); if (d) { deleteTemplate(d.dataset.name); return; }
+    });
+  }
+}
+document.addEventListener('DOMContentLoaded', setupDelegatedHandlers);
 async function saveTemplate(){
   const name = prompt('Name this template (e.g. "Senior Engineer"):');
   if(!name || !name.trim()) return;
