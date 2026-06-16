@@ -95,18 +95,50 @@ function extractTopKeywords(text, limit) {
     .map(([kw]) => kw);
 }
 
+// Synonyms collapsed to a single canonical skill before comparing/rendering.
+const SKILL_SYNONYMS = {
+  golang: 'go',
+  js: 'javascript',
+  ts: 'typescript',
+};
+function canonicalSkill(name) {
+  return SKILL_SYNONYMS[name] || name;
+}
+// All surface forms (canonical + its synonyms) for a canonical skill, so a CV
+// using any synonym counts as having the skill the JD required.
+function skillSurfaceForms(canonical) {
+  const forms = [canonical];
+  for (const syn in SKILL_SYNONYMS) {
+    if (SKILL_SYNONYMS[syn] === canonical) forms.push(syn);
+  }
+  return forms;
+}
+function textHasSkill(text, canonical) {
+  return skillSurfaceForms(canonical).some(
+    (form) => new RegExp('\\b' + escapeRegex(form) + '\\b', 'i').test(text)
+  );
+}
+
 function scoreSkills(cvLower, jdLower) {
-  const jdSkills = [];
-  const skillResults = [];
+  // Only skills required by THIS job description belong in the Found/Missing
+  // table — not the global SKILLS_DB vocabulary. Synonyms (e.g. golang/go)
+  // are canonicalised on both the JD and CV side and deduped so they collapse
+  // to one consistent entry.
+  const byCanonical = new Map();
   for (const skill of SKILLS_DB) {
     const regex = new RegExp('\\b' + escapeRegex(skill.name) + '\\b', 'i');
-    const inJD = regex.test(jdLower);
-    const inCV = regex.test(cvLower);
-    if (inJD) jdSkills.push({ ...skill, found: inCV });
-    skillResults.push({ name: skill.name, found: inCV, category: skill.category });
+    if (!regex.test(jdLower)) continue; // skip skills the JD doesn't require
+    const canonical = canonicalSkill(skill.name);
+    if (byCanonical.has(canonical)) continue; // already added via a synonym
+    byCanonical.set(canonical, {
+      name: canonical,
+      found: textHasSkill(cvLower, canonical), // matches any synonym in the CV
+      category: skill.category,
+    });
   }
-  const score = jdSkills.length > 0
-    ? Math.round((jdSkills.filter(s => s.found).length / jdSkills.length) * 100)
+  const skillResults = [...byCanonical.values()];
+  const score = skillResults.length > 0
+    ? Math.round((skillResults.filter(s => s.found).length / skillResults.length) * 100)
     : 50;
   return { score, skillResults };
 }
