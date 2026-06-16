@@ -961,6 +961,22 @@ img, video, table { max-width: 100%; }
     <button class="btn btn-ghost btn-sm" id="manageBillingBtn" onclick="openBillingPortal()" style="display:none">Manage billing</button>
   </div>
   <div class="plan-status-line" id="planMemberNote" style="display:none;color:#9ca3af">Your plan is managed by your organization&rsquo;s owner.</div>
+  <div id="brandingSection" style="display:none">
+    <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+    <h3>Report Branding</h3>
+    <div class="settings-row" style="margin-top:6px">
+      <input class="text-input" type="text" id="brandName" placeholder="Display name (e.g. Chaulin)" style="flex:1" aria-label="Brand display name">
+    </div>
+    <div class="settings-row" style="margin-top:8px">
+      <input class="text-input" type="url" id="brandLogoUrl" placeholder="Logo URL (https://…)" style="flex:1" aria-label="Brand logo URL">
+    </div>
+    <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <span style="font-size:13px;color:#374151">Brand colour</span>
+      <input class="text-input" type="text" id="brandColor" placeholder="#0f2847" style="width:110px" aria-label="Brand colour (hex)">
+      <button class="btn btn-primary btn-sm" id="brandSaveBtn" onclick="saveBranding()">Save</button>
+    </div>
+    <div style="font-size:11px;color:#6b7280;margin-top:4px">Applied to candidate PDF reports. Leave blank to use the CVsprings (Chaulin) defaults. Logo must be an http(s) URL.</div>
+  </div>
 </div>
 
 <!-- === ANALYZER === -->
@@ -2139,7 +2155,8 @@ async function saveToAudit(){
     note:document.getElementById('noteInput').value.trim(),
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:document.getElementById('roleInput').value.trim(),anonymized:lastResult.anonymized||false,
-    appVersion:CVSPRINGS_VERSION,modelId:lastResult.modelId||null,analysisTimestamp:lastResult.analysisTimestamp||null};
+    appVersion:CVSPRINGS_VERSION,modelId:lastResult.modelId||null,analysisTimestamp:lastResult.analysisTimestamp||null,
+    analysisDetail:{found:lastResult.found||[],missing:lastResult.missing||[],skills:lastResult.skills||[],recommendations:lastResult.recommendations||[]}};
   try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
     lastResult._auditId=d.id;toast('Saved to audit log.','success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'single',role:(lastResult&&lastResult.role)||'unknown'}}));}
   catch(e){handleApiError(e,'Network error');}
@@ -2153,7 +2170,8 @@ async function saveSingleBatch(i){
     decision:res._decision||'',note:'',
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:res.role||'',anonymized:res.anonymized||false,
-    appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null};
+    appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
+    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[]}};
   try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
     toast('Saved: '+body.candidateName,'success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'batch_row',role:(body&&body.role)||'unknown'}}));}
   catch(e){handleApiError(e,'Network error');}
@@ -2169,7 +2187,8 @@ async function saveAllToAudit(){
       decision:res._decision||'',note:'',
       jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
       role:res.role||'',anonymized:res.anonymized||false,
-      appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null};
+      appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
+    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[]}};
     try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;}catch(_){}
   }
   toast(saved+' of '+lastBatchResults.length+' records saved.','success');
@@ -2486,7 +2505,28 @@ async function populateOrgSettings(){
     });
     const note=document.getElementById('retOwnerNote');
     if(note)note.style.display=isOwner?'none':'block';
+    // Report branding — owner only.
+    const bsec=document.getElementById('brandingSection');
+    if(bsec)bsec.style.display=isOwner?'block':'none';
+    if(isOwner&&me.org&&me.org.branding){
+      const b=me.org.branding;
+      const setV=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
+      setV('brandName',b.brandDisplayName);setV('brandLogoUrl',b.brandLogoUrl);setV('brandColor',b.brandColor);
+    }
   }catch(_){}
+}
+async function saveBranding(){
+  const name=(document.getElementById('brandName').value||'').trim();
+  const logo=(document.getElementById('brandLogoUrl').value||'').trim();
+  const color=(document.getElementById('brandColor').value||'').trim();
+  if(logo&&!/^https?:\/\//i.test(logo)){toast('Logo URL must start with http:// or https://','error');return;}
+  if(color&&!/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(color)){toast('Colour must be a hex value like #0f2847.','error');return;}
+  const btn=document.getElementById('brandSaveBtn');if(btn)btn.disabled=true;
+  try{
+    await api('/api/org/branding',{method:'PATCH',body:JSON.stringify({brandDisplayName:name||null,brandLogoUrl:logo||null,brandColor:color||null})});
+    toast('Report branding saved.','success');
+  }catch(e){handleApiError(e,'Could not save branding');}
+  finally{if(btn)btn.disabled=false;}
 }
 async function saveRetention(){
   const inp=document.getElementById('setRetentionDays');

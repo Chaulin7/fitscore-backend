@@ -167,9 +167,10 @@ router.post('/logout', requireSession, (req, res) => {
 
 router.get('/me', requireSession, (req, res) => {
   const org = auth.getOrganizationById(req.orgId);
+  const branding = auth.getOrganizationBranding(req.orgId);
   res.json({
     user: { email: req.user.email, orgId: req.orgId, role: req.user.role },
-    org: { name: org ? org.name : null, retentionDays: org ? org.retentionDays : null },
+    org: { name: org ? org.name : null, retentionDays: org ? org.retentionDays : null, branding },
   });
 });
 
