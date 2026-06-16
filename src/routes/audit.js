@@ -3,6 +3,8 @@
 const express = require('express');
 const { insertAudit, getAllAudits, deleteAudit, exportCsv, getRoles, getRoleHistory, getAuditById, updateAudit, getAuditChanges, getAuditsByTenant } = require('../services/db');
 const { analyzeBias } = require('../services/biasAudit');
+const { getOrganizationBranding } = require('../services/authService');
+const { resolveBranding } = require('../services/branding');
 
 const router = express.Router();
 
@@ -17,17 +19,30 @@ function sendError(res, status, code, message, field) {
 // POST /api/audit - save an audit record
 router.post('/', async (req, res) => {
   try {
-    const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized, appVersion, modelId, analysisTimestamp } = req.body;
+    const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized, appVersion, modelId, analysisTimestamp, analysisDetail } = req.body;
     if (!candidateName) return sendError(res, 400, 'VALIDATION_ERROR', 'candidateName is required.', 'candidateName');
     // Provenance (Art. 12): reviewedBy comes from the authenticated session,
     // never from the client payload.
     const reviewedBy = (req.user && req.user.email) || null;
+    // Structured detail (keywords/skills/recommendations) for the branded report.
+    // Keep only the expected shape; cap sizes so a payload can't bloat the row.
+    let detail = null;
+    if (analysisDetail && typeof analysisDetail === 'object') {
+      const arr = (v) => Array.isArray(v) ? v.slice(0, 200) : [];
+      detail = {
+        found: arr(analysisDetail.found).map((k) => String(k).slice(0, 80)),
+        missing: arr(analysisDetail.missing).map((k) => String(k).slice(0, 80)),
+        skills: arr(analysisDetail.skills).map((s) => ({ name: String((s && s.name) || '').slice(0, 80), found: !!(s && s.found) })),
+        recommendations: arr(analysisDetail.recommendations).map((r) => ({ icon: String((r && r.icon) || '').slice(0, 12), text: String((r && r.text) || '').slice(0, 500) })),
+      };
+    }
     const record = insertAudit({
       candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized,
       appVersion: appVersion ? String(appVersion).slice(0, 50) : null,
       modelId: modelId ? String(modelId).slice(0, 100) : null,
       analysisTimestamp: analysisTimestamp ? String(analysisTimestamp).slice(0, 40) : null,
       reviewedBy,
+      analysisDetail: detail,
     }, req.orgId, req.userId || null);
     res.status(201).json(record);
   } catch (err) {
@@ -365,20 +380,195 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// GET /api/audit/report/:id - HTML candidate report
+// GET /api/audit/report/:id - branded, print-optimised HTML candidate report
 router.get('/report/:id', async (req, res) => {
   try {
     const record = getAuditById(req.params.id, req.orgId);
     if (!record) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
-    const scoreBar = (val, color) => '<div style="background:#e5e7eb;border-radius:4px;height:8px;margin-top:4px"><div style="width:' + val + '%;background:' + color + ';height:8px;border-radius:4px"></div></div>';
-    const badgeClass = record.decision === 'shortlist' ? 'badge-green' : record.decision === 'reject' ? 'badge-red' : 'badge-yellow';
-    const html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Candidate Report - ' + esc(record.candidateName) + '</title><style>* { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: "Segoe UI", Arial, sans-serif; background: #f0f2f5; color: #1a202c; } .page { max-width: 800px; margin: 32px auto; background: #fff; border-radius: 8px; border: 1px solid #e5e7eb; } .header { background: #0f2847; color: #fff; padding: 28px 32px; } .header h1 { font-size: 22px; font-weight: 700; } .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; } .badge-green { background: #d1fae5; color: #065f46; } .badge-yellow { background: #fef3c7; color: #92400e; } .badge-red { background: #fee2e2; color: #991b1b; } .body { padding: 28px 32px; } .section { margin-bottom: 28px; } .section-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; margin-bottom: 12px; } .score-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; } .score-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 16px; } .score-label { font-size: 11px; font-weight: 600; color: #6b7280; } .score-value { font-size: 28px; font-weight: 700; color: #0f2847; } .overall-card { background: #0f2847; color: #fff; border-radius: 6px; padding: 18px 20px; text-align: center; } .overall-value { font-size: 52px; font-weight: 800; } .overall-label { font-size: 13px; opacity: 0.7; } .verdict-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 16px; font-size: 13px; line-height: 1.6; } .footer { padding: 16px 32px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; display: flex; justify-content: space-between; } @media print { body { background: #fff; } .page { box-shadow: none; border: none; } }</style></head><body><div class="page"><div class="header"><h1>' + esc(record.candidateName) + '</h1>' + (record.role ? '<div style="font-size:13px;opacity:.75;margin-top:4px">Role: ' + esc(record.role) + '</div>' : '') + '<div style="font-size:13px;opacity:.75;margin-top:4px">Analyzed: ' + new Date(record.createdAt).toUTCString() + '</div>' + (record.decision ? '<span class="badge ' + badgeClass + '" style="margin-top:8px;display:inline-block">' + esc(record.decision) + '</span>' : '') + (record.anonymized ? '<span class="badge" style="background:rgba(255,255,255,.15);color:#fff;margin-left:8px">Anonymized</span>' : '') + '</div><div class="body"><div class="section"><div class="overall-card"><div class="overall-value">' + (record.overall != null ? record.overall : '–') + '</div><div class="overall-label">Overall Fit Score / 100</div>' + (record.overall != null ? scoreBar(record.overall, record.overall >= 60 ? '#10b981' : record.overall >= 40 ? '#f59e0b' : '#ef4444') : '') + '</div></div>' + (record.scores ? '<div class="section"><div class="section-title">Category Scores</div><div class="score-grid"><div class="score-card"><div class="score-label">Keywords</div><div class="score-value">' + (record.scores.keywords != null ? record.scores.keywords : '–') + '</div>' + (record.scores.keywords != null ? scoreBar(record.scores.keywords, '#3b82f6') : '') + '</div><div class="score-card"><div class="score-label">Skills</div><div class="score-value">' + (record.scores.skills != null ? record.scores.skills : '–') + '</div>' + (record.scores.skills != null ? scoreBar(record.scores.skills, '#8b5cf6') : '') + '</div><div class="score-card"><div class="score-label">Experience</div><div class="score-value">' + (record.scores.experience != null ? record.scores.experience : '–') + '</div>' + (record.scores.experience != null ? scoreBar(record.scores.experience, '#f59e0b') : '') + '</div><div class="score-card"><div class="score-label">Education</div><div class="score-value">' + (record.scores.education != null ? record.scores.education : '–') + '</div>' + (record.scores.education != null ? scoreBar(record.scores.education, '#10b981') : '') + '</div></div></div>' : '') + (record.verdict ? '<div class="section"><div class="section-title">Assessment</div><div class="verdict-box">' + esc(record.verdict) + '</div></div>' : '') + (record.note ? '<div class="section"><div class="section-title">Recruiter Notes</div><div class="verdict-box" style="background:#fffbeb;border-color:#fde68a">' + esc(record.note) + '</div></div>' : '') + '</div><div class="footer"><span>CVsprings</span><span>Report ID: ' + esc(record.id) + '</span></div></div><script>window.onload=function(){if(window.location.search.includes("print=1")){window.print();}}</script></body></html>';
-    res.setHeader('Content-Type', 'text/html');
+    const branding = resolveBranding(getOrganizationBranding(req.orgId));
+    const supportEmail = process.env.SUPPORT_EMAIL || null;
+    const html = renderCandidateReport(record, branding, supportEmail);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
+
+// Score band colour — matches the app's default threshold (70) and pill logic:
+// >=70 strong (green), 50-69 partial (amber), <50 weak (red).
+function bandColor(v) {
+  return v >= 70 ? '#059669' : v >= 50 ? '#d97706' : '#dc2626';
+}
+
+// Server-side equivalent of the app's buildWhyHTML(), from the stored scores
+// + recommendations, so the report's reasoning matches the on-screen analysis.
+function buildWhyReportHtml(record) {
+  const scores = record.scores || {};
+  const overall = record.overall || 0;
+  let html = '<strong>Overall: ' + overall + '/100</strong><br>';
+  if (scores.keywords != null) html += '<div style="margin-top:4px">&#128273; <strong>Keywords ' + scores.keywords + '</strong> &mdash; match between the job title, required terms and CV content.</div>';
+  if (scores.skills != null) html += '<div style="margin-top:4px">&#9889; <strong>Skills ' + scores.skills + '</strong> &mdash; technical and soft skills alignment with the role requirements.</div>';
+  if (scores.experience != null) html += '<div style="margin-top:4px">&#128197; <strong>Experience ' + scores.experience + '</strong> &mdash; years of relevant experience and seniority match.</div>';
+  if (scores.education != null) html += '<div style="margin-top:4px">&#127891; <strong>Education ' + scores.education + '</strong> &mdash; academic qualifications and certifications match.</div>';
+  const recs = (record.analysisDetail && record.analysisDetail.recommendations) || [];
+  if (recs.length) {
+    html += '<div style="margin-top:8px"><strong>Key notes:</strong> ' + esc(recs.map((r) => r.text || r).slice(0, 2).join(' ')) + '</div>';
+  }
+  return html;
+}
+
+function renderCandidateReport(record, branding, supportEmail) {
+  const brand = esc(branding.name);
+  const accent = branding.color; // validated hex by resolveBranding
+  const detail = record.analysisDetail || null;
+
+  // Respect the anonymized flag exactly as the app does — never reveal the name.
+  const displayName = record.anonymized ? 'Anonymous Candidate' : esc(record.candidateName || 'Candidate');
+
+  const logoHtml = branding.logoUrl
+    ? '<img src="' + esc(branding.logoUrl) + '" alt="" style="height:38px;width:auto;border-radius:6px;background:#fff;padding:3px">'
+    : '';
+
+  const scoreBox = (label, val, color, big) => {
+    const v = val != null ? val : '–';
+    const pct = typeof val === 'number' ? val : 0;
+    return '<div class="sbox' + (big ? ' sbox-overall' : '') + '">' +
+      '<div class="sbox-label">' + label + '</div>' +
+      '<div class="sbox-val" style="color:' + (big ? '#fff' : color) + '">' + v + (big ? '<span class="sbox-out">/100</span>' : '') + '</div>' +
+      '<div class="bar"><div class="bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+      '</div>';
+  };
+
+  const scores = record.scores || {};
+  const overall = record.overall;
+
+  // Decision badge (Shortlist / Hold / Reject), matching app colours.
+  const decBadge = record.decision
+    ? '<span class="dec-badge ' + (record.decision === 'shortlist' ? 'd-green' : record.decision === 'reject' ? 'd-red' : 'd-amber') + '">' + esc(record.decision.charAt(0).toUpperCase() + record.decision.slice(1)) + '</span>'
+    : '<span style="color:#9ca3af;font-size:13px">No decision recorded</span>';
+
+  // Keyword chips (only when detail was captured at save time).
+  let keywordsSection = '';
+  if (detail && (Array.isArray(detail.found) || Array.isArray(detail.missing))) {
+    const found = detail.found || [], missing = detail.missing || [];
+    keywordsSection = '<div class="section avoid-break"><div class="section-title">Keywords</div>' +
+      '<div class="sub">Found</div><div class="chips">' +
+      (found.length ? found.map((k) => '<span class="chip chip-found">' + esc(k) + '</span>').join('') : '<span class="muted">None found</span>') +
+      '</div><div class="sub" style="margin-top:10px">Missing</div><div class="chips">' +
+      (missing.length ? missing.map((k) => '<span class="chip chip-miss">' + esc(k) + '</span>').join('') : '<span class="muted" style="color:#059669">None missing</span>') +
+      '</div></div>';
+  }
+
+  // Skills table (only when detail captured).
+  let skillsSection = '';
+  if (detail && Array.isArray(detail.skills) && detail.skills.length) {
+    skillsSection = '<div class="section avoid-break"><div class="section-title">Skills</div><table class="tbl"><thead><tr><th>Skill</th><th>Status</th></tr></thead><tbody>' +
+      detail.skills.map((s) => '<tr><td>' + esc(s.name) + '</td><td><span class="badge ' + (s.found ? 'badge-green' : 'badge-red') + '">' + (s.found ? '✓ Found' : '✗ Missing') + '</span></td></tr>').join('') +
+      '</tbody></table></div>';
+  }
+
+  // Recommendations (structured if captured, else the stored verdict text).
+  let recsSection = '';
+  if (detail && Array.isArray(detail.recommendations) && detail.recommendations.length) {
+    recsSection = '<div class="section avoid-break"><div class="section-title">Recommendations</div><table class="tbl"><tbody>' +
+      detail.recommendations.map((r) => '<tr><td style="white-space:nowrap">' + esc(r.icon || '') + '</td><td>' + esc(r.text || '') + '</td></tr>').join('') +
+      '</tbody></table></div>';
+  } else if (record.verdict) {
+    recsSection = '<div class="section avoid-break"><div class="section-title">Assessment</div><div class="box">' + esc(record.verdict) + '</div></div>';
+  }
+
+  const generated = new Date().toUTCString();
+  const analyzed = record.createdAt ? new Date(record.createdAt).toUTCString() : '—';
+
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Candidate Fit Report' + (record.anonymized ? '' : ' — ' + displayName) + '</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
+    '<style>' +
+    '*{box-sizing:border-box;margin:0;padding:0}' +
+    'body{font-family:"Inter",Arial,sans-serif;background:#f0f2f5;color:#1a202c;font-size:14px}' +
+    '.dl-btn{position:fixed;top:16px;right:16px;z-index:50;background:' + accent + ';color:#fff;border:none;border-radius:8px;padding:10px 16px;font:600 13px "Inter",sans-serif;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.2)}' +
+    '.page{max-width:820px;margin:24px auto;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden}' +
+    '.header{background:' + accent + ';color:#fff;padding:24px 32px;display:flex;align-items:center;gap:16px}' +
+    '.header .brand{display:flex;align-items:center;gap:12px;flex:1}' +
+    '.header .brand-name{font-size:16px;font-weight:800;letter-spacing:-.3px}' +
+    '.header .rtitle{font-size:12px;text-transform:uppercase;letter-spacing:.1em;opacity:.8;text-align:right}' +
+    '.header .rtitle b{display:block;font-size:15px;letter-spacing:0;text-transform:none;font-weight:700;margin-top:2px}' +
+    '.body{padding:26px 32px}' +
+    '.section{margin-bottom:24px}' +
+    '.section-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin-bottom:10px;border-bottom:1px solid #eef0f4;padding-bottom:5px}' +
+    '.cand-name{font-size:24px;font-weight:800;color:#0a1f3d}' +
+    '.cand-meta{font-size:13px;color:#6b7280;margin-top:3px}' +
+    '.jd{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px 12px;font-size:12px;color:#4b5563;margin-top:10px;line-height:1.5}' +
+    '.scores{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}' +
+    '.sbox{border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center}' +
+    '.sbox-overall{background:' + accent + ';border-color:transparent;grid-column:span 1}' +
+    '.sbox-label{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px}' +
+    '.sbox-overall .sbox-label{color:rgba(255,255,255,.7)}' +
+    '.sbox-val{font-size:26px;font-weight:800}.sbox-out{font-size:11px;font-weight:600;opacity:.7;margin-left:1px}' +
+    '.bar{background:#eef0f4;border-radius:4px;height:6px;margin-top:8px;overflow:hidden}.sbox-overall .bar{background:rgba(255,255,255,.18)}' +
+    '.bar-fill{height:6px;border-radius:4px}' +
+    '.sub{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px}' +
+    '.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{padding:3px 10px;border-radius:14px;font-size:12px;font-weight:600}' +
+    '.chip-found{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}.chip-miss{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}' +
+    '.muted{color:#9ca3af;font-size:13px}' +
+    '.tbl{width:100%;border-collapse:collapse;font-size:13px}.tbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;padding:7px 10px;background:#f9fafb;border-bottom:1px solid #eef0f4}.tbl td{padding:8px 10px;border-bottom:1px solid #f3f4f6;color:#374151}.tbl tr:last-child td{border-bottom:none}' +
+    '.badge{display:inline-flex;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600}.badge-green{background:#dcfce7;color:#15803d}.badge-red{background:#fee2e2;color:#b91c1c}' +
+    '.dec-badge{display:inline-block;padding:5px 14px;border-radius:14px;font-size:13px;font-weight:700}.d-green{background:#dcfce7;color:#15803d}.d-amber{background:#fef9c3;color:#a16207}.d-red{background:#fee2e2;color:#b91c1c}' +
+    '.box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px 14px;font-size:13px;line-height:1.6;color:#374151}' +
+    '.note-box{background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px 14px;font-size:13px;line-height:1.6;color:#78350f}' +
+    '.disclaimer{background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px 14px;font-size:12px;line-height:1.55;color:#78350f;margin-top:6px}' +
+    '.prov{font-size:11px;color:#6b7280;line-height:1.7}.prov b{color:#374151}' +
+    '.footer{padding:14px 32px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between;align-items:center}' +
+    '.avoid-break{break-inside:avoid;page-break-inside:avoid}' +
+    '@media print{body{background:#fff}.page{border:none;border-radius:0;margin:0;max-width:none}.dl-btn{display:none}@page{margin:14mm}}' +
+    '</style></head><body>' +
+    '<button class="dl-btn" onclick="window.print()">Download PDF</button>' +
+    '<div class="page">' +
+    // Header
+    '<div class="header"><div class="brand">' + logoHtml + '<span class="brand-name">' + brand + '</span></div>' +
+    '<div class="rtitle">Candidate Fit Report<b>' + generated + '</b></div></div>' +
+    '<div class="body">' +
+    // Candidate block
+    '<div class="section avoid-break"><div class="cand-name">' + displayName + (record.anonymized ? ' <span class="badge" style="background:#e0e7ff;color:#3730a3;vertical-align:middle">Anonymised</span>' : '') + '</div>' +
+    '<div class="cand-meta">' + (record.role ? 'Role: ' + esc(record.role) + ' &nbsp;·&nbsp; ' : '') + 'Analysed: ' + analyzed + '</div>' +
+    (record.jdSnippet ? '<div class="jd"><strong>Job description (excerpt):</strong> ' + esc(record.jdSnippet) + '</div>' : '') +
+    '</div>' +
+    // Scores
+    '<div class="section avoid-break"><div class="section-title">Fit Scores</div><div class="scores">' +
+    scoreBox('Overall', overall, bandColor(overall || 0), true) +
+    scoreBox('Keywords', scores.keywords, '#2563eb') +
+    scoreBox('Skills', scores.skills, '#7c3aed') +
+    scoreBox('Experience', scores.experience, '#d97706') +
+    scoreBox('Education', scores.education, '#059669') +
+    '</div></div>' +
+    keywordsSection +
+    skillsSection +
+    // Why this score
+    '<div class="section avoid-break"><div class="section-title">Why this score</div><div class="box">' + buildWhyReportHtml(record) + '</div></div>' +
+    recsSection +
+    // Recruiter decision (human)
+    '<div class="section avoid-break"><div class="section-title">Recruiter Decision (made by a human)</div>' + decBadge +
+    (record.note ? '<div class="note-box" style="margin-top:10px"><strong>Recruiter notes:</strong> ' + esc(record.note) + '</div>' : '') +
+    '</div>' +
+    // Provenance / compliance footer
+    '<div class="section avoid-break"><div class="section-title">Provenance &amp; Compliance</div>' +
+    '<div class="prov">' +
+    '<b>Reviewed by:</b> ' + esc(record.reviewedBy || '—') + '<br>' +
+    '<b>Model version:</b> ' + esc(record.modelId || '—') + '<br>' +
+    '<b>App version:</b> ' + esc(record.appVersion || '—') + '<br>' +
+    '<b>Analysis timestamp:</b> ' + esc(record.analysisTimestamp || record.createdAt || '—') +
+    '</div>' +
+    '<div class="disclaimer">This assessment is AI-generated and advisory only. Hiring decisions are made by the recruiter, not by CVsprings.</div>' +
+    '</div>' +
+    '</div>' + // end body
+    // Confidentiality footer
+    '<div class="footer"><span>Confidential &mdash; ' + brand + '</span><span>' + (supportEmail ? esc(supportEmail) + ' &nbsp;·&nbsp; ' : '') + 'Report ID: ' + esc(record.id) + '</span></div>' +
+    '</div>' +
+    '<script>window.onload=function(){if(window.location.search.includes("print=1")){window.print();}}</script>' +
+    '</body></html>';
+}
 
 // DELETE /api/audit/:id - remove a record
 router.delete('/:id', async (req, res) => {

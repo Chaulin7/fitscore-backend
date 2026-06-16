@@ -59,6 +59,9 @@ function initSchema() {
   try { getDb().exec('ALTER TABLE audit_log ADD COLUMN model_id TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE audit_log ADD COLUMN analysis_timestamp TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE audit_log ADD COLUMN reviewed_by TEXT'); } catch (_) {}
+  // Structured analysis detail (keywords found/missing, skills, recommendations)
+  // captured at save time so the branded report can match the on-screen result.
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN analysis_detail TEXT'); } catch (_) {}
 
   // Backfill updated_at for existing rows
   try { getDb().exec("UPDATE audit_log SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''"); } catch (_) {}
@@ -108,6 +111,10 @@ function initSchema() {
   `);
   // Org-wide audit retention in days; 0 = keep until manually deleted.
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN retention_days INTEGER NOT NULL DEFAULT 365'); } catch (_) {}
+  // Per-org report branding (nullable; falls back to env defaults)
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN brand_display_name TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN brand_logo_url TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN brand_color TEXT'); } catch (_) {}
   // Billing (Stripe subscriptions, attached to the organization)
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_customer_id TEXT'); } catch (_) {}
   try { getDb().exec("ALTER TABLE organizations ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'"); } catch (_) {}
@@ -186,11 +193,11 @@ function insertAudit(data, orgId, userId) {
     INSERT INTO audit_log
     (id, user_id, org_id, candidate_name, file_name, overall, keywords_score, skills_score,
      experience_score, education_score, weights, verdict, decision, note, jd_snippet, role, anonymized,
-     app_version, model_id, analysis_timestamp, reviewed_by, created_at, updated_at)
+     app_version, model_id, analysis_timestamp, reviewed_by, analysis_detail, created_at, updated_at)
     VALUES
     (@id, @userId, @orgId, @candidateName, @fileName, @overall, @keywords, @skills,
      @experience, @education, @weights, @verdict, @decision, @note, @jdSnippet, @role, @anonymized,
-     @appVersion, @modelId, @analysisTimestamp, @reviewedBy, @createdAt, @updatedAt)
+     @appVersion, @modelId, @analysisTimestamp, @reviewedBy, @analysisDetail, @createdAt, @updatedAt)
   `);
   stmt.run({
     id,
@@ -200,6 +207,7 @@ function insertAudit(data, orgId, userId) {
     modelId: data.modelId || null,
     analysisTimestamp: data.analysisTimestamp || null,
     reviewedBy: data.reviewedBy || null,
+    analysisDetail: data.analysisDetail ? JSON.stringify(data.analysisDetail) : null,
     candidateName: data.candidateName,
     fileName: data.fileName,
     overall: data.overall,
@@ -503,6 +511,7 @@ function formatRow(row) {
     modelId: row.model_id || null,
     analysisTimestamp: row.analysis_timestamp || null,
     reviewedBy: row.reviewed_by || null,
+    analysisDetail: row.analysis_detail ? (() => { try { return JSON.parse(row.analysis_detail); } catch { return null; } })() : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at || row.created_at,
   };

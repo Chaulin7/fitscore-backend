@@ -83,6 +83,17 @@ function setOrganizationRetention(id, days) {
   getDb().prepare('UPDATE organizations SET retention_days = ? WHERE id = ?').run(days, id);
 }
 
+// Per-org report branding (nullable). Raw values; callers validate/escape.
+function getOrganizationBranding(id) {
+  const row = getDb().prepare('SELECT brand_display_name AS brandDisplayName, brand_logo_url AS brandLogoUrl, brand_color AS brandColor FROM organizations WHERE id = ?').get(id);
+  return row || { brandDisplayName: null, brandLogoUrl: null, brandColor: null };
+}
+
+function setOrganizationBranding(id, { brandDisplayName, brandLogoUrl, brandColor }) {
+  getDb().prepare('UPDATE organizations SET brand_display_name = ?, brand_logo_url = ?, brand_color = ? WHERE id = ?')
+    .run(brandDisplayName || null, brandLogoUrl || null, brandColor || null, id);
+}
+
 // --- Users -------------------------------------------------------------------
 
 function findUserByEmail(email) {
@@ -297,6 +308,8 @@ module.exports = {
   createOrganization,
   getOrganizationById,
   setOrganizationRetention,
+  getOrganizationBranding,
+  setOrganizationBranding,
   findUserByEmail,
   findUserById,
   createUser,
