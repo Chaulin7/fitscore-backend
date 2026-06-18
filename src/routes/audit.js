@@ -575,7 +575,8 @@ function renderCandidateReport(record, branding, supportEmail) {
 // DELETE /api/audit/:id - remove a record
 router.delete('/:id', async (req, res) => {
   try {
-    const changedBy = req.userId || null;
+    // Attribution: email snapshot (durable), set server-side from the session.
+    const changedBy = (req.user && req.user.email) || req.userId || null;
     const deleted = deleteAudit({ id: req.params.id }, changedBy, req.orgId);
     if (!deleted) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
     res.json({ success: true, id: req.params.id });
