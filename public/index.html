@@ -752,6 +752,8 @@ img, video, table { max-width: 100%; }
 .history-list .hi-field { font-weight: 600; color: #0c1730; font-size: 13px; }
 .history-list .hi-from-to { font-size: 13px; color: #5c6a8a; margin-top: 2px; }
 .history-list .hi-when { font-size: 12px; color: #9aa6c0; margin-top: 4px; }
+.history-list .hi-by { font-size: 12px; color: #5c6a8a; margin-top: 2px; }
+@media (max-width: 768px) { .col-reviewer { display: none; } }
 .audit-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 4px; font-size: 13px; color: #5c6a8a; }
 .audit-pager .ctrls { display: flex; gap: 8px; }
 .audit-pager button { border: 1px solid #e7ebf3; background: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
@@ -848,6 +850,13 @@ img, video, table { max-width: 100%; }
       <h2>Set a new password</h2>
       <input class="text-input" type="password" id="rpPassword" placeholder="New password (min 10 characters)" autocomplete="new-password" required>
       <button class="btn btn-primary" type="submit" id="rpSubmitBtn">Set new password</button>
+    </form>
+    <form id="authAcceptForm" style="display:none">
+      <h2 id="acceptTitle">Accept invitation</h2>
+      <p class="auth-note" id="acceptNote">Set a password to join your team.</p>
+      <input class="text-input" type="password" id="acceptPassword" placeholder="Choose a password (min 10 characters)" autocomplete="new-password" required>
+      <button class="btn btn-primary" type="submit" id="acceptBtn">Join</button>
+      <div class="auth-links"><button type="button" class="auth-link" id="acceptToLogin">Back to sign in</button></div>
     </form>
   </div>
 </div>
@@ -976,6 +985,21 @@ img, video, table { max-width: 100%; }
       <button class="btn btn-primary btn-sm" id="brandSaveBtn" onclick="saveBranding()">Save</button>
     </div>
     <div style="font-size:11px;color:#6b7280;margin-top:4px">Applied to candidate PDF reports. Leave blank to use the CVsprings (Chaulin) defaults. Logo must be an http(s) URL.</div>
+  </div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3>Team</h3>
+  <div id="teamBody" style="font-size:13px;color:#6b7280">Loading&hellip;</div>
+  <!-- owner-only invite controls (hidden for members / non-team) -->
+  <div id="teamInviteRow" class="settings-row" style="display:none;gap:8px;margin-top:10px">
+    <input class="text-input" type="email" id="inviteEmail" placeholder="colleague@company.com" style="flex:1" aria-label="Invite email">
+    <button class="btn btn-primary btn-sm" id="inviteBtn" onclick="inviteMember()">Invite</button>
+  </div>
+  <div id="inviteLinkRow" style="display:none;margin-top:8px">
+    <div class="settings-row" style="gap:8px">
+      <input class="text-input" type="text" id="inviteLink" readonly style="flex:1" aria-label="Invite link">
+      <button class="btn btn-ghost btn-sm" id="copyInviteBtn" onclick="copyInviteLink()">Copy link</button>
+    </div>
+    <div id="inviteLinkNote" style="font-size:11px;color:#6b7280;margin-top:4px">Send this link to your colleague.</div>
   </div>
 </div>
 
@@ -1236,7 +1260,7 @@ img, video, table { max-width: 100%; }
         <thead><tr>
           <th>Date</th><th>Candidate</th><th>Role</th>
           <th>Overall</th><th>KW</th><th>SK</th><th>EX</th><th>ED</th>
-          <th>Decision</th><th>Note</th><th></th>
+          <th>Decision</th><th>Note</th><th class="col-reviewer">Saved by</th><th></th>
         </tr></thead>
         <tbody id="auditBody"></tbody>
       </table>
@@ -1337,6 +1361,14 @@ function handleApiError(err, fallbackMsg) {
       toast("You're going a bit fast — try again in a moment.", 'info', 4500);
       return;
     }
+    if (err && err.code === 'TEAM_PLAN_REQUIRED') {
+      toast('Team members require the Team plan. Upgrade in Settings → Plan & Billing.', 'info', 5500);
+      return;
+    }
+    if (err && err.code === 'SEAT_LIMIT') {
+      toast(err.message || 'Your team seat limit was reached — ask your org owner to upgrade.', 'error', 5500);
+      return;
+    }
     if (err && err.code === 'QUOTA_EXCEEDED') {
       toast(err.message || 'Monthly analysis limit reached. Upgrade to continue.', 'error', 6000);
       return;
@@ -1361,6 +1393,7 @@ const SESSION_KEY = 'cvsprings_session_token';
 const USER_EMAIL_KEY = 'cvsprings_user_email';
 const ORG_NAME_KEY = 'cvsprings_org_name';
 let _pendingResetToken = null;
+let _pendingInviteToken = null;
 
 function getSessionToken(){ try { return localStorage.getItem(SESSION_KEY) || ''; } catch (_) { return ''; } }
 function clearSessionKeys(){
@@ -1380,7 +1413,7 @@ function showAuthScreen(mode){
 function hideAuthScreen(){ const s = document.getElementById('authScreen'); if (s) s.style.display = 'none'; }
 function setAuthMode(mode){
   clearAuthError();
-  const forms = { login: 'authLoginForm', signup: 'authSignupForm', forgot: 'authForgotForm', reset: 'authResetForm' };
+  const forms = { login: 'authLoginForm', signup: 'authSignupForm', forgot: 'authForgotForm', reset: 'authResetForm', accept: 'authAcceptForm' };
   Object.keys(forms).forEach(function(m){
     const f = document.getElementById(forms[m]);
     if (f) f.style.display = (m === mode ? 'flex' : 'none');
@@ -1505,6 +1538,29 @@ async function doResetPassword(){
     showAuthError(e.message || 'Could not reset the password.');
   } finally {
     setAuthBusy('rpSubmitBtn', false);
+  }
+}
+
+async function doAcceptInvite(){
+  const password = document.getElementById('acceptPassword').value;
+  if (!password) { showAuthError('Choose a password (min 10 characters).'); return; }
+  clearAuthError();
+  setAuthBusy('acceptBtn', true);
+  try {
+    const d = await api('/api/team/accept', { method: 'POST', body: JSON.stringify({ token: _pendingInviteToken, password }) });
+    try { localStorage.setItem(SESSION_KEY, d.sessionToken); } catch (_) {}
+    document.getElementById('acceptPassword').value = '';
+    _pendingInviteToken = null;
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.delete('invite');
+      history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
+    } catch (_) {}
+    onAuthed(d);
+  } catch (e) {
+    showAuthError(e.message || 'Could not accept the invitation.');
+  } finally {
+    setAuthBusy('acceptBtn', false);
   }
 }
 
@@ -1692,19 +1748,35 @@ async function bootAuth(){
   wire('authSignupForm', doSignup);
   wire('authForgotForm', doForgotRequest);
   wire('authResetForm', doResetPassword);
+  wire('authAcceptForm', doAcceptInvite);
   const on = function(id, fn){ const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
   on('authToSignup', function(){ setAuthMode('signup'); });
   on('authToLogin', function(){ setAuthMode('login'); });
   on('authForgotLink', function(){ setAuthMode('forgot'); });
   on('frBackToLogin', function(){ setAuthMode('login'); });
+  on('acceptToLogin', function(){
+    _pendingInviteToken = null;
+    try { const u = new URL(window.location.href); u.searchParams.delete('invite'); history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || '')); } catch (_) {}
+    setAuthMode('login');
+  });
   updateAccountChip();
 
+  let params = null;
+  try { params = new URLSearchParams(window.location.search); } catch (_) {}
+
   // 1) Arriving from a password-reset email link
-  let resetToken = null;
-  try { resetToken = new URLSearchParams(window.location.search).get('reset_token'); } catch (_) {}
+  const resetToken = params && params.get('reset_token');
   if (resetToken) {
     _pendingResetToken = resetToken;
     showAuthScreen('reset');
+    return;
+  }
+  // 1b) Arriving from a team invite link
+  const inviteToken = params && params.get('invite');
+  if (inviteToken) {
+    _pendingInviteToken = inviteToken;
+    // A fresh invite acceptance should not silently ride an existing session.
+    showAuthScreen('accept');
     return;
   }
   // 2) Existing session: validate it before initializing the app
@@ -1822,10 +1894,13 @@ async function openChangeHistory(auditId) {
       const fld = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.field || '');
       const oldV = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.oldValue == null ? '—' : String(r.oldValue));
       const newV = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.newValue == null ? '—' : String(r.newValue));
+      const esc2 = (typeof escHtml === 'function' ? escHtml : (x => String(x)));
+      const byLine = r.changedBy ? '<div class="hi-by">by ' + esc2(r.changedBy) + '</div>' : '';
       return '<li>'
         + '<div class="hi-field">' + fld + '</div>'
         + '<div class="hi-from-to">' + oldV + ' → ' + newV + '</div>'
-        + '<div class="hi-when">' + (typeof escHtml === 'function' ? escHtml : (x => String(x)))(_formatChangeWhen(r.changedAt)) + ' · ' + (typeof escHtml === 'function' ? escHtml : (x => String(x)))(new Date(r.changedAt).toLocaleString()) + '</div>'
+        + byLine
+        + '<div class="hi-when">' + esc2(_formatChangeWhen(r.changedAt)) + ' · ' + esc2(new Date(r.changedAt).toLocaleString()) + '</div>'
         + '</li>';
     }).join('');
   } catch (e) {
@@ -2208,7 +2283,7 @@ async function loadAudit(){
   if(!API)return;
   const errEl=document.getElementById('auditError');errEl.style.display='none';
   const tb=document.getElementById('auditBody');
-  if(tb)tb.innerHTML='<tr><td colspan="11"><div class="empty-state skel" style="height:120px;">Loading…</div></td></tr>';
+  if(tb)tb.innerHTML='<tr><td colspan="12"><div class="empty-state skel" style="height:120px;">Loading…</div></td></tr>';
   try{
     const resp=await api('/api/audit'+buildAuditQuery());
     if(Array.isArray(resp)){
@@ -2282,7 +2357,7 @@ function renderAuditTable(records){
     const sub=hasFilters?'Try clearing your filters or adjust the search.':'Analyse a CV and click "Save to audit" to start tracking decisions.';
     const btn=hasFilters?'<button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="clearAuditFilters()">Clear filters</button>':'';
     const icon='<div class="empty-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
-    tb.innerHTML='<tr><td colspan="11"><div class="empty-state-rich">'+icon+'<div class="empty-title">'+msg+'</div><div class="empty-sub">'+sub+'</div>'+btn+'</div></td></tr>';return;
+    tb.innerHTML='<tr><td colspan="12"><div class="empty-state-rich">'+icon+'<div class="empty-title">'+msg+'</div><div class="empty-sub">'+sub+'</div>'+btn+'</div></td></tr>';return;
   }
   tb.innerHTML=records.map(rec=>{
     const date=rec.createdAt?new Date(rec.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';
@@ -2302,6 +2377,7 @@ function renderAuditTable(records){
         '<option value="reject"'+(rec.decision==='reject'?' selected':'')+'>Reject</option>'+
       '</select></td>'+
       '<td><input class="note-inp" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." data-action="audit-note" data-id="'+escHtml(rec.id)+'"></td>'+
+      '<td class="col-reviewer" style="font-size:11px;color:#6b7280;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="'+escHtml(rec.reviewedBy||'')+'">'+escHtml(rec.reviewedBy||'—')+'</td>'+
       '<td style="white-space:nowrap;display:flex;gap:4px">'+
         '<button type="button" class="history-btn" data-action="audit-history" data-id="'+escHtml(rec.id)+'" title="Change history" aria-label="Change history">⧉</button>'+
         '<button class="btn btn-ghost btn-sm" data-action="audit-report" data-id="'+escHtml(rec.id)+'" title="Report">📊</button>'+
@@ -2489,6 +2565,7 @@ function toggleSettings(){
     if(cb){cb.checked=(typeof getAutosaveBatch==='function')?getAutosaveBatch():false;}
     populateOrgSettings();
     populatePlanBilling();
+    populateTeam();
   }
 }
 
@@ -2527,6 +2604,102 @@ async function saveBranding(){
     toast('Report branding saved.','success');
   }catch(e){handleApiError(e,'Could not save branding');}
   finally{if(btn)btn.disabled=false;}
+}
+
+// ── Team members & invitations (settings panel) ──
+let _teamIsOwner=false;
+function _fmtWhen(iso){ if(!iso)return 'never'; try{return new Date(iso).toLocaleDateString();}catch(_){return '—';} }
+async function populateTeam(){
+  const body=document.getElementById('teamBody');
+  const inviteRow=document.getElementById('teamInviteRow');
+  const linkRow=document.getElementById('inviteLinkRow');
+  if(linkRow)linkRow.style.display='none';
+  if(!body)return;
+  body.innerHTML='Loading…';
+  let me=null,data=null;
+  try{ me=await api('/api/auth/me'); }catch(_){}
+  _teamIsOwner=!!(me&&me.user&&me.user.role==='owner');
+  try{ data=await api('/api/team/members'); }
+  catch(e){
+    // A blocked/downgraded member lands here (SEAT_LIMIT) — keep it graceful.
+    body.textContent='Team information is unavailable.';
+    if(inviteRow)inviteRow.style.display='none';
+    return;
+  }
+  const onTeam=!!(data.org&&data.org.teamPlan);
+  const members=data.members||[];
+  if(!onTeam){
+    body.innerHTML='<div style="color:#374151">Team members are available on the <strong>Team</strong> plan.'
+      + (_teamIsOwner?' Upgrade in the <em>Plan &amp; Billing</em> section above.':' Ask your organization owner to upgrade.')+'</div>';
+    if(inviteRow)inviteRow.style.display='none';
+    return;
+  }
+  // Member list
+  let html='<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px">Members</div>';
+  html+=members.map(function(m){
+    const removable=_teamIsOwner && m.email!==(me&&me.user&&me.user.email) && !(m.role==='owner');
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6">'
+      +'<span style="flex:1;color:#111827">'+escHtml(m.email)+' <span style="color:#9ca3af;font-size:11px">('+escHtml(m.role)+')</span></span>'
+      +'<span style="font-size:11px;color:#9ca3af">last active '+escHtml(_fmtWhen(m.lastLoginAt))+'</span>'
+      +(removable?'<button class="btn btn-danger btn-sm" data-team="remove" data-id="'+escHtml(m.id)+'" data-email="'+escHtml(m.email)+'">Remove</button>':'')
+      +'</div>';
+  }).join('');
+  // Pending invites (owner only)
+  if(_teamIsOwner){
+    let invites=[];try{ invites=await api('/api/team/invites'); }catch(_){}
+    if(invites.length){
+      html+='<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin:12px 0 6px">Pending invites</div>';
+      html+=invites.map(function(i){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6">'
+          +'<span style="flex:1;color:#374151">'+escHtml(i.email)+'</span>'
+          +'<button class="btn btn-ghost btn-sm" data-team="revoke" data-id="'+escHtml(i.id)+'">Revoke</button></div>';
+      }).join('');
+    }
+  }
+  body.innerHTML=html;
+  if(inviteRow)inviteRow.style.display=_teamIsOwner?'flex':'none';
+}
+// Delegated handlers for remove/revoke (values from escaped data attributes).
+(function(){
+  const body=document.getElementById('teamBody');
+  if(!body||body._teamDelegated)return; body._teamDelegated=true;
+  body.addEventListener('click',function(e){
+    const rm=e.target.closest('[data-team="remove"]'); if(rm){ removeMember(rm.dataset.id, rm.dataset.email); return; }
+    const rv=e.target.closest('[data-team="revoke"]'); if(rv){ revokeInvite(rv.dataset.id); return; }
+  });
+})();
+async function inviteMember(){
+  const email=(document.getElementById('inviteEmail').value||'').trim();
+  if(!email){toast('Enter an email to invite.','error');return;}
+  const btn=document.getElementById('inviteBtn');if(btn)btn.disabled=true;
+  try{
+    const d=await api('/api/team/invite',{method:'POST',body:JSON.stringify({email})});
+    document.getElementById('inviteEmail').value='';
+    const linkRow=document.getElementById('inviteLinkRow'), link=document.getElementById('inviteLink'), note=document.getElementById('inviteLinkNote');
+    if(link)link.value=d.inviteUrl;
+    if(note)note.textContent=d.emailed?'Send this link to your colleague. We also emailed it to '+d.email+'.':'Send this link to your colleague.';
+    if(linkRow)linkRow.style.display='block';
+    toast('Invite created.','success');
+    populateTeam();
+  }catch(e){handleApiError(e,'Could not create invite');}
+  finally{if(btn)btn.disabled=false;}
+}
+function copyInviteLink(){
+  const link=document.getElementById('inviteLink');
+  if(!link||!link.value)return;
+  const done=function(ok){toast(ok?'Invite link copied.':'Copy failed — select and copy manually.',ok?'success':'error');};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(link.value).then(function(){done(true);},function(){done(false);});}
+  else{try{link.select();done(document.execCommand('copy'));}catch(_){done(false);}}
+}
+async function revokeInvite(id){
+  if(!confirm('Revoke this invitation?'))return;
+  try{ await api('/api/team/invite/'+encodeURIComponent(id),{method:'DELETE'}); toast('Invite revoked.','success'); populateTeam(); }
+  catch(e){handleApiError(e,'Could not revoke invite');}
+}
+async function removeMember(id,email){
+  if(!confirm('Remove '+(email||'this member')+"? They lose access; their saved records and attribution are kept."))return;
+  try{ await api('/api/team/member/'+encodeURIComponent(id),{method:'DELETE'}); toast('Member removed.','success'); populateTeam(); }
+  catch(e){handleApiError(e,'Could not remove member');}
 }
 async function saveRetention(){
   const inp=document.getElementById('setRetentionDays');

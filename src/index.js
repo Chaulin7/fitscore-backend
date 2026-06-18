@@ -13,6 +13,7 @@ const templatesRouter = require('./routes/templates');
 const authRouter = require('./routes/auth');
 const orgRouter = require('./routes/org');
 const billingRouter = require('./routes/billing');
+const teamRouter = require('./routes/team');
 const { migrateLegacyData } = require('./services/authService');
 const { purgeExpiredAudits } = require('./services/db');
 const { mutationLimiter } = require('./middleware/rateLimits');
@@ -137,6 +138,8 @@ app.use('/api/auth', generalLimiter, authRouter);
 // mutation limiter sits at the mount and keys by IP until orgId is set.
 app.use('/api/org', generalLimiter, mutationLimiter, orgRouter);
 app.use('/api/billing', generalLimiter, billingRouter);
+// Team routes do their own per-route auth (accept is public, like signup).
+app.use('/api/team', generalLimiter, teamRouter);
 
 // Public, non-personal metadata for static pages (contact + company details
 // from env so the operator sets real values without code edits).

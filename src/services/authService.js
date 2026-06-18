@@ -138,6 +138,80 @@ function setUserPassword(userId, passwordHash) {
   getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
 }
 
+// --- Team members & invitations ----------------------------------------------
+
+// All users in an org (for the members list + capacity counting).
+function listOrgUsers(orgId) {
+  return getDb().prepare(`
+    SELECT id, email, role, created_at AS createdAt, last_login_at AS lastLoginAt
+    FROM users WHERE org_id = ? ORDER BY created_at ASC
+  `).all(orgId);
+}
+
+function countOrgUsers(orgId) {
+  return getDb().prepare('SELECT COUNT(*) AS c FROM users WHERE org_id = ?').get(orgId).c;
+}
+
+function countOrgOwners(orgId) {
+  return getDb().prepare("SELECT COUNT(*) AS c FROM users WHERE org_id = ? AND role = 'owner'").get(orgId).c;
+}
+
+function setUserRole(userId, role) {
+  getDb().prepare('UPDATE users SET role = ? WHERE id = ?').run(role, userId);
+}
+
+function deleteUser(userId) {
+  getDb().prepare('DELETE FROM users WHERE id = ?').run(userId);
+}
+
+// Create or refresh a pending invite for an email (idempotent per pending
+// email). Returns the raw token. Any existing pending invite for the same
+// (org,email) is revoked so only one token is live at a time.
+function createOrRefreshInvite({ orgId, email, invitedBy, ttlMs = 7 * 24 * 60 * 60 * 1000 }) {
+  const normEmail = normalizeEmail(email);
+  getDb().prepare(`
+    UPDATE invites SET revoked_at = ?
+    WHERE org_id = ? AND email = ? AND accepted_at IS NULL AND revoked_at IS NULL
+  `).run(nowIso(), orgId, normEmail);
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  getDb().prepare(`
+    INSERT INTO invites (id, org_id, email, role, token_hash, invited_by, expires_at, created_at)
+    VALUES (?, ?, ?, 'member', ?, ?, ?, ?)
+  `).run(uuidv4(), orgId, normEmail, sha256hex(rawToken), invitedBy || null, new Date(Date.now() + ttlMs).toISOString(), nowIso());
+  return rawToken;
+}
+
+function listPendingInvites(orgId) {
+  return getDb().prepare(`
+    SELECT id, email, role, invited_by AS invitedBy, expires_at AS expiresAt, created_at AS createdAt
+    FROM invites
+    WHERE org_id = ? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ?
+    ORDER BY created_at DESC
+  `).all(orgId, nowIso());
+}
+
+function revokeInvite(orgId, inviteId) {
+  const r = getDb().prepare(`
+    UPDATE invites SET revoked_at = ?
+    WHERE id = ? AND org_id = ? AND accepted_at IS NULL AND revoked_at IS NULL
+  `).run(nowIso(), inviteId, orgId);
+  return r.changes > 0;
+}
+
+// Returns a valid (unexpired, unrevoked, unaccepted) invite by raw token, else null.
+function findValidInvite(rawToken) {
+  if (!rawToken || typeof rawToken !== 'string') return null;
+  const row = getDb().prepare('SELECT * FROM invites WHERE token_hash = ?').get(sha256hex(rawToken));
+  if (!row) return null;
+  if (row.accepted_at || row.revoked_at) return null;
+  if (Date.parse(row.expires_at) <= Date.now()) return null;
+  return row;
+}
+
+function markInviteAccepted(id) {
+  getDb().prepare('UPDATE invites SET accepted_at = ? WHERE id = ?').run(nowIso(), id);
+}
+
 // --- Sessions ----------------------------------------------------------------
 
 // Creates a session and returns the raw token (only the hash is stored).
@@ -310,6 +384,16 @@ module.exports = {
   setOrganizationRetention,
   getOrganizationBranding,
   setOrganizationBranding,
+  listOrgUsers,
+  countOrgUsers,
+  countOrgOwners,
+  setUserRole,
+  deleteUser,
+  createOrRefreshInvite,
+  listPendingInvites,
+  revokeInvite,
+  findValidInvite,
+  markInviteAccepted,
   findUserByEmail,
   findUserById,
   createUser,

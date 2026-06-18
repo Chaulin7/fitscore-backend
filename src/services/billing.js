@@ -58,6 +58,14 @@ function limitFor(billing) {
   return isUnlimited(billing) ? null : FREE_MONTHLY_LIMIT;
 }
 
+// Whether an org may have more than one active user (Team plan, active or in
+// the past_due grace window). Free/Pro orgs stay owner-only.
+function hasActiveTeamPlan(billing) {
+  if (!billing) return false;
+  const ok = billing.subscriptionStatus === 'active' || billing.subscriptionStatus === 'past_due';
+  return billing.plan === 'team' && ok;
+}
+
 // Decide whether an org may run `requested` more analyses this period.
 // Returns { allowed, limit, used, plan }.
 function checkQuota(billing, used, requested) {
@@ -74,6 +82,7 @@ module.exports = {
   priceIdForPlan,
   planForPriceId,
   isUnlimited,
+  hasActiveTeamPlan,
   limitFor,
   checkQuota,
 };

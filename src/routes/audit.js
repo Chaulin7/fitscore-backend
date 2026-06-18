@@ -371,7 +371,9 @@ router.patch('/:id', async (req, res) => {
       patch.note = no;
     }
 
-    const changedBy = req.userId || null;
+    // Attribution: snapshot the editor's email so the change log survives
+    // the user later being removed.
+    const changedBy = (req.user && req.user.email) || req.userId || null;
     const result = updateAudit({ id: req.params.id, ...patch }, changedBy, req.orgId);
     if (!result) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
     res.json(result);

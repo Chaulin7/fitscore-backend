@@ -167,6 +167,24 @@ function initSchema() {
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id)');
 
+  // Team invitations (member invites; accepted to create a 'member' user)
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS invites (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      token_hash TEXT NOT NULL,
+      invited_by TEXT,
+      expires_at TEXT NOT NULL,
+      accepted_at TEXT,
+      revoked_at TEXT,
+      created_at TEXT NOT NULL
+    )
+  `);
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_invites_org_id ON invites(org_id)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_invites_token_hash ON invites(token_hash)');
+
   // templates is also created by routes/templates.js; ensure it exists here so
   // the org_id migration can run regardless of module load order.
   getDb().exec(`
