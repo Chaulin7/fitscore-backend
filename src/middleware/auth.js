@@ -22,6 +22,8 @@
  */
 
 const authService = require('../services/authService');
+const billing = require('../services/billing');
+const { getOrgBilling } = require('../services/db');
 
 function unauthorized(res) {
   return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_REQUIRED' });
@@ -41,6 +43,15 @@ function requireSession(req, res, next) {
   if (!found) return unauthorized(res);
 
   const { session, user } = found;
+  // Seat/plan gate: only an active Team plan permits non-owner members. If the
+  // org downgrades or the Team subscription lapses, members are blocked on
+  // their next request (no data is deleted; the owner re-upgrades to restore).
+  if (user.role !== 'owner' && !billing.hasActiveTeamPlan(getOrgBilling(user.org_id))) {
+    return res.status(403).json({
+      error: 'Your team access is inactive. Ask your organization owner to re-activate the Team plan.',
+      code: 'SEAT_LIMIT',
+    });
+  }
   req.userId = user.id;
   req.orgId = user.org_id;
   req.sessionId = session.id;
