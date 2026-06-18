@@ -1895,7 +1895,7 @@ async function openChangeHistory(auditId) {
       const oldV = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.oldValue == null ? '—' : String(r.oldValue));
       const newV = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.newValue == null ? '—' : String(r.newValue));
       const esc2 = (typeof escHtml === 'function' ? escHtml : (x => String(x)));
-      const byLine = r.changedBy ? '<div class="hi-by">by ' + esc2(r.changedBy) + '</div>' : '';
+      const byLine = '<div class="hi-by">by ' + esc2(r.changedBy || 'unknown') + '</div>';
       return '<li>'
         + '<div class="hi-field">' + fld + '</div>'
         + '<div class="hi-from-to">' + oldV + ' → ' + newV + '</div>'
