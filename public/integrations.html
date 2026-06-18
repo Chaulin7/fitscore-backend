@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="/logo.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CVsprings · Integrations &amp; API</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
+.topbar{background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);padding:0 32px;height:60px;display:flex;align-items:center;gap:20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);position:sticky;top:0;z-index:100}
+.topbar-brand{display:flex;align-items:center;gap:5px;margin-right:auto;text-decoration:none}
+.logo-ring{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:50%;border:2px solid rgba(255,255,255,0.85);flex-shrink:0}
+.logo-ring-img{width:48px;height:48px;object-fit:contain;filter:invert(1) brightness(1.15);mix-blend-mode:screen}
+.brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.4px}
+.brand-name em{font-style:normal;color:#7dd3fc}
+.nav-btn{background:none;border:none;color:rgba(255,255,255,0.65);font:600 13px 'Inter',sans-serif;padding:7px 15px;border-radius:6px;cursor:pointer;letter-spacing:.03em;transition:all .18s;text-decoration:none}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,0.1)}
+.page{max-width:860px;margin:0 auto;padding:32px 20px 60px}
+.hero{background:linear-gradient(135deg,#0a1f3d,#153360);color:#fff;border-radius:14px;padding:34px 36px;margin-bottom:22px}
+.hero h1{font-size:24px;font-weight:800;letter-spacing:-.3px;margin-bottom:10px}
+.hero p{font-size:14px;line-height:1.65;color:rgba(255,255,255,.82);max-width:660px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:18px;box-shadow:0 1px 6px rgba(0,0,0,0.05);overflow:hidden}
+.card-head{padding:16px 24px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#0a1f3d}
+.card-body{padding:20px 24px;line-height:1.7;color:#374151}
+.card-body p{margin-bottom:10px}.card-body p:last-child{margin-bottom:0}
+.card-body ul{padding-left:20px;margin-bottom:6px}.card-body li{margin-bottom:6px}
+.use{font-size:12.5px;color:#6b7280;margin-top:6px}
+.tag{display:inline-block;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.tag-now{background:#dcfce7;color:#15803d}
+.tag-planned{background:#dbeafe;color:#1d4ed8}
+.tag-exploring{background:#fef9c3;color:#a16207}
+.phase{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #f3f4f6}
+.phase:last-child{border-bottom:none}
+.phase .n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#0f2847;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.cta{display:inline-block;background:#0f2847;color:#fff;text-decoration:none;border-radius:8px;padding:10px 18px;font-weight:600;font-size:13px;margin-top:4px}
+.cta:hover{background:#1a3d6e}
+.note{font-size:12px;color:#9ca3af;line-height:1.6}
+a{color:#0f2847}
+.site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
+.site-footer a{color:#93c5fd}
+@media(max-width:640px){.topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}.card-head{flex-direction:column;align-items:flex-start;gap:6px}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="topbar-brand" href="/">
+    <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CVsprings logo"></span>
+    <span class="brand-name">CV<em>springs</em></span>
+  </a>
+  <a class="nav-btn" href="/">App</a>
+  <a class="nav-btn" href="/compliance.html">EU AI Act</a>
+  <a class="nav-btn" href="/privacy.html">Privacy</a>
+  <a class="nav-btn" href="/terms.html">Terms</a>
+</div>
+
+<div class="page">
+  <div class="hero">
+    <h1>Integrations &amp; API</h1>
+    <p>How CVsprings connects to recruiting workflows — what works today, and where we&rsquo;re headed. Each capability is tagged so you always know what&rsquo;s live versus planned. We have no ATS partnerships yet; platform names below indicate intended targets only.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Today</span><span class="tag tag-now">Available now</span></div>
+    <div class="card-body">
+      <p>Integration today means <strong>manual upload and export</strong>:</p>
+      <ul>
+        <li>Single &amp; batch CV upload (PDF/DOCX) scored against a job description.</li>
+        <li>CSV export of ranked results and the full audit log.</li>
+        <li>Branded, print-to-PDF candidate reports.</li>
+        <li>Reusable role / job-description templates.</li>
+      </ul>
+      <p class="note">There is no programmatic API or automated ATS push/pull yet — everything below is direction, not a live capability.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Public REST API</span><span class="tag tag-planned">Planned</span></div>
+    <div class="card-body">
+      <p>Authenticate with a per-org API key and call documented endpoints to submit CVs/JDs and retrieve scores, audit records, and templates — the same analysis the web app produces, programmatically.</p>
+      <div class="use">Use case: embed CVsprings scoring into your own recruiting tooling. A draft technical specification (auth, endpoints, schemas, webhooks, limits) is available to prospects &mdash; request it via the contact below.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Webhooks</span><span class="tag tag-planned">Planned</span></div>
+    <div class="card-body">
+      <p>Register a callback URL and receive a signed notification when an analysis (especially a large batch) finishes, instead of polling.</p>
+      <div class="use">Use case: trigger the next step in your workflow the moment results are ready.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Native ATS connectors</span><span class="tag tag-exploring">Exploring</span></div>
+    <div class="card-body">
+      <p>The generic pattern: your ATS pushes a new application plus the job description to CVsprings → CVsprings scores it → the score and the recruiter&rsquo;s decision are written back to the ATS record, so scoring appears inside the tool your team already uses.</p>
+      <p>Platforms we <strong>intend to support</strong> (examples of common ATS targets &mdash; <strong>not existing integrations or partnerships</strong>): Greenhouse, Lever, Teamtailor, Recruitee, Personio, SmartRecruiters.</p>
+      <div class="use">Priority follows client demand — tell us which ATS you use.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Middleware (Zapier / Make)</span><span class="tag tag-exploring">Exploring</span></div>
+    <div class="card-body">
+      <p>Once the public API exists, a Zapier/Make connector could bridge CVsprings to many tools without a bespoke integration per platform.</p>
+      <div class="use">Use case: a lower-effort path to broad coverage while native connectors mature.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Sequencing</span></div>
+    <div class="card-body">
+      <p>We commit to <strong>phases, not dates</strong>. Order reflects dependency; priority within exploration follows what clients ask for.</p>
+      <div class="phase"><span class="n">1</span><div><strong>Public REST API + API keys</strong> <span class="tag tag-planned">Planned</span><br><span class="note">Foundation for everything else.</span></div></div>
+      <div class="phase"><span class="n">2</span><div><strong>Webhooks</strong> <span class="tag tag-planned">Planned</span><br><span class="note">Analysis-complete callbacks with signed payloads.</span></div></div>
+      <div class="phase"><span class="n">3</span><div><strong>First native ATS connector(s)</strong> <span class="tag tag-exploring">Exploring</span><br><span class="note">Built for the platform the most clients request.</span></div></div>
+      <div class="phase"><span class="n">4</span><div><strong>Broader connector coverage / middleware</strong> <span class="tag tag-exploring">Exploring</span></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Request an integration / API access</span></div>
+    <div class="card-body">
+      <p>Integrations are prioritised by demand. Tell us which ATS you use and what you&rsquo;d like to automate &mdash; it directly informs what we build first.</p>
+      <a class="cta" id="contactCta" href="#">Contact us</a>
+      <p class="note" style="margin-top:10px">API usage, once available, is subject to the same human-oversight principle as the rest of the product: scores are advisory and all hiring decisions remain with the recruiter. See the <a href="/compliance.html">compliance page</a>.</p>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  CVsprings &mdash; AI-powered candidate fit analysis &nbsp;&middot;&nbsp; <a href="/">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/compliance.html">EU AI Act</a> &nbsp;&middot;&nbsp; <a href="/privacy.html">Privacy</a> &nbsp;&middot;&nbsp; <a href="/terms.html">Terms</a>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  var API = '';
+  try { API = (localStorage.getItem('cvsprings_api_url') || 'https://cvsprings7.onrender.com').replace(/\/+$/, ''); } catch (_) {}
+  var cta = document.getElementById('contactCta');
+  fetch(API + '/api/meta', { headers: { 'Accept': 'application/json' } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(meta){
+      if (cta && meta && meta.supportEmail) {
+        cta.href = 'mailto:' + meta.supportEmail + '?subject=' + encodeURIComponent('CVsprings — integration / API access');
+      } else if (cta) {
+        cta.textContent = 'Contact us via the in-app About panel';
+        cta.removeAttribute('href');
+        cta.style.background = '#6b7280';
+      }
+    })
+    .catch(function(){ if (cta) { cta.textContent = 'Contact us via the in-app About panel'; cta.removeAttribute('href'); cta.style.background = '#6b7280'; } });
+})();
+</script>
+</body>
+</html>
