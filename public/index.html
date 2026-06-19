@@ -899,6 +899,46 @@ img, video, table { max-width: 100%; }
 <!-- Settings panel -->
 <div class="settings-panel" id="settingsPanel">
   <button class="settings-close" onclick="toggleSettings()" aria-label="Close settings">&#215;</button>
+  <h3>Plan &amp; Billing</h3>
+  <div class="plan-status-line" id="planStatusLine">Loading plan&hellip;</div>
+  <div class="plan-row" id="planOwnerControls" style="display:none">
+    <button class="btn btn-primary btn-sm" id="upgradeProBtn" onclick="startCheckout('pro')">Upgrade to Pro</button>
+    <button class="btn btn-primary btn-sm" id="upgradeTeamBtn" onclick="startCheckout('team')">Upgrade to Team</button>
+    <button class="btn btn-ghost btn-sm" id="manageBillingBtn" onclick="openBillingPortal()" style="display:none">Manage billing</button>
+  </div>
+  <div class="plan-status-line" id="planMemberNote" style="display:none;color:#9ca3af">Your plan is managed by your organization&rsquo;s owner.</div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3>Team</h3>
+  <div id="teamBody" style="font-size:13px;color:#6b7280">Loading&hellip;</div>
+  <!-- owner-only invite controls (hidden for members / non-team) -->
+  <div id="teamInviteRow" class="settings-row" style="display:none;gap:8px;margin-top:10px">
+    <input class="text-input" type="email" id="inviteEmail" placeholder="colleague@company.com" style="flex:1" aria-label="Invite email">
+    <button class="btn btn-primary btn-sm" id="inviteBtn" onclick="inviteMember()">Invite</button>
+  </div>
+  <div id="inviteLinkRow" style="display:none;margin-top:8px">
+    <div class="settings-row" style="gap:8px">
+      <input class="text-input" type="text" id="inviteLink" readonly style="flex:1" aria-label="Invite link">
+      <button class="btn btn-ghost btn-sm" id="copyInviteBtn" onclick="copyInviteLink()">Copy link</button>
+    </div>
+    <div id="inviteLinkNote" style="font-size:11px;color:#6b7280;margin-top:4px">Send this link to your colleague.</div>
+  </div>
+  <div id="brandingSection" style="display:none">
+    <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+    <h3>Report Branding</h3>
+    <div class="settings-row" style="margin-top:6px">
+      <input class="text-input" type="text" id="brandName" placeholder="Display name (e.g. Chaulin)" style="flex:1" aria-label="Brand display name">
+    </div>
+    <div class="settings-row" style="margin-top:8px">
+      <input class="text-input" type="url" id="brandLogoUrl" placeholder="Logo URL (https://…)" style="flex:1" aria-label="Brand logo URL">
+    </div>
+    <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <span style="font-size:13px;color:#374151">Brand colour</span>
+      <input class="text-input" type="text" id="brandColor" placeholder="#0f2847" style="width:110px" aria-label="Brand colour (hex)">
+      <button class="btn btn-primary btn-sm" id="brandSaveBtn" onclick="saveBranding()">Save</button>
+    </div>
+    <div style="font-size:11px;color:#6b7280;margin-top:4px">Applied to candidate PDF reports. Leave blank to use the CVsprings (Chaulin) defaults. Logo must be an http(s) URL.</div>
+  </div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3 style="margin-top:0">Preferences</h3>
   <label class="settings-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#374151">
     <input type="checkbox" id="autosaveBatchToggle" onchange="setAutosaveBatch(this.checked)">
@@ -962,46 +1002,6 @@ img, video, table { max-width: 100%; }
     <button class="btn btn-danger btn-sm" id="orgDeleteBtn" onclick="deleteAllOrgData()">Delete all audit data</button>
   </div>
   <div style="font-size:11px;color:#6b7280;margin-top:4px">Export downloads every audit record (incl. change history) and template in your organization. Delete permanently removes all audit records and change history &mdash; it cannot be undone.</div>
-  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
-  <h3>Plan &amp; Billing</h3>
-  <div class="plan-status-line" id="planStatusLine">Loading plan&hellip;</div>
-  <div class="plan-row" id="planOwnerControls" style="display:none">
-    <button class="btn btn-primary btn-sm" id="upgradeProBtn" onclick="startCheckout('pro')">Upgrade to Pro</button>
-    <button class="btn btn-primary btn-sm" id="upgradeTeamBtn" onclick="startCheckout('team')">Upgrade to Team</button>
-    <button class="btn btn-ghost btn-sm" id="manageBillingBtn" onclick="openBillingPortal()" style="display:none">Manage billing</button>
-  </div>
-  <div class="plan-status-line" id="planMemberNote" style="display:none;color:#9ca3af">Your plan is managed by your organization&rsquo;s owner.</div>
-  <div id="brandingSection" style="display:none">
-    <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
-    <h3>Report Branding</h3>
-    <div class="settings-row" style="margin-top:6px">
-      <input class="text-input" type="text" id="brandName" placeholder="Display name (e.g. Chaulin)" style="flex:1" aria-label="Brand display name">
-    </div>
-    <div class="settings-row" style="margin-top:8px">
-      <input class="text-input" type="url" id="brandLogoUrl" placeholder="Logo URL (https://…)" style="flex:1" aria-label="Brand logo URL">
-    </div>
-    <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:8px">
-      <span style="font-size:13px;color:#374151">Brand colour</span>
-      <input class="text-input" type="text" id="brandColor" placeholder="#0f2847" style="width:110px" aria-label="Brand colour (hex)">
-      <button class="btn btn-primary btn-sm" id="brandSaveBtn" onclick="saveBranding()">Save</button>
-    </div>
-    <div style="font-size:11px;color:#6b7280;margin-top:4px">Applied to candidate PDF reports. Leave blank to use the CVsprings (Chaulin) defaults. Logo must be an http(s) URL.</div>
-  </div>
-  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
-  <h3>Team</h3>
-  <div id="teamBody" style="font-size:13px;color:#6b7280">Loading&hellip;</div>
-  <!-- owner-only invite controls (hidden for members / non-team) -->
-  <div id="teamInviteRow" class="settings-row" style="display:none;gap:8px;margin-top:10px">
-    <input class="text-input" type="email" id="inviteEmail" placeholder="colleague@company.com" style="flex:1" aria-label="Invite email">
-    <button class="btn btn-primary btn-sm" id="inviteBtn" onclick="inviteMember()">Invite</button>
-  </div>
-  <div id="inviteLinkRow" style="display:none;margin-top:8px">
-    <div class="settings-row" style="gap:8px">
-      <input class="text-input" type="text" id="inviteLink" readonly style="flex:1" aria-label="Invite link">
-      <button class="btn btn-ghost btn-sm" id="copyInviteBtn" onclick="copyInviteLink()">Copy link</button>
-    </div>
-    <div id="inviteLinkNote" style="font-size:11px;color:#6b7280;margin-top:4px">Send this link to your colleague.</div>
-  </div>
 </div>
 
 <!-- === ANALYZER === -->
