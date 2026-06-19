@@ -470,6 +470,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .modal-head h3{margin:0;font-size:17px;font-weight:700;color:#0a1f3d}
 .modal-close{background:none;border:none;font-size:22px;color:#6b7280;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}
 .modal-close:hover{background:#f3f4f6;color:#0a1f3d}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
 .modal-tabs{display:flex;gap:0;border-bottom:1px solid #e5e7eb;padding:0 24px;flex-shrink:0}
 .modal-tab{background:none;border:none;padding:12px 18px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;letter-spacing:.03em}
 .modal-tab.active{color:#0a1f3d;border-bottom-color:#0f2847}
@@ -1949,10 +1950,10 @@ function getScoreThreshold(){
 function saveSettings(){
   const kw=+document.getElementById('setWKw').value, sk=+document.getElementById('setWSk').value,
         ex=+document.getElementById('setWEx').value, ed=+document.getElementById('setWEd').value;
-  if([kw,sk,ex,ed].some(n=>isNaN(n)||n<0||n>100)){ alert('Weights must each be between 0 and 100.'); return; }
-  if(Math.abs((kw+sk+ex+ed)-100)>0.01){ alert('Scoring weights must sum to 100 (currently '+(kw+sk+ex+ed)+').'); return; }
+  if([kw,sk,ex,ed].some(n=>isNaN(n)||n<0||n>100)){ toast('Weights must each be between 0 and 100.','error'); return; }
+  if(Math.abs((kw+sk+ex+ed)-100)>0.01){ toast('Scoring weights must sum to 100 (currently '+(kw+sk+ex+ed)+').','error'); return; }
   let thr=parseInt(document.getElementById('setScoreThreshold').value,10);
-  if(isNaN(thr)||thr<1||thr>99){ alert('Strong fit threshold must be between 1 and 99.'); return; }
+  if(isNaN(thr)||thr<1||thr>99){ toast('Strong fit threshold must be between 1 and 99.','error'); return; }
   localStorage.setItem('cvsprings_weights', JSON.stringify({kw,sk,ex,ed}));
   localStorage.setItem('cvsprings_anonymize_default', document.getElementById('setAnonymizeDefault').checked?'1':'0');
   localStorage.setItem('cvsprings_default_role', document.getElementById('setDefaultRole').value.trim());
@@ -2253,7 +2254,8 @@ async function saveSingleBatch(i){
 }
 async function saveAllToAudit(){
   if(!API||!lastBatchResults.length)return;
-  if(!confirm('Save all '+lastBatchResults.length+' results?'))return;
+  const ok = await confirmModal({ title:'Save all', message:'Save all '+lastBatchResults.length+' results to the audit log?', confirmLabel:'Save all' });
+  if(!ok)return;
   let saved=0;
   for(const res of lastBatchResults){
     const body={candidateName:res.candidateName||res.fileName,fileName:res.fileName||'',
@@ -2398,7 +2400,9 @@ async function updateAuditNote(id,note){
   catch(e){handleApiError(e,'Could not save note');}
 }
 async function deleteAuditRecord(id){
-  if(!confirm('Delete this record?')||!API)return;
+  if(!API)return;
+  const ok = await confirmModal({ title:'Delete record', message:'Permanently delete this audit record?', confirmLabel:'Delete', danger:true });
+  if(!ok)return;
   try{await api('/api/audit/'+encodeURIComponent(id),{method:'DELETE'});toast('Record deleted','success');loadAudit();}
   catch(e){handleApiError(e,'Could not delete record');}
 }
@@ -2511,6 +2515,77 @@ function showErr(el,msg){el.className='msg msg-err';el.textContent=msg;el.style.
 function showWarn(el,msg){el.className='msg msg-warn';el.textContent=msg;el.style.display='block';}
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function escCsv(s){return String(s||'').replace(/"/g,'""');}
+
+// ── Promise-based styled dialogs (replace native confirm()/prompt()) ──
+// Reuses the existing .modal-backdrop/.modal-box/.modal-head CSS, the
+// pointer-events/visibility fix, .text-input and .field-flash. One modal at a
+// time; listeners are bound per-open and removed on resolve (no leaks).
+function _styledDialog(opts){
+  return new Promise(function(resolve){
+    const prev = document.activeElement;
+    const existing = document.getElementById('_dlgBackdrop'); if(existing){ try{ existing.remove(); }catch(_){} }
+    const backdrop=document.createElement('div');
+    backdrop.className='modal-backdrop'; backdrop.id='_dlgBackdrop';
+    backdrop.setAttribute('role','dialog'); backdrop.setAttribute('aria-modal','true'); backdrop.setAttribute('aria-labelledby','_dlgTitle');
+    const box=document.createElement('div'); box.className='modal-box'; box.style.maxWidth='440px';
+    const head=document.createElement('div'); head.className='modal-head';
+    const h3=document.createElement('h3'); h3.id='_dlgTitle'; h3.textContent=opts.title||'';
+    const x=document.createElement('button'); x.className='modal-close'; x.setAttribute('aria-label','Close'); x.innerHTML='&times;';
+    head.appendChild(h3); head.appendChild(x);
+    const body=document.createElement('div'); body.className='modal-body';
+    if(opts.message){ const p=document.createElement('p'); p.innerHTML=opts.message; body.appendChild(p); } // caller escapes dynamic values
+    let input=null;
+    if(opts.prompt){ input=document.createElement('input'); input.className='text-input'; input.type='text'; input.style.width='100%'; input.placeholder=opts.placeholder||''; input.value=opts.defaultValue||''; body.appendChild(input); }
+    const foot=document.createElement('div'); foot.className='modal-foot';
+    const cancelBtn=document.createElement('button'); cancelBtn.type='button'; cancelBtn.className='btn btn-ghost'; cancelBtn.textContent=opts.cancelLabel||'Cancel';
+    const confirmBtn=document.createElement('button'); confirmBtn.type='button'; confirmBtn.className='btn '+(opts.danger?'btn-danger':'btn-primary'); confirmBtn.textContent=opts.confirmLabel||'Confirm';
+    foot.appendChild(cancelBtn); foot.appendChild(confirmBtn);
+    box.appendChild(head); box.appendChild(body); box.appendChild(foot);
+    backdrop.appendChild(box); document.body.appendChild(backdrop);
+
+    let done=false;
+    function cleanup(result){
+      if(done) return; done=true;
+      document.removeEventListener('keydown', onKey, true);
+      backdrop.classList.remove('open');
+      setTimeout(function(){ try{ backdrop.remove(); }catch(_){} }, 260);
+      try{ if(prev && typeof prev.focus==='function') prev.focus(); }catch(_){}
+      resolve(result);
+    }
+    function doConfirm(){
+      if(opts.prompt){
+        const val=(input.value||'').trim();
+        if(opts.required!==false && !val){ input.classList.remove('field-flash'); void input.offsetWidth; input.classList.add('field-flash'); input.focus(); return; }
+        cleanup(val);
+      } else { cleanup(true); }
+    }
+    function doCancel(){ cleanup(opts.prompt ? null : false); }
+    function onKey(e){
+      // Capture phase + stopPropagation so app-level Enter/Escape shortcuts
+      // (analyze, settings/info/history close) don't also fire while open.
+      if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); doCancel(); }
+      else if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); e.stopPropagation(); doConfirm(); }
+    }
+    cancelBtn.addEventListener('click', doCancel);
+    confirmBtn.addEventListener('click', doConfirm);
+    x.addEventListener('click', doCancel);
+    backdrop.addEventListener('click', function(e){ if(e.target===backdrop) doCancel(); });
+    document.addEventListener('keydown', onKey, true);
+    requestAnimationFrame(function(){
+      backdrop.classList.add('open');
+      if(opts.prompt){ try{ input.focus(); input.select(); }catch(_){} }
+      else { try{ (opts.danger?cancelBtn:confirmBtn).focus(); }catch(_){} }
+    });
+  });
+}
+function confirmModal(opts){
+  opts=opts||{};
+  return _styledDialog({ title:opts.title||'Confirm', message:opts.message||'', confirmLabel:opts.confirmLabel||'Confirm', cancelLabel:opts.cancelLabel||'Cancel', danger:!!opts.danger, prompt:false });
+}
+function promptModal(opts){
+  opts=opts||{};
+  return _styledDialog({ title:opts.title||'', message:opts.message||'', placeholder:opts.placeholder||'', defaultValue:opts.defaultValue||'', confirmLabel:opts.confirmLabel||'Save', cancelLabel:'Cancel', required:opts.required!==false, prompt:true });
+}
 function showLoading(msg){document.getElementById('loadingMsg').textContent=msg||'Processing...';document.getElementById('progressBar').style.width='0%';document.getElementById('progressLabel').textContent='';document.getElementById('loadingOverlay').style.display='flex';
   var _stepIdx=0,_stepSteps=["Parsing CV...","Matching keywords...","Scoring fit...","Ranking results..."];
   if(_stepTimer) clearInterval(_stepTimer);
@@ -2692,12 +2767,14 @@ function copyInviteLink(){
   else{try{link.select();done(document.execCommand('copy'));}catch(_){done(false);}}
 }
 async function revokeInvite(id){
-  if(!confirm('Revoke this invitation?'))return;
+  const ok = await confirmModal({ title:'Revoke invitation', message:'Revoke this invitation? The link will stop working.', confirmLabel:'Revoke', danger:true });
+  if(!ok)return;
   try{ await api('/api/team/invite/'+encodeURIComponent(id),{method:'DELETE'}); toast('Invite revoked.','success'); populateTeam(); }
   catch(e){handleApiError(e,'Could not revoke invite');}
 }
 async function removeMember(id,email){
-  if(!confirm('Remove '+(email||'this member')+"? They lose access; their saved records and attribution are kept."))return;
+  const ok = await confirmModal({ title:'Remove member', message:'Remove '+escHtml(email||'this member')+'? They lose access; their saved records and attribution are kept.', confirmLabel:'Remove', danger:true });
+  if(!ok)return;
   try{ await api('/api/team/member/'+encodeURIComponent(id),{method:'DELETE'}); toast('Member removed.','success'); populateTeam(); }
   catch(e){handleApiError(e,'Could not remove member');}
 }
@@ -2721,8 +2798,14 @@ async function exportOrgData(){
 }
 async function deleteAllOrgData(){
   let orgName='';try{orgName=localStorage.getItem('cvsprings_org_name')||'';}catch(_){}
-  const typed=prompt('This permanently deletes ALL audit records and change history for your organization.\n\nType your organization name'+(orgName?' ("'+orgName+'")':'')+' to confirm:');
+  const typed=await promptModal({
+    title:'Delete all audit data',
+    message:'This permanently deletes <strong>all</strong> audit records and change history for your organization. Type your organization name'+(orgName?' (&ldquo;'+escHtml(orgName)+'&rdquo;)':'')+' to confirm:',
+    placeholder:orgName||'Organization name',
+    confirmLabel:'Delete everything'
+  });
   if(typed===null)return;
+  if(orgName && typed!==orgName){ toast('Name did not match — deletion cancelled.','error'); return; }
   const btn=document.getElementById('orgDeleteBtn');if(btn)btn.disabled=true;
   try{
     const r=await api('/api/org/audit-data',{method:'DELETE',body:JSON.stringify({confirm:typed})});
@@ -2942,8 +3025,8 @@ function setupDelegatedHandlers(){
 }
 document.addEventListener('DOMContentLoaded', setupDelegatedHandlers);
 async function saveTemplate(){
-  const name = prompt('Name this template (e.g. "Senior Engineer"):');
-  if(!name || !name.trim()) return;
+  const name = await promptModal({ title:'Save template', message:'Name this template', placeholder:'e.g. Senior Engineer' });
+  if(!name) return;
   const trimmed = name.trim();
   const payload = {
     name: trimmed,
@@ -2996,7 +3079,8 @@ function loadTemplate(name){
 }
 
 async function deleteTemplate(name){
-  if(!confirm('Delete template "'+name+'"?')) return;
+  const ok = await confirmModal({ title:'Delete template', message:'Delete the template &ldquo;'+escHtml(name)+'&rdquo;?', confirmLabel:'Delete', danger:true });
+  if(!ok) return;
   const t = _tplCache.find(t => t.name === name);
   try {
     if (t && t.id) {
