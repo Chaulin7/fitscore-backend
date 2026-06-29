@@ -39,7 +39,7 @@ function scoreCV(cvText, jobDescription, weights) {
   const jdLower = jobDescription.toLowerCase();
 
   const { score: kwScore, found: kwFound, missing: kwMissing } = scoreKeywords(cvLower, jdLower);
-  const { score: skScore, skillResults } = scoreSkills(cvLower, jdLower);
+  const { score: skScore, skillResults } = scoreSkills(cvText, cvLower, jdLower);
   const exScore = scoreExperience(cvLower, jdLower);
   const edScore = scoreEducation(cvLower, jdLower);
 
@@ -54,6 +54,13 @@ function scoreCV(cvText, jobDescription, weights) {
     found: kwFound,
     missing: kwMissing,
     skills: skillResults,
+    matches: skillResults.map((s) => ({
+      requirement: s.name,
+      matched: s.found,
+      evidence: s.evidence || null,
+      cvLineRef: null,
+      weight: null,
+    })),
     recommendations: generateRecommendations({ kwScore, skScore, exScore, edScore, kwMissing, skillResults, overall })
   };
 }
@@ -119,7 +126,54 @@ function textHasSkill(text, canonical) {
   );
 }
 
-function scoreSkills(cvLower, jdLower) {
+// Decide whether the char just BEFORE index i ends a clause. A newline always
+// does. A . ! ? does only if it's a real sentence end (word char before it,
+// but NOT glued to a word char after it) — so the dot inside "Node.js" or
+// "3.5" is NOT treated as a boundary.
+function _isClauseBoundaryBefore(text, i) {
+  const ch = text[i - 1];
+  if (ch === '\n') return true;
+  if (/[.!?]/.test(ch)) {
+    const next = text[i], prev = text[i - 2];
+    return !!(prev && /\w/.test(prev)) && !(next && /\w/.test(next));
+  }
+  return false;
+}
+// Same test for the char AT index i (used when expanding right).
+function _isClauseBoundaryAt(text, i) {
+  const ch = text[i];
+  if (ch === '\n') return true;
+  if (/[.!?]/.test(ch)) {
+    const next = text[i + 1], prev = text[i - 1];
+    return !!(prev && /\w/.test(prev)) && !(next && /\w/.test(next));
+  }
+  return false;
+}
+
+// Capture the CV clause where a skill matched, for the evidence report.
+// Prefers the LONGEST surface form (so canonical "javascript" beats the
+// ambiguous synonym "js"), then expands to the surrounding clause using
+// boundary detection that ignores dots glued inside tokens like "Node.js".
+function findSkillEvidence(cvText, cvLower, canonical, maxLen) {
+  const forms = skillSurfaceForms(canonical).slice().sort((a, b) => b.length - a.length);
+  let best = -1, bestLen = 0;
+  for (const form of forms) {
+    const m = cvLower.match(new RegExp('\\b' + escapeRegex(form) + '\\b', 'i'));
+    if (m) { best = m.index; bestLen = m[0].length; break; }
+  }
+  if (best === -1) return null;
+  const cap = maxLen || 160;
+  let start = best;
+  while (start > 0 && (best - start) < cap && !_isClauseBoundaryBefore(cvText, start)) start--;
+  let end = best + bestLen;
+  while (end < cvText.length && (end - best) < cap && !_isClauseBoundaryAt(cvText, end)) end++;
+  if (end < cvText.length && _isClauseBoundaryAt(cvText, end) && /[.!?]/.test(cvText[end])) end++;
+  let snippet = cvText.slice(start, end).replace(/\s+/g, ' ').trim();
+  if (start > 0 && !_isClauseBoundaryBefore(cvText, start)) snippet = '…' + snippet;
+  return snippet;
+}
+
+function scoreSkills(cvText, cvLower, jdLower) {
   // Only skills required by THIS job description belong in the Found/Missing
   // table — not the global SKILLS_DB vocabulary. Synonyms (e.g. golang/go)
   // are canonicalised on both the JD and CV side and deduped so they collapse
@@ -134,6 +188,9 @@ function scoreSkills(cvLower, jdLower) {
       name: canonical,
       found: textHasSkill(cvLower, canonical), // matches any synonym in the CV
       category: skill.category,
+      evidence: textHasSkill(cvLower, canonical)
+        ? findSkillEvidence(cvText, cvLower, canonical)
+        : null,
     });
   }
   const skillResults = [...byCanonical.values()];
