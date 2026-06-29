@@ -5,6 +5,7 @@ const { insertAudit, getAllAudits, deleteAudit, exportCsv, getRoles, getRoleHist
 const { analyzeBias } = require('../services/biasAudit');
 const { getOrganizationBranding } = require('../services/authService');
 const { resolveBranding } = require('../services/branding');
+const { streamReport } = require('./reportRenderer');
 
 const router = express.Router();
 
@@ -34,6 +35,13 @@ router.post('/', async (req, res) => {
         missing: arr(analysisDetail.missing).map((k) => String(k).slice(0, 80)),
         skills: arr(analysisDetail.skills).map((s) => ({ name: String((s && s.name) || '').slice(0, 80), found: !!(s && s.found) })),
         recommendations: arr(analysisDetail.recommendations).map((r) => ({ icon: String((r && r.icon) || '').slice(0, 12), text: String((r && r.text) || '').slice(0, 500) })),
+        matches: arr(analysisDetail.matches).slice(0, 60).map((m) => ({
+          requirement: String((m && m.requirement) || '').slice(0, 80),
+          matched: !!(m && m.matched),
+          evidence: m && m.evidence != null ? String(m.evidence).slice(0, 300) : null,
+          cvLineRef: null,
+          weight: null,
+        })),
       };
     }
     const record = insertAudit({
@@ -388,10 +396,7 @@ router.get('/report/:id', async (req, res) => {
     const record = getAuditById(req.params.id, req.orgId);
     if (!record) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
     const branding = resolveBranding(getOrganizationBranding(req.orgId));
-    const supportEmail = process.env.SUPPORT_EMAIL || null;
-    const html = renderCandidateReport(record, branding, supportEmail);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(html);
+    return streamReport(record, res, `cvsprings-report-${record.id}.pdf`, branding);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
