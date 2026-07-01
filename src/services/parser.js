@@ -30,29 +30,50 @@ async function extractText(filePath, mimetype) {
   );
 }
 
+// pdf-parse is intermittently flaky (the same file can throw "bad XRef entry"
+// then parse on a retry), so the THROW path is retried a bounded number of
+// times. The EMPTY-text path (scanned/image PDF) is NOT retried — re-parsing
+// an image won't produce text. Both exhaustion cases return 422 (unprocessable
+// client input), not 500. The original pdf-parse error is preserved on .cause
+// for server-side logging.
+const PDF_PARSE_RETRIES = 2; // total attempts = 1 + PDF_PARSE_RETRIES
+const PDF_RETRY_DELAY_MS = 150;
+
 async function extractFromPdf(filePath) {
   const fs = require('fs');
   const buffer = fs.readFileSync(filePath);
+  const maxAttempts = PDF_PARSE_RETRIES + 1;
+  let lastParseError = null;
 
-  let data;
-  try {
-    data = await pdfParse(buffer);
-  } catch (err) {
-    throw Object.assign(
-      new Error('File may be image-based — text could not be extracted from PDF.'),
-      { statusCode: 500 }
-    );
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let data;
+    try {
+      data = await pdfParse(buffer);
+    } catch (err) {
+      lastParseError = err;
+      console.warn('[parser] pdf-parse attempt ' + attempt + '/' + maxAttempts +
+        ' failed: ' + (err && err.name ? err.name + ': ' : '') + (err && err.message));
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, PDF_RETRY_DELAY_MS));
+        continue;
+      }
+      const e = Object.assign(
+        new Error('This PDF could not be read — the file may be corrupted or malformed. Try re-saving or re-exporting it, then upload again.'),
+        { statusCode: 422, code: 'UNPROCESSABLE_FILE' }
+      );
+      e.cause = lastParseError;
+      throw e;
+    }
+    // Parsed successfully — check for empty text (scanned/image PDF). No retry.
+    const text = (data.text || '').trim();
+    if (!text) {
+      throw Object.assign(
+        new Error('No text could be extracted — this PDF appears to be a scanned image. Upload a text-based PDF or an OCR-processed version.'),
+        { statusCode: 422, code: 'IMAGE_ONLY_PDF' }
+      );
+    }
+    return text;
   }
-
-  const text = (data.text || '').trim();
-  if (!text) {
-    throw Object.assign(
-      new Error('File may be image-based — text could not be extracted from PDF.'),
-      { statusCode: 500 }
-    );
-  }
-
-  return text;
 }
 
 async function extractFromDocx(filePath) {
@@ -60,20 +81,20 @@ async function extractFromDocx(filePath) {
   try {
     result = await mammoth.extractRawText({ path: filePath });
   } catch (err) {
-    throw Object.assign(
-      new Error('Could not parse DOCX file. The file may be corrupt or unsupported.'),
-      { statusCode: 500 }
+    const e = Object.assign(
+      new Error('This DOCX file could not be read — it may be corrupted. Try re-saving it, then upload again.'),
+      { statusCode: 422, code: 'UNPROCESSABLE_FILE' }
     );
+    e.cause = err;
+    throw e;
   }
-
   const text = (result.value || '').trim();
   if (!text) {
     throw Object.assign(
-      new Error('No text could be extracted from the DOCX file.'),
-      { statusCode: 500 }
+      new Error('No text could be extracted from this DOCX file — it appears to be empty.'),
+      { statusCode: 422, code: 'EMPTY_FILE' }
     );
   }
-
   return text;
 }
 
