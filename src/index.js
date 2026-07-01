@@ -50,10 +50,11 @@ app.use(helmet({
       // Inline handlers/scripts in the single-file app require 'unsafe-inline'.
       // Stripe.js is loaded only if Checkout redirects in-page; allow its host.
       scriptSrc: ["'self'", "'unsafe-inline'", 'https://plausible.io', 'https://js.stripe.com'],
-      // Allow inline event-handler attributes (onclick=…, onchange=…) used
-      // throughout the single-file app. Overrides helmet's default
-      // script-src-attr 'none' (from useDefaults), which otherwise blocks them.
-      scriptSrcAttr: ["'unsafe-inline'"],
+      // Inline event-handler attributes were removed from the frontend (handlers
+      // are wired via data-action + delegated listeners), so attribute handlers
+      // are blocked by design. scriptSrc keeps 'unsafe-inline' for the inline
+      // <script> block (removing that is a separate Level 2 change).
+      scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:'],

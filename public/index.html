@@ -877,34 +877,34 @@ img, video, table { max-width: 100%; }
     <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CV Springs Logo" style="object-fit:contain;flex-shrink:0;filter:invert(1) brightness(1.15);mix-blend-mode:screen;"></span>
     <span class="brand-name">CV<em>springs</em></span>
   </a>
-  <button class="mobile-menu-button" type="button" aria-label="Open menu" aria-expanded="false" onclick="var n=document.querySelector('nav.topbar-nav');var o=n.classList.toggle('mobile-open');this.setAttribute('aria-expanded',o);">☰</button>
+  <button class="mobile-menu-button" type="button" aria-label="Open menu" aria-expanded="false" data-action="toggleMobileNav">☰</button>
   <nav class="topbar-nav">
-    <button class="nav-btn active" onclick="switchTab('analyzer',this)">Analyzer</button>
-    <button class="nav-btn" onclick="switchTab('audit',this)">Audit Log</button>
-    <button class="nav-btn" onclick="switchTab('history',this)">Role History</button>
+    <button class="nav-btn active" data-action="switchTab" data-tab="analyzer">Analyzer</button>
+    <button class="nav-btn" data-action="switchTab" data-tab="audit">Audit Log</button>
+    <button class="nav-btn" data-action="switchTab" data-tab="history">Role History</button>
     <a class="nav-btn" href="/bias-report.html" style="text-decoration:none;display:inline-block">Bias Report</a>
   </nav>
   <span class="nav-status-pill" id="navStatusPill" title="Backend status"><span class="dot" id="navStatusDot"></span><span id="navStatusLabel">Not connected</span></span>
-  <button type="button" class="nav-search-btn" id="navSearchBtn" onclick="focusAuditSearch()" title="Search audit log" aria-label="Search audit log">
+  <button type="button" class="nav-search-btn" id="navSearchBtn" data-action="focusAuditSearch" title="Search audit log" aria-label="Search audit log">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
   </button>
   <span class="plan-chip" id="planChip" title="Your plan"><span class="plan-dot"></span><span id="planChipLabel"></span></span>
-  <span class="account-chip" id="accountChip"><span class="acct-email" id="accountEmail"></span><button type="button" id="logoutBtn" onclick="doLogout()">Logout</button></span>
-  <button class="settings-btn" onclick="toggleSettings()" title="Settings" aria-label="Open settings">&#9881;</button>
+  <span class="account-chip" id="accountChip"><span class="acct-email" id="accountEmail"></span><button type="button" id="logoutBtn" data-action="doLogout">Logout</button></span>
+  <button class="settings-btn" data-action="toggleSettings" title="Settings" aria-label="Open settings">&#9881;</button>
 </div>
 
 <!-- Config bar -->
 <!-- Settings overlay -->
-<div class="settings-overlay" id="settingsOverlay" onclick="toggleSettings()"></div>
+<div class="settings-overlay" id="settingsOverlay" data-action="toggleSettings"></div>
 <!-- Settings panel -->
 <div class="settings-panel" id="settingsPanel">
-  <button class="settings-close" onclick="toggleSettings()" aria-label="Close settings">&#215;</button>
+  <button class="settings-close" data-action="toggleSettings" aria-label="Close settings">&#215;</button>
   <h3>Plan &amp; Billing</h3>
   <div class="plan-status-line" id="planStatusLine">Loading plan&hellip;</div>
   <div class="plan-row" id="planOwnerControls" style="display:none">
-    <button class="btn btn-primary btn-sm" id="upgradeProBtn" onclick="startCheckout('pro')">Upgrade to Pro</button>
-    <button class="btn btn-primary btn-sm" id="upgradeTeamBtn" onclick="startCheckout('team')">Upgrade to Team</button>
-    <button class="btn btn-ghost btn-sm" id="manageBillingBtn" onclick="openBillingPortal()" style="display:none">Manage billing</button>
+    <button class="btn btn-primary btn-sm" id="upgradeProBtn" data-action="startCheckout" data-plan="pro">Upgrade to Pro</button>
+    <button class="btn btn-primary btn-sm" id="upgradeTeamBtn" data-action="startCheckout" data-plan="team">Upgrade to Team</button>
+    <button class="btn btn-ghost btn-sm" id="manageBillingBtn" data-action="openBillingPortal" style="display:none">Manage billing</button>
   </div>
   <div class="plan-status-line" id="planMemberNote" style="display:none;color:#9ca3af">Your plan is managed by your organization&rsquo;s owner.</div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
@@ -913,12 +913,12 @@ img, video, table { max-width: 100%; }
   <!-- owner-only invite controls (hidden for members / non-team) -->
   <div id="teamInviteRow" class="settings-row" style="display:none;gap:8px;margin-top:10px">
     <input class="text-input" type="email" id="inviteEmail" placeholder="colleague@company.com" style="flex:1" aria-label="Invite email">
-    <button class="btn btn-primary btn-sm" id="inviteBtn" onclick="inviteMember()">Invite</button>
+    <button class="btn btn-primary btn-sm" id="inviteBtn" data-action="inviteMember">Invite</button>
   </div>
   <div id="inviteLinkRow" style="display:none;margin-top:8px">
     <div class="settings-row" style="gap:8px">
       <input class="text-input" type="text" id="inviteLink" readonly style="flex:1" aria-label="Invite link">
-      <button class="btn btn-ghost btn-sm" id="copyInviteBtn" onclick="copyInviteLink()">Copy link</button>
+      <button class="btn btn-ghost btn-sm" id="copyInviteBtn" data-action="copyInviteLink">Copy link</button>
     </div>
     <div id="inviteLinkNote" style="font-size:11px;color:#6b7280;margin-top:4px">Send this link to your colleague.</div>
   </div>
@@ -934,14 +934,14 @@ img, video, table { max-width: 100%; }
     <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:8px">
       <span style="font-size:13px;color:#374151">Brand colour</span>
       <input class="text-input" type="text" id="brandColor" placeholder="#0f2847" style="width:110px" aria-label="Brand colour (hex)">
-      <button class="btn btn-primary btn-sm" id="brandSaveBtn" onclick="saveBranding()">Save</button>
+      <button class="btn btn-primary btn-sm" id="brandSaveBtn" data-action="saveBranding">Save</button>
     </div>
     <div style="font-size:11px;color:#6b7280;margin-top:4px">Applied to candidate PDF reports. Leave blank to use the CVsprings (Chaulin) defaults. Logo must be an http(s) URL.</div>
   </div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3 style="margin-top:0">Preferences</h3>
   <label class="settings-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#374151">
-    <input type="checkbox" id="autosaveBatchToggle" onchange="setAutosaveBatch(this.checked)">
+    <input type="checkbox" id="autosaveBatchToggle" data-action="setAutosaveBatch">
     <span>Auto-save batch results to audit log</span>
   </label>
   <div style="font-size:11px;color:#6b7280;margin-top:4px;margin-left:24px">When enabled, every CV in a batch is saved to the audit log automatically once analysis completes.</div>
@@ -972,7 +972,7 @@ img, video, table { max-width: 100%; }
     <input class="text-input" type="number" id="setScoreThreshold" min="1" max="99" style="width:80px" aria-label="Strong fit score threshold">
   </div>
   <div class="settings-row" style="display:flex;align-items:center;gap:10px;margin-top:12px">
-    <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save Settings</button>
+    <button class="btn btn-primary btn-sm" data-action="saveSettings">Save Settings</button>
     <span id="settingsSavedMsg" style="font-size:12px;color:#059669;font-weight:700;display:none">Settings saved</span>
   </div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
@@ -984,7 +984,7 @@ img, video, table { max-width: 100%; }
     <input class="text-input" type="password" id="cpNew" placeholder="New password (min 10 characters)" autocomplete="new-password" style="flex:1" aria-label="New password">
   </div>
   <div class="settings-row" style="margin-top:10px">
-    <button class="btn btn-primary btn-sm" id="cpSaveBtn" onclick="changePassword()">Update Password</button>
+    <button class="btn btn-primary btn-sm" id="cpSaveBtn" data-action="changePassword">Update Password</button>
   </div>
   <div style="font-size:11px;color:#6b7280;margin-top:4px">Updating your password signs you out on all other devices.</div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
@@ -992,14 +992,14 @@ img, video, table { max-width: 100%; }
   <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:6px">
     <input class="text-input" type="number" id="setRetentionDays" min="0" max="1095" style="width:90px" aria-label="Audit retention in days">
     <span style="font-size:13px;color:#374151">days</span>
-    <button class="btn btn-primary btn-sm" id="retSaveBtn" onclick="saveRetention()">Save</button>
+    <button class="btn btn-primary btn-sm" id="retSaveBtn" data-action="saveRetention">Save</button>
   </div>
   <div style="font-size:11px;color:#6b7280;margin-top:4px">Audit records older than this are <strong>permanently deleted</strong> by a daily job (including their change history). Allowed: 30&ndash;1095, or 0 to keep records until manually deleted. Applies to your whole organization.</div>
   <div id="retOwnerNote" style="display:none;font-size:11px;color:#9ca3af;margin-top:4px">Only the organization owner can change retention and use the controls below.</div>
   <h3 style="margin-top:18px">Organization Data</h3>
   <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:6px">
-    <button class="btn btn-ghost btn-sm" id="orgExportBtn" onclick="exportOrgData()">Export all data (JSON)</button>
-    <button class="btn btn-danger btn-sm" id="orgDeleteBtn" onclick="deleteAllOrgData()">Delete all audit data</button>
+    <button class="btn btn-ghost btn-sm" id="orgExportBtn" data-action="exportOrgData">Export all data (JSON)</button>
+    <button class="btn btn-danger btn-sm" id="orgDeleteBtn" data-action="deleteAllOrgData">Delete all audit data</button>
   </div>
   <div style="font-size:11px;color:#6b7280;margin-top:4px">Export downloads every audit record (incl. change history) and template in your organization. Delete permanently removes all audit records and change history &mdash; it cannot be undone.</div>
 </div>
@@ -1009,8 +1009,8 @@ img, video, table { max-width: 100%; }
   <div class="tool-section" id="analyzer-tool">
 
   <div class="mode-toggle">
-    <button class="mode-btn active" id="modeSingle" onclick="setMode('single')">Single CV</button>
-    <button class="mode-btn" id="modeBatch" onclick="setMode('batch')">Batch Upload</button>
+    <button class="mode-btn active" id="modeSingle" data-action="setMode" data-mode="single">Single CV</button>
+    <button class="mode-btn" id="modeBatch" data-action="setMode" data-mode="batch">Batch Upload</button>
   </div>
 
   <!-- How it works -->
@@ -1032,7 +1032,7 @@ img, video, table { max-width: 100%; }
 
   <!-- First-run onboarding: try with a sample (no upload/JD needed) -->
   <div class="sample-row">
-    <button class="btn btn-ghost" id="trySampleBtn" onclick="trySample()">
+    <button class="btn btn-ghost" id="trySampleBtn" data-action="trySample">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/></svg>
       <span>Try with a sample CV</span>
     </button>
@@ -1042,17 +1042,14 @@ img, video, table { max-width: 100%; }
   <!-- Sample result notice (shown above results when viewing the sample) -->
   <div class="msg msg-warn" id="sampleBanner" style="display:none;align-items:center;gap:10px">
     <span style="flex:1">This is a sample result. Upload your own CV and job description to analyse for real.</span>
-    <button type="button" class="btn btn-ghost btn-sm" onclick="clearSample()">Clear sample</button>
+    <button type="button" class="btn btn-ghost btn-sm" data-action="clearSample">Clear sample</button>
   </div>
 
   <div class="card">
     <div class="card-head"><span class="card-title" id="uploadCardTitle">Upload CV</span></div>
     <div class="card-body">
-      <div class="dropzone" id="dropzone"
-        ondragover="event.preventDefault();this.classList.add('drag')"
-        ondragleave="this.classList.remove('drag')"
-        ondrop="handleDrop(event)">
-        <input type="file" id="cvInput" accept=".pdf,.docx" onchange="handleFiles(this.files)">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="cvInput" accept=".pdf,.docx" data-action="handleFiles">
         <div class="dz-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
@@ -1082,7 +1079,7 @@ img, video, table { max-width: 100%; }
     <div class="card-head" style="position:relative">
       <span class="card-title">Job Description</span>
       <div class="tpl-wrap" id="tplWrap">
-        <button class="tpl-trigger" id="tplTrigger" onclick="toggleTplPanel(event)">
+        <button class="tpl-trigger" id="tplTrigger" data-action="toggleTplPanel">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/></svg>
           Templates
           <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
@@ -1090,7 +1087,7 @@ img, video, table { max-width: 100%; }
         <div class="tpl-panel" id="tplPanel">
           <div class="tpl-panel-head">
             <span>Saved Templates</span>
-            <button class="tpl-save-btn" onclick="saveTemplate()">+ Save Current</button>
+            <button class="tpl-save-btn" data-action="saveTemplate">+ Save Current</button>
           </div>
           <div class="tpl-migration-banner" id="tplMigrationBanner" style="display:none;align-items:center;gap:10px;padding:10px 12px;margin:0 0 10px 0;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:13px;color:#7c2d12">
             <span style="flex:1">You have <strong class="tpl-mig-count">0</strong> templates saved locally. Upload them to your account?</span>
@@ -1116,25 +1113,25 @@ img, video, table { max-width: 100%; }
     </div>
     <div class="card-body">
       <div class="weights-grid">
-        <div class="w-card"><div class="w-name">Keywords</div><div class="w-desc">Job title &amp; role terms</div><input class="w-input" type="number" id="wKw" value="40" min="0" max="100" oninput="syncSlider('wKw');updateWeightSum()">
-          <input type="range" class="w-slider" id="wKwSlider" min="0" max="100" value="40" oninput="syncInput('wKw');updateWeightSum()"></div>
-        <div class="w-card"><div class="w-name">Skills</div><div class="w-desc">Technical &amp; soft skills</div><input class="w-input" type="number" id="wSk" value="30" min="0" max="100" oninput="syncSlider('wSk');updateWeightSum()">
-          <input type="range" class="w-slider" id="wSkSlider" min="0" max="100" value="30" oninput="syncInput('wSk');updateWeightSum()"></div>
-        <div class="w-card"><div class="w-name">Experience</div><div class="w-desc">Years &amp; seniority level</div><input class="w-input" type="number" id="wEx" value="20" min="0" max="100" oninput="syncSlider('wEx');updateWeightSum()">
-          <input type="range" class="w-slider" id="wExSlider" min="0" max="100" value="20" oninput="syncInput('wEx');updateWeightSum()"></div>
-        <div class="w-card"><div class="w-name">Education</div><div class="w-desc">Degrees &amp; qualifications</div><input class="w-input" type="number" id="wEd" value="10" min="0" max="100" oninput="syncSlider('wEd');updateWeightSum()">
-          <input type="range" class="w-slider" id="wEdSlider" min="0" max="100" value="10" oninput="syncInput('wEd');updateWeightSum()"></div>
+        <div class="w-card"><div class="w-name">Keywords</div><div class="w-desc">Job title &amp; role terms</div><input class="w-input" type="number" id="wKw" value="40" min="0" max="100" data-action="syncSlider" data-weight="wKw">
+          <input type="range" class="w-slider" id="wKwSlider" min="0" max="100" value="40" data-action="syncInput" data-weight="wKw"></div>
+        <div class="w-card"><div class="w-name">Skills</div><div class="w-desc">Technical &amp; soft skills</div><input class="w-input" type="number" id="wSk" value="30" min="0" max="100" data-action="syncSlider" data-weight="wSk">
+          <input type="range" class="w-slider" id="wSkSlider" min="0" max="100" value="30" data-action="syncInput" data-weight="wSk"></div>
+        <div class="w-card"><div class="w-name">Experience</div><div class="w-desc">Years &amp; seniority level</div><input class="w-input" type="number" id="wEx" value="20" min="0" max="100" data-action="syncSlider" data-weight="wEx">
+          <input type="range" class="w-slider" id="wExSlider" min="0" max="100" value="20" data-action="syncInput" data-weight="wEx"></div>
+        <div class="w-card"><div class="w-name">Education</div><div class="w-desc">Degrees &amp; qualifications</div><input class="w-input" type="number" id="wEd" value="10" min="0" max="100" data-action="syncSlider" data-weight="wEd">
+          <input type="range" class="w-slider" id="wEdSlider" min="0" max="100" value="10" data-action="syncInput" data-weight="wEd"></div>
       </div>
     </div>
   </div>
 
   <div id="analyzeError" role="alert" aria-live="polite"></div>
   <div style="display:flex;gap:10px;margin-bottom:6px">
-    <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()">
+    <button class="btn btn-primary" id="analyzeBtn" data-action="analyze">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       Analyze
     </button>
-    <button class="btn btn-ghost" onclick="clearResults()">Clear</button>
+    <button class="btn btn-ghost" data-action="clearResults">Clear</button>
   <span class="kbd-hint">Press <kbd>Enter</kbd> to analyze</span>
   </div>
 
@@ -1144,8 +1141,8 @@ img, video, table { max-width: 100%; }
       <div class="card-head">
         <span class="card-title" id="resultName">Results</span>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-ghost btn-sm" onclick="saveToAudit()">Save to Audit</button>
-          <button class="btn btn-ghost btn-sm" onclick="openReport()">
+          <button class="btn btn-ghost btn-sm" data-action="saveToAudit">Save to Audit</button>
+          <button class="btn btn-ghost btn-sm" data-action="openReport">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             Report
           </button>
@@ -1163,7 +1160,7 @@ img, video, table { max-width: 100%; }
           <thead><tr><th>Skill</th><th>Status</th></tr></thead><tbody></tbody>
         </table>
         <div style="margin-bottom:12px">
-          <button class="why-toggle" onclick="toggleWhy('singleWhy',this)">
+          <button class="why-toggle" data-action="toggleWhy" data-why="singleWhy">
             <span>Why this score?</span><span class="why-arrow">&#9660;</span>
           </button>
           <div class="why-box" id="singleWhy"></div>
@@ -1192,7 +1189,7 @@ img, video, table { max-width: 100%; }
           <textarea class="textarea" id="noteInput" rows="2" placeholder="Optional recruiter notes..."></textarea>
         </div>
         <div style="padding-top:22px">
-          <button class="btn btn-primary btn-sm" onclick="saveToAudit()">Save</button>
+          <button class="btn btn-primary btn-sm" data-action="saveToAudit">Save</button>
         </div>
       </div>
     </div>
@@ -1204,9 +1201,9 @@ img, video, table { max-width: 100%; }
       <div class="card-head">
         <span class="card-title" id="batchTitle">Batch Results</span>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-ghost btn-sm" onclick="saveAllToAudit()">Save All to Audit</button>
-          <button class="btn btn-ghost btn-sm" onclick="exportBatchCsv()">Export CSV</button>
-          <button class="print-btn" onclick="window.print()" title="Print / Save as PDF">&#128438; Print Report</button>
+          <button class="btn btn-ghost btn-sm" data-action="saveAllToAudit">Save All to Audit</button>
+          <button class="btn btn-ghost btn-sm" data-action="exportBatchCsv">Export CSV</button>
+          <button class="print-btn" data-action="printPage" title="Print / Save as PDF">&#128438; Print Report</button>
         </div>
       </div>
       <div class="batch-summary" id="batchSummary" style="display:none">
@@ -1218,8 +1215,8 @@ img, video, table { max-width: 100%; }
       <div style="overflow-x:auto">
         <div class="batch-controls">
           <label>Sort by</label>
-          <button class="sort-btn active" id="sortScore" onclick="sortBatch('score')">Score <span class="sort-arrow" id="arrowScore">&#9660;</span></button>
-          <button class="sort-btn" id="sortName" onclick="sortBatch('name')">Name <span class="sort-arrow" id="arrowName">&#9660;</span></button>
+          <button class="sort-btn active" id="sortScore" data-action="sortBatch" data-sort="score">Score <span class="sort-arrow" id="arrowScore">&#9660;</span></button>
+          <button class="sort-btn" id="sortName" data-action="sortBatch" data-sort="name">Name <span class="sort-arrow" id="arrowName">&#9660;</span></button>
         </div>
         <div class="oversight-hint" style="margin-bottom:10px">Decisions are made by you, not by the AI. Scores are a decision aid.</div>
         <table class="lb" id="batchTable">
@@ -1239,19 +1236,19 @@ img, video, table { max-width: 100%; }
 <!-- === AUDIT LOG === -->
 <div class="tab-content main" id="tab-audit">
   <div class="audit-tb audit-tb-stack">
-    <div class="audit-tb-row"><input class="text-input" type="text" id="auditSearch" placeholder="Search candidate..." oninput="filterAudit()" style="width:100%"></div>
-    <div class="audit-tb-row"><select class="text-input" id="auditDecisionFilter" onchange="filterAudit()" style="width:100%">
+    <div class="audit-tb-row"><input class="text-input" type="text" id="auditSearch" placeholder="Search candidate..." data-action="filterAudit" style="width:100%"></div>
+    <div class="audit-tb-row"><select class="text-input" id="auditDecisionFilter" data-action="filterAudit" style="width:100%">
       <option value="">All decisions</option>
       <option value="shortlist">Shortlist</option>
       <option value="hold">Hold</option>
       <option value="reject">Reject</option>
     </select></div>
-    <div class="audit-tb-row"><select class="text-input" id="auditRoleFilter" onchange="filterAudit()" style="width:100%">
+    <div class="audit-tb-row"><select class="text-input" id="auditRoleFilter" data-action="filterAudit" style="width:100%">
       <option value="">All roles</option>
     </select></div>
     <div class="audit-tb-row audit-tb-actions">
-      <button class="btn btn-ghost btn-sm" onclick="loadAudit()">&#8635; Refresh</button>
-      <button class="btn btn-ghost btn-sm" onclick="exportAuditCsv()">Export CSV</button>
+      <button class="btn btn-ghost btn-sm" data-action="loadAudit">&#8635; Refresh</button>
+      <button class="btn btn-ghost btn-sm" data-action="exportAuditCsv">Export CSV</button>
     </div>
   </div>
   <div class="msg msg-err" id="auditError"></div>
@@ -1275,7 +1272,7 @@ img, video, table { max-width: 100%; }
   <div class="card">
     <div class="card-head">
       <span class="card-title">Score History by Role</span>
-      <button class="btn btn-ghost btn-sm" onclick="loadRoles()">&#8635; Refresh</button>
+      <button class="btn btn-ghost btn-sm" data-action="loadRoles">&#8635; Refresh</button>
     </div>
     <div class="card-body">
       <div class="role-tabs" id="roleTabs"></div>
@@ -2041,7 +2038,7 @@ function handleDrop(ev){ev.preventDefault();document.getElementById('dropzone').
 function removeFile(name){selectedFiles=selectedFiles.filter(f=>f.name!==name);renderFileList();}
 function renderFileList(){
   document.getElementById('fileList').innerHTML=selectedFiles.map(f=>
-    '<div class="file-chip"><span>'+f.name+'</span><button onclick="removeFile(\''+f.name+'\')">&#x2715;</button></div>'
+    '<div class="file-chip"><span>'+escHtml(f.name)+'</span><button data-action="removeFile" data-file="'+escHtml(f.name)+'">&#x2715;</button></div>'
   ).join('');
 }
 
@@ -2357,7 +2354,7 @@ function renderAuditTable(records){
     const hasFilters=!!(auditFilter.search||auditFilter.decision||auditFilter.role);
     const msg=hasFilters?'No audit records match these filters':'No audit records yet';
     const sub=hasFilters?'Try clearing your filters or adjust the search.':'Analyse a CV and click "Save to audit" to start tracking decisions.';
-    const btn=hasFilters?'<button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="clearAuditFilters()">Clear filters</button>':'';
+    const btn=hasFilters?'<button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px" data-action="clearAuditFilters">Clear filters</button>':'';
     const icon='<div class="empty-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
     tb.innerHTML='<tr><td colspan="12"><div class="empty-state-rich">'+icon+'<div class="empty-title">'+msg+'</div><div class="empty-sub">'+sub+'</div>'+btn+'</div></td></tr>';return;
   }
@@ -3169,7 +3166,7 @@ function toggleBatchWhy(btn, idx){
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-section">
-      <h4><button class="footer-link" onclick="openInfoModal(0)">How Scores Are Calculated</button></h4>
+      <h4><button class="footer-link" data-action="openInfoModal" data-index="0">How Scores Are Calculated</button></h4>
       <p>Each CV's text is analysed by a deterministic matching algorithm that extracts keywords, skills, experience and education signals and compares them against your job description. Four sub-scores are produced (KW, SK, EX, ED) and combined using the weights you set in the Scoring Weights panel to produce a single Overall Fit score out of 100. The same rules are applied identically to every CV.</p>
     </div>
     <div class="footer-section">
@@ -3178,22 +3175,22 @@ function toggleBatchWhy(btn, idx){
     </div>
   </div>
   <div class="footer-bottom">
-    <span>CVsprings &mdash; AI-powered candidate fit analysis &nbsp;|&nbsp; <button class="footer-link" onclick="openInfoModal(1)">About &amp; Contact</button> &nbsp;|&nbsp; <a class="footer-link" href="/terms.html">Terms</a> &nbsp;|&nbsp; <a class="footer-link" href="/privacy.html">Privacy Policy</a> &nbsp;|&nbsp; <a class="footer-link" href="/compliance.html">EU AI Act compliance</a> &nbsp;|&nbsp; <a class="footer-link" href="/bias-report.html">Bias &amp; monitoring</a> &nbsp;|&nbsp; <a class="footer-link" href="/integrations.html">Integrations &amp; API</a></span>
+    <span>CVsprings &mdash; AI-powered candidate fit analysis &nbsp;|&nbsp; <button class="footer-link" data-action="openInfoModal" data-index="1">About &amp; Contact</button> &nbsp;|&nbsp; <a class="footer-link" href="/terms.html">Terms</a> &nbsp;|&nbsp; <a class="footer-link" href="/privacy.html">Privacy Policy</a> &nbsp;|&nbsp; <a class="footer-link" href="/compliance.html">EU AI Act compliance</a> &nbsp;|&nbsp; <a class="footer-link" href="/bias-report.html">Bias &amp; monitoring</a> &nbsp;|&nbsp; <a class="footer-link" href="/integrations.html">Integrations &amp; API</a></span>
     <span>Scores are AI-generated and intended as a decision aid, not a final verdict.</span>
   </div>
 </footer>
 
 
 <!-- Info Modal (How Scores + About) -->
-<div id="infoModal" class="modal-backdrop" onclick="if(event.target===this)closeInfoModal()">
+<div id="infoModal" class="modal-backdrop" data-action="closeInfoModalBackdrop">
   <div class="modal-box">
     <div class="modal-head">
       <h3 id="infoModalTitle">How Scores Are Calculated</h3>
-      <button class="modal-close" onclick="closeInfoModal()" aria-label="Close">&times;</button>
+      <button class="modal-close" data-action="closeInfoModal" aria-label="Close">&times;</button>
     </div>
     <div class="modal-tabs">
-      <button class="modal-tab active" id="tab0" onclick="switchModalTab(0)">How Scores Work</button>
-      <button class="modal-tab" id="tab1" onclick="switchModalTab(1)">About &amp; Contact</button>
+      <button class="modal-tab active" id="tab0" data-action="switchModalTab" data-index="0">How Scores Work</button>
+      <button class="modal-tab" id="tab1" data-action="switchModalTab" data-index="1">About &amp; Contact</button>
     </div>
     <div class="modal-body">
       <div id="tabPanel0">
@@ -3348,6 +3345,10 @@ keepAlive();
     if (dragCounter <= 0) { dragCounter = 0; dz.classList.remove('drag'); }
   });
   document.addEventListener('drop', function(){ dragCounter = 0; dz.classList.remove('drag'); });
+  // Inline ondragover/ondrop were removed for CSP; wired here instead.
+  // dragover must preventDefault so the dropzone is a valid drop target.
+  dz.addEventListener('dragover', function(e){ e.preventDefault(); });
+  dz.addEventListener('drop', function(e){ handleDrop(e); });
 })();
 </script>
 <script>
@@ -3370,6 +3371,63 @@ keepAlive();
     plausible('sample_viewed');
   });
 })();
+
+/* ── Event delegation (CSP hardening) ────────────────────────────────────────
+   Inline on* handler attributes were removed so the CSP can set
+   script-src-attr 'none'. Every interactive element now carries a data-action
+   (plus data-* args); they are wired with delegated listeners here. This stays
+   in the inline <script> (covered by script-src 'unsafe-inline'). Handlers are
+   namespaced per event type so an element's action only fires for its intended
+   event (e.g. the file input's "handleFiles" fires on change, not on click). */
+function toggleMobileNav(el){
+  const n = document.querySelector('nav.topbar-nav');
+  const o = n.classList.toggle('mobile-open');
+  el.setAttribute('aria-expanded', o);
+}
+const delegatedHandlers = {
+  click: {
+    toggleMobileNav,
+    switchTab: (el) => switchTab(el.dataset.tab, el),
+    focusAuditSearch, doLogout, toggleSettings,
+    startCheckout: (el) => startCheckout(el.dataset.plan),
+    openBillingPortal, inviteMember, copyInviteLink, saveBranding,
+    saveSettings, changePassword, saveRetention, exportOrgData, deleteAllOrgData,
+    setMode: (el) => setMode(el.dataset.mode),
+    trySample, clearSample,
+    toggleTplPanel: (el, e) => toggleTplPanel(e),
+    saveTemplate, analyze, clearResults, saveToAudit, openReport,
+    toggleWhy: (el) => toggleWhy(el.dataset.why, el),
+    saveAllToAudit, exportBatchCsv,
+    printPage: () => window.print(),
+    sortBatch: (el) => sortBatch(el.dataset.sort),
+    loadAudit, exportAuditCsv, loadRoles,
+    removeFile: (el) => removeFile(el.dataset.file),
+    clearAuditFilters,
+    openInfoModal: (el) => openInfoModal(Number(el.dataset.index)),
+    switchModalTab: (el) => switchModalTab(Number(el.dataset.index)),
+    closeInfoModal,
+    closeInfoModalBackdrop: (el, e) => { if (e.target === el) closeInfoModal(); },
+  },
+  change: {
+    setAutosaveBatch: (el) => setAutosaveBatch(el.checked),
+    handleFiles: (el) => handleFiles(el.files),
+    filterAudit,
+  },
+  input: {
+    syncSlider: (el) => { syncSlider(el.dataset.weight); updateWeightSum(); },
+    syncInput: (el) => { syncInput(el.dataset.weight); updateWeightSum(); },
+    filterAudit,
+  },
+};
+Object.keys(delegatedHandlers).forEach(function(eventType){
+  const map = delegatedHandlers[eventType];
+  document.addEventListener(eventType, function(e){
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const fn = map[el.dataset.action];
+    if (typeof fn === 'function') fn(el, e);
+  });
+});
 </script>
 </body>
 </html>
