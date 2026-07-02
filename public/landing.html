@@ -101,7 +101,7 @@
 </style>
 <!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
 <script defer data-domain="cvsprings.onrender.com" src="https://plausible.io/js/script.tagged-events.js"></script>
-<script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+<script nonce="__CSP_NONCE__">window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
 <body>
 
@@ -216,7 +216,7 @@
   </div>
 </footer>
 
-<script>
+<script nonce="__CSP_NONCE__">
   // ----- Pricing period toggle (persisted; intent flow wired in Phase 2A Section 5 commit) -----
   (function () {
     const mBtn = document.getElementById('period-monthly');
