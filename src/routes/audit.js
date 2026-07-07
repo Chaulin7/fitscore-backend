@@ -17,6 +17,24 @@ function sendError(res, status, code, message, field) {
   return res.status(status).json(body);
 }
 
+// Extraction provenance (engine/version/text-hash) recorded with the
+// assessment. Values are server-produced by /api/analyze and echoed back by
+// the client on save; sanitized to fixed shapes so nothing arbitrary lands
+// in the row. The sha256 must be exactly 64 hex chars or it is dropped.
+function sanitizeExtraction(ex) {
+  if (!ex || typeof ex !== 'object') return null;
+  const str = (v, max) => (v == null ? null : String(v).slice(0, max));
+  const int = (v) => (Number.isFinite(v) ? Math.round(v) : null);
+  return {
+    engine: str(ex.engine, 40),
+    engineVersion: str(ex.engineVersion, 24),
+    assemblerVersion: str(ex.assemblerVersion, 24),
+    textSha256: /^[a-f0-9]{64}$/.test(String(ex.textSha256 || '')) ? String(ex.textSha256) : null,
+    pageCount: int(ex.pageCount),
+    charCount: int(ex.charCount),
+  };
+}
+
 // POST /api/audit - save an audit record
 router.post('/', async (req, res) => {
   try {
@@ -42,6 +60,7 @@ router.post('/', async (req, res) => {
           cvLineRef: null,
           weight: null,
         })),
+        extraction: sanitizeExtraction(analysisDetail.extraction),
       };
     }
     const record = insertAudit({

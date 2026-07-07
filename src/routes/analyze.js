@@ -21,8 +21,11 @@ let _sampleCache = null;
 let _sampleCacheKey = null;
 
 // Authoritative server-side checks: content-sniff the type, run the optional
-// AV scan, then extract text under a hard per-file timeout. Returns the
-// extracted text. Throws INVALID_FILE / FILE_REJECTED / PROCESSING_TIMEOUT.
+// AV scan, then deterministic text extraction. Returns { text, sha256, meta }.
+// Throws INVALID_FILE / FILE_REJECTED / UNPROCESSABLE_FILE / IMAGE_ONLY_PDF /
+// PDF_ENCRYPTED / PROCESSING_TIMEOUT. The old 30s wrapper here is gone: the
+// extractor carries its own 60s DoS circuit breaker internally, and with a
+// deterministic engine a timeout is a property of the file, not of the run.
 async function validateAndExtract(file, field) {
   fileSec.validateUploadedFile(file, field);            // magic bytes + size
   const scan = await fileSec.scanFile(file.path);       // no-op unless ENABLE_AV_SCAN
@@ -30,7 +33,20 @@ async function validateAndExtract(file, field) {
     throw Object.assign(new Error('This file was rejected by a security scan.'),
       { statusCode: 400, code: 'FILE_REJECTED', field });
   }
-  return fileSec.withTimeout(extractText(file.path, file.mimetype), fileSec.PROCESS_TIMEOUT_MS, 'CV processing');
+  return extractText(file.path, file.mimetype);
+}
+
+// Extraction provenance for the audit block: engine + versions + the SHA-256
+// of the canonical extracted text (computed BEFORE any anonymization).
+function extractionSummary(extracted) {
+  return {
+    engine: extracted.meta.engine,
+    engineVersion: extracted.meta.engineVersion,
+    assemblerVersion: extracted.meta.assemblerVersion,
+    textSha256: extracted.sha256,
+    pageCount: extracted.meta.pages,
+    charCount: extracted.meta.chars,
+  };
 }
 
 // Plan gate: may this org run `requested` more analyses this period?
@@ -193,12 +209,13 @@ router.post('/', upload.single('cv'), async (req, res) => {
     if (!enforceQuota(req, res, 1)) return;
 
     // Authoritative content validation + optional AV scan + bounded extraction.
-    let cvText;
-    try { cvText = await validateAndExtract(req.file, 'cv'); }
+    let extracted;
+    try { extracted = await validateAndExtract(req.file, 'cv'); }
     catch (e) {
       if (e.code === 'FILE_REJECTED') console.warn('[security] upload rejected by AV scan', { org: req.orgId, file: req.file.originalname });
       return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'cv');
     }
+    let cvText = extracted.text;
     if (anonymize) cvText = anonymizeText(cvText);
 
     const results = scoreCV(cvText, jobDescription, weights);
@@ -209,7 +226,7 @@ router.post('/', upload.single('cv'), async (req, res) => {
     // Meter only after a successful analysis, so failures don't burn quota.
     incrementUsage(req.orgId, 1);
     recordUsage(req, 'analyze_single', 1);
-    res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), ...results });
+    res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), extraction: extractionSummary(extracted), ...results });
   } catch (err) {
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
@@ -255,8 +272,8 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
       filePaths.push(file.path);
       try {
         // Per-file authoritative validation + AV scan + bounded extraction.
-        let cvText;
-        try { cvText = await validateAndExtract(file, 'cvs'); }
+        let extracted;
+        try { extracted = await validateAndExtract(file, 'cvs'); }
         catch (ve) {
           if (ve.code === 'FILE_REJECTED') console.warn('[security] upload rejected by AV scan', { org: req.orgId, file: file.originalname });
           results.push({
@@ -267,12 +284,13 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
           });
           continue;
         }
+        let cvText = extracted.text;
         if (anonymize) cvText = anonymizeText(cvText);
         const scored = scoreCV(cvText, jobDescription, weights);
         const candidateName = anonymize
           ? 'Candidate #' + (results.length + 1)
           : path.basename(file.originalname, path.extname(file.originalname));
-        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), ...scored });
+        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), extraction: extractionSummary(extracted), ...scored });
       } catch (fileErr) {
         results.push({
           candidateName: path.basename(file.originalname, path.extname(file.originalname)),
