@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "node --test src/**/*.test.js 2>&1 || echo 'No tests found or tests failed'"
+    "test": "node --test src/**/*.test.js 2>&1 || echo 'No tests found or tests failed'",
+    "extraction:baseline": "node scripts/extraction-golden.mjs --write",
+    "extraction:verify": "node scripts/extraction-golden.mjs --verify"
   },
   "keywords": [
     "cv",
@@ -30,7 +32,6 @@
     "helmet": "^7.1.0",
     "mammoth": "^1.7.2",
     "multer": "^1.4.5-lts.1",
-    "pdf-parse": "^1.1.1",
     "pdfjs-dist": "5.4.624",
     "pdfmake": "0.2.20",
     "pino": "^9.5.0",
@@ -39,6 +40,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "pdf-parse": "1.1.4"
   }
 }
