@@ -17,6 +17,19 @@ function sendError(res, status, code, message, field) {
   return res.status(status).json(body);
 }
 
+// Extraction provenance is SERVER-BOUND, never trusted from the client. The
+// echoed extraction object contributes only a lookup key (its textSha256);
+// the stored value is the server-held summary that /api/analyze issued for
+// this org (see services/provenanceCache.js). A sha the server never issued
+// — or one that expired / predates a server restart — stores null provenance
+// rather than a client-controlled echo, so the audit hash stays
+// tamper-evident.
+const provenance = require('../services/provenanceCache');
+function bindExtraction(orgId, echoed) {
+  if (!echoed || typeof echoed !== 'object') return null;
+  return provenance.lookup(orgId, echoed.textSha256);
+}
+
 // POST /api/audit - save an audit record
 router.post('/', async (req, res) => {
   try {
@@ -42,6 +55,7 @@ router.post('/', async (req, res) => {
           cvLineRef: null,
           weight: null,
         })),
+        extraction: bindExtraction(req.orgId, analysisDetail.extraction),
       };
     }
     const record = insertAudit({

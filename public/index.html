@@ -2081,7 +2081,7 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
       if (e.status === 429 || e.code === 'RATE_LIMITED') { handleApiError(e); return; }
       if (e.code === 'QUOTA_EXCEEDED') { showQuotaPrompt(errEl, e); return; }
       if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field);
-      if (e.code === 'INVALID_FILE' || e.code === 'FILE_REJECTED') { if (e.field) highlightField(e.field); }
+      if (e.code === 'INVALID_FILE' || e.code === 'FILE_REJECTED' || e.code === 'PDF_ENCRYPTED') { if (e.field) highlightField(e.field); }
       showErr(errEl, e.message || 'Analysis failed'); return;
     }
     lastResult={...data,role,file:file.name};
@@ -2113,7 +2113,7 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
       if (e.status === 429 || e.code === 'RATE_LIMITED') { hideLoading(); handleApiError(e); return; }
       if (e.code === 'QUOTA_EXCEEDED') { hideLoading(); showQuotaPrompt(errEl, e); return; }
       if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field);
-      if (e.code === 'INVALID_FILE' || e.code === 'FILE_REJECTED') { if (e.field) highlightField(e.field); }
+      if (e.code === 'INVALID_FILE' || e.code === 'FILE_REJECTED' || e.code === 'PDF_ENCRYPTED') { if (e.field) highlightField(e.field); }
       showErr(errEl, e.message || 'Batch failed'); return;
     }
     setProgress(80,'Comparing against job description...');
@@ -2229,7 +2229,7 @@ async function saveToAudit(){
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:document.getElementById('roleInput').value.trim(),anonymized:lastResult.anonymized||false,
     appVersion:CVSPRINGS_VERSION,modelId:lastResult.modelId||null,analysisTimestamp:lastResult.analysisTimestamp||null,
-    analysisDetail:{found:lastResult.found||[],missing:lastResult.missing||[],skills:lastResult.skills||[],recommendations:lastResult.recommendations||[],matches:lastResult.matches||[]}};
+    analysisDetail:{found:lastResult.found||[],missing:lastResult.missing||[],skills:lastResult.skills||[],recommendations:lastResult.recommendations||[],matches:lastResult.matches||[],extraction:lastResult.extraction||null}};
   try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
     lastResult._auditId=d.id;toast('Saved to audit log.','success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'single',role:(lastResult&&lastResult.role)||'unknown'}}));}
   catch(e){handleApiError(e,'Network error');}
@@ -2244,7 +2244,7 @@ async function saveSingleBatch(i){
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:res.role||'',anonymized:res.anonymized||false,
     appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
-    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[]}};
+    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
   try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
     toast('Saved: '+body.candidateName,'success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'batch_row',role:(body&&body.role)||'unknown'}}));}
   catch(e){handleApiError(e,'Network error');}
@@ -2262,7 +2262,7 @@ async function saveAllToAudit(){
       jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
       role:res.role||'',anonymized:res.anonymized||false,
       appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
-    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[]}};
+    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
     try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;}catch(_){}
   }
   toast(saved+' of '+lastBatchResults.length+' records saved.','success');

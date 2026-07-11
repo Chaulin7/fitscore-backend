@@ -5,3 +5,6 @@ audit.db
 *.log
 .DS_Store
 dist/
+
+# Generated forensic-scan output (per-environment, never committed)
+scripts/output/
