@@ -1,9 +1,11 @@
-// Old-vs-new extraction diff: pdf-parse 1.1.4 (devDependency, the engine
-// being replaced) against the pdfjs-dist extractor, over the full validation
-// dataset. Writes EXTRACTION_DIFF.md at the repo root.
+// Old-vs-new extraction diff: pdf-parse 1.1.4 (the engine that was replaced)
+// against the pdfjs-dist extractor, over the full validation dataset.
+// Writes EXTRACTION_DIFF.md at the repo root.
 //
-// To re-run after pdf-parse is dropped from devDependencies:
+// NOTE: pdf-parse was removed from devDependencies on 2026-07-11 (Phase 4 of
+// the extraction migration). To re-run this diff, temp-install it first:
 //   npm install --save-dev --save-exact pdf-parse@1.1.4 && node scripts/extraction-diff.mjs
+// (then `npm uninstall pdf-parse` to restore the clean state).
 //
 // The old engine is given 3 attempts per file (matching the retry loop the
 // production code used to carry) because it fails non-deterministically.
@@ -15,7 +17,14 @@ import path from 'path';
 
 const require = createRequire(import.meta.url);
 const { extractPdfText } = require('../src/services/pdfExtractor.js');
-const pdfParse = require('pdf-parse');
+let pdfParse;
+try {
+  pdfParse = require('pdf-parse');
+} catch (_) {
+  console.error('pdf-parse is not installed (removed from devDependencies 2026-07-11).');
+  console.error('To re-run this diff: npm install --save-dev --save-exact pdf-parse@1.1.4');
+  process.exit(2);
+}
 const { scoreCV } = require('../src/services/scorer.js');
 const { SAMPLE_JD } = require('../src/data/sample.js');
 

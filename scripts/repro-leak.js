@@ -13,7 +13,16 @@
 
 const fs = require('fs');
 const path = require('path');
-const pdfParse = require('pdf-parse');
+// pdf-parse was removed from devDependencies on 2026-07-11 (Phase 4). To
+// re-run this repro: npm install --save-dev --save-exact pdf-parse@1.1.4
+let pdfParse;
+try {
+  pdfParse = require('pdf-parse');
+} catch (_) {
+  console.error('pdf-parse is not installed (removed from devDependencies 2026-07-11).');
+  console.error('To re-run this repro: npm install --save-dev --save-exact pdf-parse@1.1.4');
+  process.exit(2);
+}
 
 // pdf-parse's bundled pdf.js (v1.10, 2017) can throw from internal timer
 // callbacks, escaping try/catch entirely. Record those so the repro can
