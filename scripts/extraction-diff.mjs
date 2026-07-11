@@ -2,8 +2,8 @@
 // against the pdfjs-dist extractor, over the full validation dataset.
 // Writes EXTRACTION_DIFF.md at the repo root.
 //
-// NOTE: pdf-parse was removed from devDependencies on 2026-07-11 (Phase 4 of
-// the extraction migration). To re-run this diff, temp-install it first:
+// NOTE: pdf-parse removed 2026-07-11 — see docs/extraction-determinism.md.
+// To re-run this diff, temp-install the legacy engine first:
 //   npm install --save-dev --save-exact pdf-parse@1.1.4 && node scripts/extraction-diff.mjs
 // (then `npm uninstall pdf-parse` to restore the clean state).
 //

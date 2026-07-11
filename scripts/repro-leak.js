@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-// pdf-parse was removed from devDependencies on 2026-07-11 (Phase 4). To
+// pdf-parse removed 2026-07-11 — see docs/extraction-determinism.md. To
 // re-run this repro: npm install --save-dev --save-exact pdf-parse@1.1.4
 let pdfParse;
 try {

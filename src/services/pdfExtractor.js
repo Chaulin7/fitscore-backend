@@ -365,10 +365,15 @@ function extractPdfText(buffer) {
   return fileSec.withTimeout(extractPdfTextInner(buffer), SAFETY_TIMEOUT_MS, 'PDF extraction')
     .catch((err) => {
       if (err && err.code === 'PROCESSING_TIMEOUT') {
-        console.warn(
-          `[pdfExtractor] liveness breaker fired after ${SAFETY_TIMEOUT_MS}ms — pathological input or broken environment`,
-          { bytes: Buffer.isBuffer(buffer) ? buffer.length : null }
-        );
+        // This path should be unreachable for legitimate CVs: firing indicates
+        // a pathological/malicious PDF or an upstream guard failure, and any
+        // occurrence warrants investigation. pageCount is intentionally absent
+        // from the log — the breaker races the whole extraction, so page
+        // enumeration may not have completed when it fires.
+        console.warn('[pdfExtractor] LIVENESS BREAKER FIRED', {
+          fileBytes: Buffer.isBuffer(buffer) ? buffer.length : null,
+          elapsedMs: SAFETY_TIMEOUT_MS,
+        });
       }
       throw err;
     });

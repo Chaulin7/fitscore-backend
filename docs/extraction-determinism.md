@@ -91,6 +91,9 @@ scores, same report.
   (`CV_DATASET_DIR` pointing at the validation set) and compare against the
   committed manifest — that converts "deterministic on the dev laptop" into
   "deterministic across environments", which is the claim that matters.
+  (Deploy gate: Render runs Node v24.14.1, satisfying the `engines`
+  requirement of ≥ 20.16.0; `pdfjs-dist@5.4.624` boots cleanly there —
+  verified 11 July 2026.)
 - **Re-baselining procedure** (engine or assembler upgrade): bump the pin /
   `EXTRACTOR_VERSION`, run `npm run extraction:baseline`, review the manifest
   diff file-by-file, re-run the A/B diff if warranted, commit the new
@@ -123,15 +126,17 @@ own stack, and how we handled it.**
   permanently in the "warm state" regime where the substitution lives, and
   the 1 July retry loop reused one buffer per file. Exposure cannot be
   excluded for batches processed before the migration.
-- **Forensic scan:** `scripts/scan-leak-fingerprint.js` (strictly read-only)
-  scans stored audit records for the leak's fingerprint — identical analysis
-  detail + scores under different candidate/file names within the same batch
-  proxy (`org_id` + JD snippet; records carry no batch id). Validated against
-  a synthetic dataset. **Status: production run pending** — execute on the
-  Render instance: `DB_PATH=<disk>/audit.db node
-  scripts/scan-leak-fingerprint.js`, then record the result here. Flagged
-  pairs are review signals, not proof (genuinely duplicate CVs also match);
-  no record is modified by the scan.
+- **Production forensic scan (Gate B): CLEAN.** `scripts/scan-leak-fingerprint.js`
+  (strictly read-only) scans stored audit records for the leak's fingerprint —
+  identical analysis detail + scores under different candidate/file names
+  within the same batch proxy (`org_id` + JD snippet; records carry no batch
+  id). Validated against a synthetic dataset, then run on the production
+  database on Render (11 July 2026): **5 records total, 5 scannable, 0
+  pre-provenance, 0 flagged pairs — no cross-document leakage signature in
+  production. No remediation required.** Caveats, stated plainly: the sample
+  is small (pre-revenue), and the scan is a signature detector (identical
+  fingerprint across distinct candidates in a batch), not a proof of
+  universal absence. No record was modified by the scan.
 - **The cv_15 correction:** in the A/B diff, cv_15's old score (38) had been
   computed on cv_14's leaked text; its new score (40) is the first score ever
   computed on cv_15's actual content. Acknowledged as a correction, not a
@@ -170,3 +175,10 @@ proxy — and flag any pair within a group where
 `candidate_name`/`file_name` differ. Implementation:
 `scripts/scan-leak-fingerprint.js` (read-only; output
 `scripts/output/leak-scan.json`, gitignored).
+
+Exact command used for the production audit (11 July 2026), run from the
+project root on Render so `better-sqlite3` resolves:
+
+```
+DB_PATH=/opt/render/project/src/data/audit.db node scripts/scan-leak-fingerprint.js
+```
