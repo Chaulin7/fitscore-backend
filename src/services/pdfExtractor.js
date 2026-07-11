@@ -351,12 +351,27 @@ async function extractPdfTextInner(buffer) {
   }
 }
 
-// Circuit breaker: a DoS backstop against pathological/crafted PDFs, not flow
-// control. With serial processing it should never fire for a legitimate CV,
-// and a file that trips it will trip it every run. Reuses the repo's
-// withTimeout, so exhaustion surfaces as the existing PROCESSING_TIMEOUT/422.
+// Circuit breaker: a LIVENESS backstop against pathological/crafted PDFs, not
+// flow control. The size/page guards make reaching it effectively impossible
+// for real input (measured: 25-CV validation set mean 22.5ms / max 409ms incl.
+// first-call engine warmup; a dense 30-page synthetic PDF extracts in ~300ms —
+// >100x headroom under the 60s limit). The determinism guarantee holds
+// conditional on this never firing for legitimate input: a file that trips it
+// is pathological and will trip it every run. Reuses the repo's withTimeout,
+// so exhaustion surfaces as the existing PROCESSING_TIMEOUT/422 — and logs
+// loudly, because a firing breaker means either an attack or a broken
+// environment, never normal operation.
 function extractPdfText(buffer) {
-  return fileSec.withTimeout(extractPdfTextInner(buffer), SAFETY_TIMEOUT_MS, 'PDF extraction');
+  return fileSec.withTimeout(extractPdfTextInner(buffer), SAFETY_TIMEOUT_MS, 'PDF extraction')
+    .catch((err) => {
+      if (err && err.code === 'PROCESSING_TIMEOUT') {
+        console.warn(
+          `[pdfExtractor] liveness breaker fired after ${SAFETY_TIMEOUT_MS}ms — pathological input or broken environment`,
+          { bytes: Buffer.isBuffer(buffer) ? buffer.length : null }
+        );
+      }
+      throw err;
+    });
 }
 
 module.exports = {

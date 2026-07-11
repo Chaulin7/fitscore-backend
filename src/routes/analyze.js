@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { extractText } = require('../services/parser');
+const provenance = require('../services/provenanceCache');
 const { scoreCV, anonymizeText } = require('../services/scorer');
 const { getOrgBilling, getUsageCount, incrementUsage } = require('../services/db');
 const { checkQuota } = require('../services/billing');
@@ -226,7 +227,11 @@ router.post('/', upload.single('cv'), async (req, res) => {
     // Meter only after a successful analysis, so failures don't burn quota.
     incrementUsage(req.orgId, 1);
     recordUsage(req, 'analyze_single', 1);
-    res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), extraction: extractionSummary(extracted), ...results });
+    const extraction = extractionSummary(extracted);
+    // Server-side provenance binding: the audit save later resolves the echoed
+    // sha against this server-held record (see provenanceCache.js).
+    provenance.remember(req.orgId, extraction);
+    res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), extraction, ...results });
   } catch (err) {
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
@@ -290,7 +295,9 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
         const candidateName = anonymize
           ? 'Candidate #' + (results.length + 1)
           : path.basename(file.originalname, path.extname(file.originalname));
-        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), extraction: extractionSummary(extracted), ...scored });
+        const extraction = extractionSummary(extracted);
+        provenance.remember(req.orgId, extraction);
+        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), extraction, ...scored });
       } catch (fileErr) {
         results.push({
           candidateName: path.basename(file.originalname, path.extname(file.originalname)),
