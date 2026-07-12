@@ -121,6 +121,11 @@ function initSchema() {
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN subscription_status TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN current_period_end TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN plan_updated_at TEXT'); } catch (_) {}
+  // Webhook ordering guard: unix seconds (Stripe event.created) of the last
+  // event applied to this org, so stale/out-of-order events can be skipped.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_event_created INTEGER'); } catch (_) {}
+  // Stripe subscription id — storage only (reconciliation/support), never exposed via API.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_subscription_id TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
 
   // Per-org monthly usage counters (analyses run; periodKey = YYYY-MM)
@@ -557,12 +562,38 @@ function incrementUsage(orgId, n, periodKey = currentPeriodKey()) {
   return getUsageCount(orgId, periodKey);
 }
 
+// Atomically reserve `n` analyses against the org's monthly counter, inside a
+// synchronous better-sqlite3 transaction so check+increment cannot race two
+// concurrent requests past the limit. limit == null (unlimited) always
+// reserves — the counter still increments, so usage stats stay intact.
+// Returns { ok, used }: used is the post-reservation count on success, or the
+// current count on refusal (nothing written).
+function reserveUsage(orgId, n, limit, periodKey = currentPeriodKey()) {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.prepare('INSERT OR IGNORE INTO usage_counters (org_id, period_key, analysis_count) VALUES (?, ?, 0)').run(orgId, periodKey);
+    const count = db.prepare('SELECT analysis_count AS c FROM usage_counters WHERE org_id = ? AND period_key = ?').get(orgId, periodKey).c;
+    if (limit != null && count + n > limit) return { ok: false, used: count };
+    db.prepare('UPDATE usage_counters SET analysis_count = analysis_count + ? WHERE org_id = ? AND period_key = ?').run(n, orgId, periodKey);
+    return { ok: true, used: count + n };
+  });
+  return tx();
+}
+
+// Return `n` previously-reserved analyses to the counter (files that failed to
+// process). Floors at 0; n <= 0 and missing rows are no-ops.
+function refundUsage(orgId, n, periodKey = currentPeriodKey()) {
+  if (!(n > 0)) return;
+  getDb().prepare('UPDATE usage_counters SET analysis_count = MAX(0, analysis_count - ?) WHERE org_id = ? AND period_key = ?').run(n, orgId, periodKey);
+}
+
 // --- Billing state (Stripe; attached to the organization) ------------------
 
 function getOrgBilling(orgId) {
   const row = getDb().prepare(`
     SELECT stripe_customer_id AS stripeCustomerId, plan, subscription_status AS subscriptionStatus,
-           current_period_end AS currentPeriodEnd, plan_updated_at AS planUpdatedAt
+           current_period_end AS currentPeriodEnd, plan_updated_at AS planUpdatedAt,
+           stripe_event_created AS stripeEventCreated, stripe_subscription_id AS stripeSubscriptionId
     FROM organizations WHERE id = ?
   `).get(orgId);
   return row || null;
@@ -576,13 +607,26 @@ function findOrgByStripeCustomerId(customerId) {
   return getDb().prepare('SELECT id FROM organizations WHERE stripe_customer_id = ?').get(customerId) || null;
 }
 
-// Sets plan state from a webhook event (idempotent — always sets, never toggles).
-function setOrgPlan(orgId, { plan, subscriptionStatus, currentPeriodEnd }) {
-  getDb().prepare(`
-    UPDATE organizations
-    SET plan = ?, subscription_status = ?, current_period_end = ?, plan_updated_at = ?
-    WHERE id = ?
-  `).run(plan, subscriptionStatus || null, currentPeriodEnd || null, nowIso(), orgId);
+// Sets plan state from a webhook event (idempotent — always sets absolute
+// state, never toggles). Optional fields are written only when the key is
+// present, so a caller can advance the ordering guard / subscription id
+// without clobbering the other:
+//   eventCreated         -> stripe_event_created  (unix seconds; ordering guard)
+//   stripeSubscriptionId -> stripe_subscription_id (pass null to clear on cancel)
+function setOrgPlan(orgId, fields) {
+  const { plan, subscriptionStatus, currentPeriodEnd, eventCreated } = fields;
+  const sets = ['plan = ?', 'subscription_status = ?', 'current_period_end = ?', 'plan_updated_at = ?'];
+  const params = [plan, subscriptionStatus || null, currentPeriodEnd || null, nowIso()];
+  if ('eventCreated' in fields) {
+    sets.push('stripe_event_created = ?');
+    params.push(Number.isFinite(eventCreated) ? eventCreated : null);
+  }
+  if ('stripeSubscriptionId' in fields) {
+    sets.push('stripe_subscription_id = ?');
+    params.push(fields.stripeSubscriptionId || null);
+  }
+  params.push(orgId);
+  getDb().prepare(`UPDATE organizations SET ${sets.join(', ')} WHERE id = ?`).run(...params);
 }
 
 module.exports = {
@@ -591,6 +635,8 @@ module.exports = {
   currentPeriodKey,
   getUsageCount,
   incrementUsage,
+  reserveUsage,
+  refundUsage,
   getOrgBilling,
   setOrgStripeCustomerId,
   findOrgByStripeCustomerId,

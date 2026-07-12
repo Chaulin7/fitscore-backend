@@ -126,8 +126,9 @@ router.post('/portal', requireSession, requireOwner, async (req, res) => {
 // --- Webhook (raw body, signature-verified, auth-exempt) -------------------
 
 // Applies a Stripe Subscription object to our org plan state. Idempotent:
-// always sets state from the event, never blindly toggles.
-function applySubscription(orgId, subscription) {
+// always sets state from the event, never blindly toggles. `eventCreated`
+// (unix seconds) advances the ordering guard so later stale events are skipped.
+function applySubscription(orgId, subscription, eventCreated) {
   const status = subscription.status; // active, past_due, canceled, ...
   const priceId = subscription.items && subscription.items.data && subscription.items.data[0]
     && subscription.items.data[0].price && subscription.items.data[0].price.id;
@@ -147,6 +148,8 @@ function applySubscription(orgId, subscription) {
     plan,
     subscriptionStatus: plan === 'free' ? null : status,
     currentPeriodEnd,
+    eventCreated,
+    stripeSubscriptionId: subscription.id || null,
   });
 }
 
@@ -171,48 +174,61 @@ async function handleWebhook(req, res) {
     return res.status(400).json({ error: `Webhook signature verification failed: ${err.message}`, code: 'BAD_SIGNATURE' });
   }
 
+  // Events that mutate org plan state; all resolve orgId the same way and go
+  // through the ordering guard below.
+  const PLAN_MUTATING = new Set([
+    'checkout.session.completed',
+    'customer.subscription.created',
+    'customer.subscription.updated',
+    'customer.subscription.deleted',
+    'invoice.payment_failed',
+  ]);
+
   try {
     const obj = event.data.object;
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        // Resolve org by metadata or customer; fetch the subscription for full state.
-        const orgId = (obj.metadata && obj.metadata.orgId) || orgIdFromCustomer(obj.customer);
-        if (orgId && obj.customer) setOrgStripeCustomerId(orgId, obj.customer);
-        if (orgId && obj.subscription) {
-          const sub = await stripe.subscriptions.retrieve(obj.subscription);
-          applySubscription(orgId, sub);
+
+    if (PLAN_MUTATING.has(event.type)) {
+      const orgId = (obj.metadata && obj.metadata.orgId) || orgIdFromCustomer(obj.customer);
+      if (orgId) {
+        // Ordering guard: Stripe does NOT guarantee delivery order. Skip any
+        // event older than the last one applied to this org, so a delayed
+        // subscription.updated can't resurrect a canceled/downgraded plan.
+        const stored = getOrgBilling(orgId);
+        const lastApplied = stored ? stored.stripeEventCreated : null;
+        if (lastApplied != null && event.created < lastApplied) {
+          console.warn('[billing] stale Stripe event skipped', {
+            type: event.type, eventId: event.id, eventCreated: event.created, lastApplied, orgId,
+          });
+          return res.json({ received: true }); // 200 — Stripe must NOT retry stale events
         }
-        break;
-      }
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-      case 'customer.subscription.deleted': {
-        const orgId = (obj.metadata && obj.metadata.orgId) || orgIdFromCustomer(obj.customer);
-        if (orgId) {
-          if (event.type === 'customer.subscription.deleted') {
-            setOrgPlan(orgId, { plan: 'free', subscriptionStatus: 'canceled', currentPeriodEnd: null });
-          } else {
-            applySubscription(orgId, obj);
+
+        if (event.type === 'checkout.session.completed') {
+          if (obj.customer) setOrgStripeCustomerId(orgId, obj.customer);
+          if (obj.subscription) {
+            const sub = await stripe.subscriptions.retrieve(obj.subscription);
+            applySubscription(orgId, sub, event.created); // writes subscription id too
           }
-        }
-        break;
-      }
-      case 'invoice.payment_failed': {
-        const orgId = orgIdFromCustomer(obj.customer);
-        if (orgId) {
-          // Keep access; surface a warning in the UI.
+        } else if (event.type === 'customer.subscription.deleted') {
+          setOrgPlan(orgId, {
+            plan: 'free', subscriptionStatus: 'canceled', currentPeriodEnd: null,
+            eventCreated: event.created, stripeSubscriptionId: null, // clear on cancel
+          });
+        } else if (event.type === 'invoice.payment_failed') {
+          // Keep access; surface a warning in the UI. Leave subscription id as-is.
           const current = getOrgBilling(orgId);
           setOrgPlan(orgId, {
             plan: current && current.plan ? current.plan : 'free',
             subscriptionStatus: 'past_due',
             currentPeriodEnd: current ? current.currentPeriodEnd : null,
+            eventCreated: event.created,
           });
+        } else {
+          // customer.subscription.created / customer.subscription.updated
+          applySubscription(orgId, obj, event.created);
         }
-        break;
       }
-      default:
-        break; // ignore unhandled event types
     }
+
     res.json({ received: true });
   } catch (err) {
     // Returning 500 asks Stripe to retry; our handlers are idempotent.

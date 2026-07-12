@@ -901,6 +901,8 @@ img, video, table { max-width: 100%; }
   <button class="settings-close" data-action="toggleSettings" aria-label="Close settings">&#215;</button>
   <h3>Plan &amp; Billing</h3>
   <div class="plan-status-line" id="planStatusLine">Loading plan&hellip;</div>
+  <!-- keep in sync with Stripe prices -->
+  <div id="planCompare"></div>
   <div class="plan-row" id="planOwnerControls" style="display:none">
     <button class="btn btn-primary btn-sm" id="upgradeProBtn" data-action="startCheckout" data-plan="pro">Upgrade to Pro</button>
     <button class="btn btn-primary btn-sm" id="upgradeTeamBtn" data-action="startCheckout" data-plan="team">Upgrade to Team</button>
@@ -1650,6 +1652,7 @@ async function populatePlanBilling(){
   if(b && b.subscriptionStatus==='past_due'){ txt += ' &middot; <span class="past-due">payment issue — please update your card</span>'; }
   else if((plan==='pro'||plan==='team')){ txt += ' &middot; unlimited analyses'; }
   line.innerHTML = txt;
+  renderPlanCompare(plan, b);
 
   if(!isOwner){
     if(ownerControls)ownerControls.style.display='none';
@@ -1664,6 +1667,32 @@ async function populatePlanBilling(){
   if(team)team.style.display=paid?'none':'inline-flex';
   // Show "Manage billing" whenever a Stripe customer exists (paid, or past_due/canceled).
   if(manage)manage.style.display=(paid||b&&b.subscriptionStatus)?'inline-flex':'none';
+}
+
+// Pricing comparison in Settings → Plan & Billing. Prices are hardcoded copy
+// (keep in sync with Stripe prices). {limit} comes from the live usage
+// response; the Team seat text uses the seatLimit cached from
+// GET /api/team/members when available ("multiple members" until known).
+let _seatLimitCache = null;
+function renderPlanCompare(currentPlan, b){
+  const el=document.getElementById('planCompare');
+  if(!el)return;
+  const limitTxt=(b&&b.limit!=null)?(b.limit+' analyses/mo'):'limited analyses/mo';
+  const seatTxt=(typeof _seatLimitCache==='number')?('up to '+_seatLimitCache+' members'):'multiple members';
+  const plans=[
+    {id:'free',name:'Free',price:'€0',lines:[limitTxt,'1 user']},
+    {id:'pro',name:'Pro',price:'€49/mo',lines:['unlimited analyses','1 user']},
+    {id:'team',name:'Team',price:'€199/mo',lines:['unlimited analyses',seatTxt]},
+  ];
+  el.innerHTML='<div style="display:flex;gap:8px;margin:10px 0">'+plans.map(function(p){
+    const cur=p.id===currentPlan;
+    return '<div style="flex:1;border:1px solid '+(cur?'#0f2847':'#e5e7eb')+';border-radius:8px;padding:10px;background:'+(cur?'#f8fafc':'#fff')+'">'
+      +'<div style="font-weight:700;font-size:13px;color:#111827">'+p.name
+      +(cur?' <span style="font-size:10px;background:#0f2847;color:#fff;border-radius:8px;padding:1px 7px;vertical-align:middle">Current</span>':'')+'</div>'
+      +'<div style="font-size:15px;font-weight:800;color:#0f2847;margin:2px 0 6px">'+p.price+'</div>'
+      +p.lines.map(function(l){return '<div style="font-size:11px;color:#6b7280">'+l+'</div>';}).join('')
+      +'</div>';
+  }).join('')+'</div>';
 }
 
 async function startCheckout(plan){
@@ -1688,25 +1717,26 @@ async function openBillingPortal(){
 // Quota-exceeded upgrade prompt shown inline in #analyzeError.
 function showQuotaPrompt(errEl, e){
   const limit = e && e.limit!=null ? e.limit : (_billing&&_billing.limit);
-  const isOwner = _billing ? undefined : undefined; // resolved async below
   const msg = 'You’ve used all '+(limit!=null?limit:'')+' free analyses this month.';
   errEl.innerHTML = '<div class="err-retry-card" style="background:#fffbeb;border-color:#fde68a">'
     + '<span class="err-retry-icon">⚠️</span>'
     + '<span class="err-retry-msg" style="color:#92400e">'+msg+' <span id="quotaUpgradeHint">Upgrade for unlimited analyses.</span></span>'
-    + '<button class="err-retry-btn" id="quotaUpgradeBtn" style="background:#0f2847">Upgrade</button></div>';
+    + '<button class="err-retry-btn" id="quotaUpgradeProBtn" style="background:#0f2847;display:none">Upgrade to Pro €49</button>'
+    + '<button class="err-retry-btn" id="quotaUpgradeTeamBtn" style="background:#374151;display:none">Team €199</button></div>';
   errEl.style.display='block';
   toast(e&&e.message?e.message:'Monthly analysis limit reached. Upgrade to continue.','error',6000);
-  // Owner gets an Upgrade button; members get a "ask your owner" hint.
+  // Owners get plan-choice upgrade buttons; members get an "ask your owner" hint.
   api('/api/auth/me').then(function(me){
     const isOwner = !!(me&&me.user&&me.user.role==='owner');
-    const btn=document.getElementById('quotaUpgradeBtn');
+    const pro=document.getElementById('quotaUpgradeProBtn');
+    const team=document.getElementById('quotaUpgradeTeamBtn');
     const hint=document.getElementById('quotaUpgradeHint');
     if(!isOwner){
-      if(btn)btn.style.display='none';
       if(hint)hint.textContent='Ask your organization’s owner to upgrade.';
-    }else if(btn){
-      btn.onclick=function(){ startCheckout('pro'); };
+      return;
     }
+    if(pro){ pro.style.display='inline-flex'; pro.onclick=function(){ startCheckout('pro'); }; }
+    if(team){ team.style.display='inline-flex'; team.onclick=function(){ startCheckout('team'); }; }
   }).catch(function(){});
 }
 
@@ -2700,14 +2730,22 @@ async function populateTeam(){
   }
   const onTeam=!!(data.org&&data.org.teamPlan);
   const members=data.members||[];
+  // Cache the seat limit for the pricing comparison (null = unlimited seats).
+  _seatLimitCache=(typeof data.seatLimit==='number')?data.seatLimit:null;
+  if(_billing) renderPlanCompare((_billing.plan)||'free', _billing);
   if(!onTeam){
     body.innerHTML='<div style="color:#374151">Team members are available on the <strong>Team</strong> plan.'
       + (_teamIsOwner?' Upgrade in the <em>Plan &amp; Billing</em> section above.':' Ask your organization owner to upgrade.')+'</div>';
     if(inviteRow)inviteRow.style.display='none';
     return;
   }
+  // Seat counter (only when the deployment caps Team seats; null = unlimited).
+  let html='';
+  if(typeof data.seatLimit==='number'){
+    html+='<div style="font-size:12px;color:#374151;margin-bottom:6px">'+members.length+' of '+data.seatLimit+' seats used</div>';
+  }
   // Member list
-  let html='<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px">Members</div>';
+  html+='<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px">Members</div>';
   html+=members.map(function(m){
     const removable=_teamIsOwner && m.email!==(me&&me.user&&me.user.email) && !(m.role==='owner');
     return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6">'

@@ -169,6 +169,7 @@ router.get('/members', requireSession, (req, res) => {
     const org = auth.getOrganizationById(req.orgId);
     res.json({
       org: { name: org ? org.name : null, teamPlan: orgHasTeamPlan(req.orgId) },
+      seatLimit: TEAM_MAX_MEMBERS || null, // additive; null = unlimited seats
       members: auth.listOrgUsers(req.orgId),
     });
   } catch (err) {

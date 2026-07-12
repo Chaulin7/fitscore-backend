@@ -7,8 +7,8 @@ const fs = require('fs');
 const { extractText } = require('../services/parser');
 const provenance = require('../services/provenanceCache');
 const { scoreCV, anonymizeText } = require('../services/scorer');
-const { getOrgBilling, getUsageCount, incrementUsage } = require('../services/db');
-const { checkQuota } = require('../services/billing');
+const { getOrgBilling, reserveUsage, refundUsage } = require('../services/db');
+const { limitFor } = require('../services/billing');
 const fileSec = require('../services/fileSecurity');
 const { enforceAnalyzeRate, sampleLimiter } = require('../middleware/rateLimits');
 const { SAMPLE_VERSION, SAMPLE_ROLE, SAMPLE_WEIGHTS, SAMPLE_CV, SAMPLE_JD } = require('../data/sample');
@@ -50,23 +50,27 @@ function extractionSummary(extracted) {
   };
 }
 
-// Plan gate: may this org run `requested` more analyses this period?
-// Returns the quota result; on block, writes a 402 and returns null.
-function enforceQuota(req, res, requested) {
-  const billing = getOrgBilling(req.orgId);
-  const used = getUsageCount(req.orgId);
-  const q = checkQuota(billing, used, requested);
-  if (!q.allowed) {
+// Atomic plan gate: reserve `requested` analyses against the org's monthly
+// counter in a single DB transaction (race-free), so two concurrent requests
+// can't both pass the check and exceed the limit. On block, writes the same
+// 402 QUOTA_EXCEEDED body as before and returns null. Callers refund the
+// reservation if processing later fails (see the routes below).
+function reserveQuota(req, res, requested) {
+  const b = getOrgBilling(req.orgId);
+  const limit = limitFor(b);            // null = unlimited (still reserves + counts)
+  const plan = b ? b.plan : 'free';
+  const r = reserveUsage(req.orgId, requested, limit);
+  if (!r.ok) {
     res.status(402).json({
       error: 'Monthly analysis limit reached. Upgrade to continue.',
       code: 'QUOTA_EXCEEDED',
-      limit: q.limit,
-      used: q.used,
-      plan: q.plan,
+      limit,
+      used: r.used,
+      plan,
     });
     return null;
   }
-  return q;
+  return { reserved: requested, limit, used: r.used, plan };
 }
 
 // Identifies the scoring engine version for provenance records (Art. 12).
@@ -186,6 +190,7 @@ router.get('/sample', sampleLimiter, (req, res) => {
 
 router.post('/', upload.single('cv'), async (req, res) => {
   let filePath = null;
+  let reserved = 0; // analyses reserved against quota; refunded on failure
   try {
     if (!req.file) {
       return sendError(res, 400, 'NO_FILE', 'No CV file uploaded. Include a file with field name "cv".', 'cv');
@@ -206,13 +211,15 @@ router.post('/', upload.single('cv'), async (req, res) => {
 
     // Abuse/cost rate guard (per org), layered on top of the billing quota.
     if (!enforceAnalyzeRate(req, res, 1)) return;
-    // Plan gate (server-side): single CV = 1 analysis.
-    if (!enforceQuota(req, res, 1)) return;
+    // Plan gate (server-side): single CV = 1 analysis. Reserved atomically.
+    if (!reserveQuota(req, res, 1)) return;
+    reserved = 1;
 
     // Authoritative content validation + optional AV scan + bounded extraction.
     let extracted;
     try { extracted = await validateAndExtract(req.file, 'cv'); }
     catch (e) {
+      refundUsage(req.orgId, reserved); reserved = 0; // extraction failed: return the reservation
       if (e.code === 'FILE_REJECTED') console.warn('[security] upload rejected by AV scan', { org: req.orgId, file: req.file.originalname });
       return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'cv');
     }
@@ -224,8 +231,7 @@ router.post('/', upload.single('cv'), async (req, res) => {
       ? 'Candidate ' + path.basename(req.file.originalname, path.extname(req.file.originalname)).slice(0, 4).toUpperCase()
       : path.basename(req.file.originalname, path.extname(req.file.originalname));
 
-    // Meter only after a successful analysis, so failures don't burn quota.
-    incrementUsage(req.orgId, 1);
+    // Usage was reserved atomically at the gate; a success keeps the reservation.
     recordUsage(req, 'analyze_single', 1);
     const extraction = extractionSummary(extracted);
     // Server-side provenance binding: the audit save later resolves the echoed
@@ -233,6 +239,7 @@ router.post('/', upload.single('cv'), async (req, res) => {
     provenance.remember(req.orgId, extraction);
     res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), extraction, ...results });
   } catch (err) {
+    if (reserved) refundUsage(req.orgId, reserved); // a post-reservation failure returns the reservation
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
     // Don't leak internals on a 500; keep specific messages for handled statuses.
@@ -245,6 +252,7 @@ router.post('/', upload.single('cv'), async (req, res) => {
 
 router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
   const filePaths = [];
+  let reserved = 0; // analyses reserved against quota; unscored files refunded below
   try {
     if (!req.files || req.files.length === 0) {
       return sendError(res, 400, 'NO_FILES', 'No CV files uploaded. Use field name "cvs" for multiple files.', 'cvs');
@@ -268,8 +276,9 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     // Abuse/cost rate guard (per org): a batch costs its CV count.
     if (!enforceAnalyzeRate(req, res, req.files.length)) return;
     // Plan gate (server-side): a batch that would exceed the cap is rejected
-    // whole — we never analyze a partial batch.
-    if (!enforceQuota(req, res, req.files.length)) return;
+    // whole — we never analyze a partial batch. Reserved atomically.
+    if (!reserveQuota(req, res, req.files.length)) return;
+    reserved = req.files.length;
 
     const results = [];
 
@@ -308,9 +317,11 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     }
 
     results.sort((a, b) => (b.overall || 0) - (a.overall || 0));
-    // Meter only CVs that were actually scored (errored files don't burn quota).
+    // Whole batch was reserved atomically at the gate; refund the files that
+    // failed to score so errored files don't burn quota (unchanged behavior).
     const scoredCount = results.filter((r) => !r.error).length;
-    if (scoredCount > 0) incrementUsage(req.orgId, scoredCount);
+    refundUsage(req.orgId, reserved - scoredCount);
+    reserved = 0; // settled — the outer catch must not refund again
     recordUsage(req, 'analyze_batch', scoredCount);
     res.json({ count: results.length, modelId: MODEL_ID, results });
   } catch (err) {
@@ -320,6 +331,7 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     const message = status === 500 ? 'Something went wrong. Please try again.' : (err.message || 'Request failed');
     sendError(res, status, code, message, err.field);
   } finally {
+    if (reserved) refundUsage(req.orgId, reserved); // catastrophic failure before settling: refund all reserved
     for (const fp of filePaths) fs.unlink(fp, () => {});
   }
 });
