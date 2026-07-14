@@ -15,7 +15,7 @@ const orgRouter = require('./routes/org');
 const billingRouter = require('./routes/billing');
 const teamRouter = require('./routes/team');
 const { migrateLegacyData } = require('./services/authService');
-const { purgeExpiredAudits } = require('./services/db');
+const { getDb, purgeExpiredAudits } = require('./services/db');
 const { mutationLimiter } = require('./middleware/rateLimits');
 
 // Optional pino logger (graceful fallback if not installed yet)
@@ -242,6 +242,13 @@ app.use((err, req, res, next) => {
   if (err.field && status < 500) body.field = err.field;
   res.status(status).json(body);
 });
+
+// Open the database and ensure the FULL schema exists before the server
+// accepts traffic — on a fresh persistent disk (first boot after mounting)
+// no tables exist yet, and any request racing schema creation would 500.
+// better-sqlite3 is synchronous, so this completes before app.listen below.
+// (Also logs the resolved DB path for boot verification in Render logs.)
+getDb();
 
 // One-time legacy data migration: assigns pre-auth records to the
 // "Chaulin (legacy)" organization and creates the owner user from
