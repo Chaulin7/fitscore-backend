@@ -4,7 +4,12 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data', 'audit.db');
+// DATABASE_PATH points production at the Render persistent disk (e.g.
+// /opt/render/project/data/fitscore.db); DB_PATH is the legacy alias used by
+// existing scripts/docs. The repo-local fallback keeps dev and tests working
+// with no env set. Keep in sync with the same constant in routes/templates.js.
+const DB_PATH = process.env.DATABASE_PATH || process.env.DB_PATH
+  || path.join(__dirname, '..', '..', 'data', 'audit.db');
 
 let db;
 
@@ -16,6 +21,9 @@ function getDb() {
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
     initSchema();
+    // Boot verification: confirms in Render logs that the app is using the
+    // mounted persistent disk, not the ephemeral repo directory.
+    console.log('[db] sqlite database opened', { dbPath: DB_PATH });
   }
   return db;
 }
