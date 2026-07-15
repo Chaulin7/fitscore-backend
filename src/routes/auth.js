@@ -152,6 +152,9 @@ router.post('/login', loginLimiter, async (req, res) => {
     const org = auth.getOrganizationById(user.org_id);
     return res.json(sessionResponse(rawToken, user, org));
   } catch (err) {
+    // Log the real error (pino err serializer: message+stack only — never the
+    // request body or credentials); the client response stays generic.
+    req.log.error({ err }, 'login failed');
     return sendError(res, 500, 'INTERNAL_ERROR', 'Login failed.');
   }
 });
