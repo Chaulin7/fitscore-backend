@@ -4,7 +4,7 @@
   "description": "REST API backend for CV Job Fit Analyzer (CVsprings)",
   "main": "src/index.js",
   "engines": {
-    "node": ">=20.16.0"
+    "node": "22.x"
   },
   "scripts": {
     "start": "node src/index.js",
