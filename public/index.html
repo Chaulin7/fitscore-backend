@@ -1357,6 +1357,9 @@ async function api(path, options = {}) {
 }
 function handleApiError(err, fallbackMsg) {
   try {
+    // Always put status+code+message in the console so failures are
+    // diagnosable without opening the Network tab.
+    console.error('[api]', err && err.status, err && err.code, err && err.message);
     if (err && (err.status === 429 || err.code === 'RATE_LIMITED')) {
       toast("You're going a bit fast — try again in a moment.", 'info', 4500);
       return;
@@ -1378,7 +1381,24 @@ function handleApiError(err, fallbackMsg) {
       toast(err.message || 'Please check the highlighted field', 'error');
       return;
     }
-    if (err && (err.status === 503 || /Failed to fetch|NetworkError|TypeError/i.test(err.message || ''))) {
+    // Permanent config error — do NOT invite a retry: nothing will change
+    // until the server's Stripe env vars are set.
+    if (err && err.code === 'BILLING_NOT_CONFIGURED') {
+      toast("Checkout isn't available yet — email support@cvsprings.com and we'll sort it out.", 'error', 8000);
+      return;
+    }
+    if (err && err.code === 'STRIPE_ERROR') {
+      toast('Payment provider error — please try again shortly.', 'error', 6000);
+      return;
+    }
+    if (err && err.code === 'OWNER_REQUIRED') {
+      toast(err.message || 'Only your organization owner can manage billing.', 'error', 5500);
+      return;
+    }
+    // "Waking up" is ONLY for platform cold starts / network failures. Our
+    // backend errors always carry a `code` (sendError JSON); a Render
+    // cold-start 502/503/504 serves HTML, so err.code is undefined.
+    if (err && !err.code && (err.status === 502 || err.status === 503 || err.status === 504 || /Failed to fetch|NetworkError|TypeError/i.test(err.message || ''))) {
       toast('Server is waking up. Please try again in a moment.', 'info', 4500);
       return;
     }
@@ -2118,7 +2138,10 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
     renderSingleResult(data,file.name,role);
     document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'single', role: role || 'unknown' } }));
   }catch(e){
-    var errMsg=e.message&&(e.message.includes('fetch')||e.message.includes('Failed'))
+    console.error('[analyze]', e && e.status, e && e.code, e && e.message);
+    // Same rule as handleApiError: only claim "waking up" when the error has
+    // no `code` (our backend errors always carry one).
+    var errMsg=(!e.code&&e.message&&(e.message.includes('fetch')||e.message.includes('Failed')))
       ?'Connection error. The server may still be waking up — please retry.'
       :'Something went wrong: '+e.message;
     errEl.innerHTML='<div class="err-retry-card"><span class="err-retry-icon">⚠️</span>'
@@ -2152,7 +2175,10 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     lastBatchResults=(data.results||[]).map(res=>({...res,role}));
     renderBatchResults(data.results,role);
   }catch(e){
-    var errMsg=e.message&&(e.message.includes('fetch')||e.message.includes('Failed'))
+    console.error('[analyze]', e && e.status, e && e.code, e && e.message);
+    // Same rule as handleApiError: only claim "waking up" when the error has
+    // no `code` (our backend errors always carry one).
+    var errMsg=(!e.code&&e.message&&(e.message.includes('fetch')||e.message.includes('Failed')))
       ?'Connection error. The server may still be waking up — please retry.'
       :'Something went wrong: '+e.message;
     errEl.innerHTML='<div class="err-retry-card"><span class="err-retry-icon">⚠️</span>'
