@@ -1,0 +1,3497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="/logo.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CVsprings · Candidate Fit Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+@media(max-width:768px){input,textarea,select{font-size:16px!important}}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
+
+/* ==================== Topbar ==================== */
+.topbar{
+  background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);
+  padding:0 32px;height:60px;display:flex;align-items:center;gap:20px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.25);position:sticky;top:0;z-index:100
+}
+.topbar-brand{display:flex;align-items:center;gap:5px;margin-right:auto;text-decoration:none}
+.brand-icon{
+  width:62px;height:62px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0
+}
+.brand-icon img{width:100%;height:100%;image-rendering:crisp-edges;filter:brightness(1.08)}
+.logo-ring{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:50%;border:2px solid rgba(255,255,255,0.85);flex-shrink:0}
+.logo-ring-img{width:48px;height:48px}
+.brand-name{font-size:18px;font-weight:800;color:#ffffff;letter-spacing:-.4px;text-shadow:0 0 18px rgba(255,255,255,0.35)}
+.brand-name em{font-style:normal;color:#7dd3fc}
+.topbar-nav{display:flex;gap:2px}
+.nav-btn{
+  background:none;border:none;
+  color:rgba(255,255,255,0.65);
+  font:600 13px 'Inter',sans-serif;
+  padding:7px 15px;border-radius:6px;cursor:pointer;
+  letter-spacing:.03em;transition:all .18s;position:relative
+}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,0.1)}
+.nav-btn.active{color:#fff;background:rgba(255,255,255,0.14)}
+.nav-btn.active::after{
+  content:'';position:absolute;bottom:-1px;left:50%;
+  transform:translateX(-50%);width:24px;height:2px;
+  background:#7dd3fc;border-radius:1px
+}
+.conn-badge{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;padding:5px 13px;font-size:12px;font-weight:500;
+  color:rgba(255,255,255,0.7)
+}
+.dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.3);transition:all .3s}
+.dot.ok{background:#4ade80;box-shadow:0 0 7px rgba(74,222,128,0.7)}
+.dot.err{background:#f87171;box-shadow:0 0 7px rgba(248,113,113,0.7)}
+
+/* ==================== Config bar ==================== */
+.config-bar{
+  background:#fff;border-bottom:1px solid #e5e7eb;
+  padding:10px 32px;display:flex;align-items:center;gap:10px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.04)
+}
+.config-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;white-space:nowrap}
+
+/* ==================== Buttons ==================== */
+.btn{
+  height:36px;padding:0 18px;border-radius:7px;
+  font:600 13px 'Inter',sans-serif;cursor:pointer;border:none;
+  transition:all .18s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap
+}
+.btn-primary{
+  background:linear-gradient(135deg,#0f2847,#1a3d6e);
+  color:#fff;box-shadow:0 2px 8px rgba(15,40,71,0.35)
+}
+.btn-primary:hover{background:linear-gradient(135deg,#1a3d6e,#0f2847);box-shadow:0 4px 14px rgba(15,40,71,0.4);transform:translateY(-1px)}
+.btn-primary:active{transform:translateY(0)}
+.btn-ghost{
+  background:#fff;color:#374151;
+  border:1px solid #d1d5db;box-shadow:0 1px 3px rgba(0,0,0,0.06)
+}
+.btn-ghost:hover{background:#f9fafb;border-color:#9ca3af;transform:translateY(-1px);box-shadow:0 3px 8px rgba(0,0,0,0.1)}
+.btn-ghost:active{transform:translateY(0)}
+.btn-danger{background:#fff5f5;color:#dc2626;border:1px solid #fecaca}
+.btn-danger:hover{background:#fee2e2}
+.btn-sm{height:30px;padding:0 12px;font-size:12px}
+
+/* ==================== Inputs ==================== */
+.text-input{
+  height:36px;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:7px;padding:0 12px;
+  font:500 13px 'Inter',sans-serif;color:#111827;outline:none;
+  transition:border .18s,box-shadow .18s
+}
+.text-input:focus{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.08)}
+.text-input::placeholder{color:#d1d5db}
+
+/* ==================== Mode toggle ==================== */
+.mode-toggle{
+  display:inline-flex;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:8px;overflow:hidden;margin-bottom:22px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.06)
+}
+.mode-btn{
+  padding:8px 22px;background:none;border:none;
+  font:600 12px 'Inter',sans-serif;cursor:pointer;
+  color:#9ca3af;letter-spacing:.06em;text-transform:uppercase;transition:all .18s
+}
+.mode-btn.active{
+  background:linear-gradient(135deg,#0f2847,#1a3d6e);
+  color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,0.1)
+}
+
+/* ==================== Tab / Sections ==================== */
+.tab-content{display:none}
+.tab-content.active{display:block;animation:fadeUp .22s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.main{padding:28px 32px}
+
+/* ==================== Cards ==================== */
+.card{
+  background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+  margin-bottom:18px;box-shadow:0 1px 6px rgba(0,0,0,0.05);
+  transition:box-shadow .2s
+}
+.card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.09)}
+.card-head{
+  padding:14px 20px;border-bottom:1px solid #f3f4f6;
+  display:flex;align-items:center;justify-content:space-between
+}
+.card-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#0a1f3d}
+.card-body{padding:20px}
+
+/* ==================== Drop zone ==================== */
+.dropzone{
+  border:2px dashed #e5e7eb;border-radius:9px;
+  padding:36px 20px;text-align:center;cursor:pointer;
+  transition:all .22s;position:relative;background:#fafafa
+}
+.dropzone:hover,.dropzone.drag{
+  border-color:#0f2847;background:#f0f4ff;
+  box-shadow:0 0 0 4px rgba(15,40,71,0.06)
+}
+.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-icon{
+  width:50px;height:50px;border-radius:12px;
+  background:linear-gradient(135deg,#eff6ff,#dbeafe);
+  border:1px solid #bfdbfe;
+  display:flex;align-items:center;justify-content:center;margin:0 auto 14px
+}
+.dz-label{font-size:15px;font-weight:700;color:#111827;margin-bottom:4px}
+.dz-sub{font-size:12px;color:#9ca3af}
+.file-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.file-chip{
+  background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;
+  padding:5px 14px;font-size:12px;font-weight:600;color:#1d4ed8;
+  display:flex;align-items:center;gap:6px
+}
+.file-chip button{background:none;border:none;cursor:pointer;color:#93c5fd;font-size:15px;padding:0;transition:color .15s;line-height:1}
+.file-chip button:hover{color:#dc2626}
+
+/* ==================== Options row ==================== */
+.options-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.opt-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;white-space:nowrap}
+
+/* ==================== Toggle ==================== */
+.toggle-wrap{display:flex;align-items:center;gap:8px}
+.toggle{position:relative;width:40px;height:22px;display:inline-block;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.tog-slider{
+  position:absolute;inset:0;background:#e5e7eb;
+  border-radius:11px;cursor:pointer;transition:.22s;
+  border:1.5px solid #d1d5db
+}
+.tog-slider:before{
+  content:'';position:absolute;width:16px;height:16px;
+  left:2px;top:1px;background:#9ca3af;border-radius:50%;transition:.22s
+}
+.toggle input:checked+.tog-slider{background:#0f2847;border-color:#0f2847}
+.toggle input:checked+.tog-slider:before{transform:translateX(18px);background:#fff}
+.tog-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af}
+
+/* ==================== Weights ==================== */
+.weights-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.w-card{
+  background:#fafafa;border:1.5px solid #e5e7eb;
+  border-radius:8px;padding:14px;transition:border .18s,box-shadow .18s
+}
+.w-card:focus-within{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.07)}
+.w-name{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px}
+.w-input{
+  width:100%;height:42px;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:7px;text-align:center;
+  font:800 22px 'Inter',sans-serif;color:#0f2847;outline:none;transition:border .18s
+}
+.w-input:focus{border-color:#0f2847}
+.w-sum{font-size:12px;font-weight:600;color:#9ca3af}
+.w-sum.ok{color:#059669}.w-sum.err{color:#dc2626;font-weight:700}
+
+/* ==================== Textarea ==================== */
+.textarea{
+  width:100%;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:7px;padding:12px;
+  font:400 13px 'Inter',sans-serif;color:#111827;
+  resize:vertical;outline:none;transition:border .18s,box-shadow .18s;line-height:1.65
+}
+.textarea:focus{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.07)}
+.textarea::placeholder{color:#d1d5db}
+
+/* ==================== Score boxes ==================== */
+.score-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+.score-box{
+  background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;
+  padding:16px 12px;text-align:center;
+  box-shadow:0 1px 4px rgba(0,0,0,0.05);
+  transition:transform .2s,box-shadow .2s;position:relative;overflow:hidden
+}
+.score-box:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,0.1)}
+.score-box.overall{
+  background:linear-gradient(135deg,#0a1f3d,#0f2847);
+  border-color:transparent;
+  box-shadow:0 4px 16px rgba(15,40,71,0.35)
+}
+.score-box.overall::before{
+  content:'';position:absolute;top:-30px;right:-30px;
+  width:80px;height:80px;border-radius:50%;
+  background:rgba(255,255,255,0.04)
+}
+.s-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px}
+.score-box.overall .s-label{color:rgba(255,255,255,0.55)}
+.ring-svg{overflow:visible}
+.ring-bg{fill:none;stroke:#f3f4f6;stroke-width:5}
+.score-box.overall .ring-bg{stroke:rgba(255,255,255,0.1)}
+.ring-fill{fill:none;stroke-linecap:round;stroke-width:5;transition:stroke-dashoffset 1.1s cubic-bezier(.4,0,.2,1)}
+
+/* ==================== Score pill ==================== */
+.score-pill{display:inline-block;padding:3px 11px;border-radius:12px;font-size:12px;font-weight:700;letter-spacing:.02em}
+.pill-hi{background:#dcfce7;color:#15803d}
+.pill-med{background:#fef9c3;color:#a16207}
+.pill-lo{background:#fee2e2;color:#b91c1c}
+
+/* ==================== Chips ==================== */
+.section-sub{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:9px}
+.chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+.chip{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;transition:transform .15s,box-shadow .15s}
+.chip:hover{transform:scale(1.04);box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.chip-found{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.chip-miss{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+
+/* ==================== Tables ==================== */
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{
+  text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:#9ca3af;
+  padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6
+}
+.data-table td{padding:10px 14px;border-bottom:1px solid #f9fafb;color:#374151;vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tbody tr{transition:background .14s}
+.data-table tbody tr:hover td{background:#f8fafc;color:#111827}
+
+/* ==================== Leaderboard ==================== */
+.lb{width:100%;border-collapse:collapse;font-size:13px}
+.lb th{
+  text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:#9ca3af;
+  padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6
+}
+.lb td{padding:10px 14px;border-bottom:1px solid #f9fafb;vertical-align:middle}
+.lb tr:last-child td{border-bottom:none}
+.lb tbody tr{transition:background .14s}
+.lb tbody tr:hover td{background:#f8fafc}
+.rank-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:50%;font-size:11px;font-weight:700
+}
+.r1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,0.4)}
+.r2{background:linear-gradient(135deg,#9ca3af,#6b7280);color:#fff}
+.r3{background:linear-gradient(135deg,#d97706,#92400e);color:#fff}
+.rn{background:#f3f4f6;color:#6b7280;font-size:12px}
+
+/* ==================== Badges ==================== */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-green{background:#dcfce7;color:#15803d}
+.badge-red{background:#fee2e2;color:#b91c1c}
+.badge-yellow{background:#fef9c3;color:#a16207}
+.badge-blue{background:#dbeafe;color:#1d4ed8}
+
+/* ==================== Audit toolbar ==================== */
+.audit-tb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.dec-sel{
+  height:28px;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:6px;padding:0 8px;font:500 12px 'Inter',sans-serif;color:#374151;outline:none
+}
+.note-inp{
+  height:28px;background:#fff;border:1.5px solid #e5e7eb;
+  border-radius:6px;padding:0 8px;font:500 12px 'Inter',sans-serif;
+  color:#374151;outline:none;width:130px;transition:border .18s
+}
+.note-inp:focus{border-color:#0f2847}
+
+/* ==================== Role tabs ==================== */
+.role-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
+.rtab{
+  padding:7px 16px;border-radius:7px;
+  font:600 12px 'Inter',sans-serif;cursor:pointer;
+  background:#fff;color:#6b7280;border:1.5px solid #e5e7eb;
+  letter-spacing:.04em;transition:all .18s;
+  box-shadow:0 1px 3px rgba(0,0,0,0.05)
+}
+.rtab:hover:not(.active){background:#f9fafb;border-color:#9ca3af;color:#374151}
+.rtab.active{
+  background:linear-gradient(135deg,#0f2847,#1a3d6e);
+  color:#fff;border-color:transparent;
+  box-shadow:0 3px 10px rgba(15,40,71,0.3)
+}
+
+/* ==================== Messages ==================== */
+.msg{border-radius:8px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:16px;display:none}
+.msg-err{background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626}
+.msg-ok{background:#f0fdf4;border:1.5px solid #bbf7d0;color:#15803d}
+.msg-warn{background:#fffbeb;border:1.5px solid #fde68a;color:#92400e}
+
+/* ==================== Loading overlay ==================== */
+.loading-overlay{
+  position:fixed;inset:0;background:rgba(15,40,71,0.45);
+  backdrop-filter:blur(6px);display:none;
+  align-items:center;justify-content:center;z-index:9999
+}
+.loading-card{
+  background:#fff;border-radius:14px;padding:32px 40px;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,0.2);min-width:280px
+}
+.big-spinner{
+  width:44px;height:44px;border:3.5px solid #e5e7eb;border-top-color:#0f2847;
+  border-radius:50%;animation:spin .75s linear infinite;margin:0 auto 16px
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-title{font-size:15px;font-weight:700;color:#0f2847;margin-bottom:4px}
+.load-sub{font-size:12px;color:#9ca3af;margin-bottom:14px}
+.prog-track{background:#f3f4f6;border-radius:4px;height:4px;overflow:hidden}
+.prog-fill{height:4px;background:linear-gradient(90deg,#0f2847,#3b82f6);border-radius:4px;transition:width .3s}
+
+/* ==================== Results ==================== */
+.results-section{display:none}
+
+/* ==================== Misc ==================== */
+.empty-state{text-align:center;padding:48px 20px;color:#9ca3af;font-size:13px}
+.empty-state-rich{display:flex;flex-direction:column;align-items:center;gap:8px;padding:64px 20px;color:#9ca3af}
+.empty-state-rich .empty-icon{width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:rgba(255,255,255,0.06);color:#9ca3af}
+.empty-state-rich .empty-icon svg{width:32px;height:32px;stroke:currentColor;fill:none;stroke-width:1.6}
+.empty-state-rich .empty-title{font-size:15px;font-weight:600;color:#111827;margin-top:4px}
+.empty-state-rich .empty-sub{font-size:13px;color:#6b7280;max-width:340px;text-align:center;line-height:1.45}
+.audit-tb-stack{display:flex;flex-direction:column;gap:10px;align-items:stretch;margin-bottom:14px}
+.audit-tb-stack .audit-tb-row{width:100%}
+.audit-tb-stack .audit-tb-actions{display:flex;gap:8px}
+.audit-tb-stack .audit-tb-actions .btn{flex:0 0 auto}
+.nav-status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,0.08);color:#cbd5e1;font-size:12px;line-height:1;margin:0 6px}
+.nav-status-pill .dot{width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block}
+.nav-status-pill .dot.ok{background:#22c55e}
+.nav-status-pill .dot.err{background:#ef4444}
+.nav-search-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.06);color:#cbd5e1;cursor:pointer;border:0;margin:0 4px}
+.nav-search-btn:hover{background:rgba(255,255,255,0.12)}
+.nav-search-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
+
+@media(max-width:760px){
+  .weights-grid{grid-template-columns:1fr 1fr}
+  .score-row{grid-template-columns:1fr 1fr}
+  .main{padding:16px}
+  .topbar,.config-bar{padding-left:16px;padding-right:16px}
+}
+
+/* Anonymize tooltip */
+.anon-tooltip-wrap{position:relative;display:inline-flex;align-items:center;margin-left:4px;cursor:default}
+.anon-tooltip-icon{width:15px;height:15px;border-radius:50%;border:1.5px solid #9ca3af;color:#9ca3af;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;user-select:none;transition:border-color .15s,color .15s}
+.anon-tooltip-wrap:hover .anon-tooltip-icon{border-color:#6366f1;color:#6366f1}
+.anon-tooltip-box{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1e1b4b;color:#e0e7ff;font-size:12px;line-height:1.55;padding:10px 13px;border-radius:9px;width:240px;box-shadow:0 6px 24px rgba(0,0,0,.22);z-index:9999;pointer-events:none;text-align:left;white-space:normal}
+.anon-tooltip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#1e1b4b}
+.anon-tooltip-wrap:hover .anon-tooltip-box{display:block}
+
+/* ── How-it-works banner ─────────────────────────────────────── */
+.how-banner{display:flex;gap:0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-bottom:22px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.how-step{flex:1;display:flex;align-items:flex-start;gap:12px;padding:16px 18px;position:relative}
+.how-step:not(:last-child)::after{content:'';position:absolute;right:0;top:20%;height:60%;width:1px;background:#e5e7eb}
+.how-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#0a1f3d,#0f2847);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.how-text strong{display:block;font-size:13px;font-weight:700;color:#0f2847;margin-bottom:2px}
+.how-text span{font-size:12px;color:#6b7280;line-height:1.4}
+
+/* ── Sort controls ───────────────────────────────────────────── */
+.batch-controls{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.batch-controls label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af}
+.sort-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
+.sort-btn:hover,.sort-btn.active{background:#0f2847;color:#fff;border-color:#0f2847}
+.sort-arrow{font-size:10px;opacity:.7}
+
+/* ── Footer / About ─────────────────────────────────────────── */
+.site-footer{background:#0a1f3d;color:rgba(255,255,255,.7);font-size:12px;line-height:1.7;padding:32px;margin-top:40px}
+.footer-inner{max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.footer-section h4{font-size:13px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
+.footer-section p{margin:0;color:rgba(255,255,255,.6)}
+.footer-bottom{max-width:900px;margin:20px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.4)}
+@media(max-width:600px){.how-banner{flex-direction:column}.how-step:not(:last-child)::after{display:none}.footer-inner{grid-template-columns:1fr}}
+
+/* Settings panel */
+.settings-btn{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:6px 10px;cursor:pointer;color:rgba(255,255,255,0.8);font-size:18px;line-height:1;transition:all .18s;position:relative}
+.settings-btn:hover{background:rgba(255,255,255,0.2);color:#fff}
+.settings-panel{display:none;position:fixed;top:54px;right:16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:9999;min-width:340px;max-height:calc(100vh - 70px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.settings-panel.open{display:block}
+.settings-panel h3{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin:0 0 10px}
+.settings-row{display:flex;align-items:center;gap:8px}
+.settings-row .text-input{flex:1}
+.settings-close{position:absolute;top:10px;right:12px;background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1}
+.settings-close:hover{color:#374151;background:#f3f4f6}
+.settings-overlay{display:none;position:fixed;inset:0;z-index:9998}
+.settings-overlay.open{display:block}
+.tool-section{padding:32px 24px}
+.err-retry-card{background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:14px;margin-top:12px}
+.err-retry-icon{font-size:22px;flex-shrink:0}
+.err-retry-msg{flex:1;font-size:14px;color:#dc2626;font-weight:500}
+.err-retry-btn{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .18s}
+.err-retry-btn:hover{background:#b91c1c}
+
+/* Batch summary */
+.batch-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.bs-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;text-align:center}
+.bs-val{font-size:26px;font-weight:800;color:#0a1f3d;line-height:1}
+.bs-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-top:4px}
+.bs-sub{font-size:11px;color:#6b7280;margin-top:2px}
+/* Why score */
+.why-toggle{background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:#6b7280;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.why-toggle:hover{border-color:#0f2847;color:#0f2847}
+.why-arrow{font-size:9px;transition:transform .2s;display:inline-block}
+.why-toggle.open .why-arrow{transform:rotate(180deg)}
+.why-box{display:none;background:#f8faff;border:1px solid #dde4f7;border-radius:8px;padding:12px 14px;margin-top:10px;font-size:12px;line-height:1.65;color:#374151}
+.why-box.open{display:block}
+/* Templates */
+.tpl-trigger{display:inline-flex;align-items:center;gap:6px;background:none;border:1.5px solid #e5e7eb;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .18s}
+.tpl-trigger:hover,.tpl-trigger.open{border-color:#0a1f3d;color:#0a1f3d;background:#f0f4ff}
+.tpl-trigger svg{transition:transform .2s}
+.tpl-trigger.open svg{transform:rotate(180deg)}
+.tpl-panel{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 8px 32px rgba(10,31,61,.13);z-index:999;width:300px;padding:0;overflow:hidden}
+.tpl-panel.open{display:block}
+.tpl-panel-head{padding:14px 16px 10px;border-bottom:1px solid #f3f4f6;display:flex;justify-content:space-between;align-items:center}
+.tpl-panel-head span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af}
+.tpl-save-btn{background:#0a1f3d;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;transition:opacity .15s}
+.tpl-save-btn:hover{opacity:.85}
+.tpl-chips{padding:10px 12px;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
+.tpl-empty{padding:20px 16px;text-align:center;color:#9ca3af;font-size:12px}
+.tpl-chip{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:9px;overflow:hidden;transition:border-color .15s}
+.tpl-chip:hover{border-color:#c7d6f5}
+.tpl-chip-name{flex:1;padding:9px 13px;font-size:13px;font-weight:600;color:#0f2847;cursor:pointer;transition:background .15s;background:none;border:none;text-align:left}
+.tpl-chip-name:hover{background:#f0f4ff}
+.tpl-chip-del{padding:9px 11px;color:#d1d5db;font-size:13px;cursor:pointer;transition:all .15s;background:none;border:none;border-left:1.5px solid #f3f4f6;line-height:1}
+.tpl-chip-del:hover{color:#dc2626;background:#fff5f5}
+.tpl-panel-footer{padding:10px 16px;border-top:1px solid #f3f4f6;font-size:11px;color:#b0b8c4;font-style:italic}
+.tpl-wrap{position:relative;display:inline-block}
+/* Print */
+.print-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.print-btn:hover{background:#0f2847;color:#fff;border-color:#0f2847}
+@media print{.topbar,.config-bar,.mode-toggle,.how-banner,.options-row,.card-has-jd,.card-has-weights,.action-row,.batch-controls,.template-bar,.site-footer,.nav-btn,.conn-badge,.settings-btn,.settings-panel,.print-btn,.why-toggle,.tpl-btn,.sort-btn,.btn{display:none!important}body{background:#fff!important}
+.main{padding:10px!important}.card{box-shadow:none!important;border:1px solid #ddd!important;break-inside:avoid}.batch-summary{break-inside:avoid}.lb td,.lb th{padding:4px 6px!important;font-size:11px}}
+/* Slider */
+.w-slider{width:100%;margin-top:8px;accent-color:#0f2847;cursor:pointer;height:4px}
+/* ── Modal ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(10,31,61,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;transition:opacity .25s}
+.modal-backdrop.open{opacity:1}
+.modal-box{background:#fff;border-radius:14px;width:100%;max-width:640px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(10,31,61,0.22);transform:translateY(20px);transition:transform .25s}
+.modal-backdrop.open .modal-box{transform:translateY(0)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid #e5e7eb}
+.modal-head h3{margin:0;font-size:17px;font-weight:700;color:#0a1f3d}
+.modal-close{background:none;border:none;font-size:22px;color:#6b7280;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}
+.modal-close:hover{background:#f3f4f6;color:#0a1f3d}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+.modal-tabs{display:flex;gap:0;border-bottom:1px solid #e5e7eb;padding:0 24px;flex-shrink:0}
+.modal-tab{background:none;border:none;padding:12px 18px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;letter-spacing:.03em}
+.modal-tab.active{color:#0a1f3d;border-bottom-color:#0f2847}
+.modal-body{padding:24px;overflow-y:auto;line-height:1.65;font-size:14px;color:#374151}
+.modal-body h4{font-size:13px;font-weight:700;color:#0a1f3d;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 6px}
+.modal-body h4:first-child{margin-top:0}
+.modal-body p{margin:0 0 12px}
+.modal-body ul{margin:0 0 12px;padding-left:18px}
+.modal-body li{margin-bottom:4px}
+.score-example{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.score-example .ex-pill{padding:4px 14px;border-radius:20px;font-size:13px;font-weight:700}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.about-card{background:#f8faff;border:1px solid #e5e7eb;border-radius:10px;padding:16px}
+.about-card h5{margin:0 0 6px;font-size:13px;font-weight:700;color:#0a1f3d}
+.about-card p{margin:0;font-size:13px;color:#6b7280}
+.contact-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f3f4f6}
+.contact-row:last-child{border:none}
+.contact-row strong{min-width:80px;font-size:13px;color:#0a1f3d}
+.contact-row a,.contact-row span{font-size:13px;color:#0f2847}
+.contact-row a:hover{text-decoration:underline}
+/* ── Enhanced score banding on batch rows ── */
+.score-hi-row{border-left:3px solid #16a34a!important}
+.score-med-row{border-left:3px solid #d97706!important}
+.score-lo-row{border-left:3px solid #dc2626!important}
+/* ── Score text colour in single result ── */
+.score-hi-text{color:#15803d!important;font-weight:800}
+.score-med-text{color:#b45309!important;font-weight:800}
+.score-lo-text{color:#b91c1c!important;font-weight:800}
+/* ── Footer link style ── */
+.footer-link{background:none;border:none;color:#93c5fd;font-size:inherit;cursor:pointer;text-decoration:underline;padding:0;font-family:inherit}
+.footer-link:hover{color:#fff}
+/* ── Mobile responsiveness ── */
+@media(max-width:480px){
+  .topbar{padding:0 8px;height:54px;gap:4px}
+  .logo-ring{width:46px;height:46px}
+  .logo-ring-img{width:42px;height:42px}
+  .nav-btn{font-size:10px;padding:4px 6px;letter-spacing:0}
+  .topbar-nav{gap:0;flex-shrink:1;min-width:0}
+  .brand-name{font-size:13px;flex-shrink:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topbar-brand{min-width:0;flex-shrink:1;gap:4px}
+  .brand-icon{width:44px!important;height:44px!important}
+  .main{padding:12px}
+  .card{border-radius:10px}
+  .card-head{padding:12px 14px 8px}
+  .card-body{padding:12px 14px 14px}
+  .mode-toggle{gap:0}
+  .mode-btn{font-size:11px;padding:6px 10px}
+  .how-banner{display:none}
+  .score-row{grid-template-columns:1fr 1fr;gap:8px}
+  .weights-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .weight-card{padding:10px}
+  .batch-summary{grid-template-columns:1fr 1fr}
+  .data-table{font-size:11px}
+  .data-table th,.data-table td{padding:8px 6px}
+  .data-table th:nth-child(n+4),.data-table td:nth-child(n+4){display:none}
+  .batch-actions{flex-wrap:wrap;gap:6px}
+  .footer-inner{grid-template-columns:1fr}
+  .footer-bottom{flex-direction:column;gap:6px;text-align:center}
+  .about-grid{grid-template-columns:1fr}
+  .modal-box{max-height:92vh}
+  .sort-bar{flex-wrap:wrap;gap:6px}
+}
+@media(max-width:640px){
+  .score-row{grid-template-columns:1fr 1fr;gap:10px}
+  .batch-summary{grid-template-columns:1fr 1fr}
+  .main{padding:16px}
+  .data-table th:nth-child(n+5),.data-table td:nth-child(n+5){display:none}
+  .batch-actions{flex-wrap:wrap}
+  .topbar-nav{gap:8px}
+  .topbar-nav a{font-size:12px}
+  .modal-box{margin:10px}
+}
+@media(max-width:768px){
+  .weights-grid{grid-template-columns:1fr 1fr}
+  .score-row{grid-template-columns:1fr 1fr}
+  .batch-actions{flex-wrap:wrap;gap:8px}
+}
+
+/* ── Smooth result transitions ── */
+.slide-in{animation:slideIn .35s cubic-bezier(.22,1,.36,1) both}
+@keyframes slideIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.slide-in-fast{animation:slideIn .22s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Success flash animation ── */
+.success-flash{animation:successPulse .6s ease both}
+@keyframes successPulse{
+  0%{box-shadow:0 0 0 0 rgba(5,150,105,0.4)}
+  50%{box-shadow:0 0 0 12px rgba(5,150,105,0)}
+  100%{box-shadow:0 0 0 0 rgba(5,150,105,0)}
+}
+.success-tick{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:#dcfce7;border-radius:50%;animation:tickPop .4s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes tickPop{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ── Drag-and-drop enhanced ── */
+.dropzone{transition:border-color .2s,background .2s,transform .15s}
+.dropzone.drag{border-color:#0f2847;background:#eef2ff;transform:scale(1.01);box-shadow:0 0 0 4px rgba(15,40,71,0.1)}
+.dropzone.drag .dz-icon svg{transform:translateY(-4px);transition:transform .2s}
+.dropzone.drag .dz-label{color:#0f2847;font-weight:600}
+
+/* ── Candidate notes in batch rows ── */
+.row-notes-wrap{padding:4px 0}
+.row-notes{width:100%;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;color:#374151;resize:none;height:32px;transition:border-color .15s,height .2s;background:#fafafa}
+.row-notes:focus{outline:none;border-color:#0f2847;background:#fff;height:56px}
+.row-notes::placeholder{color:#d1d5db}
+
+/* ── Keyboard hint ── */
+.kbd-hint{font-size:11px;color:#9ca3af;margin-left:10px}
+/* ── Human-oversight hint (EU AI Act Art. 14) ── */
+.oversight-hint{font-size:11px;color:#9ca3af;font-style:italic;line-height:1.4}
+
+/* ── First-run onboarding: sample button + nudge ── */
+.sample-row{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.sample-tip{display:none;font-size:12px;font-weight:600;color:#1d4ed8}
+.sample-row.nudge .sample-tip{display:inline}
+.sample-row.nudge #trySampleBtn{border-color:#1d4ed8;color:#0f2847;animation:samplePulse 1.6s ease-in-out infinite}
+@keyframes samplePulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,0)}50%{box-shadow:0 0 0 5px rgba(29,78,216,0.18)}}
+.file-chip.sample-chip{background:#eef2ff;border-color:#c7d2fe;color:#4338ca}
+.file-chip.sample-chip .sample-tag{opacity:.7;font-weight:500;margin-left:2px}
+.kbd-hint kbd{background:#f3f4f6;border:1px solid #d1d5db;border-radius:3px;padding:1px 5px;font-size:10px;font-family:inherit}
+/* ── Splash screen ── */
+#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);
+  transition:opacity .6s ease, visibility .6s ease}
+#splash.hidden{opacity:0;visibility:hidden;pointer-events:none}
+#splash .splash-ring{width:96px;height:96px;position:relative;display:flex;align-items:center;justify-content:center}
+#splash .splash-ring svg{position:absolute;inset:0;width:100%;height:100%;animation:splashSpin 1.4s linear infinite}
+#splash .splash-ring img{width:72px;height:72px;object-fit:contain;filter:invert(1) brightness(1.2);mix-blend-mode:screen;position:relative;z-index:1}
+#splash .splash-brand{font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px}
+#splash .splash-brand em{font-style:normal;color:#7dd3fc}
+#splash .splash-status{font-size:13px;color:rgba(255,255,255,0.55);letter-spacing:.04em}
+#splash .splash-dots span{animation:splashDot 1.4s infinite}
+#splash .splash-dots span:nth-child(2){animation-delay:.2s}
+#splash .splash-dots span:nth-child(3){animation-delay:.4s}
+@keyframes splashSpin{to{transform:rotate(360deg)}}
+@keyframes splashDot{0%,80%,100%{opacity:0}40%{opacity:1}}
+
+/* ── Auth screen ── */
+#authScreen{position:fixed;inset:0;z-index:9500;display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:20px;
+  background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);overflow:auto}
+#authScreen .auth-brand-wrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+.auth-card{background:#fff;border-radius:14px;padding:28px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.35)}
+.auth-card h2{font-size:18px;font-weight:800;color:#0a1f3d;margin:0 0 4px}
+.auth-card form{display:flex;flex-direction:column;gap:12px}
+.auth-card .text-input{width:100%;height:42px}
+.auth-card .btn{justify-content:center;height:42px;width:100%}
+.auth-links{display:flex;justify-content:space-between;gap:8px;margin-top:2px;flex-wrap:wrap}
+.auth-link{background:none;border:none;color:#0f2847;font:600 12px 'Inter',sans-serif;cursor:pointer;padding:0;text-decoration:underline}
+.auth-link:hover{color:#1a3d6e}
+.auth-note{font-size:12px;color:#6b7280;margin:0}
+#authError{margin-bottom:14px}
+
+/* ── Topbar account chip ── */
+.account-chip{display:none;align-items:center;gap:8px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;padding:4px 6px 4px 13px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.85);max-width:230px}
+.account-chip .acct-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+.account-chip button{background:rgba(255,255,255,0.12);border:none;border-radius:14px;color:#fff;font:600 11px 'Inter',sans-serif;padding:4px 10px;cursor:pointer;transition:background .15s}
+.account-chip button:hover{background:rgba(255,255,255,0.25)}
+@media(max-width:640px){.account-chip .acct-email{display:none}.account-chip{padding-left:6px}}
+
+/* ── Topbar plan/usage chip ── */
+.plan-chip{display:none;align-items:center;gap:6px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);white-space:nowrap;cursor:default}
+.plan-chip .plan-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,0.7)}
+.plan-chip.warn{background:rgba(245,158,11,0.18);border-color:rgba(245,158,11,0.5);color:#fde68a}
+.plan-chip.warn .plan-dot{background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,0.7)}
+.plan-chip.clickable{cursor:pointer}
+.plan-chip.clickable:hover{background:rgba(255,255,255,0.16)}
+@media(max-width:640px){.plan-chip{padding:4px 9px}}
+/* Plan & Billing settings buttons */
+.plan-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.plan-status-line{font-size:12px;color:#374151;margin-top:4px}
+.plan-status-line .past-due{color:#b45309;font-weight:700}
+
+/* === MOBILE RESPONSIVENESS OVERHAUL === */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, video, table { max-width: 100%; }
+.card, .main { min-width: 0; }
+.table-wrap, .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 900px) {
+  .topbar { padding: 0 14px; gap: 10px; }
+  .config-bar { padding: 8px 14px; flex-wrap: wrap; gap: 8px; }
+  .main { padding: 16px; }
+  .score-row { grid-template-columns: repeat(3, 1fr) !important; }
+  .weights-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .batch-summary { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 768px) {
+  html, body { font-size: 14px; }
+  .topbar { padding: 0 10px; gap: 6px; height: 56px; }
+  .topbar-nav { gap: 2px; }
+  .nav-btn { font-size: 12px; padding: 6px 8px; letter-spacing: 0; }
+  .brand-name { font-size: 14px; }
+  .config-bar { padding: 8px 12px; }
+  .config-bar > * { flex: 1 1 auto; min-width: 0; }
+  .main { padding: 14px; }
+  .card-head, .card-body { padding: 12px 14px; }
+  .score-row { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
+  .weights-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
+  .batch-summary { grid-template-columns: repeat(2, 1fr) !important; }
+  .options-row, .role-input-row, .action-row, .batch-actions, .sort-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch;
+  }
+  .options-row > *, .role-input-row > *, .action-row > * { flex: 1 1 auto; min-width: 0; }
+  .about-grid, .footer-inner { grid-template-columns: 1fr !important; }
+  .footer-bottom { flex-direction: column; gap: 6px; text-align: center; }
+  .modal-box { max-width: 94vw; max-height: 92vh; }
+  input, select, textarea, button { font-size: 16px; min-height: 40px; }
+  textarea { min-height: 120px; }
+  .data-table { font-size: 12px; }
+  .data-table th, .data-table td { padding: 8px 6px; }
+  .topbar-nav .nav-btn span.label { display: inline; }
+}
+
+@media (max-width: 560px) {
+  .topbar { padding: 0 8px; gap: 4px; height: 54px; }
+  .brand-name { font-size: 13px; max-width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-btn { font-size: 11px; padding: 5px 6px; }
+  .main { padding: 10px; }
+  .card { border-radius: 10px; margin-bottom: 12px; }
+  .card-head, .card-body { padding: 10px 12px; }
+  .score-row { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
+  .weights-grid { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+  .weight-card { padding: 10px; }
+  .batch-summary { grid-template-columns: 1fr 1fr !important; }
+  .how-banner { display: none; }
+  .mode-toggle { width: 100%; }
+  .mode-btn { flex: 1 1 0; font-size: 12px; padding: 8px 6px; }
+  .action-row { flex-direction: column; }
+  .action-row > button { width: 100%; }
+  .data-table th:nth-child(n+4), .data-table td:nth-child(n+4) { display: none; }
+  .modal-box { width: 96vw; max-width: 96vw; }
+  .config-bar { gap: 6px; }
+  .gear-btn { width: 36px; height: 36px; }
+}
+
+@media (max-width: 380px) {
+  .score-row { grid-template-columns: 1fr !important; }
+  .weights-grid { grid-template-columns: 1fr !important; }
+  .batch-summary { grid-template-columns: 1fr !important; }
+  .topbar-nav .nav-btn { font-size: 10px; padding: 4px 4px; }
+  .brand-name { max-width: 90px; }
+  
+}
+
+/* Touch-friendly targets */
+@media (hover: none) and (pointer: coarse) {
+  button, .nav-btn, .mode-btn, a.btn, [role="button"] { min-height: 40px; }
+  input[type="range"] { height: 32px; }
+}
+/* === END MOBILE OVERHAUL === */
+/* === MODAL POINTER-EVENTS FIX ===
+   The .modal-backdrop uses opacity:0 to hide, but kept pointer-events:auto,
+   so it was silently blocking ALL clicks on the page beneath it. */
+.modal-backdrop { pointer-events: none; visibility: hidden; }
+.modal-backdrop.open { pointer-events: auto; visibility: visible; }
+/* === END MODAL FIX === */
+
+/* === Phase 2A additions (Sections 1, 2, 4) === */
+#toast-stack { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; max-width: calc(100vw - 32px); pointer-events: none; }
+.toast { background: #1f2937; color: #fff; padding: 12px 16px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-size: 14px; line-height: 1.45; min-width: 240px; max-width: 380px; pointer-events: auto; opacity: 0; transform: translateY(-8px); transition: opacity .18s ease, transform .18s ease; word-break: break-word; }
+.toast.in { opacity: 1; transform: translateY(0); }
+.toast.success { background: #166534; }
+.toast.error { background: #991b1b; }
+.toast.info { background: #1e3a8a; }
+.skel { background: linear-gradient(90deg, rgba(0,0,0,0.05), rgba(0,0,0,0.12), rgba(0,0,0,0.05)); background-size: 200% 100%; animation: skel-pulse 1.2s ease-in-out infinite; border-radius: 6px; color: transparent !important; }
+@keyframes skel-pulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.field-flash { animation: field-flash 0.6s ease; }
+@keyframes field-flash { 0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); } 30%, 70% { box-shadow: 0 0 0 3px rgba(220,38,38,0.45); } }
+.history-overlay { position: fixed; inset: 0; background: rgba(12,23,48,0.55); z-index: 9990; display: none; align-items: center; justify-content: center; padding: 24px; }
+.history-overlay.open { display: flex; }
+.history-panel { background: #fff; color: #0c1730; border-radius: 12px; max-width: 560px; width: 100%; max-height: 80vh; overflow: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.35); }
+.history-panel header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e7ebf3; position: sticky; top: 0; background: #fff; }
+.history-panel header h3 { margin: 0; font-size: 16px; }
+.history-panel .x { background: transparent; border: 0; color: #5c6a8a; font-size: 22px; cursor: pointer; padding: 0 4px; }
+.history-list { padding: 8px 0; list-style: none; margin: 0; }
+.history-list li { padding: 12px 20px; border-bottom: 1px solid #f1f3f8; }
+.history-list li:last-child { border-bottom: 0; }
+.history-list .hi-field { font-weight: 600; color: #0c1730; font-size: 13px; }
+.history-list .hi-from-to { font-size: 13px; color: #5c6a8a; margin-top: 2px; }
+.history-list .hi-when { font-size: 12px; color: #9aa6c0; margin-top: 4px; }
+.history-list .hi-by { font-size: 12px; color: #5c6a8a; margin-top: 2px; }
+@media (max-width: 768px) { .col-reviewer { display: none; } }
+.audit-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 4px; font-size: 13px; color: #5c6a8a; }
+.audit-pager .ctrls { display: flex; gap: 8px; }
+.audit-pager button { border: 1px solid #e7ebf3; background: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.audit-pager button[disabled] { opacity: 0.45; cursor: not-allowed; }
+.history-btn { background: transparent; border: 0; cursor: pointer; padding: 4px 6px; color: #5c6a8a; font-size: 13px; }
+.history-btn:hover { color: #0c1730; }
+
+/* Welcome banner (shown when apiUrl is unset) */
+.welcome-banner{margin:0 16px 18px;border:1px solid #f59e0b;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border-radius:12px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.welcome-banner[hidden]{display:none}
+.welcome-banner-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.welcome-banner-icon{flex:0 0 auto;width:40px;height:40px;border-radius:10px;background:#fde68a;display:flex;align-items:center;justify-content:center;color:#92400e}
+.welcome-banner-text{flex:1 1 240px;min-width:200px}
+.welcome-banner-title{font-size:15px;font-weight:700;color:#78350f;line-height:1.2;margin:0 0 2px}
+.welcome-banner-subtitle{font-size:13px;color:#92400e;line-height:1.4}
+.welcome-banner-form{flex:1 1 320px;display:flex;align-items:stretch;gap:8px;min-width:260px}
+.welcome-banner-input{flex:1 1 auto;min-width:0;padding:8px 12px;border:1px solid #f59e0b;border-radius:8px;background:#fff;color:#1f2937;font-size:13px;outline:none}
+.welcome-banner-input:focus{border-color:#0b1e3d;box-shadow:0 0 0 3px rgba(11,30,61,.15)}
+.welcome-banner-btn{flex:0 0 auto;padding:8px 18px;border:none;border-radius:8px;background:#0b1e3d;color:#fff;font-weight:600;font-size:13px;cursor:pointer;transition:background .15s ease}
+.welcome-banner-btn:hover{background:#1d3a72}
+.welcome-banner-btn:active{background:#0b1e3d}
+@media(max-width:760px){.welcome-banner-form{flex-basis:100%}.welcome-banner-text{flex-basis:100%}}
+    /* === Mobile top-bar fix (added) === */
+    .mobile-menu-button{display:none;background:none;border:none;color:rgba(255,255,255,0.85);font-size:22px;line-height:1;padding:6px 10px;border-radius:6px;cursor:pointer;align-items:center;justify-content:center}
+    @media (max-width: 640px){
+      .topbar-nav{display:none}
+      .mobile-menu-button{display:flex}
+      .topbar-nav.mobile-open{display:flex;flex-direction:column;position:absolute;top:54px;left:0;right:0;background:#0f2847;padding:8px;gap:4px;z-index:200;box-shadow:0 8px 20px rgba(0,0,0,0.35)}
+      .topbar-nav.mobile-open .nav-btn{font-size:14px;padding:10px 12px;text-align:left}
+    }
+</style>
+<!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
+<script defer data-domain="cvsprings.onrender.com" src="https://plausible.io/js/script.tagged-events.js"></script>
+<script nonce="__CSP_NONCE__">window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+</head>
+<body>
+<!-- Phase 2A: toast stack + audit change-history modal -->
+<div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+<div id="history-overlay" class="history-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title">
+  <div class="history-panel">
+    <header>
+      <h3 id="history-title">Change history</h3>
+      <button type="button" class="x" aria-label="Close" data-history-close>&times;</button>
+    </header>
+    <ul class="history-list" id="history-list"></ul>
+  </div>
+</div>
+<!-- Splash screen -->
+<div id="splash">
+  <div class="splash-ring">
+    <svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="48" cy="48" r="44" stroke="rgba(255,255,255,0.15)" stroke-width="2.5"/>
+      <path d="M48 4 A44 44 0 0 1 92 48" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    <img src="/logo.png" alt="CVsprings">
+  </div>
+  <div class="splash-brand">CV<em>springs</em></div>
+  <div class="splash-status">Starting up<span class="splash-dots"><span>.</span><span>.</span><span>.</span></span></div>
+</div>
+<!-- Auth screen (login / signup / reset) -->
+<div id="authScreen" role="dialog" aria-modal="true" aria-label="Sign in to CVsprings">
+  <div class="auth-brand-wrap">
+    <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="" style="object-fit:contain;filter:invert(1) brightness(1.15);mix-blend-mode:screen;"></span>
+    <div class="splash-brand">CV<em>springs</em></div>
+  </div>
+  <div class="auth-card">
+    <div class="msg msg-err" id="authError" role="alert" aria-live="polite"></div>
+    <form id="authLoginForm" autocomplete="on">
+      <h2>Sign in</h2>
+      <input class="text-input" type="email" id="authEmail" placeholder="Email" autocomplete="email" required>
+      <input class="text-input" type="password" id="authPassword" placeholder="Password" autocomplete="current-password" required>
+      <button class="btn btn-primary" type="submit" id="authLoginBtn">Sign in</button>
+      <div class="auth-links">
+        <button type="button" class="auth-link" id="authForgotLink">Forgot password?</button>
+        <button type="button" class="auth-link" id="authToSignup">Create an account</button>
+      </div>
+    </form>
+    <form id="authSignupForm" style="display:none">
+      <h2>Create your account</h2>
+      <input class="text-input" type="email" id="suEmail" placeholder="Work email" autocomplete="email" required>
+      <input class="text-input" type="password" id="suPassword" placeholder="Password (min 10 characters)" autocomplete="new-password" required>
+      <input class="text-input" type="text" id="suOrgName" placeholder="Company / team name" autocomplete="organization">
+      <button class="btn btn-primary" type="submit" id="suCreateBtn">Create account</button>
+      <div class="auth-links"><button type="button" class="auth-link" id="authToLogin">Back to sign in</button></div>
+    </form>
+    <form id="authForgotForm" style="display:none">
+      <h2>Reset your password</h2>
+      <p class="auth-note">Enter your email and we&rsquo;ll send you a reset link.</p>
+      <input class="text-input" type="email" id="frEmail" placeholder="Email" autocomplete="email" required>
+      <button class="btn btn-primary" type="submit" id="frSubmitBtn">Send reset link</button>
+      <div class="auth-links"><button type="button" class="auth-link" id="frBackToLogin">Back to sign in</button></div>
+    </form>
+    <form id="authResetForm" style="display:none">
+      <h2>Set a new password</h2>
+      <input class="text-input" type="password" id="rpPassword" placeholder="New password (min 10 characters)" autocomplete="new-password" required>
+      <button class="btn btn-primary" type="submit" id="rpSubmitBtn">Set new password</button>
+    </form>
+    <form id="authAcceptForm" style="display:none">
+      <h2 id="acceptTitle">Accept invitation</h2>
+      <p class="auth-note" id="acceptNote">Set a password to join your team.</p>
+      <input class="text-input" type="password" id="acceptPassword" placeholder="Choose a password (min 10 characters)" autocomplete="new-password" required>
+      <button class="btn btn-primary" type="submit" id="acceptBtn">Join</button>
+      <div class="auth-links"><button type="button" class="auth-link" id="acceptToLogin">Back to sign in</button></div>
+    </form>
+  </div>
+</div>
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay" style="display:none">
+  <div class="loading-card">
+    <div class="big-spinner"></div>
+    <div class="load-title" id="loadingMsg">Analysing...</div>
+    <div class="load-sub" id="progressLabel"></div>
+    <div class="prog-track"><div class="prog-fill" id="progressBar" style="width:0%"></div></div>
+  </div>
+</div>
+
+<!-- Topbar -->
+<div class="topbar">
+  <a class="topbar-brand" href="/login">
+    <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CV Springs Logo" style="object-fit:contain;flex-shrink:0;filter:invert(1) brightness(1.15);mix-blend-mode:screen;"></span>
+    <span class="brand-name">CV<em>springs</em></span>
+  </a>
+  <button class="mobile-menu-button" type="button" aria-label="Open menu" aria-expanded="false" data-action="toggleMobileNav">☰</button>
+  <nav class="topbar-nav">
+    <button class="nav-btn active" data-action="switchTab" data-tab="analyzer">Analyzer</button>
+    <button class="nav-btn" data-action="switchTab" data-tab="audit">Audit Log</button>
+    <button class="nav-btn" data-action="switchTab" data-tab="history">Role History</button>
+    <a class="nav-btn" href="/bias-report.html" style="text-decoration:none;display:inline-block">Bias Report</a>
+  </nav>
+  <span class="nav-status-pill" id="navStatusPill" title="Backend status"><span class="dot" id="navStatusDot"></span><span id="navStatusLabel">Not connected</span></span>
+  <button type="button" class="nav-search-btn" id="navSearchBtn" data-action="focusAuditSearch" title="Search audit log" aria-label="Search audit log">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+  </button>
+  <span class="plan-chip" id="planChip" title="Your plan"><span class="plan-dot"></span><span id="planChipLabel"></span></span>
+  <span class="account-chip" id="accountChip"><span class="acct-email" id="accountEmail"></span><button type="button" id="logoutBtn" data-action="doLogout">Logout</button></span>
+  <button class="settings-btn" data-action="toggleSettings" title="Settings" aria-label="Open settings">&#9881;</button>
+</div>
+
+<!-- Config bar -->
+<!-- Settings overlay -->
+<div class="settings-overlay" id="settingsOverlay" data-action="toggleSettings"></div>
+<!-- Settings panel -->
+<div class="settings-panel" id="settingsPanel">
+  <button class="settings-close" data-action="toggleSettings" aria-label="Close settings">&#215;</button>
+  <h3>Plan &amp; Billing</h3>
+  <div class="plan-status-line" id="planStatusLine">Loading plan&hellip;</div>
+  <!-- keep in sync with Stripe prices -->
+  <div id="planCompare"></div>
+  <div class="plan-row" id="planOwnerControls" style="display:none">
+    <button class="btn btn-primary btn-sm" id="upgradeProBtn" data-action="startCheckout" data-plan="pro">Upgrade to Pro</button>
+    <button class="btn btn-primary btn-sm" id="upgradeTeamBtn" data-action="startCheckout" data-plan="team">Upgrade to Team</button>
+    <button class="btn btn-ghost btn-sm" id="manageBillingBtn" data-action="openBillingPortal" style="display:none">Manage billing</button>
+  </div>
+  <div class="plan-status-line" id="planMemberNote" style="display:none;color:#9ca3af">Your plan is managed by your organization&rsquo;s owner.</div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3>Team</h3>
+  <div id="teamBody" style="font-size:13px;color:#6b7280">Loading&hellip;</div>
+  <!-- owner-only invite controls (hidden for members / non-team) -->
+  <div id="teamInviteRow" class="settings-row" style="display:none;gap:8px;margin-top:10px">
+    <input class="text-input" type="email" id="inviteEmail" placeholder="colleague@company.com" style="flex:1" aria-label="Invite email">
+    <button class="btn btn-primary btn-sm" id="inviteBtn" data-action="inviteMember">Invite</button>
+  </div>
+  <div id="inviteLinkRow" style="display:none;margin-top:8px">
+    <div class="settings-row" style="gap:8px">
+      <input class="text-input" type="text" id="inviteLink" readonly style="flex:1" aria-label="Invite link">
+      <button class="btn btn-ghost btn-sm" id="copyInviteBtn" data-action="copyInviteLink">Copy link</button>
+    </div>
+    <div id="inviteLinkNote" style="font-size:11px;color:#6b7280;margin-top:4px">Send this link to your colleague.</div>
+  </div>
+  <div id="brandingSection" style="display:none">
+    <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+    <h3>Report Branding</h3>
+    <div class="settings-row" style="margin-top:6px">
+      <input class="text-input" type="text" id="brandName" placeholder="Display name (e.g. Chaulin)" style="flex:1" aria-label="Brand display name">
+    </div>
+    <div class="settings-row" style="margin-top:8px">
+      <input class="text-input" type="url" id="brandLogoUrl" placeholder="Logo URL (https://…)" style="flex:1" aria-label="Brand logo URL">
+    </div>
+    <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <span style="font-size:13px;color:#374151">Brand colour</span>
+      <input class="text-input" type="text" id="brandColor" placeholder="#0f2847" style="width:110px" aria-label="Brand colour (hex)">
+      <button class="btn btn-primary btn-sm" id="brandSaveBtn" data-action="saveBranding">Save</button>
+    </div>
+    <div style="font-size:11px;color:#6b7280;margin-top:4px">Applied to candidate PDF reports. Leave blank to use the CVsprings (Chaulin) defaults. Logo must be an http(s) URL.</div>
+  </div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3 style="margin-top:0">Preferences</h3>
+  <label class="settings-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#374151">
+    <input type="checkbox" id="autosaveBatchToggle" data-action="setAutosaveBatch">
+    <span>Auto-save batch results to audit log</span>
+  </label>
+  <div style="font-size:11px;color:#6b7280;margin-top:4px;margin-left:24px">When enabled, every CV in a batch is saved to the audit log automatically once analysis completes.</div>
+  <h3 style="margin-top:18px">Default Scoring Weights</h3>
+  <div class="settings-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+    <span style="min-width:70px;font-size:13px;color:#374151">Keywords</span>
+    <input class="text-input" type="number" id="setWKw" min="0" max="100" style="width:70px" aria-label="Default keyword weight">
+    <span style="min-width:55px;font-size:13px;color:#374151">Skills</span>
+    <input class="text-input" type="number" id="setWSk" min="0" max="100" style="width:70px" aria-label="Default skills weight">
+  </div>
+  <div class="settings-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+    <span style="min-width:70px;font-size:13px;color:#374151">Experience</span>
+    <input class="text-input" type="number" id="setWEx" min="0" max="100" style="width:70px" aria-label="Default experience weight">
+    <span style="min-width:55px;font-size:13px;color:#374151">Education</span>
+    <input class="text-input" type="number" id="setWEd" min="0" max="100" style="width:70px" aria-label="Default education weight">
+  </div>
+  <div style="font-size:11px;color:#6b7280;margin-top:4px">Must sum to 100. Applied to the main weight sliders.</div>
+  <h3 style="margin-top:18px">Defaults</h3>
+  <label class="settings-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#374151;margin-top:6px">
+    <input type="checkbox" id="setAnonymizeDefault">
+    <span>Anonymize by default</span>
+  </label>
+  <div class="settings-row" style="margin-top:8px">
+    <input class="text-input" type="text" id="setDefaultRole" placeholder="Default role / position" style="flex:1" aria-label="Default role or position">
+  </div>
+  <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+    <span style="font-size:13px;color:#374151">Strong fit threshold</span>
+    <input class="text-input" type="number" id="setScoreThreshold" min="1" max="99" style="width:80px" aria-label="Strong fit score threshold">
+  </div>
+  <div class="settings-row" style="display:flex;align-items:center;gap:10px;margin-top:12px">
+    <button class="btn btn-primary btn-sm" data-action="saveSettings">Save Settings</button>
+    <span id="settingsSavedMsg" style="font-size:12px;color:#059669;font-weight:700;display:none">Settings saved</span>
+  </div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3>Change Password</h3>
+  <div class="settings-row" style="margin-top:6px">
+    <input class="text-input" type="password" id="cpCurrent" placeholder="Current password" autocomplete="current-password" style="flex:1" aria-label="Current password">
+  </div>
+  <div class="settings-row" style="margin-top:8px">
+    <input class="text-input" type="password" id="cpNew" placeholder="New password (min 10 characters)" autocomplete="new-password" style="flex:1" aria-label="New password">
+  </div>
+  <div class="settings-row" style="margin-top:10px">
+    <button class="btn btn-primary btn-sm" id="cpSaveBtn" data-action="changePassword">Update Password</button>
+  </div>
+  <div style="font-size:11px;color:#6b7280;margin-top:4px">Updating your password signs you out on all other devices.</div>
+  <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
+  <h3>Data Retention</h3>
+  <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:6px">
+    <input class="text-input" type="number" id="setRetentionDays" min="0" max="1095" style="width:90px" aria-label="Audit retention in days">
+    <span style="font-size:13px;color:#374151">days</span>
+    <button class="btn btn-primary btn-sm" id="retSaveBtn" data-action="saveRetention">Save</button>
+  </div>
+  <div style="font-size:11px;color:#6b7280;margin-top:4px">Audit records older than this are <strong>permanently deleted</strong> by a daily job (including their change history). Allowed: 30&ndash;1095, or 0 to keep records until manually deleted. Applies to your whole organization.</div>
+  <div id="retOwnerNote" style="display:none;font-size:11px;color:#9ca3af;margin-top:4px">Only the organization owner can change retention and use the controls below.</div>
+  <h3 style="margin-top:18px">Organization Data</h3>
+  <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:6px">
+    <button class="btn btn-ghost btn-sm" id="orgExportBtn" data-action="exportOrgData">Export all data (JSON)</button>
+    <button class="btn btn-danger btn-sm" id="orgDeleteBtn" data-action="deleteAllOrgData">Delete all audit data</button>
+  </div>
+  <div style="font-size:11px;color:#6b7280;margin-top:4px">Export downloads every audit record (incl. change history) and template in your organization. Delete permanently removes all audit records and change history &mdash; it cannot be undone.</div>
+</div>
+
+<!-- === ANALYZER === -->
+<div class="tab-content active main" id="tab-analyzer">
+  <div class="tool-section" id="analyzer-tool">
+
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="modeSingle" data-action="setMode" data-mode="single">Single CV</button>
+    <button class="mode-btn" id="modeBatch" data-action="setMode" data-mode="batch">Batch Upload</button>
+  </div>
+
+  <!-- How it works -->
+  <div class="how-banner">
+    <div class="how-step">
+      <div class="how-num">1</div>
+      <div class="how-text"><strong>Upload CVs</strong><span>Drop one or multiple PDF / DOCX files into the upload zone</span></div>
+    </div>
+    <div class="how-step">
+      <div class="how-num">2</div>
+      <div class="how-text"><strong>Add a Job Description</strong><span>Paste the full job posting so the AI has the right context to score against</span></div>
+    </div>
+    <div class="how-step">
+      <div class="how-num">3</div>
+      <div class="how-text"><strong>Review Your Scores</strong><span>Get instant fit scores across Keywords, Skills, Experience and Education</span></div>
+    </div>
+  </div>
+
+
+  <!-- First-run onboarding: try with a sample (no upload/JD needed) -->
+  <div class="sample-row">
+    <button class="btn btn-ghost" id="trySampleBtn" data-action="trySample">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/></svg>
+      <span>Try with a sample CV</span>
+    </button>
+    <span class="sample-tip" id="sampleTip">New here? See it in action &rarr;</span>
+  </div>
+
+  <!-- Sample result notice (shown above results when viewing the sample) -->
+  <div class="msg msg-warn" id="sampleBanner" style="display:none;align-items:center;gap:10px">
+    <span style="flex:1">This is a sample result. Upload your own CV and job description to analyse for real.</span>
+    <button type="button" class="btn btn-ghost btn-sm" data-action="clearSample">Clear sample</button>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title" id="uploadCardTitle">Upload CV</span></div>
+    <div class="card-body">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="cvInput" accept=".pdf,.docx" data-action="handleFiles">
+        <div class="dz-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <div class="dz-label" id="dropLabel">Drop PDF or DOCX here, or click to browse</div>
+        <div class="dz-sub" id="dropSub">Supports PDF and DOCX &middot; Max 10 MB per file</div>
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+  </div>
+
+  <div class="options-row">
+    <span class="opt-label">Role / Position</span>
+    <input type="text" class="text-input" id="roleInput" placeholder="e.g. Senior Engineer" style="min-width:200px">
+    <div class="toggle-wrap" style="margin-left:8px">
+      <label class="toggle"><input type="checkbox" id="anonymizeToggle"><span class="tog-slider"></span></label>
+      <span class="tog-label">Anonymize</span>
+      <span class="anon-tooltip-wrap">
+        <span class="anon-tooltip-icon">?</span>
+        <span class="anon-tooltip-box"><strong style="display:block;margin-bottom:4px">What is Anonymize?</strong>Strips contact details (emails, phone numbers, links, address lines), years 1940&ndash;2015 and stand-alone name lines from the CV text before scoring, to help reduce unconscious bias. Indirect identifiers (e.g. employers, universities, names mid-sentence) are not removed.</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head" style="position:relative">
+      <span class="card-title">Job Description</span>
+      <div class="tpl-wrap" id="tplWrap">
+        <button class="tpl-trigger" id="tplTrigger" data-action="toggleTplPanel">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/></svg>
+          Templates
+          <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="tpl-panel" id="tplPanel">
+          <div class="tpl-panel-head">
+            <span>Saved Templates</span>
+            <button class="tpl-save-btn" data-action="saveTemplate">+ Save Current</button>
+          </div>
+          <div class="tpl-migration-banner" id="tplMigrationBanner" style="display:none;align-items:center;gap:10px;padding:10px 12px;margin:0 0 10px 0;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:13px;color:#7c2d12">
+            <span style="flex:1">You have <strong class="tpl-mig-count">0</strong> templates saved locally. Upload them to your account?</span>
+            <button type="button" class="tpl-mig-upload" style="padding:6px 10px;background:#ea580c;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer">Upload</button>
+            <button type="button" class="tpl-mig-dismiss" style="padding:6px 10px;background:transparent;color:#7c2d12;border:0;cursor:pointer">Dismiss</button>
+          </div>
+          <div class="tpl-chips" id="tplChips">
+            <div class="tpl-empty">No templates saved yet.<br>Set up a role and click &ldquo;+ Save Current&rdquo;.</div>
+          </div>
+          <div class="tpl-panel-footer">Click a template to load it instantly</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <textarea class="textarea" id="jdInput" rows="6" placeholder="Paste the full job description here..."></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Scoring Weights</span>
+      <span class="w-sum ok" id="weightSum">Total: 100</span>
+    </div>
+    <div class="card-body">
+      <div class="weights-grid">
+        <div class="w-card"><div class="w-name">Keywords</div><div class="w-desc">Job title &amp; role terms</div><input class="w-input" type="number" id="wKw" value="40" min="0" max="100" data-action="syncSlider" data-weight="wKw">
+          <input type="range" class="w-slider" id="wKwSlider" min="0" max="100" value="40" data-action="syncInput" data-weight="wKw"></div>
+        <div class="w-card"><div class="w-name">Skills</div><div class="w-desc">Technical &amp; soft skills</div><input class="w-input" type="number" id="wSk" value="30" min="0" max="100" data-action="syncSlider" data-weight="wSk">
+          <input type="range" class="w-slider" id="wSkSlider" min="0" max="100" value="30" data-action="syncInput" data-weight="wSk"></div>
+        <div class="w-card"><div class="w-name">Experience</div><div class="w-desc">Years &amp; seniority level</div><input class="w-input" type="number" id="wEx" value="20" min="0" max="100" data-action="syncSlider" data-weight="wEx">
+          <input type="range" class="w-slider" id="wExSlider" min="0" max="100" value="20" data-action="syncInput" data-weight="wEx"></div>
+        <div class="w-card"><div class="w-name">Education</div><div class="w-desc">Degrees &amp; qualifications</div><input class="w-input" type="number" id="wEd" value="10" min="0" max="100" data-action="syncSlider" data-weight="wEd">
+          <input type="range" class="w-slider" id="wEdSlider" min="0" max="100" value="10" data-action="syncInput" data-weight="wEd"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="analyzeError" role="alert" aria-live="polite"></div>
+  <div style="display:flex;gap:10px;margin-bottom:6px">
+    <button class="btn btn-primary" id="analyzeBtn" data-action="analyze">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Analyze
+    </button>
+    <button class="btn btn-ghost" data-action="clearResults">Clear</button>
+  <span class="kbd-hint">Press <kbd>Enter</kbd> to analyze</span>
+  </div>
+
+  <!-- Single results -->
+  <div class="results-section" id="singleResults" style="margin-top:10px">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" id="resultName">Results</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" data-action="saveToAudit">Save to Audit</button>
+          <button class="btn btn-ghost btn-sm" data-action="openReport">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Report
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="score-row" id="scoreRow"></div>
+        <div class="oversight-hint" style="margin:-12px 0 16px">AI-generated assessment &mdash; review before acting.</div>
+        <div class="section-sub">Keywords Found</div>
+        <div class="chip-list" id="foundChips"></div>
+        <div class="section-sub">Keywords Missing</div>
+        <div class="chip-list" id="missingChips"></div>
+        <div class="section-sub" style="margin-top:4px">Skills</div>
+        <table class="data-table" id="skillsTable" style="margin-bottom:20px">
+          <thead><tr><th>Skill</th><th>Status</th></tr></thead><tbody></tbody>
+        </table>
+        <div style="margin-bottom:12px">
+          <button class="why-toggle" data-action="toggleWhy" data-why="singleWhy">
+            <span>Why this score?</span><span class="why-arrow">&#9660;</span>
+          </button>
+          <div class="why-box" id="singleWhy"></div>
+        </div>
+        <div class="section-sub">Recommendations</div>
+        <table class="data-table" id="recsTable">
+          <thead><tr><th>Area</th><th>Recommendation</th></tr></thead><tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Recruiter Decision</span></div>
+      <div class="oversight-hint" style="padding:10px 20px 0">Decisions are made by you, not by the AI. Scores are a decision aid.</div>
+      <div class="card-body" style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <div class="section-sub" style="margin-bottom:7px">Decision</div>
+          <select class="text-input" id="decisionSelect" style="min-width:160px">
+            <option value="">— Select —</option>
+            <option value="shortlist">Shortlist</option>
+            <option value="hold">Hold</option>
+            <option value="reject">Reject</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div class="section-sub" style="margin-bottom:7px">Notes</div>
+          <textarea class="textarea" id="noteInput" rows="2" placeholder="Optional recruiter notes..."></textarea>
+        </div>
+        <div style="padding-top:22px">
+          <button class="btn btn-primary btn-sm" data-action="saveToAudit">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batch results -->
+  <div class="results-section" id="batchResults" style="margin-top:10px">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title" id="batchTitle">Batch Results</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" data-action="saveAllToAudit">Save All to Audit</button>
+          <button class="btn btn-ghost btn-sm" data-action="exportBatchCsv">Export CSV</button>
+          <button class="print-btn" data-action="printPage" title="Print / Save as PDF">&#128438; Print Report</button>
+        </div>
+      </div>
+      <div class="batch-summary" id="batchSummary" style="display:none">
+        <div class="bs-card"><div class="bs-val" id="bsTotalCVs">0</div><div class="bs-label">CVs Analysed</div></div>
+        <div class="bs-card"><div class="bs-val" id="bsAvgScore">—</div><div class="bs-label">Avg Score</div><div class="bs-sub">out of 100</div></div>
+        <div class="bs-card"><div class="bs-val" id="bsShortlisted">0</div><div class="bs-label">Above threshold</div><div class="bs-sub" id="bsSubThreshold">score &ge; 70</div></div>
+        <div class="bs-card"><div class="bs-val" id="bsTopCandidate" style="font-size:14px;padding-top:4px">—</div><div class="bs-label">Top Candidate</div></div>
+      </div>
+      <div style="overflow-x:auto">
+        <div class="batch-controls">
+          <label>Sort by</label>
+          <button class="sort-btn active" id="sortScore" data-action="sortBatch" data-sort="score">Score <span class="sort-arrow" id="arrowScore">&#9660;</span></button>
+          <button class="sort-btn" id="sortName" data-action="sortBatch" data-sort="name">Name <span class="sort-arrow" id="arrowName">&#9660;</span></button>
+        </div>
+        <div class="oversight-hint" style="margin-bottom:10px">Decisions are made by you, not by the AI. Scores are a decision aid.</div>
+        <table class="lb" id="batchTable">
+          <thead><tr>
+            <th style="width:44px">#</th><th>Candidate</th><th>Overall</th>
+            <th>KW</th><th>SK</th><th>EX</th><th>ED</th><th>Decision</th><th></th>
+          </tr></thead>
+          <tbody id="batchBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- === AUDIT LOG === -->
+<div class="tab-content main" id="tab-audit">
+  <div class="audit-tb audit-tb-stack">
+    <div class="audit-tb-row"><input class="text-input" type="text" id="auditSearch" placeholder="Search candidate..." data-action="filterAudit" style="width:100%"></div>
+    <div class="audit-tb-row"><select class="text-input" id="auditDecisionFilter" data-action="filterAudit" style="width:100%">
+      <option value="">All decisions</option>
+      <option value="shortlist">Shortlist</option>
+      <option value="hold">Hold</option>
+      <option value="reject">Reject</option>
+    </select></div>
+    <div class="audit-tb-row"><select class="text-input" id="auditRoleFilter" data-action="filterAudit" style="width:100%">
+      <option value="">All roles</option>
+    </select></div>
+    <div class="audit-tb-row audit-tb-actions">
+      <button class="btn btn-ghost btn-sm" data-action="loadAudit">&#8635; Refresh</button>
+      <button class="btn btn-ghost btn-sm" data-action="exportAuditCsv">Export CSV</button>
+    </div>
+  </div>
+  <div class="msg msg-err" id="auditError"></div>
+  <div class="card" style="margin-bottom:0">
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr>
+          <th>Date</th><th>Candidate</th><th>Role</th>
+          <th>Overall</th><th>KW</th><th>SK</th><th>EX</th><th>ED</th>
+          <th>Decision</th><th>Note</th><th class="col-reviewer">Saved by</th><th></th>
+        </tr></thead>
+        <tbody id="auditBody"></tbody>
+      </table>
+      <div id="auditPager"></div>
+    </div>
+  </div>
+</div>
+
+<!-- === ROLE HISTORY === -->
+<div class="tab-content main" id="tab-history">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Score History by Role</span>
+      <button class="btn btn-ghost btn-sm" data-action="loadRoles">&#8635; Refresh</button>
+    </div>
+    <div class="card-body">
+      <div class="role-tabs" id="roleTabs"></div>
+      <div id="roleHistoryContent"><div class="empty-state">Select a role above to view candidate scores</div></div>
+    </div>
+  </div>
+</div>
+  </div><!-- /tool-section -->
+</div>
+<script nonce="__CSP_NONCE__">
+// Frontend version recorded on every audit record (EU AI Act Art. 12 provenance)
+const CVSPRINGS_VERSION = '1.3.0';
+// Backend base. Set to '' to use same-origin relative paths (post-domain-merge).
+const CVSPRINGS_API_BASE = 'https://cvsprings7.onrender.com';
+
+// Hidden developer override — NOT exposed in any UI. Set in console:
+//   localStorage.setItem('cvsprings_api_override', 'https://staging.example.com')
+// then reload. Remove the key to revert.
+function resolveApiBase() {
+  try {
+    const o = (localStorage.getItem('cvsprings_api_override') || '').trim();
+    if (o) return o.replace(/\/+$/, '');
+  } catch (e) {}
+  return CVSPRINGS_API_BASE.replace(/\/+$/, '');
+}
+
+const API = resolveApiBase();   // single shared backend; org separation is server-side
+const API_BASE = API;           // alias used by api()
+
+// One-time cleanup of the deprecated user-set backend URL key.
+try { localStorage.removeItem('cvsprings_api_url'); } catch (e) {}
+// === Phase 2A helpers (Sections 1 + 4 of the wireup brief) ===
+const RETRY_SAFE_PATHS = ['/health', '/api/audit', '/api/stats/overview', '/api/templates', '/api/analyze', '/api/audit/roles'];
+function _isRetrySafe(method, path) {
+  const m = (method || 'GET').toUpperCase();
+  if (m === 'GET') return RETRY_SAFE_PATHS.some(p => path.startsWith(p));
+  // POST /api/analyze and /api/analyze/batch are safe to retry (stateless from backend perspective)
+  if ((m === 'POST') && (path.startsWith('/api/analyze'))) return true;
+  return false;
+}
+async function api(path, options = {}) {
+  const url = path.startsWith('http') ? path : API_BASE + path;
+  const isForm = options.body && (options.body instanceof FormData);
+  const sessionToken = getSessionToken();
+  const baseInit = {
+    ...options,
+    headers: {
+      'Accept': 'application/json',
+      ...(options.body && !isForm ? { 'Content-Type': 'application/json' } : {}),
+      ...(sessionToken ? { 'Authorization': 'Bearer ' + sessionToken } : {}),
+      ...(options.headers || {}),
+    },
+  };
+  async function doFetch() {
+    const res = await fetch(url, baseInit);
+    let data = null;
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('application/json')) { try { data = await res.json(); } catch (_) { data = null; } }
+    if (!res.ok) {
+      // Session missing/expired: drop the stored session and show the auth screen.
+      // (Login failures return 401 without the AUTH_REQUIRED code, so they don't land here.)
+      if (res.status === 401 && data && data.code === 'AUTH_REQUIRED') { try { handleUnauthorized(); } catch (_) {} }
+      const err = new Error((data && data.error) || ('HTTP ' + res.status));
+      err.status = res.status; err.code = data && data.code; err.field = data && data.field;
+      throw err;
+    }
+    return data;
+  }
+  try { return await doFetch(); }
+  catch (e) {
+    // Auto-retry once on 503 or network error for safe paths
+    const path0 = path.split('?')[0];
+    if (_isRetrySafe(options.method, path0) && (e.status === 503 || /Failed to fetch|NetworkError|TypeError/i.test(e.message))) {
+      try { toast('Waking up the server, hang on…', 'info', 4000); } catch (_) {}
+      await new Promise(r => setTimeout(r, 2000));
+      return await doFetch();
+    }
+    throw e;
+  }
+}
+function handleApiError(err, fallbackMsg) {
+  try {
+    // Always put status+code+message in the console so failures are
+    // diagnosable without opening the Network tab.
+    console.error('[api]', err && err.status, err && err.code, err && err.message);
+    if (err && (err.status === 429 || err.code === 'RATE_LIMITED')) {
+      toast("You're going a bit fast — try again in a moment.", 'info', 4500);
+      return;
+    }
+    if (err && err.code === 'TEAM_PLAN_REQUIRED') {
+      toast('Team members require the Team plan. Upgrade in Settings → Plan & Billing.', 'info', 5500);
+      return;
+    }
+    if (err && err.code === 'SEAT_LIMIT') {
+      toast(err.message || 'Your team seat limit was reached — ask your org owner to upgrade.', 'error', 5500);
+      return;
+    }
+    if (err && err.code === 'QUOTA_EXCEEDED') {
+      toast(err.message || 'Monthly analysis limit reached. Upgrade to continue.', 'error', 6000);
+      return;
+    }
+    if (err && err.code === 'VALIDATION_ERROR' && err.field) {
+      highlightField(err.field);
+      toast(err.message || 'Please check the highlighted field', 'error');
+      return;
+    }
+    // Permanent config error — do NOT invite a retry: nothing will change
+    // until the server's Stripe env vars are set.
+    if (err && err.code === 'BILLING_NOT_CONFIGURED') {
+      toast("Checkout isn't available yet — email support@cvsprings.com and we'll sort it out.", 'error', 8000);
+      return;
+    }
+    if (err && err.code === 'STRIPE_ERROR') {
+      toast('Payment provider error — please try again shortly.', 'error', 6000);
+      return;
+    }
+    if (err && err.code === 'OWNER_REQUIRED') {
+      toast(err.message || 'Only your organization owner can manage billing.', 'error', 5500);
+      return;
+    }
+    // "Waking up" is ONLY for platform cold starts / network failures. Our
+    // backend errors always carry a `code` (sendError JSON); a Render
+    // cold-start 502/503/504 serves HTML, so err.code is undefined.
+    if (err && !err.code && (err.status === 502 || err.status === 503 || err.status === 504 || /Failed to fetch|NetworkError|TypeError/i.test(err.message || ''))) {
+      toast('Server is waking up. Please try again in a moment.', 'info', 4500);
+      return;
+    }
+    toast((err && err.message) || fallbackMsg || 'Something went wrong', 'error');
+  } catch (_) {
+    try { alert((err && err.message) || fallbackMsg || 'Something went wrong'); } catch (__) {}
+  }
+}
+
+// === Auth: email + password sessions =======================================
+const SESSION_KEY = 'cvsprings_session_token';
+const USER_EMAIL_KEY = 'cvsprings_user_email';
+const ORG_NAME_KEY = 'cvsprings_org_name';
+let _pendingResetToken = null;
+let _pendingInviteToken = null;
+
+function getSessionToken(){ try { return localStorage.getItem(SESSION_KEY) || ''; } catch (_) { return ''; } }
+function clearSessionKeys(){
+  try {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(USER_EMAIL_KEY);
+    localStorage.removeItem(ORG_NAME_KEY);
+  } catch (_) {}
+}
+function handleUnauthorized(){ clearSessionKeys(); updateAccountChip(); showAuthScreen(); }
+
+function showAuthScreen(mode){
+  const s = document.getElementById('authScreen');
+  if (s) s.style.display = 'flex';
+  setAuthMode(mode || 'login');
+}
+function hideAuthScreen(){ const s = document.getElementById('authScreen'); if (s) s.style.display = 'none'; }
+function setAuthMode(mode){
+  clearAuthError();
+  const forms = { login: 'authLoginForm', signup: 'authSignupForm', forgot: 'authForgotForm', reset: 'authResetForm', accept: 'authAcceptForm' };
+  Object.keys(forms).forEach(function(m){
+    const f = document.getElementById(forms[m]);
+    if (f) f.style.display = (m === mode ? 'flex' : 'none');
+  });
+}
+function showAuthError(msg, kind){
+  const el = document.getElementById('authError');
+  if (!el) return;
+  el.className = 'msg ' + (kind === 'ok' ? 'msg-ok' : 'msg-err');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function clearAuthError(){
+  const el = document.getElementById('authError');
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+}
+function setAuthBusy(btnId, busy){
+  const b = document.getElementById(btnId);
+  if (!b) return;
+  if (busy) {
+    if (!b.dataset.label) b.dataset.label = b.textContent;
+    b.disabled = true;
+    b.innerHTML = '<span class="spinner"></span>';
+  } else {
+    b.disabled = false;
+    b.textContent = b.dataset.label || b.textContent;
+  }
+}
+
+function updateAccountChip(){
+  const chip = document.getElementById('accountChip');
+  if (!chip) return;
+  let email = '', orgName = '';
+  try { email = localStorage.getItem(USER_EMAIL_KEY) || ''; orgName = localStorage.getItem(ORG_NAME_KEY) || ''; } catch (_) {}
+  const authed = !!(getSessionToken() && email);
+  chip.style.display = authed ? 'flex' : 'none';
+  const el = document.getElementById('accountEmail');
+  if (el) { el.textContent = email; el.title = orgName ? (email + ' · ' + orgName) : email; }
+  // Hide the plan chip whenever we're not authenticated.
+  if (!authed) { const pc = document.getElementById('planChip'); if (pc) pc.style.display = 'none'; }
+}
+
+function onAuthed(d){
+  try {
+    if (d && d.user && d.user.email) localStorage.setItem(USER_EMAIL_KEY, d.user.email);
+    if (d && d.org && d.org.name) localStorage.setItem(ORG_NAME_KEY, d.org.name);
+  } catch (_) {}
+  updateAccountChip();
+  hideAuthScreen();
+  initApp();
+}
+
+async function doLogin(){
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!email || !password) { showAuthError('Enter your email and password.'); return; }
+  clearAuthError();
+  setAuthBusy('authLoginBtn', true);
+  try {
+    const d = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    try { localStorage.setItem(SESSION_KEY, d.sessionToken); } catch (_) {}
+    document.getElementById('authPassword').value = '';
+    onAuthed(d);
+  } catch (e) {
+    showAuthError(e.message || 'Login failed. Please try again.');
+  } finally {
+    setAuthBusy('authLoginBtn', false);
+  }
+}
+
+async function doSignup(){
+  const email = document.getElementById('suEmail').value.trim();
+  const password = document.getElementById('suPassword').value;
+  const orgName = document.getElementById('suOrgName').value.trim();
+  if (!email || !password) { showAuthError('Enter an email and a password (min 10 characters).'); return; }
+  clearAuthError();
+  setAuthBusy('suCreateBtn', true);
+  try {
+    const d = await api('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, orgName: orgName || undefined }) });
+    try { localStorage.setItem(SESSION_KEY, d.sessionToken); } catch (_) {}
+    document.getElementById('suPassword').value = '';
+    onAuthed(d);
+  } catch (e) {
+    showAuthError(e.message || 'Could not create the account.');
+  } finally {
+    setAuthBusy('suCreateBtn', false);
+  }
+}
+
+async function doForgotRequest(){
+  const email = document.getElementById('frEmail').value.trim();
+  if (!email) { showAuthError('Enter your email address.'); return; }
+  clearAuthError();
+  setAuthBusy('frSubmitBtn', true);
+  try {
+    await api('/api/auth/request-reset', { method: 'POST', body: JSON.stringify({ email }) });
+    showAuthError('If an account exists for that email, a reset link is on its way.', 'ok');
+  } catch (e) {
+    showAuthError(e.message || 'Could not request a reset link.');
+  } finally {
+    setAuthBusy('frSubmitBtn', false);
+  }
+}
+
+async function doResetPassword(){
+  const newPassword = document.getElementById('rpPassword').value;
+  if (!newPassword) { showAuthError('Enter a new password (min 10 characters).'); return; }
+  clearAuthError();
+  setAuthBusy('rpSubmitBtn', true);
+  try {
+    await api('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: _pendingResetToken, newPassword }) });
+    _pendingResetToken = null;
+    document.getElementById('rpPassword').value = '';
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.delete('reset_token');
+      history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
+    } catch (_) {}
+    setAuthMode('login');
+    showAuthError('Password updated — please sign in.', 'ok');
+  } catch (e) {
+    showAuthError(e.message || 'Could not reset the password.');
+  } finally {
+    setAuthBusy('rpSubmitBtn', false);
+  }
+}
+
+async function doAcceptInvite(){
+  const password = document.getElementById('acceptPassword').value;
+  if (!password) { showAuthError('Choose a password (min 10 characters).'); return; }
+  clearAuthError();
+  setAuthBusy('acceptBtn', true);
+  try {
+    const d = await api('/api/team/accept', { method: 'POST', body: JSON.stringify({ token: _pendingInviteToken, password }) });
+    try { localStorage.setItem(SESSION_KEY, d.sessionToken); } catch (_) {}
+    document.getElementById('acceptPassword').value = '';
+    _pendingInviteToken = null;
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.delete('invite');
+      history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
+    } catch (_) {}
+    onAuthed(d);
+  } catch (e) {
+    showAuthError(e.message || 'Could not accept the invitation.');
+  } finally {
+    setAuthBusy('acceptBtn', false);
+  }
+}
+
+async function doLogout(){
+  try { await api('/api/auth/logout', { method: 'POST' }); } catch (_) {}
+  clearSessionKeys();
+  updateAccountChip();
+  showAuthScreen();
+}
+
+async function changePassword(){
+  const cur = document.getElementById('cpCurrent').value;
+  const nw = document.getElementById('cpNew').value;
+  if (!cur || !nw) { toast('Enter your current and new password.', 'error'); return; }
+  const btn = document.getElementById('cpSaveBtn');
+  if (btn) btn.disabled = true;
+  try {
+    await api('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: cur, newPassword: nw }) });
+    document.getElementById('cpCurrent').value = '';
+    document.getElementById('cpNew').value = '';
+    toast('Password updated. Other devices were signed out.', 'success');
+  } catch (e) {
+    handleApiError(e, 'Could not change the password');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Data loading only happens here — i.e. only after a successful auth check.
+function initApp(){
+  loadAudit();
+  loadRoles();
+  refreshTemplatesCache()
+    .then(function(){ renderTplChips(); maybeShowTemplateMigrationBanner(); })
+    .catch(function(){});
+  refreshUsage();
+  handleBillingReturn();
+  maybeShowOnboardingNudge();
+}
+
+// === Billing / plan (server-enforced; client display only) =================
+let _billing = null; // last GET /api/billing/usage result
+
+async function refreshUsage(){
+  if(!getSessionToken())return null;
+  try{
+    _billing = await api('/api/billing/usage');
+    renderPlanChip(_billing);
+    return _billing;
+  }catch(_){ return null; }
+}
+
+function renderPlanChip(b){
+  const chip=document.getElementById('planChip');
+  const label=document.getElementById('planChipLabel');
+  if(!chip||!label||!b){ if(chip)chip.style.display='none'; return; }
+  chip.classList.remove('warn','clickable');
+  chip.onclick=null;
+  if(b.subscriptionStatus==='past_due'){
+    label.textContent='Payment issue';
+    chip.classList.add('warn','clickable');
+    chip.title='Payment failed — click to manage billing';
+    chip.onclick=openBillingPortal;
+  }else if(b.plan==='pro'||b.plan==='team'){
+    label.textContent=b.plan==='team'?'Team':'Pro';
+    chip.title='Active subscription';
+  }else{
+    const used=b.used||0, limit=b.limit;
+    label.textContent='Free · '+used+'/'+(limit==null?'∞':limit);
+    chip.title='Free plan usage this month';
+    if(limit && used/limit>=0.8) chip.classList.add('warn');
+  }
+  chip.style.display='inline-flex';
+}
+
+async function populatePlanBilling(){
+  const line=document.getElementById('planStatusLine');
+  const ownerControls=document.getElementById('planOwnerControls');
+  const memberNote=document.getElementById('planMemberNote');
+  if(!line)return;
+  let me=null;
+  try{ me=await api('/api/auth/me'); }catch(_){}
+  const b = _billing || await refreshUsage();
+  const isOwner = !!(me&&me.user&&me.user.role==='owner');
+  const plan = (b&&b.plan)||'free';
+  const planName = plan==='team'?'Team':plan==='pro'?'Pro':'Free';
+  let txt = 'Current plan: <strong>'+planName+'</strong>';
+  if(plan==='free' && b && b.limit!=null){ txt += ' &middot; '+(b.used||0)+'/'+b.limit+' analyses used this month'; }
+  if(b && b.subscriptionStatus==='past_due'){ txt += ' &middot; <span class="past-due">payment issue — please update your card</span>'; }
+  else if((plan==='pro'||plan==='team')){ txt += ' &middot; unlimited analyses'; }
+  line.innerHTML = txt;
+  renderPlanCompare(plan, b);
+
+  if(!isOwner){
+    if(ownerControls)ownerControls.style.display='none';
+    if(memberNote)memberNote.style.display='block';
+    return;
+  }
+  if(memberNote)memberNote.style.display='none';
+  if(ownerControls)ownerControls.style.display='flex';
+  const paid = (plan==='pro'||plan==='team');
+  const pro=document.getElementById('upgradeProBtn'), team=document.getElementById('upgradeTeamBtn'), manage=document.getElementById('manageBillingBtn');
+  if(pro)pro.style.display=paid?'none':'inline-flex';
+  if(team)team.style.display=paid?'none':'inline-flex';
+  // Show "Manage billing" whenever a Stripe customer exists (paid, or past_due/canceled).
+  if(manage)manage.style.display=(paid||b&&b.subscriptionStatus)?'inline-flex':'none';
+}
+
+// Pricing comparison in Settings → Plan & Billing. Prices are hardcoded copy
+// (keep in sync with Stripe prices). {limit} comes from the live usage
+// response; the Team seat text uses the seatLimit cached from
+// GET /api/team/members when available ("multiple members" until known).
+let _seatLimitCache = null;
+function renderPlanCompare(currentPlan, b){
+  const el=document.getElementById('planCompare');
+  if(!el)return;
+  const limitTxt=(b&&b.limit!=null)?(b.limit+' analyses/mo'):'limited analyses/mo';
+  const seatTxt=(typeof _seatLimitCache==='number')?('up to '+_seatLimitCache+' members'):'multiple members';
+  const plans=[
+    {id:'free',name:'Free',price:'€0',lines:[limitTxt,'1 user']},
+    {id:'pro',name:'Pro',price:'€49/mo',lines:['unlimited analyses','1 user']},
+    {id:'team',name:'Team',price:'€199/mo',lines:['unlimited analyses',seatTxt]},
+  ];
+  el.innerHTML='<div style="display:flex;gap:8px;margin:10px 0">'+plans.map(function(p){
+    const cur=p.id===currentPlan;
+    return '<div style="flex:1;border:1px solid '+(cur?'#0f2847':'#e5e7eb')+';border-radius:8px;padding:10px;background:'+(cur?'#f8fafc':'#fff')+'">'
+      +'<div style="font-weight:700;font-size:13px;color:#111827">'+p.name
+      +(cur?' <span style="font-size:10px;background:#0f2847;color:#fff;border-radius:8px;padding:1px 7px;vertical-align:middle">Current</span>':'')+'</div>'
+      +'<div style="font-size:15px;font-weight:800;color:#0f2847;margin:2px 0 6px">'+p.price+'</div>'
+      +p.lines.map(function(l){return '<div style="font-size:11px;color:#6b7280">'+l+'</div>';}).join('')
+      +'</div>';
+  }).join('')+'</div>';
+}
+
+async function startCheckout(plan){
+  const btn=document.getElementById(plan==='team'?'upgradeTeamBtn':'upgradeProBtn');
+  if(btn)btn.disabled=true;
+  try{
+    const d=await api('/api/billing/checkout',{method:'POST',body:JSON.stringify({plan})});
+    if(d&&d.url){ window.location = d.url; return; }
+    toast('Could not start checkout.','error');
+  }catch(e){ handleApiError(e,'Could not start checkout'); }
+  finally{ if(btn)btn.disabled=false; }
+}
+
+async function openBillingPortal(){
+  try{
+    const d=await api('/api/billing/portal',{method:'POST'});
+    if(d&&d.url){ window.location = d.url; return; }
+    toast('Could not open billing portal.','error');
+  }catch(e){ handleApiError(e,'Could not open billing portal'); }
+}
+
+// Quota-exceeded upgrade prompt shown inline in #analyzeError.
+function showQuotaPrompt(errEl, e){
+  const limit = e && e.limit!=null ? e.limit : (_billing&&_billing.limit);
+  const msg = 'You’ve used all '+(limit!=null?limit:'')+' free analyses this month.';
+  errEl.innerHTML = '<div class="err-retry-card" style="background:#fffbeb;border-color:#fde68a">'
+    + '<span class="err-retry-icon">⚠️</span>'
+    + '<span class="err-retry-msg" style="color:#92400e">'+msg+' <span id="quotaUpgradeHint">Upgrade for unlimited analyses.</span></span>'
+    + '<button class="err-retry-btn" id="quotaUpgradeProBtn" style="background:#0f2847;display:none">Upgrade to Pro €49</button>'
+    + '<button class="err-retry-btn" id="quotaUpgradeTeamBtn" style="background:#374151;display:none">Team €199</button></div>';
+  errEl.style.display='block';
+  toast(e&&e.message?e.message:'Monthly analysis limit reached. Upgrade to continue.','error',6000);
+  // Owners get plan-choice upgrade buttons; members get an "ask your owner" hint.
+  api('/api/auth/me').then(function(me){
+    const isOwner = !!(me&&me.user&&me.user.role==='owner');
+    const pro=document.getElementById('quotaUpgradeProBtn');
+    const team=document.getElementById('quotaUpgradeTeamBtn');
+    const hint=document.getElementById('quotaUpgradeHint');
+    if(!isOwner){
+      if(hint)hint.textContent='Ask your organization’s owner to upgrade.';
+      return;
+    }
+    if(pro){ pro.style.display='inline-flex'; pro.onclick=function(){ startCheckout('pro'); }; }
+    if(team){ team.style.display='inline-flex'; team.onclick=function(){ startCheckout('team'); }; }
+  }).catch(function(){});
+}
+
+// Post-Checkout return: ?billing=success → strip param, re-poll usage briefly.
+function handleBillingReturn(){
+  let params;
+  try{ params=new URLSearchParams(window.location.search); }catch(_){ return; }
+  const status=params.get('billing');
+  if(!status)return;
+  try{
+    const u=new URL(window.location.href);
+    u.searchParams.delete('billing');
+    history.replaceState({}, '', u.pathname+(u.search||'')+(u.hash||''));
+  }catch(_){}
+  if(status!=='success'){ return; }
+  // Webhook is the source of truth and may lag — poll a few times over ~10s.
+  let tries=0;
+  (function poll(){
+    refreshUsage().then(function(b){
+      const paid = b && (b.plan==='pro'||b.plan==='team');
+      if(paid){ toast('You’re on the '+(b.plan==='team'?'Team':'Pro')+' plan.','success'); return; }
+      if(++tries<5){ setTimeout(poll, 2000); }
+      else { toast('Payment received — your plan will update shortly.','info',5000); }
+    });
+  })();
+}
+
+// Keep the usage chip fresh after each completed analysis.
+document.addEventListener('cv:analyze_completed', function(){ refreshUsage(); });
+
+async function bootAuth(){
+  const wire = function(formId, fn){
+    const f = document.getElementById(formId);
+    if (f) f.addEventListener('submit', function(e){ e.preventDefault(); fn(); });
+  };
+  wire('authLoginForm', doLogin);
+  wire('authSignupForm', doSignup);
+  wire('authForgotForm', doForgotRequest);
+  wire('authResetForm', doResetPassword);
+  wire('authAcceptForm', doAcceptInvite);
+  const on = function(id, fn){ const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+  on('authToSignup', function(){ setAuthMode('signup'); });
+  on('authToLogin', function(){ setAuthMode('login'); });
+  on('authForgotLink', function(){ setAuthMode('forgot'); });
+  on('frBackToLogin', function(){ setAuthMode('login'); });
+  on('acceptToLogin', function(){
+    _pendingInviteToken = null;
+    try { const u = new URL(window.location.href); u.searchParams.delete('invite'); history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || '')); } catch (_) {}
+    setAuthMode('login');
+  });
+  updateAccountChip();
+
+  let params = null;
+  try { params = new URLSearchParams(window.location.search); } catch (_) {}
+
+  // 1) Arriving from a password-reset email link
+  const resetToken = params && params.get('reset_token');
+  if (resetToken) {
+    _pendingResetToken = resetToken;
+    showAuthScreen('reset');
+    return;
+  }
+  // 1b) Arriving from a team invite link
+  const inviteToken = params && params.get('invite');
+  if (inviteToken) {
+    _pendingInviteToken = inviteToken;
+    // A fresh invite acceptance should not silently ride an existing session.
+    showAuthScreen('accept');
+    return;
+  }
+  // 2) Existing session: validate it before initializing the app
+  if (getSessionToken()) {
+    try {
+      const me = await api('/api/auth/me');
+      onAuthed(me);
+    } catch (_) {
+      // 401 already cleared the keys via handleUnauthorized; network errors land here too
+      showAuthScreen();
+    }
+    return;
+  }
+  // 3) Fresh visitor
+  showAuthScreen();
+}
+
+// Single-use download token for browser-opened URLs (report HTML, CSV export)
+// that cannot carry an Authorization header.
+async function openWithDownloadToken(url){
+  // Open the window synchronously to stay inside the user-gesture popup allowance
+  let w = null;
+  try { w = window.open('about:blank', '_blank'); } catch (_) {}
+  try {
+    const d = await api('/api/auth/download-token', { method: 'POST' });
+    const full = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'dt=' + encodeURIComponent(d.token);
+    if (w && !w.closed) { w.location = full; } else { window.open(full, '_blank'); }
+  } catch (e) {
+    if (w) { try { w.close(); } catch (_) {} }
+    handleApiError(e, 'Could not authorize the download');
+  }
+}
+function openAuditReport(id){
+  if (!API) return;
+  openWithDownloadToken(API + '/api/audit/report/' + encodeURIComponent(id));
+}
+// === End auth ===============================================================
+function toast(msg, kind, duration) {
+  const stack = document.getElementById('toast-stack');
+  if (!stack) { try { console.log('[toast]', kind, msg); } catch(_){} return; }
+  const el = document.createElement('div');
+  el.className = 'toast ' + (kind === 'success' || kind === 'error' || kind === 'info' ? kind : '');
+  el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  el.textContent = msg;
+  stack.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('in'));
+  const ttl = typeof duration === 'number' ? duration : (kind === 'error' ? 5000 : 3200);
+  setTimeout(() => {
+    el.classList.remove('in');
+    setTimeout(() => { try { el.remove(); } catch (_) {} }, 220);
+  }, ttl);
+}
+const FIELD_MAP = {
+  weights: ['weights-fit', 'weights-skill', 'weights-exp', 'weights-edu'],
+  jobDescription: ['jdText', 'jd'],
+  cv: ['cvInput', 'fileInput', 'cvFile'],
+  cvs: ['cvInput', 'fileInput', 'cvFile'],
+  role: ['role'],
+  decision: ['decision'],
+  note: ['note'],
+};
+function highlightField(field) {
+  const ids = FIELD_MAP[field] || [field];
+  let el = null;
+  for (const id of ids) {
+    el = document.getElementById(id);
+    if (el) break;
+  }
+  if (!el) return;
+  try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+  el.classList.remove('field-flash');
+  // Force reflow then add class so the animation restarts
+  void el.offsetWidth;
+  el.classList.add('field-flash');
+  setTimeout(() => el.classList.remove('field-flash'), 800);
+  if (typeof el.focus === 'function') { try { el.focus({ preventScroll: true }); } catch (_) { try { el.focus(); } catch (__) {} } }
+}
+// Close handler for history overlay
+document.addEventListener('click', (e) => {
+  const overlay = document.getElementById('history-overlay');
+  if (!overlay) return;
+  if (e.target && (e.target.matches('[data-history-close]') || e.target === overlay)) {
+    overlay.classList.remove('open');
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('history-overlay');
+    if (overlay && overlay.classList.contains('open')) overlay.classList.remove('open');
+  }
+});
+function _formatChangeWhen(iso) {
+  const d = new Date(iso);
+  const now = Date.now();
+  const diff = (now - d.getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.round(diff / 60) + ' min ago';
+  if (diff < 86400) return Math.round(diff / 3600) + ' h ago';
+  if (diff < 7 * 86400) return Math.round(diff / 86400) + ' d ago';
+  return d.toLocaleDateString();
+}
+async function openChangeHistory(auditId) {
+  const overlay = document.getElementById('history-overlay');
+  const list = document.getElementById('history-list');
+  if (!overlay || !list) return;
+  list.innerHTML = '<li style="padding:16px 20px;color:#9aa6c0;">Loading…</li>';
+  overlay.classList.add('open');
+  try {
+    const rows = await api('/api/audit/' + encodeURIComponent(auditId) + '/changes');
+    if (!Array.isArray(rows) || !rows.length) {
+      list.innerHTML = '<li style="padding:16px 20px;color:#9aa6c0;">No changes recorded yet.</li>';
+      return;
+    }
+    list.innerHTML = rows.map(r => {
+      const fld = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.field || '');
+      const oldV = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.oldValue == null ? '—' : String(r.oldValue));
+      const newV = (typeof escHtml === 'function' ? escHtml : (x => String(x)))(r.newValue == null ? '—' : String(r.newValue));
+      const esc2 = (typeof escHtml === 'function' ? escHtml : (x => String(x)));
+      const byLine = '<div class="hi-by">by ' + esc2(r.changedBy || 'unknown') + '</div>';
+      return '<li>'
+        + '<div class="hi-field">' + fld + '</div>'
+        + '<div class="hi-from-to">' + oldV + ' → ' + newV + '</div>'
+        + byLine
+        + '<div class="hi-when">' + esc2(_formatChangeWhen(r.changedAt)) + ' · ' + esc2(new Date(r.changedAt).toLocaleString()) + '</div>'
+        + '</li>';
+    }).join('');
+  } catch (e) {
+    list.innerHTML = '<li style="padding:16px 20px;color:#991b1b;">Could not load history: ' + ((typeof escHtml === 'function' ? escHtml : (x => String(x)))(e.message || 'error')) + '</li>';
+  }
+}
+// Server-side filter state (Section 2.3)
+const auditFilter = { role: '', decision: '', search: '', limit: 50, offset: 0, total: null, paginated: false };
+let _auditFilterDebounce = null;
+function scheduleAuditReload() {
+  if (_auditFilterDebounce) clearTimeout(_auditFilterDebounce);
+  _auditFilterDebounce = setTimeout(() => { auditFilter.offset = 0; if (typeof loadAudit === 'function') loadAudit(); }, 300);
+}
+function buildAuditQuery() {
+  const p = new URLSearchParams();
+  if (auditFilter.role) p.set('role', auditFilter.role);
+  if (auditFilter.decision) p.set('decision', auditFilter.decision);
+  if (auditFilter.search) p.set('search', auditFilter.search);
+  // Only send pagination params when at least one filter is active (preserves legacy unwrapped response otherwise)
+  const hasFilters = !!(auditFilter.role || auditFilter.decision || auditFilter.search);
+  if (hasFilters) {
+    p.set('limit', String(auditFilter.limit));
+    p.set('offset', String(auditFilter.offset));
+  }
+  const qs = p.toString();
+  return qs ? ('?' + qs) : '';
+}
+
+let mode='single',selectedFiles=[],lastResult=null,lastBatchResults=[],lastAuditRecords=[];
+let _stepTimer = null;
+
+// ── Persisted settings helpers (cvsprings_ prefixed) ───────────────
+function getDefaultWeights(){
+  try{
+    const raw=localStorage.getItem('cvsprings_weights');
+    if(raw){ const w=JSON.parse(raw); if(w&&typeof w.kw==='number') return w; }
+  }catch(e){}
+  return {kw:40,sk:30,ex:20,ed:10};
+}
+function getDefaultAnonymize(){ return localStorage.getItem('cvsprings_anonymize_default')==='1'; }
+function getDefaultRole(){ return localStorage.getItem('cvsprings_default_role')||''; }
+function getScoreThreshold(){
+  const v=parseInt(localStorage.getItem('cvsprings_score_threshold'),10);
+  return (isNaN(v)||v<1||v>99)?70:v;
+}
+function saveSettings(){
+  const kw=+document.getElementById('setWKw').value, sk=+document.getElementById('setWSk').value,
+        ex=+document.getElementById('setWEx').value, ed=+document.getElementById('setWEd').value;
+  if([kw,sk,ex,ed].some(n=>isNaN(n)||n<0||n>100)){ toast('Weights must each be between 0 and 100.','error'); return; }
+  if(Math.abs((kw+sk+ex+ed)-100)>0.01){ toast('Scoring weights must sum to 100 (currently '+(kw+sk+ex+ed)+').','error'); return; }
+  let thr=parseInt(document.getElementById('setScoreThreshold').value,10);
+  if(isNaN(thr)||thr<1||thr>99){ toast('Strong fit threshold must be between 1 and 99.','error'); return; }
+  localStorage.setItem('cvsprings_weights', JSON.stringify({kw,sk,ex,ed}));
+  localStorage.setItem('cvsprings_anonymize_default', document.getElementById('setAnonymizeDefault').checked?'1':'0');
+  localStorage.setItem('cvsprings_default_role', document.getElementById('setDefaultRole').value.trim());
+  localStorage.setItem('cvsprings_score_threshold', String(thr));
+  applySavedSettings();
+  const msg=document.getElementById('settingsSavedMsg');
+  if(msg){ msg.style.display='inline'; setTimeout(()=>{ msg.style.display='none'; }, 2500); }
+}
+function applySavedSettings(){
+  const w=getDefaultWeights();
+  const map={wKw:w.kw,wSk:w.sk,wEx:w.ex,wEd:w.ed};
+  Object.keys(map).forEach(id=>{
+    const inp=document.getElementById(id), sld=document.getElementById(id+'Slider');
+    if(inp) inp.value=map[id];
+    if(sld) sld.value=map[id];
+  });
+  if(typeof updateWeightSum==='function') updateWeightSum();
+  const an=document.getElementById('anonymizeToggle');
+  if(an) an.checked=getDefaultAnonymize();
+  const role=document.getElementById('roleInput');
+  if(role && !role.value.trim()){ const dr=getDefaultRole(); if(dr) role.value=dr; }
+  const sub=document.getElementById('bsSubThreshold');
+  if(sub) sub.innerHTML='score &ge; '+getScoreThreshold();
+}
+function loadSettingsIntoPanel(){
+  const w=getDefaultWeights();
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.value=v; };
+  set('setWKw',w.kw); set('setWSk',w.sk); set('setWEx',w.ex); set('setWEd',w.ed);
+  const an=document.getElementById('setAnonymizeDefault'); if(an) an.checked=getDefaultAnonymize();
+  set('setDefaultRole', getDefaultRole());
+  set('setScoreThreshold', getScoreThreshold());
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  ping();
+  loadSettingsIntoPanel();applySavedSettings();
+  // Auth gate: no data loads (loadAudit/loadRoles/templates) run until
+  // bootAuth() has confirmed a valid session — see initApp().
+  bootAuth();
+});
+
+function switchTab(n,btn){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+n).classList.add('active');btn.classList.add('active');
+  if(n==='audit')loadAudit();if(n==='history')loadRoles();
+}
+
+async function ping(){
+  const nd=document.getElementById('navStatusDot'),nl=document.getElementById('navStatusLabel');
+  if(nd){nd.className='dot';}if(nl){nl.textContent='Checking...';}
+  try{await api('/health', {signal:AbortSignal.timeout(8000)});
+    if(nd){nd.className='dot ok';}if(nl){nl.textContent='Connected';}}
+  catch(_){
+    if(nd){nd.className='dot err';}if(nl){nl.textContent='Not connected';}}
+}
+
+function setMode(m){
+  mode=m;
+  document.getElementById('modeSingle').classList.toggle('active',m==='single');
+  document.getElementById('modeBatch').classList.toggle('active',m==='batch');
+  document.getElementById('uploadCardTitle').textContent=m==='single'?'Upload CV':'Upload CVs (up to 200)';
+  document.getElementById('dropLabel').textContent=m==='single'?'Drop PDF or DOCX here, or click to browse':'Drop multiple CVs here, or click to browse';
+  document.getElementById('cvInput').multiple=m==='batch';
+  clearResults();selectedFiles=[];renderFileList();
+}
+
+function handleFiles(files){
+  const arr=Array.from(files);
+  if(mode==='single'){selectedFiles=arr.slice(0,1);}
+  else{
+    const errEl=document.getElementById('analyzeError');
+    for(const f of arr)if(!selectedFiles.find(x=>x.name===f.name))selectedFiles.push(f);
+    if(selectedFiles.length>200){
+      const removed=selectedFiles.length-200;
+      selectedFiles=selectedFiles.slice(0,200);
+      if(errEl)showWarn(errEl,'Batch limit is 200 CVs. '+removed+' file'+(removed===1?'':'s')+' ignored — only the first 200 were kept.');
+    }else if(errEl){
+      errEl.style.display='none';
+    }
+  }
+  renderFileList();
+}
+function handleDrop(ev){ev.preventDefault();document.getElementById('dropzone').classList.remove('drag');handleFiles(ev.dataTransfer.files);}
+function removeFile(name){selectedFiles=selectedFiles.filter(f=>f.name!==name);renderFileList();}
+function renderFileList(){
+  document.getElementById('fileList').innerHTML=selectedFiles.map(f=>
+    '<div class="file-chip"><span>'+escHtml(f.name)+'</span><button data-action="removeFile" data-file="'+escHtml(f.name)+'">&#x2715;</button></div>'
+  ).join('');
+}
+
+function updateWeightSum(){
+  const t=+document.getElementById('wKw').value+ +document.getElementById('wSk').value+
+           +document.getElementById('wEx').value+ +document.getElementById('wEd').value;
+  const el=document.getElementById('weightSum');
+  el.textContent='Total: '+t;
+  el.className='w-sum '+(Math.abs(t-100)>0.01?'err':'ok');
+}
+function getWeights(){return{kw:+document.getElementById('wKw').value,sk:+document.getElementById('wSk').value,ex:+document.getElementById('wEx').value,ed:+document.getElementById('wEd').value};}
+
+async function analyze(){
+  markOnboarded();
+  // A real analysis supersedes any sample on screen.
+  _sampleActive=false; var _sb=document.getElementById('sampleBanner'); if(_sb)_sb.style.display='none';
+  const errEl=document.getElementById('analyzeError');errEl.style.display='none';
+  if(!API){showErr(errEl,'Set API endpoint first.');return;}
+  if(!selectedFiles.length){showErr(errEl,'Upload at least one CV file.');return;}
+  if(mode!=='single' && selectedFiles.length>200){showErr(errEl,'You can upload up to 200 CVs at once. Please remove '+(selectedFiles.length-200)+' file(s).');return;}
+  const jd=document.getElementById('jdInput').value.trim();
+  if(!jd){showErr(errEl,'Job description is required.');return;}
+  const w=getWeights();
+  if(Math.abs(w.kw+w.sk+w.ex+w.ed-100)>0.01){showErr(errEl,'Weights must sum to 100.');return;}
+  const anon=document.getElementById('anonymizeToggle').checked;
+  const role=document.getElementById('roleInput').value.trim();
+  if(mode==='single')await analyzeSingle(selectedFiles[0],jd,w,anon,role,errEl);
+  else await analyzeBatch(selectedFiles,jd,w,anon,role,errEl);
+}
+
+async function analyzeSingle(file,jd,weights,anon,role,errEl){
+  const btn=document.getElementById('analyzeBtn');
+  btn.innerHTML='<span class="spinner"></span> Analyzing...';btn.disabled=true;
+  try{
+    const fd=new FormData();fd.append('cv',file);fd.append('jobDescription',jd);
+    fd.append('weights',JSON.stringify(weights));fd.append('anonymize',anon?'true':'false');
+    let data;
+    try { data = await api('/api/analyze', {method:'POST', body:fd}); }
+    catch (e) {
+      if (e.status === 429 || e.code === 'RATE_LIMITED') { handleApiError(e); return; }
+      if (e.code === 'QUOTA_EXCEEDED') { showQuotaPrompt(errEl, e); return; }
+      if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field);
+      if (e.code === 'INVALID_FILE' || e.code === 'FILE_REJECTED' || e.code === 'PDF_ENCRYPTED') { if (e.field) highlightField(e.field); }
+      showErr(errEl, e.message || 'Analysis failed'); return;
+    }
+    lastResult={...data,role,file:file.name};
+    renderSingleResult(data,file.name,role);
+    document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'single', role: role || 'unknown' } }));
+  }catch(e){
+    console.error('[analyze]', e && e.status, e && e.code, e && e.message);
+    // Same rule as handleApiError: only claim "waking up" when the error has
+    // no `code` (our backend errors always carry one).
+    var errMsg=(!e.code&&e.message&&(e.message.includes('fetch')||e.message.includes('Failed')))
+      ?'Connection error. The server may still be waking up — please retry.'
+      :'Something went wrong: '+e.message;
+    errEl.innerHTML='<div class="err-retry-card"><span class="err-retry-icon">⚠️</span>'
+      +'<span class="err-retry-msg">'+errMsg+'</span>'
+      +'<button class="err-retry-btn" id="retryBtn">Retry</button></div>';
+    errEl.style.display='block';
+    var rb=document.getElementById('retryBtn');
+    if(rb){rb.onclick=function(){errEl.innerHTML='';errEl.style.display='none';analyze();};}
+    }finally{clearInterval(_stepTimer);btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Analyze';btn.disabled=false;}
+}
+
+async function analyzeBatch(files,jd,weights,anon,role,errEl){
+  showLoading('Analyzing '+files.length+' CVs...');
+  try{
+    const fd=new FormData();files.forEach(f=>fd.append('cvs',f));
+    fd.append('jobDescription',jd);fd.append('weights',JSON.stringify(weights));
+    fd.append('anonymize',anon?'true':'false');
+    setProgress(30,'Extracting text from CV...');
+    let data;
+    try { data = await api('/api/analyze/batch', {method:'POST', body:fd}); }
+    catch (e) {
+      if (e.status === 429 || e.code === 'RATE_LIMITED') { hideLoading(); handleApiError(e); return; }
+      if (e.code === 'QUOTA_EXCEEDED') { hideLoading(); showQuotaPrompt(errEl, e); return; }
+      if (e.code === 'VALIDATION_ERROR' && e.field) highlightField(e.field);
+      if (e.code === 'INVALID_FILE' || e.code === 'FILE_REJECTED' || e.code === 'PDF_ENCRYPTED') { if (e.field) highlightField(e.field); }
+      showErr(errEl, e.message || 'Batch failed'); return;
+    }
+    setProgress(80,'Comparing against job description...');
+    setProgress(100,'Complete');
+    document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'batch', count: (data && data.results && data.results.length) || 0, role: role || 'unknown' } }));
+    lastBatchResults=(data.results||[]).map(res=>({...res,role}));
+    renderBatchResults(data.results,role);
+  }catch(e){
+    console.error('[analyze]', e && e.status, e && e.code, e && e.message);
+    // Same rule as handleApiError: only claim "waking up" when the error has
+    // no `code` (our backend errors always carry one).
+    var errMsg=(!e.code&&e.message&&(e.message.includes('fetch')||e.message.includes('Failed')))
+      ?'Connection error. The server may still be waking up — please retry.'
+      :'Something went wrong: '+e.message;
+    errEl.innerHTML='<div class="err-retry-card"><span class="err-retry-icon">⚠️</span>'
+      +'<span class="err-retry-msg">'+errMsg+'</span>'
+      +'<button class="err-retry-btn" id="retryBtn">Retry</button></div>';
+    errEl.style.display='block';
+    var rb=document.getElementById('retryBtn');
+    if(rb){rb.onclick=function(){errEl.innerHTML='';errEl.style.display='none';analyze();};}
+  }finally{hideLoading();}
+}
+
+function renderSingleResult(data,fileName,role){
+  var _sr=document.getElementById('singleResults');_sr.style.display='block';_sr.classList.remove('slide-in');void _sr.offsetWidth;_sr.classList.add('slide-in');
+  document.getElementById('batchResults').style.display='none';
+  const name=data.anonymized?'Anonymous Candidate':(data.candidateName||fileName.replace(/\.[^.]+$/,''));
+  document.getElementById('resultName').textContent=name+(role?' · '+role:'');
+  const c=s=>s>=getScoreThreshold()?'#059669':s>=50?'#d97706':'#dc2626';
+  const sr=document.getElementById('scoreRow');
+  sr.innerHTML=
+    ringBox('Overall',data.overall,true,c(data.overall))+
+    ringBox('Keywords',data.scores?.keywords,false,'#2563eb')+
+    ringBox('Skills',data.scores?.skills,false,'#7c3aed')+
+    ringBox('Experience',data.scores?.experience,false,'#d97706')+
+    ringBox('Education',data.scores?.education,false,'#059669');
+  const whyEl = document.getElementById('singleWhy');
+  if(whyEl) whyEl.innerHTML = buildWhyHTML(data);
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.ring-fill').forEach(el=>{
+      const v=parseFloat(el.dataset.v),circ=2*Math.PI*28;
+      el.style.strokeDasharray=circ;el.style.strokeDashoffset=circ;
+      requestAnimationFrame(()=>{el.style.strokeDashoffset=circ*(1-v/100);});
+    });
+  });
+  const found=data.found||data.keywords?.found||[],missing=data.missing||data.keywords?.missing||[];
+  document.getElementById('foundChips').innerHTML=found.length?found.map(k=>'<span class="chip chip-found">'+escHtml(k)+'</span>').join(''):'<span style="color:#9ca3af;font-size:13px">None found</span>';
+  document.getElementById('missingChips').innerHTML=missing.length?missing.map(k=>'<span class="chip chip-miss">'+escHtml(k)+'</span>').join(''):'<span style="color:#059669;font-size:13px">✓ None missing</span>';
+  document.getElementById('skillsTable').querySelector('tbody').innerHTML=(data.skills||[]).map(s=>
+    '<tr><td style="font-weight:600">'+escHtml(s.name)+'</td><td><span class="badge '+(s.found?'badge-green':'badge-red')+'">'+(s.found?'✓ Found':'✗ Missing')+'</span></td></tr>'
+  ).join('')||'<tr><td colspan="2" class="empty-state" style="padding:20px">No skills data</td></tr>';
+  document.getElementById('recsTable').querySelector('tbody').innerHTML=(data.recommendations||[]).map(r=>
+    '<tr><td style="font-weight:700;color:#0f2847;white-space:nowrap">'+escHtml(r.icon)+'</td><td style="color:#374151">'+escHtml(r.text)+'</td></tr>'
+  ).join('')||'<tr><td colspan="2" class="empty-state" style="padding:20px">No recommendations</td></tr>';
+}
+
+function ringBox(label,val,isOverall,color){
+  const v=val??0,r=28,circ=2*Math.PI*r;
+  const textColor=isOverall?'#fff':color;
+  return '<div class="score-box'+(isOverall?' overall':'')+'">' +
+    '<div class="s-label">'+label+'</div>' +
+    '<svg class="ring-svg" width="70" height="70" viewBox="0 0 70 70">' +
+    '<circle class="ring-bg" cx="35" cy="35" r="'+r+'" '+(isOverall?'stroke="rgba(255,255,255,0.12)"':'')+'/>' +
+    '<circle class="ring-fill" cx="35" cy="35" r="'+r+'" stroke="'+color+'"' +
+    ' data-v="'+v+'" transform="rotate(-90 35 35)"' +
+    ' style="stroke-dasharray:'+circ+';stroke-dashoffset:'+circ+'"/>' +
+    '<text x="35" y="35" text-anchor="middle" dominant-baseline="central"' +
+    ' fill="'+textColor+'" font-family="Inter" font-weight="800" font-size="17">'+v+'</text>' +
+    '</svg></div>';
+}
+
+function renderBatchResults(results,role){
+  var _br=document.getElementById('batchResults');_br.style.display='block';_br.classList.remove('slide-in','success-flash');void _br.offsetWidth;_br.classList.add('slide-in','success-flash');
+  document.getElementById('singleResults').style.display='none';
+  document.getElementById('batchTitle').textContent='Ranked Results '+results.length+' candidates'+(role?' / '+role:'');
+  document.getElementById('batchBody').innerHTML=results.map((r,i)=>{
+    const s=r.overall||0;
+    const pill=s>=getScoreThreshold()?'pill-hi':s>=50?'pill-med':'pill-lo';
+    const rc=i===0?'r1':i===1?'r2':i===2?'r3':'rn';
+    const name=r.anonymized?'Candidate #'+(i+1):(r.candidateName||r.fileName);
+    return '<tr class="'+(s>=getScoreThreshold()?'score-hi-row':s>=50?'score-med-row':'score-lo-row')+'" style="animation:fadeUp .3s ease '+(i*.05)+'s both" data-score="'+(r.overall||0)+'" data-name="'+(r.candidateName||r.fileName||'')+'">' +
+      '<td style="border-left:3px solid '+(s>=getScoreThreshold()?'#16a34a':s>=50?'#d97706':'#dc2626')+'">'+'<span class="rank-badge '+rc+'">'+(i+1)+'</span></td>' +
+      '<td style="font-weight:600;color:#111827">'+escHtml(name)+'</td>' +
+      '<td><span class="score-pill '+pill+'">'+s+'</span></td>' +
+      '<td>'+( r.scores?.keywords??'—')+'</td><td>'+(r.scores?.skills??'—')+'</td>'+
+      '<td>'+(r.scores?.experience??'—')+'</td><td>'+(r.scores?.education??'—')+'</td>' +
+      '<td><select class="dec-sel" data-action="batch-decision" data-idx="'+i+'"><option value="">— Decision —</option><option value="shortlist">Shortlist</option><option value="hold">On Hold</option><option value="reject">Reject</option></select></td>' +
+      '<td><button class="btn btn-ghost btn-sm" data-action="batch-save" data-idx="'+i+'">Save</button></td><td><textarea class="row-notes" placeholder="Notes..." rows="1" data-action="batch-note" data-idx="'+i+'">'+getBatchNote(i)+'</textarea></td></tr>';
+  }).join('');
+  updateBatchSummary(results);
+  if(getAutosaveBatch()){autosaveBatchToAudit();}
+}
+function getAutosaveBatch(){try{return localStorage.getItem('cvsprings_autosave_batch')==='1';}catch(_){return false;}}
+function setAutosaveBatch(v){try{localStorage.setItem('cvsprings_autosave_batch',v?'1':'0');}catch(_){}}
+async function autosaveBatchToAudit(){
+  if(!Array.isArray(lastBatchResults)||!lastBatchResults.length||!API)return;
+  let saved=0;
+  for(let i=0;i<lastBatchResults.length;i++){
+    try{await saveSingleBatch(i);saved++;}catch(_){}
+  }
+  if(typeof plausible==='function'){try{plausible('audit_saved',{props:{source:'batch_autosave',count:saved}});}catch(_){}}
+}
+function focusAuditSearch(){
+  try{switchTab('audit',document.querySelector('.nav-btn[onclick*="audit"]'));}catch(_){}
+  setTimeout(function(){const el=document.getElementById('auditSearch');if(el){el.focus();el.select&&el.select();}},60);
+}
+function setBatchDecision(i,v){if(lastBatchResults[i])lastBatchResults[i]._decision=v;}
+async function saveToAudit(){
+  if(_sampleActive||(lastResult&&lastResult._isSample)){toast("Sample results can't be saved — upload a real CV to save to the audit log.",'info');return;}
+  if(!lastResult||!API)return;
+  const body={candidateName:lastResult.candidateName||lastResult.file.replace(/\.[^.]+$/,''),fileName:lastResult.file,
+    overall:lastResult.overall,scores:lastResult.scores,weights:getWeights(),
+    verdict:(lastResult.recommendations||[]).map(r=>r.text).join(' '),
+    decision:document.getElementById('decisionSelect').value,
+    note:document.getElementById('noteInput').value.trim(),
+    jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
+    role:document.getElementById('roleInput').value.trim(),anonymized:lastResult.anonymized||false,
+    appVersion:CVSPRINGS_VERSION,modelId:lastResult.modelId||null,analysisTimestamp:lastResult.analysisTimestamp||null,
+    analysisDetail:{found:lastResult.found||[],missing:lastResult.missing||[],skills:lastResult.skills||[],recommendations:lastResult.recommendations||[],matches:lastResult.matches||[],extraction:lastResult.extraction||null}};
+  try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
+    lastResult._auditId=d.id;toast('Saved to audit log.','success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'single',role:(lastResult&&lastResult.role)||'unknown'}}));}
+  catch(e){handleApiError(e,'Network error');}
+}
+async function saveSingleBatch(i){
+  if(!API||!lastBatchResults[i])return;
+  const res=lastBatchResults[i];
+  const body={candidateName:res.candidateName||res.fileName,fileName:res.fileName||'',
+    overall:res.overall,scores:res.scores,weights:getWeights(),
+    verdict:(res.recommendations||[]).map(r=>r.text).join(' '),
+    decision:res._decision||'',note:'',
+    jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
+    role:res.role||'',anonymized:res.anonymized||false,
+    appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
+    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
+  try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
+    toast('Saved: '+body.candidateName,'success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'batch_row',role:(body&&body.role)||'unknown'}}));}
+  catch(e){handleApiError(e,'Network error');}
+}
+async function saveAllToAudit(){
+  if(!API||!lastBatchResults.length)return;
+  const ok = await confirmModal({ title:'Save all', message:'Save all '+lastBatchResults.length+' results to the audit log?', confirmLabel:'Save all' });
+  if(!ok)return;
+  let saved=0;
+  for(const res of lastBatchResults){
+    const body={candidateName:res.candidateName||res.fileName,fileName:res.fileName||'',
+      overall:res.overall,scores:res.scores,weights:getWeights(),
+      verdict:(res.recommendations||[]).map(r=>r.text).join(' '),
+      decision:res._decision||'',note:'',
+      jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
+      role:res.role||'',anonymized:res.anonymized||false,
+      appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
+    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
+    try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;}catch(_){}
+  }
+  toast(saved+' of '+lastBatchResults.length+' records saved.','success');
+}
+function exportBatchCsv(){
+  if(!lastBatchResults.length)return;
+  const rows=[['Rank','Candidate','Overall','Keywords','Skills','Experience','Education','Decision','Role'].join(',')];
+  lastBatchResults.forEach((r,i)=>rows.push([i+1,'"'+escCsv(r.candidateName||r.fileName)+'"',r.overall||0,r.scores?.keywords||0,r.scores?.skills||0,r.scores?.experience||0,r.scores?.education||0,'"'+escCsv(r._decision||'')+'"','"'+escCsv(r.role||'')+'"'].join(',')));
+  download('batch-results.csv',rows.join('\n'),'text/csv');
+}
+async function openReport(){
+  if(!lastResult?._auditId||!API){toast('Save to audit log first to generate a report.','info');return;}
+  openWithDownloadToken(API+'/api/audit/report/'+lastResult._auditId);
+}
+
+async function loadAudit(){
+  if(!API)return;
+  const errEl=document.getElementById('auditError');errEl.style.display='none';
+  const tb=document.getElementById('auditBody');
+  if(tb)tb.innerHTML='<tr><td colspan="12"><div class="empty-state skel" style="height:120px;">Loading…</div></td></tr>';
+  try{
+    const resp=await api('/api/audit'+buildAuditQuery());
+    if(Array.isArray(resp)){
+      auditFilter.paginated=false;auditFilter.total=resp.length;
+      lastAuditRecords=resp;
+    } else if(resp && Array.isArray(resp.records)){
+      auditFilter.paginated=true;
+      auditFilter.total=typeof resp.total==='number'?resp.total:resp.records.length;
+      if(typeof resp.limit==='number')auditFilter.limit=resp.limit;
+      if(typeof resp.offset==='number')auditFilter.offset=resp.offset;
+      lastAuditRecords=resp.records;
+    } else {
+      lastAuditRecords=[];auditFilter.paginated=false;auditFilter.total=0;
+    }
+    populateRoleFilter(lastAuditRecords);
+    renderAuditTable(lastAuditRecords);
+    renderAuditPager();
+  }
+  catch(e){showErr(errEl,'Could not load: '+(e.message||'error'));handleApiError(e);}
+}
+function renderAuditPager(){
+  const host=document.getElementById('auditPager');
+  if(!host)return;
+  if(!auditFilter.paginated){host.innerHTML='';return;}
+  const total=auditFilter.total||0;
+  const start=total?(auditFilter.offset+1):0;
+  const end=Math.min(auditFilter.offset+auditFilter.limit,total);
+  const canPrev=auditFilter.offset>0;
+  const canNext=auditFilter.offset+auditFilter.limit<total;
+  host.innerHTML='<div class="audit-pager">'
+    +'<span>Showing '+start+'–'+end+' of '+total+'</span>'
+    +'<span class="ctrls">'
+    +'<button type="button" data-pager="prev"'+(canPrev?'':' disabled')+'>Prev</button>'
+    +'<button type="button" data-pager="next"'+(canNext?'':' disabled')+'>Next</button>'
+    +'</span></div>';
+}
+document.addEventListener('click',(e)=>{
+  const b=e.target&&e.target.closest&&e.target.closest('[data-pager]');
+  if(!b)return;
+  const dir=b.getAttribute('data-pager');
+  if(dir==='prev'&&auditFilter.offset>0){auditFilter.offset=Math.max(0,auditFilter.offset-auditFilter.limit);loadAudit();}
+  else if(dir==='next'){auditFilter.offset=auditFilter.offset+auditFilter.limit;loadAudit();}
+});
+function populateRoleFilter(records){
+  const roles=[...new Set(records.map(r=>r.role).filter(Boolean))].sort();
+  const sel=document.getElementById('auditRoleFilter');const cur=sel.value;
+  sel.innerHTML='<option value="">All Roles</option>'+roles.map(r=>'<option value="'+escHtml(r)+'">'+escHtml(r)+'</option>').join('');
+  if(cur)sel.value=cur;
+}
+function filterAudit(){
+  const q=(document.getElementById('auditSearch').value||'').trim();
+  const dec=document.getElementById('auditDecisionFilter').value||'';
+  const role=document.getElementById('auditRoleFilter').value||'';
+  auditFilter.search=q;
+  auditFilter.decision=dec;
+  auditFilter.role=role;
+  scheduleAuditReload();
+}
+function clearAuditFilters(){
+  const sIn=document.getElementById('auditSearch');if(sIn)sIn.value='';
+  const dIn=document.getElementById('auditDecisionFilter');if(dIn)dIn.value='';
+  const rIn=document.getElementById('auditRoleFilter');if(rIn)rIn.value='';
+  auditFilter.search='';auditFilter.decision='';auditFilter.role='';auditFilter.offset=0;
+  loadAudit();
+}
+function renderAuditTable(records){
+  const tb=document.getElementById('auditBody');
+  if(!records.length){
+    const hasFilters=!!(auditFilter.search||auditFilter.decision||auditFilter.role);
+    const msg=hasFilters?'No audit records match these filters':'No audit records yet';
+    const sub=hasFilters?'Try clearing your filters or adjust the search.':'Analyse a CV and click "Save to audit" to start tracking decisions.';
+    const btn=hasFilters?'<button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px" data-action="clearAuditFilters">Clear filters</button>':'';
+    const icon='<div class="empty-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
+    tb.innerHTML='<tr><td colspan="12"><div class="empty-state-rich">'+icon+'<div class="empty-title">'+msg+'</div><div class="empty-sub">'+sub+'</div>'+btn+'</div></td></tr>';return;
+  }
+  tb.innerHTML=records.map(rec=>{
+    const date=rec.createdAt?new Date(rec.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';
+    const s=rec.overall||0;
+    const pill=s>=getScoreThreshold()?'pill-hi':s>=50?'pill-med':'pill-lo';
+    return '<tr>'+
+      '<td style="font-size:11px;color:#9ca3af;white-space:nowrap">'+date+'</td>'+
+      '<td style="font-weight:600;color:#111827">'+escHtml(rec.candidateName)+(rec.anonymized?' <span style="font-size:10px;color:#9ca3af">(anon)</span>':'')+'</td>'+
+      '<td style="color:#6b7280;font-size:12px">'+escHtml(rec.role||'—')+'</td>'+
+      '<td><span class="score-pill '+pill+'">'+s+'</span></td>'+
+      '<td>'+(rec.scores?.keywords??'—')+'</td><td>'+(rec.scores?.skills??'—')+'</td>'+
+      '<td>'+(rec.scores?.experience??'—')+'</td><td>'+(rec.scores?.education??'—')+'</td>'+
+      '<td><select class="dec-sel" data-action="audit-decision" data-id="'+escHtml(rec.id)+'">'+
+        '<option value=""'+((!rec.decision)?' selected':'')+'>—</option>'+
+        '<option value="shortlist"'+(rec.decision==='shortlist'?' selected':'')+'>Shortlist</option>'+
+        '<option value="hold"'+(rec.decision==='hold'?' selected':'')+'>Hold</option>'+
+        '<option value="reject"'+(rec.decision==='reject'?' selected':'')+'>Reject</option>'+
+      '</select></td>'+
+      '<td><input class="note-inp" type="text" value="'+escHtml(rec.note||'')+'" placeholder="Note..." data-action="audit-note" data-id="'+escHtml(rec.id)+'"></td>'+
+      '<td class="col-reviewer" style="font-size:11px;color:#6b7280;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="'+escHtml(rec.reviewedBy||'')+'">'+escHtml(rec.reviewedBy||'—')+'</td>'+
+      '<td style="white-space:nowrap;display:flex;gap:4px">'+
+        '<button type="button" class="history-btn" data-action="audit-history" data-id="'+escHtml(rec.id)+'" title="Change history" aria-label="Change history">⧉</button>'+
+        '<button class="btn btn-ghost btn-sm" data-action="audit-report" data-id="'+escHtml(rec.id)+'" title="Report">📊</button>'+
+        '<button class="btn btn-danger btn-sm" data-action="audit-delete" data-id="'+escHtml(rec.id)+'">🗑</button>'+
+      '</td></tr>';
+  }).join('');
+}
+async function updateAuditDecision(id,decision){
+  if(!API)return;
+  try{await api('/api/audit/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({decision})});
+    toast('Decision updated','success');loadAudit();}
+  catch(e){handleApiError(e,'Could not update decision');}
+}
+async function updateAuditNote(id,note){
+  if(!API)return;
+  try{await api('/api/audit/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({note})});
+    toast('Note saved','success');loadAudit();}
+  catch(e){handleApiError(e,'Could not save note');}
+}
+async function deleteAuditRecord(id){
+  if(!API)return;
+  const ok = await confirmModal({ title:'Delete record', message:'Permanently delete this audit record?', confirmLabel:'Delete', danger:true });
+  if(!ok)return;
+  try{await api('/api/audit/'+encodeURIComponent(id),{method:'DELETE'});toast('Record deleted','success');loadAudit();}
+  catch(e){handleApiError(e,'Could not delete record');}
+}
+async function exportAuditCsv(){
+  if(!API)return;
+  try{
+    const d=await api('/api/auth/download-token',{method:'POST'});
+    const a=document.createElement('a');a.href=API+'/api/audit/export/csv?dt='+encodeURIComponent(d.token);a.download='audit-log.csv';a.click();
+  }catch(e){handleApiError(e,'Could not export CSV');}
+}
+
+async function loadRoles(){
+  if(!API)return;
+  try{const roles=await api('/api/audit/roles');
+    const tabs=document.getElementById('roleTabs');
+    if(!roles.length){tabs.innerHTML='<span style="color:#9ca3af;font-size:13px">No roles yet. Tag CVs with a role when analyzing.</span>';return;}
+    tabs.innerHTML=roles.map(role=>'<button class="rtab" data-action="load-role" data-role="'+escHtml(role.role)+'">'+escHtml(role.role)+' <span style="opacity:.6;font-size:11px">('+role.count+')</span></button>').join('');}
+  catch(_){}
+}
+async function loadRoleHistory(role,btn){
+  document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const content=document.getElementById('roleHistoryContent');
+  content.innerHTML='<div class="empty-state">Loading...</div>';
+  try{const history=await api('/api/audit/roles/'+encodeURIComponent(role)+'/history');
+    if(!history.length){content.innerHTML='<div class="empty-state">No records for this role</div>';return;}
+    const avg=Math.round(history.reduce((s,r)=>s+(r.overall||0),0)/history.length);
+    const top=history[0];const short=history.filter(r=>r.decision==='shortlist').length;
+    const statC=(l,v,c)=>'<div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:16px 20px;min-width:110px;flex:1;box-shadow:0 1px 4px rgba(0,0,0,0.05)">'+
+      '<div style="font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px">'+l+'</div>'+
+      '<div style="font-size:30px;font-weight:800;color:'+c+'">'+v+'</div></div>';
+    content.innerHTML=
+      '<div style="display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap">'+
+        statC('Candidates',history.length,'#0f2847')+
+        statC('Avg Score',avg,avg>=getScoreThreshold()?'#059669':avg>=50?'#d97706':'#dc2626')+
+        statC('Top Score',top.overall||0,'#059669')+
+        statC('Shortlisted',short,'#7c3aed')+
+      '</div>'+
+      '<table class="data-table"><thead><tr><th>#</th><th>Candidate</th><th>Overall</th><th>KW</th><th>SK</th><th>EX</th><th>ED</th><th>Decision</th><th class="notes-th" style="min-width:120px">Notes</th></tr></thead><tbody>'+
+      history.map((r,i)=>{
+        const s=r.overall||0;const pill=s>=getScoreThreshold()?'pill-hi':s>=50?'pill-med':'pill-lo';
+        const dc=r.decision==='shortlist'?'#15803d':r.decision==='reject'?'#b91c1c':'#a16207';
+        return '<tr style="animation:fadeUp .25s ease '+(i*.04)+'s both">'+
+          '<td style="color:#9ca3af;font-size:12px">'+(i+1)+'</td>'+
+          '<td style="font-weight:600;color:#111827">'+escHtml(r.candidateName)+'</td>'+
+          '<td><span class="score-pill '+pill+'">'+s+'</span></td>'+
+          '<td>'+(r.scores?.keywords??'—')+'</td><td>'+(r.scores?.skills??'—')+'</td>'+
+          '<td>'+(r.scores?.experience??'—')+'</td><td>'+(r.scores?.education??'—')+'</td>'+
+          '<td style="font-weight:600;color:'+dc+'">'+escHtml(r.decision||'—')+'</td></tr>';
+      }).join('')+'</tbody></table>';}
+  catch(e){content.innerHTML='<div class="empty-state">Error: '+e.message+'</div>';}
+}
+
+function clearResults(){
+  document.getElementById('singleResults').style.display='none';
+  document.getElementById('batchResults').style.display='none';
+  lastResult=null;lastBatchResults=[];
+  var sb=document.getElementById('sampleBanner');if(sb)sb.style.display='none';
+  if(_sampleActive){_sampleActive=false;if(typeof renderFileList==='function')renderFileList();}
+}
+
+// ── First-run onboarding: sample analysis (display-only, never quota-counted) ──
+let _sampleActive=false;
+function markOnboarded(){
+  try{localStorage.setItem('cvsprings_onboarded','1');}catch(_){}
+  var row=document.querySelector('.sample-row');if(row)row.classList.remove('nudge');
+}
+function maybeShowOnboardingNudge(){
+  let onboarded='0';try{onboarded=localStorage.getItem('cvsprings_onboarded')||'0';}catch(_){}
+  if(onboarded!=='1'){var row=document.querySelector('.sample-row');if(row)row.classList.add('nudge');}
+}
+async function trySample(){
+  markOnboarded();
+  const btn=document.getElementById('trySampleBtn');
+  const orig=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Loading sample…';}
+  try{
+    const data=await api('/api/analyze/sample');
+    // Populate the form so the user sees what good input looks like.
+    if(data.sampleJd!=null)document.getElementById('jdInput').value=data.sampleJd;
+    if(data.sampleRole!=null)document.getElementById('roleInput').value=data.sampleRole;
+    if(data.sampleWeights){
+      const w=data.sampleWeights,map={wKw:'kw',wSk:'sk',wEx:'ex',wEd:'ed'};
+      Object.entries(map).forEach(([id,key])=>{
+        const inp=document.getElementById(id),sld=document.getElementById(id+'Slider');
+        if(inp&&w[key]!=null)inp.value=w[key];
+        if(sld&&w[key]!=null)sld.value=w[key];
+      });
+      if(typeof updateWeightSum==='function')updateWeightSum();
+    }
+    // Non-removable sample file chip.
+    const fl=document.getElementById('fileList');
+    if(fl)fl.innerHTML='<div class="file-chip sample-chip"><span>sample-cv.pdf <span class="sample-tag">(example)</span></span></div>';
+    // Render via the exact same path as a real analysis; flag as sample.
+    _sampleActive=true;
+    lastResult={...data,_isSample:true};
+    renderSingleResult(data,'sample-cv.pdf',data.sampleRole||'');
+    const sb=document.getElementById('sampleBanner');if(sb)sb.style.display='flex';
+    // Distinct analytics event — do NOT inflate real analysis metrics.
+    document.dispatchEvent(new CustomEvent('cv:sample_viewed',{detail:{}}));
+  }catch(e){handleApiError(e,'Could not load the sample');}
+  finally{if(btn){btn.disabled=false;btn.innerHTML=orig;}}
+}
+function clearSample(){
+  clearResults();
+  const jd=document.getElementById('jdInput');if(jd)jd.value='';
+  const role=document.getElementById('roleInput');if(role)role.value='';
+  selectedFiles=[];if(typeof renderFileList==='function')renderFileList();
+}
+function showErr(el,msg){el.className='msg msg-err';el.textContent=msg;el.style.display='block';}
+function showWarn(el,msg){el.className='msg msg-warn';el.textContent=msg;el.style.display='block';}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escCsv(s){return String(s||'').replace(/"/g,'""');}
+
+// ── Promise-based styled dialogs (replace native confirm()/prompt()) ──
+// Reuses the existing .modal-backdrop/.modal-box/.modal-head CSS, the
+// pointer-events/visibility fix, .text-input and .field-flash. One modal at a
+// time; listeners are bound per-open and removed on resolve (no leaks).
+function _styledDialog(opts){
+  return new Promise(function(resolve){
+    const prev = document.activeElement;
+    const existing = document.getElementById('_dlgBackdrop'); if(existing){ try{ existing.remove(); }catch(_){} }
+    const backdrop=document.createElement('div');
+    backdrop.className='modal-backdrop'; backdrop.id='_dlgBackdrop';
+    backdrop.setAttribute('role','dialog'); backdrop.setAttribute('aria-modal','true'); backdrop.setAttribute('aria-labelledby','_dlgTitle');
+    const box=document.createElement('div'); box.className='modal-box'; box.style.maxWidth='440px';
+    const head=document.createElement('div'); head.className='modal-head';
+    const h3=document.createElement('h3'); h3.id='_dlgTitle'; h3.textContent=opts.title||'';
+    const x=document.createElement('button'); x.className='modal-close'; x.setAttribute('aria-label','Close'); x.innerHTML='&times;';
+    head.appendChild(h3); head.appendChild(x);
+    const body=document.createElement('div'); body.className='modal-body';
+    if(opts.message){ const p=document.createElement('p'); p.innerHTML=opts.message; body.appendChild(p); } // caller escapes dynamic values
+    let input=null;
+    if(opts.prompt){ input=document.createElement('input'); input.className='text-input'; input.type='text'; input.style.width='100%'; input.placeholder=opts.placeholder||''; input.value=opts.defaultValue||''; body.appendChild(input); }
+    const foot=document.createElement('div'); foot.className='modal-foot';
+    const cancelBtn=document.createElement('button'); cancelBtn.type='button'; cancelBtn.className='btn btn-ghost'; cancelBtn.textContent=opts.cancelLabel||'Cancel';
+    const confirmBtn=document.createElement('button'); confirmBtn.type='button'; confirmBtn.className='btn '+(opts.danger?'btn-danger':'btn-primary'); confirmBtn.textContent=opts.confirmLabel||'Confirm';
+    foot.appendChild(cancelBtn); foot.appendChild(confirmBtn);
+    box.appendChild(head); box.appendChild(body); box.appendChild(foot);
+    backdrop.appendChild(box); document.body.appendChild(backdrop);
+
+    let done=false;
+    function cleanup(result){
+      if(done) return; done=true;
+      document.removeEventListener('keydown', onKey, true);
+      backdrop.classList.remove('open');
+      setTimeout(function(){ try{ backdrop.remove(); }catch(_){} }, 260);
+      try{ if(prev && typeof prev.focus==='function') prev.focus(); }catch(_){}
+      resolve(result);
+    }
+    function doConfirm(){
+      if(opts.prompt){
+        const val=(input.value||'').trim();
+        if(opts.required!==false && !val){ input.classList.remove('field-flash'); void input.offsetWidth; input.classList.add('field-flash'); input.focus(); return; }
+        cleanup(val);
+      } else { cleanup(true); }
+    }
+    function doCancel(){ cleanup(opts.prompt ? null : false); }
+    function onKey(e){
+      // Capture phase + stopPropagation so app-level Enter/Escape shortcuts
+      // (analyze, settings/info/history close) don't also fire while open.
+      if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); doCancel(); }
+      else if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); e.stopPropagation(); doConfirm(); }
+    }
+    cancelBtn.addEventListener('click', doCancel);
+    confirmBtn.addEventListener('click', doConfirm);
+    x.addEventListener('click', doCancel);
+    backdrop.addEventListener('click', function(e){ if(e.target===backdrop) doCancel(); });
+    document.addEventListener('keydown', onKey, true);
+    requestAnimationFrame(function(){
+      backdrop.classList.add('open');
+      if(opts.prompt){ try{ input.focus(); input.select(); }catch(_){} }
+      else { try{ (opts.danger?cancelBtn:confirmBtn).focus(); }catch(_){} }
+    });
+  });
+}
+function confirmModal(opts){
+  opts=opts||{};
+  return _styledDialog({ title:opts.title||'Confirm', message:opts.message||'', confirmLabel:opts.confirmLabel||'Confirm', cancelLabel:opts.cancelLabel||'Cancel', danger:!!opts.danger, prompt:false });
+}
+function promptModal(opts){
+  opts=opts||{};
+  return _styledDialog({ title:opts.title||'', message:opts.message||'', placeholder:opts.placeholder||'', defaultValue:opts.defaultValue||'', confirmLabel:opts.confirmLabel||'Save', cancelLabel:'Cancel', required:opts.required!==false, prompt:true });
+}
+function showLoading(msg){document.getElementById('loadingMsg').textContent=msg||'Processing...';document.getElementById('progressBar').style.width='0%';document.getElementById('progressLabel').textContent='';document.getElementById('loadingOverlay').style.display='flex';
+  var _stepIdx=0,_stepSteps=["Parsing CV...","Matching keywords...","Scoring fit...","Ranking results..."];
+  if(_stepTimer) clearInterval(_stepTimer);
+  _stepTimer=setInterval(function(){_stepIdx=(_stepIdx+1)%_stepSteps.length;var el=document.getElementById('loadingMsg');if(el)el.textContent=_stepSteps[_stepIdx];},1800);}
+function hideLoading(){if(_stepTimer){ clearInterval(_stepTimer); _stepTimer=null; }document.getElementById('loadingOverlay').style.display='none';}
+function setProgress(p,l){document.getElementById('progressBar').style.width=p+'%';document.getElementById('progressLabel').textContent=l;}
+function download(fn,text,type){const b=new Blob([text],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;a.click();URL.revokeObjectURL(u);}
+
+// ── Sort batch results ────────────────────────────────────────
+let _batchRows = [];
+let _sortDir = { score: -1, name: 1 };
+let _sortKey = 'score';
+
+const _origRenderBatch = typeof renderBatchResults === 'function' ? renderBatchResults : null;
+
+function sortBatch(key) {
+  _sortKey = key;
+  _sortDir[key] *= -1;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('sort' + (key === 'score' ? 'Score' : 'Name'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('arrowScore').innerHTML = _sortDir.score === -1 ? '&#9660;' : '&#9650;';
+  document.getElementById('arrowName').innerHTML = _sortDir.name === -1 ? '&#9660;' : '&#9650;';
+  const tbody = document.getElementById('batchBody');
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    if (key === 'score') {
+      const aVal = parseFloat(a.dataset.score || 0);
+      const bVal = parseFloat(b.dataset.score || 0);
+      return _sortDir.score * (bVal - aVal);
+    } else {
+      const aName = (a.dataset.name || '').toLowerCase();
+      const bName = (b.dataset.name || '').toLowerCase();
+      return _sortDir.name * aName.localeCompare(bName);
+    }
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+
+// ── Settings panel ─────────────────────────────────────────────
+function toggleSettings(){
+  const panel = document.getElementById('settingsPanel');
+  const overlay = document.getElementById('settingsOverlay');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open', !isOpen);
+  overlay.classList.toggle('open', !isOpen);
+  document.body.style.overflow = !isOpen ? 'hidden' : '';
+  if(!isOpen){
+    const cb=document.getElementById('autosaveBatchToggle');
+    if(cb){cb.checked=(typeof getAutosaveBatch==='function')?getAutosaveBatch():false;}
+    populateOrgSettings();
+    populatePlanBilling();
+    populateTeam();
+  }
+}
+
+// ── Org data retention + data controls (server-side, owner-only) ──
+async function populateOrgSettings(){
+  if(!getSessionToken())return;
+  try{
+    const me=await api('/api/auth/me');
+    const isOwner=!!(me&&me.user&&me.user.role==='owner');
+    const inp=document.getElementById('setRetentionDays');
+    if(inp&&me.org&&me.org.retentionDays!=null)inp.value=me.org.retentionDays;
+    ['setRetentionDays','retSaveBtn','orgExportBtn','orgDeleteBtn'].forEach(function(id){
+      const el=document.getElementById(id);if(el)el.disabled=!isOwner;
+    });
+    const note=document.getElementById('retOwnerNote');
+    if(note)note.style.display=isOwner?'none':'block';
+    // Report branding — owner only.
+    const bsec=document.getElementById('brandingSection');
+    if(bsec)bsec.style.display=isOwner?'block':'none';
+    if(isOwner&&me.org&&me.org.branding){
+      const b=me.org.branding;
+      const setV=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
+      setV('brandName',b.brandDisplayName);setV('brandLogoUrl',b.brandLogoUrl);setV('brandColor',b.brandColor);
+    }
+  }catch(_){}
+}
+async function saveBranding(){
+  const name=(document.getElementById('brandName').value||'').trim();
+  const logo=(document.getElementById('brandLogoUrl').value||'').trim();
+  const color=(document.getElementById('brandColor').value||'').trim();
+  if(logo&&!/^https?:\/\//i.test(logo)){toast('Logo URL must start with http:// or https://','error');return;}
+  if(color&&!/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(color)){toast('Colour must be a hex value like #0f2847.','error');return;}
+  const btn=document.getElementById('brandSaveBtn');if(btn)btn.disabled=true;
+  try{
+    await api('/api/org/branding',{method:'PATCH',body:JSON.stringify({brandDisplayName:name||null,brandLogoUrl:logo||null,brandColor:color||null})});
+    toast('Report branding saved.','success');
+  }catch(e){handleApiError(e,'Could not save branding');}
+  finally{if(btn)btn.disabled=false;}
+}
+
+// ── Team members & invitations (settings panel) ──
+let _teamIsOwner=false;
+function _fmtWhen(iso){ if(!iso)return 'never'; try{return new Date(iso).toLocaleDateString();}catch(_){return '—';} }
+async function populateTeam(){
+  const body=document.getElementById('teamBody');
+  const inviteRow=document.getElementById('teamInviteRow');
+  const linkRow=document.getElementById('inviteLinkRow');
+  if(linkRow)linkRow.style.display='none';
+  if(!body)return;
+  body.innerHTML='Loading…';
+  let me=null,data=null;
+  try{ me=await api('/api/auth/me'); }catch(_){}
+  _teamIsOwner=!!(me&&me.user&&me.user.role==='owner');
+  try{ data=await api('/api/team/members'); }
+  catch(e){
+    // A blocked/downgraded member lands here (SEAT_LIMIT) — keep it graceful.
+    body.textContent='Team information is unavailable.';
+    if(inviteRow)inviteRow.style.display='none';
+    return;
+  }
+  const onTeam=!!(data.org&&data.org.teamPlan);
+  const members=data.members||[];
+  // Cache the seat limit for the pricing comparison (null = unlimited seats).
+  _seatLimitCache=(typeof data.seatLimit==='number')?data.seatLimit:null;
+  if(_billing) renderPlanCompare((_billing.plan)||'free', _billing);
+  if(!onTeam){
+    body.innerHTML='<div style="color:#374151">Team members are available on the <strong>Team</strong> plan.'
+      + (_teamIsOwner?' Upgrade in the <em>Plan &amp; Billing</em> section above.':' Ask your organization owner to upgrade.')+'</div>';
+    if(inviteRow)inviteRow.style.display='none';
+    return;
+  }
+  // Seat counter (only when the deployment caps Team seats; null = unlimited).
+  let html='';
+  if(typeof data.seatLimit==='number'){
+    html+='<div style="font-size:12px;color:#374151;margin-bottom:6px">'+members.length+' of '+data.seatLimit+' seats used</div>';
+  }
+  // Member list
+  html+='<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px">Members</div>';
+  html+=members.map(function(m){
+    const removable=_teamIsOwner && m.email!==(me&&me.user&&me.user.email) && !(m.role==='owner');
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6">'
+      +'<span style="flex:1;color:#111827">'+escHtml(m.email)+' <span style="color:#9ca3af;font-size:11px">('+escHtml(m.role)+')</span></span>'
+      +'<span style="font-size:11px;color:#9ca3af">last active '+escHtml(_fmtWhen(m.lastLoginAt))+'</span>'
+      +(removable?'<button class="btn btn-danger btn-sm" data-team="remove" data-id="'+escHtml(m.id)+'" data-email="'+escHtml(m.email)+'">Remove</button>':'')
+      +'</div>';
+  }).join('');
+  // Pending invites (owner only)
+  if(_teamIsOwner){
+    let invites=[];try{ invites=await api('/api/team/invites'); }catch(_){}
+    if(invites.length){
+      html+='<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin:12px 0 6px">Pending invites</div>';
+      html+=invites.map(function(i){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6">'
+          +'<span style="flex:1;color:#374151">'+escHtml(i.email)+'</span>'
+          +'<button class="btn btn-ghost btn-sm" data-team="revoke" data-id="'+escHtml(i.id)+'">Revoke</button></div>';
+      }).join('');
+    }
+  }
+  body.innerHTML=html;
+  if(inviteRow)inviteRow.style.display=_teamIsOwner?'flex':'none';
+}
+// Delegated handlers for remove/revoke (values from escaped data attributes).
+(function(){
+  const body=document.getElementById('teamBody');
+  if(!body||body._teamDelegated)return; body._teamDelegated=true;
+  body.addEventListener('click',function(e){
+    const rm=e.target.closest('[data-team="remove"]'); if(rm){ removeMember(rm.dataset.id, rm.dataset.email); return; }
+    const rv=e.target.closest('[data-team="revoke"]'); if(rv){ revokeInvite(rv.dataset.id); return; }
+  });
+})();
+async function inviteMember(){
+  const email=(document.getElementById('inviteEmail').value||'').trim();
+  if(!email){toast('Enter an email to invite.','error');return;}
+  const btn=document.getElementById('inviteBtn');if(btn)btn.disabled=true;
+  try{
+    const d=await api('/api/team/invite',{method:'POST',body:JSON.stringify({email})});
+    document.getElementById('inviteEmail').value='';
+    const linkRow=document.getElementById('inviteLinkRow'), link=document.getElementById('inviteLink'), note=document.getElementById('inviteLinkNote');
+    if(link)link.value=d.inviteUrl;
+    if(note)note.textContent=d.emailed?'Send this link to your colleague. We also emailed it to '+d.email+'.':'Send this link to your colleague.';
+    if(linkRow)linkRow.style.display='block';
+    toast('Invite created.','success');
+    populateTeam();
+  }catch(e){handleApiError(e,'Could not create invite');}
+  finally{if(btn)btn.disabled=false;}
+}
+function copyInviteLink(){
+  const link=document.getElementById('inviteLink');
+  if(!link||!link.value)return;
+  const done=function(ok){toast(ok?'Invite link copied.':'Copy failed — select and copy manually.',ok?'success':'error');};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(link.value).then(function(){done(true);},function(){done(false);});}
+  else{try{link.select();done(document.execCommand('copy'));}catch(_){done(false);}}
+}
+async function revokeInvite(id){
+  const ok = await confirmModal({ title:'Revoke invitation', message:'Revoke this invitation? The link will stop working.', confirmLabel:'Revoke', danger:true });
+  if(!ok)return;
+  try{ await api('/api/team/invite/'+encodeURIComponent(id),{method:'DELETE'}); toast('Invite revoked.','success'); populateTeam(); }
+  catch(e){handleApiError(e,'Could not revoke invite');}
+}
+async function removeMember(id,email){
+  const ok = await confirmModal({ title:'Remove member', message:'Remove '+escHtml(email||'this member')+'? They lose access; their saved records and attribution are kept.', confirmLabel:'Remove', danger:true });
+  if(!ok)return;
+  try{ await api('/api/team/member/'+encodeURIComponent(id),{method:'DELETE'}); toast('Member removed.','success'); populateTeam(); }
+  catch(e){handleApiError(e,'Could not remove member');}
+}
+async function saveRetention(){
+  const inp=document.getElementById('setRetentionDays');
+  const days=parseInt(inp&&inp.value,10);
+  if(isNaN(days)||(days!==0&&(days<30||days>1095))){toast('Retention must be 0 (keep until deleted) or between 30 and 1095 days.','error');return;}
+  const btn=document.getElementById('retSaveBtn');if(btn)btn.disabled=true;
+  try{
+    await api('/api/org',{method:'PATCH',body:JSON.stringify({retentionDays:days})});
+    toast(days===0?'Retention set: keep until manually deleted.':'Retention set to '+days+' days.','success');
+  }catch(e){handleApiError(e,'Could not save retention');}
+  finally{if(btn)btn.disabled=false;}
+}
+async function exportOrgData(){
+  if(!API)return;
+  try{
+    const d=await api('/api/auth/download-token',{method:'POST'});
+    const a=document.createElement('a');a.href=API+'/api/org/export?dt='+encodeURIComponent(d.token);a.download='cvsprings-org-export.json';a.click();
+  }catch(e){handleApiError(e,'Could not export organization data');}
+}
+async function deleteAllOrgData(){
+  let orgName='';try{orgName=localStorage.getItem('cvsprings_org_name')||'';}catch(_){}
+  const typed=await promptModal({
+    title:'Delete all audit data',
+    message:'This permanently deletes <strong>all</strong> audit records and change history for your organization. Type your organization name'+(orgName?' (&ldquo;'+escHtml(orgName)+'&rdquo;)':'')+' to confirm:',
+    placeholder:orgName||'Organization name',
+    confirmLabel:'Delete everything'
+  });
+  if(typed===null)return;
+  if(orgName && typed!==orgName){ toast('Name did not match — deletion cancelled.','error'); return; }
+  const btn=document.getElementById('orgDeleteBtn');if(btn)btn.disabled=true;
+  try{
+    const r=await api('/api/org/audit-data',{method:'DELETE',body:JSON.stringify({confirm:typed})});
+    toast('Deleted '+r.recordsDeleted+' record(s) and '+r.changesDeleted+' change row(s).','success');
+    loadAudit();loadRoles();
+  }catch(e){handleApiError(e,'Could not delete organization data');}
+  finally{if(btn)btn.disabled=false;}
+}
+    // Accessibility: close the settings panel with the Escape key
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape'){
+        var sp = document.getElementById('settingsPanel');
+        if(sp && sp.classList.contains('open')){ toggleSettings(); }
+      }
+    });
+
+// ── Slider sync ────────────────────────────────────────────────
+function syncSlider(id){
+  const input = document.getElementById(id);
+  const slider = document.getElementById(id+'Slider');
+  if(slider) slider.value = input.value;
+}
+function syncInput(id){
+  const slider = document.getElementById(id+'Slider');
+  const input = document.getElementById(id);
+  if(input) input.value = slider.value;
+}
+
+// ── Why this score ──────────────────────────────────────────────
+function toggleWhy(id, btn){
+  const box = document.getElementById(id);
+  if(!box) return;
+  const open = box.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+
+function buildWhyHTML(data){
+  const scores = data.scores || {};
+  const overall = data.overall || 0;
+  let html = '<strong>Overall: ' + overall + '/100</strong><br>';
+  if(scores.keywords != null) html += '<div class="why-row">&#128273; <strong>Keywords ' + scores.keywords + '</strong> — match between job title, required terms and CV content.</div>';
+  if(scores.skills != null) html += '<div class="why-row">&#9889; <strong>Skills ' + scores.skills + '</strong> — technical and soft skills alignment with the role requirements.</div>';
+  if(scores.experience != null) html += '<div class="why-row">&#128197; <strong>Experience ' + scores.experience + '</strong> — years of relevant experience and seniority match.</div>';
+  if(scores.education != null) html += '<div class="why-row">&#127891; <strong>Education ' + scores.education + '</strong> — academic qualifications and certifications match.</div>';
+  const recs = (data.recommendations||[]);
+  if(recs.length){
+    html += '<div class="why-row" style="margin-top:6px"><strong>Key notes:</strong> ' + recs.map(r=>r.text||r).slice(0,2).join(' ') + '</div>';
+  }
+  return html;
+}
+
+// ── Batch summary panel ─────────────────────────────────────────
+function updateBatchSummary(results){
+  if(!results || !results.length) return;
+  const summary = document.getElementById('batchSummary');
+  if(summary) summary.style.display = 'grid';
+  const total = results.length;
+  const avg = Math.round(results.reduce((s,r)=>s+(r.overall||0),0)/total);
+  const shortlisted = results.filter(r=>(r.overall||0)>=getScoreThreshold()).length;
+  const top = results.reduce((a,b)=>(a.overall||0)>=(b.overall||0)?a:b, results[0]);
+  const topName = top.candidateName || top.fileName || 'N/A';
+  const el = id=>document.getElementById(id);
+  if(el('bsTotalCVs')) el('bsTotalCVs').textContent = total;
+  if(el('bsAvgScore')) el('bsAvgScore').textContent = avg;
+  if(el('bsShortlisted')) el('bsShortlisted').textContent = shortlisted;
+  if(el('bsSubThreshold')) el('bsSubThreshold').innerHTML = 'score &ge; '+getScoreThreshold();
+  if(el('bsTopCandidate')) el('bsTopCandidate').textContent = topName.length > 18 ? topName.substring(0,16)+'…' : topName;
+}
+
+// — Role template library (server-backed with localStorage fallback) ——
+const TMPL_KEY = 'cvsprings_templates';
+const TMPL_MIGRATED_KEY = 'cvsprings_templates_migrated_v1';
+const TMPL_OFFLINE_KEY = 'cvsprings_templates_offline_cache';
+
+// In-memory cache. Shape: Array<{id, name, role, jobDescription, weights}>
+let _tplCache = [];
+let _tplOffline = false;
+
+function _tplFromLocalStorageLegacy(){
+  try{
+    const obj = JSON.parse(localStorage.getItem(TMPL_KEY)||'{}');
+    return Object.entries(obj).map(([name, v]) => ({
+      id: null,
+      name,
+      role: v && v.role || '',
+      jobDescription: v && v.jd || '',
+      weights: v && v.weights || null,
+    }));
+  } catch(e){ return []; }
+}
+
+function _tplToOfflineCache(arr){
+  try{ localStorage.setItem(TMPL_OFFLINE_KEY, JSON.stringify(arr)); } catch(e){}
+}
+
+function _tplFromOfflineCache(){
+  try{ return JSON.parse(localStorage.getItem(TMPL_OFFLINE_KEY)||'[]'); } catch(e){ return []; }
+}
+
+async function refreshTemplatesCache(){
+  try {
+    const list = await api('/api/templates');
+    _tplCache = Array.isArray(list) ? list : [];
+    _tplOffline = false;
+    _tplToOfflineCache(_tplCache);
+  } catch(err) {
+    const offline = _tplFromOfflineCache();
+    _tplCache = offline.length ? offline : _tplFromLocalStorageLegacy();
+    _tplOffline = true;
+    if (typeof toast === 'function') toast('Templates offline — showing cached copy', 'warn');
+  }
+  return _tplCache;
+}
+
+// Legacy-shape accessor for callers that want the old { name: {jd, role, weights} } map.
+function getTemplates(){
+  const out = {};
+  for (const t of _tplCache) {
+    out[t.name] = { jd: t.jobDescription || '', role: t.role || '', weights: t.weights || null, _id: t.id };
+  }
+  return out;
+}
+
+function toggleTplPanel(e){
+  if(e) e.stopPropagation();
+  const trigger = document.getElementById('tplTrigger');
+  const panel = document.getElementById('tplPanel');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open',!isOpen);
+  trigger.classList.toggle('open',!isOpen);
+  if(!isOpen) renderTplChips();
+}
+
+function closeTplPanel(){
+  document.getElementById('tplPanel')?.classList.remove('open');
+  document.getElementById('tplTrigger')?.classList.remove('open');
+}
+
+document.addEventListener('click', function(e){
+  const wrap = document.getElementById('tplWrap');
+  if(wrap && !wrap.contains(e.target)) closeTplPanel();
+});
+
+function renderTplChips(){
+  const chips = document.getElementById('tplChips');
+  if(!chips) return;
+  const templates = getTemplates();
+  const keys = Object.keys(templates);
+  if(!keys.length){
+    chips.innerHTML = '<div class="tpl-empty">No templates saved yet.<br>Set up a role and click &ldquo;+ Save Current&rdquo;.</div>';
+    return;
+  }
+  chips.innerHTML = keys.map(function(k){
+    const safe = escHtml(k); // escapes quotes too, so it's safe in an attribute
+    return '<div class="tpl-chip">' +
+      '<button class="tpl-chip-name" data-action="load-template" data-name="'+safe+'" title="Load this template">'+safe+'</button>' +
+      '<button class="tpl-chip-del" data-action="delete-template" data-name="'+safe+'" title="Delete">×</button>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Event delegation (XSS-safe): user/candidate/role/template values live in
+// data- attributes (HTML-escaped) and are read here, never concatenated into
+// executable JS. One listener per container; survives innerHTML re-renders.
+function setupDelegatedHandlers(){
+  const batchBody = document.getElementById('batchBody');
+  if (batchBody && !batchBody._delegated) {
+    batchBody._delegated = true;
+    batchBody.addEventListener('change', function(e){
+      const el = e.target.closest('[data-action="batch-decision"]');
+      if (el) setBatchDecision(parseInt(el.dataset.idx, 10), el.value);
+    });
+    batchBody.addEventListener('click', function(e){
+      const el = e.target.closest('[data-action="batch-save"]');
+      if (el) saveSingleBatch(parseInt(el.dataset.idx, 10));
+    });
+    const noteFn = function(e){
+      const el = e.target.closest('[data-action="batch-note"]');
+      if (el) saveBatchNote(parseInt(el.dataset.idx, 10), el.value);
+    };
+    batchBody.addEventListener('input', noteFn);
+    batchBody.addEventListener('focusout', noteFn);
+  }
+  const auditBody = document.getElementById('auditBody');
+  if (auditBody && !auditBody._delegated) {
+    auditBody._delegated = true;
+    auditBody.addEventListener('change', function(e){
+      const el = e.target.closest('[data-action="audit-decision"]');
+      if (el) updateAuditDecision(el.dataset.id, el.value);
+    });
+    auditBody.addEventListener('focusout', function(e){
+      const el = e.target.closest('[data-action="audit-note"]');
+      if (el) updateAuditNote(el.dataset.id, el.value);
+    });
+    auditBody.addEventListener('click', function(e){
+      const h = e.target.closest('[data-action="audit-history"]'); if (h) { openChangeHistory(h.dataset.id); return; }
+      const r = e.target.closest('[data-action="audit-report"]'); if (r) { openAuditReport(r.dataset.id); return; }
+      const d = e.target.closest('[data-action="audit-delete"]'); if (d) { deleteAuditRecord(d.dataset.id); return; }
+    });
+  }
+  const roleTabs = document.getElementById('roleTabs');
+  if (roleTabs && !roleTabs._delegated) {
+    roleTabs._delegated = true;
+    roleTabs.addEventListener('click', function(e){
+      const el = e.target.closest('[data-action="load-role"]');
+      if (el) loadRoleHistory(el.dataset.role, el);
+    });
+  }
+  const tplChips = document.getElementById('tplChips');
+  if (tplChips && !tplChips._delegated) {
+    tplChips._delegated = true;
+    tplChips.addEventListener('click', function(e){
+      const l = e.target.closest('[data-action="load-template"]'); if (l) { loadTemplate(l.dataset.name); return; }
+      const d = e.target.closest('[data-action="delete-template"]'); if (d) { deleteTemplate(d.dataset.name); return; }
+    });
+  }
+}
+document.addEventListener('DOMContentLoaded', setupDelegatedHandlers);
+async function saveTemplate(){
+  const name = await promptModal({ title:'Save template', message:'Name this template', placeholder:'e.g. Senior Engineer' });
+  if(!name) return;
+  const trimmed = name.trim();
+  const payload = {
+    name: trimmed,
+    role: document.getElementById('roleInput').value || '',
+    jobDescription: document.getElementById('jdInput').value || '',
+    weights: getWeights()
+  };
+  const existing = _tplCache.find(t => t.name === trimmed);
+  try {
+    if (existing && existing.id) {
+      await api('/api/templates/' + encodeURIComponent(existing.id), { method:'PATCH', body: JSON.stringify(payload) });
+    } else {
+      await api('/api/templates', { method:'POST', body: JSON.stringify(payload) });
+    }
+    await refreshTemplatesCache();
+    renderTplChips();
+    if (typeof toast === 'function') toast('Template saved', 'success');
+    document.dispatchEvent(new CustomEvent('cv:template_saved', { detail: { name: trimmed, role: payload.role } }));
+  } catch(err) {
+    if (_tplOffline || /Failed to fetch|NetworkError/i.test(String(err && err.message))) {
+      const legacy = JSON.parse(localStorage.getItem(TMPL_KEY) || '{}');
+      legacy[trimmed] = { jd: payload.jobDescription, role: payload.role, weights: payload.weights };
+      localStorage.setItem(TMPL_KEY, JSON.stringify(legacy));
+      _tplCache = _tplFromLocalStorageLegacy();
+      _tplToOfflineCache(_tplCache);
+      renderTplChips();
+      if (typeof toast === 'function') toast('Saved locally (offline)', 'warn');
+    }
+  }
+}
+
+function loadTemplate(name){
+  const templates = getTemplates();
+  const tmpl = templates[name];
+  if(!tmpl) return;
+  if(tmpl.jd) document.getElementById('jdInput').value = tmpl.jd;
+  if(tmpl.role) document.getElementById('roleInput').value = tmpl.role;
+  if(tmpl.weights){
+    const w = tmpl.weights;
+    const fields = {wKw:'kw',wSk:'sk',wEx:'ex',wEd:'ed'};
+    Object.entries(fields).forEach(([id,key])=>{
+      const inp = document.getElementById(id);
+      const sld = document.getElementById(id+'Slider');
+      if(inp && w[key]!=null) inp.value = w[key];
+      if(sld && w[key]!=null) sld.value = w[key];
+    });
+    updateWeightSum();
+  }
+  closeTplPanel();
+}
+
+async function deleteTemplate(name){
+  const ok = await confirmModal({ title:'Delete template', message:'Delete the template &ldquo;'+escHtml(name)+'&rdquo;?', confirmLabel:'Delete', danger:true });
+  if(!ok) return;
+  const t = _tplCache.find(t => t.name === name);
+  try {
+    if (t && t.id) {
+      await api('/api/templates/' + encodeURIComponent(t.id), { method:'DELETE' });
+    }
+    await refreshTemplatesCache();
+    renderTplChips();
+    if (typeof toast === 'function') toast('Template deleted', 'success');
+  } catch(err) {
+    if (_tplOffline || /Failed to fetch|NetworkError/i.test(String(err && err.message))) {
+      const legacy = JSON.parse(localStorage.getItem(TMPL_KEY) || '{}');
+      delete legacy[name];
+      localStorage.setItem(TMPL_KEY, JSON.stringify(legacy));
+      _tplCache = _tplFromLocalStorageLegacy();
+      _tplToOfflineCache(_tplCache);
+      renderTplChips();
+      if (typeof toast === 'function') toast('Deleted locally (offline)', 'warn');
+    }
+  }
+}
+
+function populateTemplateSelect(){ renderTplChips(); }
+
+function maybeShowTemplateMigrationBanner(){
+  if (localStorage.getItem(TMPL_MIGRATED_KEY) === '1') return;
+  const legacy = _tplFromLocalStorageLegacy();
+  if (!legacy.length) {
+    try { localStorage.setItem(TMPL_MIGRATED_KEY, '1'); } catch(e){}
+    return;
+  }
+  const banner = document.getElementById('tplMigrationBanner');
+  if (!banner) return;
+  banner.querySelector('.tpl-mig-count').textContent = String(legacy.length);
+  banner.style.display = 'flex';
+  banner.querySelector('.tpl-mig-upload').onclick = async () => {
+    const btn = banner.querySelector('.tpl-mig-upload');
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    let ok = 0, fail = 0;
+    for (const t of legacy) {
+      try {
+        await api('/api/templates', { method:'POST', body: JSON.stringify({
+          name: t.name, role: t.role, jobDescription: t.jobDescription, weights: t.weights
+        }) });
+        ok++;
+      } catch(e) { fail++; }
+    }
+    try { localStorage.setItem(TMPL_MIGRATED_KEY, '1'); } catch(e){}
+    await refreshTemplatesCache();
+    renderTplChips();
+    banner.style.display = 'none';
+    if (typeof toast === 'function') {
+      if (fail === 0) toast('Uploaded ' + ok + ' template' + (ok===1?'':'s'), 'success');
+      else toast('Uploaded ' + ok + ', failed ' + fail, 'warn');
+    }
+  };
+  banner.querySelector('.tpl-mig-dismiss').onclick = () => {
+    try { localStorage.setItem(TMPL_MIGRATED_KEY, '1'); } catch(e){}
+    banner.style.display = 'none';
+  };
+}
+function toggleBatchWhy(btn, idx){
+  const tr = btn.closest('tr');
+  if(!tr) return;
+  const existing = tr.nextElementSibling;
+  if(existing && existing.classList.contains('why-row-expand')){
+    existing.remove();
+    btn.classList.remove('open');
+    return;
+  }
+  btn.classList.toggle('open');
+  let data = {};
+  try{ data = JSON.parse(tr.getAttribute('data-recs')||'{}'); }catch(e){}
+  const html = buildWhyHTML(data);
+  const whyTr = document.createElement('tr');
+  whyTr.className = 'why-row-expand';
+  const td = document.createElement('td');
+  td.colSpan = 9;
+  td.innerHTML = '<div class="why-box open" style="margin:4px 0">' + html + '</div>';
+  whyTr.appendChild(td);
+  tr.insertAdjacentElement('afterend', whyTr);
+}
+
+</script>
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-section">
+      <h4><button class="footer-link" data-action="openInfoModal" data-index="0">How Scores Are Calculated</button></h4>
+      <p>Each CV's text is analysed by a deterministic matching algorithm that extracts keywords, skills, experience and education signals and compares them against your job description. Four sub-scores are produced (KW, SK, EX, ED) and combined using the weights you set in the Scoring Weights panel to produce a single Overall Fit score out of 100. The same rules are applied identically to every CV.</p>
+    </div>
+    <div class="footer-section">
+      <h4>Privacy &amp; Anonymisation</h4>
+      <p>Two data flows: <strong>CV content</strong> is processed transiently — files are deleted from the server as soon as text extraction and scoring complete, and scoring runs inside CVsprings (no CV content is sent to any third-party AI service). <strong>Audit records</strong> are different: when you click Save to Audit (or have autosave on), the candidate name, file name, scores, your decision and notes, a 300-character job-description snippet and your reviewer email are stored in your organization's account until deleted or until your retention period expires. When Anonymise is enabled, contact details, links, address lines, early year numbers and stand-alone name lines are stripped from the CV text before scoring. Full details in the <a class="footer-link" href="/privacy.html">Privacy Policy</a>.</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>CVsprings &mdash; AI-powered candidate fit analysis &nbsp;|&nbsp; <button class="footer-link" data-action="openInfoModal" data-index="1">About &amp; Contact</button> &nbsp;|&nbsp; <a class="footer-link" href="/terms.html">Terms</a> &nbsp;|&nbsp; <a class="footer-link" href="/privacy.html">Privacy Policy</a> &nbsp;|&nbsp; <a class="footer-link" href="/compliance.html">EU AI Act compliance</a> &nbsp;|&nbsp; <a class="footer-link" href="/bias-report.html">Bias &amp; monitoring</a> &nbsp;|&nbsp; <a class="footer-link" href="/integrations.html">Integrations &amp; API</a></span>
+    <span>Scores are AI-generated and intended as a decision aid, not a final verdict.</span>
+  </div>
+</footer>
+
+
+<!-- Info Modal (How Scores + About) -->
+<div id="infoModal" class="modal-backdrop" data-action="closeInfoModalBackdrop">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="infoModalTitle">How Scores Are Calculated</h3>
+      <button class="modal-close" data-action="closeInfoModal" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tab0" data-action="switchModalTab" data-index="0">How Scores Work</button>
+      <button class="modal-tab" id="tab1" data-action="switchModalTab" data-index="1">About &amp; Contact</button>
+    </div>
+    <div class="modal-body">
+      <div id="tabPanel0">
+        <h4>Overview</h4>
+        <p>Each CV's text is analysed by a deterministic matching algorithm that extracts structured signals and compares them against your job description across four dimensions. The same rules are applied identically to every CV in a batch. See the <a href="/bias-report.html" style="color:#0f2847">methodology page</a> for full details.</p>
+        <h4>The Four Sub-scores</h4>
+        <ul>
+          <li><strong>Keywords (KW)</strong> &mdash; Key terms from the job description found in the CV.</li>
+          <li><strong>Skills (SK)</strong> &mdash; Technical and soft skills match between CV and role.</li>
+          <li><strong>Experience (EX)</strong> &mdash; Seniority, years of experience, and domain relevance.</li>
+          <li><strong>Education (ED)</strong> &mdash; Degree level, field of study, and certifications.</li>
+        </ul>
+        <h4>Overall Score</h4>
+        <p>The four sub-scores are blended using the weights you set in the Scoring Weights panel. Bias toward skills or experience depending on the role.</p>
+        <h4>Score Bands</h4>
+        <div class="score-example">
+          <span class="ex-pill" style="background:#dcfce7;color:#15803d">80+ Strong Fit</span>
+          <span class="ex-pill" style="background:#fef9c3;color:#92400e">50-79 Possible Fit</span>
+          <span class="ex-pill" style="background:#fee2e2;color:#b91c1c">0-49 Weak Fit</span>
+        </div>
+        <p style="font-size:12px;color:#9ca3af;margin-top:8px">Scores are AI-generated and should be used as a decision aid alongside human judgement.</p>
+      </div>
+      <div id="tabPanel1" style="display:none">
+        <h4>About CVsprings</h4>
+        <p>CVsprings is an AI-powered candidate fit analyser designed to help recruiters quickly identify best-fit candidates from a pool of applicants using objective, weighted fit scores.</p>
+        <div class="about-grid">
+          <div class="about-card"><h5>Fast &amp; Accurate</h5><p>Analyse a single CV or a full batch in seconds using cutting-edge AI.</p></div>
+          <div class="about-card"><h5>Privacy First</h5><p>CVs are processed transiently and deleted after analysis. Saved audit records stay in your org's account under your retention settings. See the <a href="/privacy.html" style="color:#0a1f3d">Privacy Policy</a>.</p></div>
+          <div class="about-card"><h5>Customisable</h5><p>Adjust scoring weights to match your role priorities across four dimensions.</p></div>
+          <div class="about-card"><h5>Transparent</h5><p>Every score includes a breakdown and a why-this-score explanation.</p></div>
+        </div>
+        <h4>Contact</h4>
+        <div class="contact-row"><strong>Support</strong><span id="contactSupport">&hellip;</span></div>
+        <div class="contact-row"><strong>Product</strong><span>CVsprings &mdash; AI Candidate Fit Analyser</span></div>
+        <div class="contact-row"><strong>Built by</strong><span>Chaulin</span></div>
+        <div class="contact-row"><strong>Legal</strong><span><a href="/terms.html">Terms of Service</a> &middot; <a href="/privacy.html">Privacy Policy</a></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script nonce="__CSP_NONCE__">
+// Populate the Support contact row from server config (env), as a mailto with
+// org context prefilled in the subject. No address is hardcoded into the page.
+var _metaPromise = null;
+function loadMeta(){
+  if (!_metaPromise) {
+    var base = (typeof API_BASE === 'string') ? API_BASE : '';
+    _metaPromise = fetch(base + '/api/meta', { headers: { 'Accept': 'application/json' } })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; });
+  }
+  return _metaPromise;
+}
+function populateSupportContact(){
+  var el = document.getElementById('contactSupport');
+  if (!el) return;
+  loadMeta().then(function(meta){
+    var email = meta && meta.supportEmail;
+    if (!email) { el.textContent = 'Support contact coming soon.'; return; }
+    var orgName = '';
+    try { orgName = localStorage.getItem('cvsprings_org_name') || ''; } catch (e) {}
+    var subject = 'CVsprings support' + (orgName ? ' — ' + orgName : '');
+    var a = document.createElement('a');
+    a.href = 'mailto:' + email + '?subject=' + encodeURIComponent(subject);
+    a.textContent = email;
+    el.innerHTML = '';
+    el.appendChild(a);
+  });
+}
+document.addEventListener('DOMContentLoaded', populateSupportContact);
+function openInfoModal(tab){
+  var m=document.getElementById('infoModal');
+  m.style.display='flex';
+  requestAnimationFrame(function(){m.classList.add('open');});
+  switchModalTab(tab||0);
+  document.body.style.overflow='hidden';
+  if ((tab||0) === 1) populateSupportContact();
+}
+function closeInfoModal(){
+  var m=document.getElementById('infoModal');
+  m.classList.remove('open');
+  setTimeout(function(){m.style.display='none';document.body.style.overflow='';},250);
+}
+function switchModalTab(idx){
+  [0,1].forEach(function(i){
+    document.getElementById('tab'+i).classList.toggle('active',i===idx);
+    document.getElementById('tabPanel'+i).style.display=i===idx?'block':'none';
+  });
+  document.getElementById('infoModalTitle').textContent=idx===0?'How Scores Are Calculated':'About & Contact';
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeInfoModal();});
+</script>
+<script nonce="__CSP_NONCE__">
+/* ── Candidate batch notes ── */
+var _batchNotes = {};
+function saveBatchNote(idx, val){
+  _batchNotes[idx] = val;
+  try { sessionStorage.setItem('cvsprings_notes', JSON.stringify(_batchNotes)); } catch(e){}
+}
+function getBatchNote(idx){
+  if (!Object.keys(_batchNotes).length) {
+    try { var s=sessionStorage.getItem('cvsprings_notes'); if(s)_batchNotes=JSON.parse(s); } catch(e){}
+  }
+  return (_batchNotes[idx]||'').replace(/</g,'&lt;');
+}
+
+/* ── Keyboard shortcuts ── */
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    var tag = document.activeElement.tagName.toLowerCase();
+    if (tag === 'textarea' || tag === 'input') return;
+    var btn = document.getElementById('analyzeBtn');
+    if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+  }
+});
+
+/* ── Keep-alive ping (prevent Render cold start) ── */
+function dismissSplash(){
+  var s=document.getElementById('splash');
+  if(s){s.classList.add('hidden');setTimeout(function(){s.remove()},700);}
+}
+function wakePing(){
+  fetch('/',{method:'HEAD',cache:'no-store'})
+    .then(function(r){if(r.ok){dismissSplash();}else{setTimeout(wakePing,1500);}})
+    .catch(function(){setTimeout(wakePing,1500);});
+}
+// Script is at bottom of body — DOM already ready, call directly
+setTimeout(wakePing, 50);
+setTimeout(dismissSplash, 15000);
+function keepAlive(){
+  setInterval(function(){
+    fetch('/', {method:'HEAD'}).catch(function(){
+      fetch('/', {method:'HEAD'}).catch(function(){});
+    });
+  }, 10 * 60 * 1000);
+}
+keepAlive();
+
+/* ── Enhanced dropzone drag feedback ── */
+(function setupDrag(){
+  var dz = document.getElementById('dropzone');
+  if (!dz) return;
+  var dragCounter = 0;
+  document.addEventListener('dragenter', function(e){
+    if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+      dragCounter++;
+      dz.classList.add('drag');
+    }
+  });
+  document.addEventListener('dragleave', function(e){
+    dragCounter--;
+    if (dragCounter <= 0) { dragCounter = 0; dz.classList.remove('drag'); }
+  });
+  document.addEventListener('drop', function(){ dragCounter = 0; dz.classList.remove('drag'); });
+  // Inline ondragover/ondrop were removed for CSP; wired here instead.
+  // dragover must preventDefault so the dropzone is a valid drop target.
+  dz.addEventListener('dragover', function(e){ e.preventDefault(); });
+  dz.addEventListener('drop', function(e){ handleDrop(e); });
+})();
+</script>
+<script nonce="__CSP_NONCE__">
+// Plausible analytics bridge: forward in-app CustomEvents to plausible()
+(function(){
+  if (typeof plausible !== 'function') return;
+  document.addEventListener('cv:analyze_completed', function(ev){
+    var d = ev.detail || {};
+    plausible('analyze_completed', { props: { mode: d.mode || 'single', role: d.role || 'unknown', count: d.count || 1 } });
+  });
+  document.addEventListener('cv:audit_saved', function(ev){
+    var d = ev.detail || {};
+    plausible('audit_saved', { props: { mode: d.mode || 'single', role: d.role || 'unknown' } });
+  });
+  document.addEventListener('cv:template_saved', function(ev){
+    var d = ev.detail || {};
+    plausible('template_saved', { props: { name: (d.name || '').slice(0, 50), role: d.role || 'unknown' } });
+  });
+  document.addEventListener('cv:sample_viewed', function(){
+    plausible('sample_viewed');
+  });
+})();
+
+/* ── Event delegation (CSP hardening) ────────────────────────────────────────
+   Inline on* handler attributes were removed so the CSP can set
+   script-src-attr 'none'. Every interactive element now carries a data-action
+   (plus data-* args); they are wired with delegated listeners here. This stays
+   in the inline <script> (allowed via the per-request CSP nonce). Handlers are
+   namespaced per event type so an element's action only fires for its intended
+   event (e.g. the file input's "handleFiles" fires on change, not on click). */
+function toggleMobileNav(el){
+  const n = document.querySelector('nav.topbar-nav');
+  const o = n.classList.toggle('mobile-open');
+  el.setAttribute('aria-expanded', o);
+}
+const delegatedHandlers = {
+  click: {
+    toggleMobileNav,
+    switchTab: (el) => switchTab(el.dataset.tab, el),
+    focusAuditSearch, doLogout, toggleSettings,
+    startCheckout: (el) => startCheckout(el.dataset.plan),
+    openBillingPortal, inviteMember, copyInviteLink, saveBranding,
+    saveSettings, changePassword, saveRetention, exportOrgData, deleteAllOrgData,
+    setMode: (el) => setMode(el.dataset.mode),
+    trySample, clearSample,
+    toggleTplPanel: (el, e) => toggleTplPanel(e),
+    saveTemplate, analyze, clearResults, saveToAudit, openReport,
+    toggleWhy: (el) => toggleWhy(el.dataset.why, el),
+    saveAllToAudit, exportBatchCsv,
+    printPage: () => window.print(),
+    sortBatch: (el) => sortBatch(el.dataset.sort),
+    loadAudit, exportAuditCsv, loadRoles,
+    removeFile: (el) => removeFile(el.dataset.file),
+    clearAuditFilters,
+    openInfoModal: (el) => openInfoModal(Number(el.dataset.index)),
+    switchModalTab: (el) => switchModalTab(Number(el.dataset.index)),
+    closeInfoModal,
+    closeInfoModalBackdrop: (el, e) => { if (e.target === el) closeInfoModal(); },
+  },
+  change: {
+    setAutosaveBatch: (el) => setAutosaveBatch(el.checked),
+    handleFiles: (el) => handleFiles(el.files),
+    filterAudit,
+  },
+  input: {
+    syncSlider: (el) => { syncSlider(el.dataset.weight); updateWeightSum(); },
+    syncInput: (el) => { syncInput(el.dataset.weight); updateWeightSum(); },
+    filterAudit,
+  },
+};
+Object.keys(delegatedHandlers).forEach(function(eventType){
+  const map = delegatedHandlers[eventType];
+  document.addEventListener(eventType, function(e){
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const fn = map[el.dataset.action];
+    if (typeof fn === 'function') fn(el, e);
+  });
+});
+</script>
+</body>
+</html>
