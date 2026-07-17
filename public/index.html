@@ -54,7 +54,7 @@ nav{border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--p
 nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
 .wordmark{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.01em;text-decoration:none;display:flex;align-items:center;gap:10px}
 .wordmark .wordtext > span{color:var(--stamp)}
-.logomark{width:30px;height:30px;flex:none;display:block}
+.logomark{width:30px;height:30px;flex:none;display:block;mix-blend-mode:multiply} /* logo.png has a solid white bg; multiply melts it into the paper background */
 .navlinks{display:flex;align-items:center;gap:24px;font-size:14px}
 .navlinks a{text-decoration:none;color:var(--ink-soft)}
 .navlinks a:hover{color:var(--ink)}
@@ -175,11 +175,7 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 <nav>
   <div class="wrap">
     <a class="wordmark" href="/" aria-label="CVsprings home">
-      <svg class="logomark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <rect x="1.5" y="1.5" width="29" height="29" fill="none" stroke="#2440B3" stroke-width="3"/>
-        <rect x="8" y="11" width="16" height="3.2" fill="#2440B3"/>
-        <rect x="8" y="17.8" width="16" height="3.2" fill="#2440B3"/>
-      </svg>
+      <img class="logomark" src="/logo.png" alt="" aria-hidden="true">
       <span class="wordtext">CV<span>springs</span></span>
     </a>
     <div class="navlinks">
