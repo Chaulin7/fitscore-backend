@@ -157,7 +157,7 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 // nonce that no longer matches the fresh CSP header. These routes are
 // registered BEFORE express.static, and static gets index:false, so the raw
 // placeholder files are never reachable (neither via / nor /index.html).
-const HTML_PAGES = ['index.html', 'landing.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html'];
+const HTML_PAGES = ['index.html', 'app.html', 'landing.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html'];
 const htmlTemplates = {};
 for (const page of HTML_PAGES) {
   htmlTemplates[page] = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8');
@@ -169,7 +169,12 @@ function serveNoncedHtml(page) {
     res.send(htmlTemplates[page].replaceAll('__CSP_NONCE__', res.locals.cspNonce));
   };
 }
+// Routing: "/" is the marketing landing page (index.html); the product app
+// (auth screen + tool) lives at /login and /signup (both serve app.html —
+// the app is a SPA that shows its login/signup modes itself).
 app.get('/', serveNoncedHtml('index.html'));
+app.get('/login', serveNoncedHtml('app.html'));
+app.get('/signup', serveNoncedHtml('app.html'));
 for (const page of HTML_PAGES) {
   app.get('/' + page, serveNoncedHtml(page));
 }
