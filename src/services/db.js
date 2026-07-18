@@ -136,6 +136,20 @@ function initSchema() {
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_subscription_id TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
 
+  // Demo requests from the marketing landing page. No raw IPs are stored:
+  // ip_hash = sha256(IP_HASH_SALT | client ip), computed in routes/demo.js.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS demo_requests (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      email TEXT NOT NULL,
+      agency TEXT,
+      note TEXT,
+      created_at TEXT NOT NULL,
+      ip_hash TEXT
+    )
+  `);
+
   // Per-org monthly usage counters (analyses run; periodKey = YYYY-MM)
   getDb().exec(`
     CREATE TABLE IF NOT EXISTS usage_counters (
@@ -595,6 +609,18 @@ function refundUsage(orgId, n, periodKey = currentPeriodKey()) {
   getDb().prepare('UPDATE usage_counters SET analysis_count = MAX(0, analysis_count - ?) WHERE org_id = ? AND period_key = ?').run(n, orgId, periodKey);
 }
 
+// --- Demo requests (marketing landing page) ---------------------------------
+
+function insertDemoRequest({ name, email, agency, note, ipHash }) {
+  const id = uuidv4();
+  const createdAt = nowIso();
+  getDb().prepare(`
+    INSERT INTO demo_requests (id, name, email, agency, note, created_at, ip_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, name || null, email, agency || null, note || null, createdAt, ipHash || null);
+  return { id, createdAt };
+}
+
 // --- Billing state (Stripe; attached to the organization) ------------------
 
 function getOrgBilling(orgId) {
@@ -645,6 +671,7 @@ module.exports = {
   incrementUsage,
   reserveUsage,
   refundUsage,
+  insertDemoRequest,
   getOrgBilling,
   setOrgStripeCustomerId,
   findOrgByStripeCustomerId,

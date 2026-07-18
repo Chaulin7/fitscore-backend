@@ -150,6 +150,9 @@ h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.4vw,36px);l
 .demo-form .btn{width:100%;text-align:center}
 .form-fine{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:14px;line-height:1.7}
 .confirm{border:1px dashed var(--verify);color:var(--verify);background:#0B7A4B0D;padding:16px;font-family:var(--mono);font-size:13px;line-height:1.7;display:none}
+.form-err{font-family:var(--mono);font-size:12px;color:#B3242C;margin-top:12px;line-height:1.6;display:none}
+/* Honeypot: off-screen but NOT display:none (some bots skip hidden fields) */
+.hp-field{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
 
 /* ---------- footer ---------- */
 footer{padding:40px 0 56px}
@@ -336,7 +339,8 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
     </div>
     <div class="demo-form">
       <div class="form-head">Demo request — form D-01</div>
-      <div id="formFields">
+      <form id="formFields" novalidate>
+        <input class="hp-field" type="text" id="f-website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
         <div class="field">
           <label for="f-name">Name</label>
           <input id="f-name" type="text" autocomplete="name" placeholder="Sanne de Vries">
@@ -354,10 +358,11 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
           <textarea id="f-note" rows="2" placeholder="e.g. we mostly place finance roles in Frankfurt"></textarea>
           <div class="hint">You can attach your 3 anonymised CVs in the reply to our confirmation email.</div>
         </div>
-        <button class="btn btn-primary" id="submitBtn" type="button">Request 15-minute demo</button>
+        <button class="btn btn-primary" id="submitBtn" type="submit">Request 15-minute demo</button>
+        <div class="form-err" id="formError" aria-live="polite"></div>
         <div class="form-fine">We reply within one working day. Your details are used only to schedule this demo — nothing else, no list, no drip campaign. That would be a strange look for us.</div>
-      </div>
-      <div class="confirm" id="confirmBox">
+      </form>
+      <div class="confirm" id="confirmBox" aria-live="polite">
         ✓ REQUEST LOGGED<br>
         Check your inbox — a confirmation with a scheduling link and the compliance checklist is on its way.
       </div>
@@ -401,18 +406,43 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
     hash.classList.add('flash');
   });
 
-  // Demo form: preview-only confirmation (no backend wired yet).
-  var submit=document.getElementById('submitBtn');
-  submit.addEventListener('click',function(){
-    var email=document.getElementById('f-email');
-    if(!email.value || email.value.indexOf('@')<0){
-      email.focus();
-      email.style.outline='2px solid #B3242C';
-      email.style.outlineOffset='-1px';
+  // Demo form: POSTs to /api/demo-request (same origin — the landing page is
+  // served by the backend). Confirmation shows only on a 2xx response.
+  var form=document.getElementById('formFields');
+  var emailField=document.getElementById('f-email');
+  var errLine=document.getElementById('formError');
+  function showFormError(msg){ errLine.textContent=msg; errLine.style.display='block'; }
+  form.addEventListener('submit',function(ev){
+    ev.preventDefault();
+    errLine.style.display='none';
+    emailField.style.outline='';
+    var email=emailField.value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      emailField.focus();
+      emailField.style.outline='2px solid #B3242C';
+      emailField.style.outlineOffset='-1px';
+      showFormError('Enter a valid work email address.');
       return;
     }
-    document.getElementById('formFields').style.display='none';
-    document.getElementById('confirmBox').style.display='block';
+    var btn=document.getElementById('submitBtn');
+    btn.disabled=true;
+    fetch('/api/demo-request',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name:document.getElementById('f-name').value.trim(),
+        email:email,
+        agency:document.getElementById('f-agency').value.trim(),
+        note:document.getElementById('f-note').value.trim(),
+        website:document.getElementById('f-website').value
+      })
+    }).then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      form.style.display='none';
+      document.getElementById('confirmBox').style.display='block';
+    }).catch(function(){
+      showFormError('Something went wrong — email us at support@cvsprings.com instead.');
+    }).finally(function(){ btn.disabled=false; });
   });
 })();
 </script>
