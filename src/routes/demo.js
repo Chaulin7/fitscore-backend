@@ -53,6 +53,9 @@ function ipHash(ip) {
 async function sendDemoEmails({ name, email, agency, note, createdAt }) {
   const from = process.env.DEMO_FROM_EMAIL || 'demo@cvsprings.com';
   const notify = process.env.DEMO_NOTIFY_EMAIL || null;
+  // Prospects are invited to reply with their anonymised CVs, so replies must
+  // land in a monitored inbox — the From address is send-only.
+  const replyTo = process.env.REPLY_TO_EMAIL || notify || null;
 
   const subjectA = `Demo request — ${agency || name || email}`;
   const bodyA = [
@@ -85,14 +88,20 @@ async function sendDemoEmails({ name, email, agency, note, createdAt }) {
     // Local dev: no provider configured — log the would-be emails instead.
     console.log('[demo] RESEND_API_KEY unset — would send notification:', { to: notify, subject: subjectA });
     console.log(bodyA);
-    console.log('[demo] would send confirmation:', { to: email, subject: subjectB });
+    console.log('[demo] would send confirmation:', { to: email, subject: subjectB, replyTo });
     return;
   }
   const resend = new Resend(key);
   if (notify) {
     await resend.emails.send({ from, to: notify, subject: subjectA, text: bodyA });
   }
-  await resend.emails.send({ from, to: email, subject: subjectB, text: bodyB });
+  await resend.emails.send({
+    from,
+    to: email,
+    subject: subjectB,
+    text: bodyB,
+    ...(replyTo ? { replyTo } : {}),
+  });
 }
 
 // POST /api/demo-request
