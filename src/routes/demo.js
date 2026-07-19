@@ -17,9 +17,22 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { isValidEmail } = require('../services/authService');
 const { insertDemoRequest } = require('../services/db');
+
+// EU AI Act checklist, attached to the prospect confirmation email. Read once
+// at startup; when the file is missing (dev checkouts), log clearly and send
+// confirmations without the attachment rather than failing requests.
+const CHECKLIST_PATH = path.join(__dirname, '..', '..', 'assets', 'CVsprings-EU-AI-Act-checklist.pdf');
+let checklistPdf = null;
+try {
+  checklistPdf = fs.readFileSync(CHECKLIST_PATH);
+} catch (_) {
+  console.warn(`[demo] checklist PDF missing at ${CHECKLIST_PATH} — confirmation emails will go out without the attachment`);
+}
 
 let Resend = null;
 try { ({ Resend } = require('resend')); } catch (_) { /* SDK optional until configured */ }
@@ -79,6 +92,7 @@ async function sendDemoEmails({ name, email, agency, note, createdAt }) {
     '',
     'No slideshow: we run the engine in front of you, twice, so you can',
     'watch the outputs match.',
+    ...(checklistPdf ? ['', 'Our one-page EU AI Act checklist for recruitment tooling is attached.'] : []),
     '',
     '— CVsprings',
   ].join('\n');
@@ -88,7 +102,7 @@ async function sendDemoEmails({ name, email, agency, note, createdAt }) {
     // Local dev: no provider configured — log the would-be emails instead.
     console.log('[demo] RESEND_API_KEY unset — would send notification:', { to: notify, subject: subjectA });
     console.log(bodyA);
-    console.log('[demo] would send confirmation:', { to: email, subject: subjectB, replyTo });
+    console.log('[demo] would send confirmation:', { to: email, subject: subjectB, replyTo, attachment: !!checklistPdf });
     return;
   }
   const resend = new Resend(key);
@@ -101,6 +115,7 @@ async function sendDemoEmails({ name, email, agency, note, createdAt }) {
     subject: subjectB,
     text: bodyB,
     ...(replyTo ? { replyTo } : {}),
+    ...(checklistPdf ? { attachments: [{ filename: 'CVsprings-EU-AI-Act-checklist.pdf', content: checklistPdf }] } : {}),
   });
 }
 
