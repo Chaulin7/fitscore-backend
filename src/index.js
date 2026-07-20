@@ -150,6 +150,24 @@ const path = require('path');
 const fs = require('fs');
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
+// EU AI Act checklist: public marketing asset at a clean URL, opened inline
+// in the browser tab. Cached for a day — the URL carries no content hash, so
+// a longer max-age would pin stale copies after the file is revised. The file
+// ships in assets/; if absent (dev), this 404s and routes/demo.js logs a
+// warning at boot.
+const CHECKLIST_PDF_PATH = path.join(__dirname, '..', 'assets', 'CVsprings-EU-AI-Act-checklist.pdf');
+app.get('/eu-ai-act-checklist.pdf', (req, res) => {
+  res.sendFile(CHECKLIST_PDF_PATH, {
+    maxAge: '1d',
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="CVsprings-EU-AI-Act-checklist.pdf"',
+    },
+  }, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
+  });
+});
+
 // HTML entry points are templates: their inline <script> tags carry a
 // __CSP_NONCE__ placeholder that must be replaced with the per-request nonce
 // so the tag matches the CSP header of the same response. Read once at
