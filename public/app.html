@@ -616,6 +616,14 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .auth-card form{display:flex;flex-direction:column;gap:12px}
 .auth-card .text-input{width:100%;height:42px}
 .auth-card .btn{justify-content:center;height:42px;width:100%}
+/* Show/hide password toggle (button sits inside the field wrapper) */
+.pw-wrap{position:relative;width:100%}
+.pw-wrap .text-input{padding-right:40px} /* room for the toggle; input stays 42px tall */
+.pw-toggle{position:absolute;top:50%;right:6px;transform:translateY(-50%);height:30px;width:30px;
+  display:flex;align-items:center;justify-content:center;background:none;border:none;padding:0;
+  cursor:pointer;color:#6b7280;border-radius:6px;transition:color .15s}
+.pw-toggle:hover{color:#0f2847}
+.pw-toggle:focus-visible{outline:2px solid #0f2847;outline-offset:2px;color:#0f2847}
 .auth-links{display:flex;justify-content:space-between;gap:8px;margin-top:2px;flex-wrap:wrap}
 .auth-link{background:none;border:none;color:#0f2847;font:600 12px 'Inter',sans-serif;cursor:pointer;padding:0;text-decoration:underline}
 .auth-link:hover{color:#1a3d6e}
@@ -825,7 +833,13 @@ img, video, table { max-width: 100%; }
     <form id="authLoginForm" autocomplete="on">
       <h2>Sign in</h2>
       <input class="text-input" type="email" id="authEmail" placeholder="Email" autocomplete="email" required>
-      <input class="text-input" type="password" id="authPassword" placeholder="Password" autocomplete="current-password" required>
+      <div class="pw-wrap">
+        <input class="text-input" type="password" id="authPassword" placeholder="Password" autocomplete="current-password" required>
+        <button class="pw-toggle" type="button" data-pw-toggle aria-label="Show password" aria-pressed="false">
+          <svg class="pw-ic pw-ic-eye" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="pw-ic pw-ic-eyeoff" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
       <button class="btn btn-primary" type="submit" id="authLoginBtn">Sign in</button>
       <div class="auth-links">
         <button type="button" class="auth-link" id="authForgotLink">Forgot password?</button>
@@ -835,7 +849,13 @@ img, video, table { max-width: 100%; }
     <form id="authSignupForm" style="display:none">
       <h2>Create your account</h2>
       <input class="text-input" type="email" id="suEmail" placeholder="Work email" autocomplete="email" required>
-      <input class="text-input" type="password" id="suPassword" placeholder="Password (min 10 characters)" autocomplete="new-password" required>
+      <div class="pw-wrap">
+        <input class="text-input" type="password" id="suPassword" placeholder="Password (min 10 characters)" autocomplete="new-password" required>
+        <button class="pw-toggle" type="button" data-pw-toggle aria-label="Show password" aria-pressed="false">
+          <svg class="pw-ic pw-ic-eye" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="pw-ic pw-ic-eyeoff" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
       <input class="text-input" type="text" id="suOrgName" placeholder="Company / team name" autocomplete="organization">
       <button class="btn btn-primary" type="submit" id="suCreateBtn">Create account</button>
       <div class="auth-links"><button type="button" class="auth-link" id="authToLogin">Back to sign in</button></div>
@@ -849,13 +869,25 @@ img, video, table { max-width: 100%; }
     </form>
     <form id="authResetForm" style="display:none">
       <h2>Set a new password</h2>
-      <input class="text-input" type="password" id="rpPassword" placeholder="New password (min 10 characters)" autocomplete="new-password" required>
+      <div class="pw-wrap">
+        <input class="text-input" type="password" id="rpPassword" placeholder="New password (min 10 characters)" autocomplete="new-password" required>
+        <button class="pw-toggle" type="button" data-pw-toggle aria-label="Show password" aria-pressed="false">
+          <svg class="pw-ic pw-ic-eye" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="pw-ic pw-ic-eyeoff" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
       <button class="btn btn-primary" type="submit" id="rpSubmitBtn">Set new password</button>
     </form>
     <form id="authAcceptForm" style="display:none">
       <h2 id="acceptTitle">Accept invitation</h2>
       <p class="auth-note" id="acceptNote">Set a password to join your team.</p>
-      <input class="text-input" type="password" id="acceptPassword" placeholder="Choose a password (min 10 characters)" autocomplete="new-password" required>
+      <div class="pw-wrap">
+        <input class="text-input" type="password" id="acceptPassword" placeholder="Choose a password (min 10 characters)" autocomplete="new-password" required>
+        <button class="pw-toggle" type="button" data-pw-toggle aria-label="Show password" aria-pressed="false">
+          <svg class="pw-ic pw-ic-eye" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="pw-ic pw-ic-eyeoff" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
       <button class="btn btn-primary" type="submit" id="acceptBtn">Join</button>
       <div class="auth-links"><button type="button" class="auth-link" id="acceptToLogin">Back to sign in</button></div>
     </form>
@@ -3492,6 +3524,36 @@ Object.keys(delegatedHandlers).forEach(function(eventType){
     if (typeof fn === 'function') fn(el, e);
   });
 });
+</script>
+<script nonce="__CSP_NONCE__">
+// Show/hide password toggles on the auth card. CSP-safe: wired with
+// addEventListener (Helmet sets script-src-attr 'none', so no inline on*).
+// One block handles all four fields — each button walks up to its .pw-wrap
+// and finds the input inside, so no per-field IDs are needed.
+(function(){
+  var toggles = document.querySelectorAll('.pw-toggle[data-pw-toggle]');
+  Array.prototype.forEach.call(toggles, function(btn){
+    var wrap = btn.closest('.pw-wrap');
+    var input = wrap && wrap.querySelector('input');
+    var eye = btn.querySelector('.pw-ic-eye');
+    var eyeOff = btn.querySelector('.pw-ic-eyeoff');
+    if(!input || !eye || !eyeOff) return;
+    // Normalise the initial state: password hidden, open-eye shown.
+    input.type = 'password';
+    eye.hidden = false;
+    eyeOff.hidden = true;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-label', 'Show password');
+    btn.addEventListener('click', function(){
+      var reveal = input.type === 'password'; // becoming visible?
+      input.type = reveal ? 'text' : 'password';
+      eye.hidden = reveal;      // hide the open eye when the password is visible
+      eyeOff.hidden = !reveal;  // show the eye-with-slash when the password is visible
+      btn.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+      btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+    });
+  });
+})();
 </script>
 </body>
 </html>
