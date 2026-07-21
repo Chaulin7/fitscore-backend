@@ -624,6 +624,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   cursor:pointer;color:#6b7280;border-radius:6px;transition:color .15s}
 .pw-toggle:hover{color:#0f2847}
 .pw-toggle:focus-visible{outline:2px solid #0f2847;outline-offset:2px;color:#0f2847}
+.pw-toggle svg[hidden]{display:none} /* guarantee the hidden icon stays hidden */
 .auth-links{display:flex;justify-content:space-between;gap:8px;margin-top:2px;flex-wrap:wrap}
 .auth-link{background:none;border:none;color:#0f2847;font:600 12px 'Inter',sans-serif;cursor:pointer;padding:0;text-decoration:underline}
 .auth-link:hover{color:#1a3d6e}
@@ -3528,29 +3529,39 @@ Object.keys(delegatedHandlers).forEach(function(eventType){
 <script nonce="__CSP_NONCE__">
 // Show/hide password toggles on the auth card. CSP-safe: wired with
 // addEventListener (Helmet sets script-src-attr 'none', so no inline on*).
-// One block handles all four fields — each button walks up to its .pw-wrap
-// and finds the input inside, so no per-field IDs are needed.
+// One block handles all four fields via their shared .pw-wrap / .pw-toggle
+// classes — no per-field IDs. The two inline SVGs are identified by CONTENT,
+// not class: the slashed eye is the one containing a <line> (the slash).
+// IMPORTANT: hide/show via setAttribute('hidden'), never el.hidden — the
+// `hidden` IDL property lives on HTMLElement, so `svgEl.hidden = true` is a
+// no-op on an SVGElement and leaves both icons visible.
 (function(){
-  var toggles = document.querySelectorAll('.pw-toggle[data-pw-toggle]');
-  Array.prototype.forEach.call(toggles, function(btn){
+  function setHidden(el, yes){ if(yes) el.setAttribute('hidden', ''); else el.removeAttribute('hidden'); }
+
+  function sync(btn){
     var wrap = btn.closest('.pw-wrap');
     var input = wrap && wrap.querySelector('input');
-    var eye = btn.querySelector('.pw-ic-eye');
-    var eyeOff = btn.querySelector('.pw-ic-eyeoff');
-    if(!input || !eye || !eyeOff) return;
-    // Normalise the initial state: password hidden, open-eye shown.
-    input.type = 'password';
-    eye.hidden = false;
-    eyeOff.hidden = true;
-    btn.setAttribute('aria-pressed', 'false');
-    btn.setAttribute('aria-label', 'Show password');
+    if(!input) return;
+    var slashed = null, plain = null;
+    Array.prototype.forEach.call(btn.querySelectorAll('svg'), function(svg){
+      if (svg.querySelector('line')) slashed = svg; else plain = svg;
+    });
+    if(!slashed || !plain) return;
+    var hidden = input.type === 'password';
+    setHidden(slashed, !hidden); // slashed eye shows WHILE the password is hidden
+    setHidden(plain, hidden);    // plain eye shows ONCE the password is visible
+    btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
+    btn.setAttribute('aria-label', hidden ? 'Show password' : 'Hide password');
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.pw-toggle[data-pw-toggle]'), function(btn){
+    var wrap = btn.closest('.pw-wrap');
+    var input = wrap && wrap.querySelector('input');
+    if(!input) return;
+    sync(btn); // correct initial state, independent of markup hidden attrs
     btn.addEventListener('click', function(){
-      var reveal = input.type === 'password'; // becoming visible?
-      input.type = reveal ? 'text' : 'password';
-      eye.hidden = reveal;      // hide the open eye when the password is visible
-      eyeOff.hidden = !reveal;  // show the eye-with-slash when the password is visible
-      btn.setAttribute('aria-pressed', reveal ? 'true' : 'false');
-      btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+      input.type = input.type === 'password' ? 'text' : 'password';
+      sync(btn);
     });
   });
 })();
