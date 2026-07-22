@@ -4,9 +4,18 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data', 'audit.db');
+// DATABASE_PATH points production at the Render persistent disk (e.g.
+// /opt/render/project/data/fitscore.db); DB_PATH is the legacy alias used by
+// existing scripts/docs. The repo-local fallback keeps dev and tests working
+// with no env set. Keep in sync with the same constant in routes/templates.js.
+const DB_PATH = process.env.DATABASE_PATH || process.env.DB_PATH
+  || path.join(__dirname, '..', '..', 'data', 'audit.db');
 
 let db;
+let checkpointTimer = null;
+let dbClosed = false;
+
+const WAL_CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 function getDb() {
   if (!db) {
@@ -15,9 +24,89 @@ function getDb() {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
+    // WAL best practice: keep synchronous at least NORMAL so an OS/power crash
+    // can't corrupt the database. SQLite's default is FULL; only raise it if
+    // something (e.g. an env-tuned deployment) dropped it below NORMAL. Values:
+    // 0=OFF, 1=NORMAL, 2=FULL, 3=EXTRA.
+    const syncLevel = db.pragma('synchronous', { simple: true });
+    if (typeof syncLevel === 'number' && syncLevel < 1) db.pragma('synchronous = NORMAL');
     initSchema();
+    // Boot verification: confirms in Render logs that the app is using the
+    // mounted persistent disk, not the ephemeral repo directory.
+    console.log('[db] sqlite database opened', { dbPath: DB_PATH, synchronous: db.pragma('synchronous', { simple: true }) });
   }
   return db;
+}
+
+// --- WAL checkpointing & graceful shutdown ---------------------------------
+// The production DB runs in WAL mode. Without periodic checkpoints the -wal
+// sidecar grows without bound and the whole dataset lives in that one file
+// until a clean close folds it back into the main .db. We defend both ends:
+// a periodic TRUNCATE checkpoint keeps the WAL small, and a signal handler
+// closes the DB cleanly on deploy (Render sends SIGTERM) so nothing is stranded
+// in the WAL.
+
+// Fold the WAL back into the main database file and reset it to zero length.
+// A checkpoint can legitimately fail / partially complete when readers are
+// active (SQLITE_BUSY), so failures are logged, never thrown.
+function checkpointWal() {
+  if (!db || !db.open) return;
+  try {
+    // Returns [{ busy, log, checkpointed }]; busy > 0 means active readers
+    // blocked a full truncate — harmless, the next run catches up.
+    const [row] = db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('[db] wal checkpoint', row);
+  } catch (err) {
+    console.error('[db] wal checkpoint failed (readers active?):', err.message);
+  }
+}
+
+// Start the periodic WAL checkpoint. .unref() so the timer never keeps the
+// process alive on its own. Idempotent — safe to call more than once.
+function startWalCheckpointing() {
+  if (checkpointTimer) return;
+  getDb(); // ensure the handle is open
+  checkpointTimer = setInterval(checkpointWal, WAL_CHECKPOINT_INTERVAL_MS);
+  checkpointTimer.unref();
+}
+
+// Idempotent clean close: stop the checkpoint timer, fold the WAL back into the
+// main file one last time, then close the handle. Safe to call twice (double
+// signals, or a signal plus a test teardown).
+function closeDb() {
+  if (dbClosed) return;
+  dbClosed = true;
+  if (checkpointTimer) { clearInterval(checkpointTimer); checkpointTimer = null; }
+  if (db && db.open) {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch (err) {
+      console.error('[db] final checkpoint failed:', err.message);
+    }
+    db.close(); // better-sqlite3 also checkpoints on close in WAL mode
+  }
+}
+
+// Graceful shutdown: on SIGTERM/SIGINT (Render sends SIGTERM on every deploy),
+// stop accepting new connections, then close the DB cleanly so the WAL is
+// folded back into fitscore.db. Idempotent against double signals via the
+// shuttingDown guard; a 10s fallback forces exit if a connection won't drain.
+function registerGracefulShutdown(server) {
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[db] received ${signal}, shutting down gracefully`);
+    const finish = () => { closeDb(); process.exit(0); };
+    if (server) {
+      server.close(finish);
+      setTimeout(finish, 10 * 1000).unref();
+    } else {
+      finish();
+    }
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 }
 
 function nowIso() {
@@ -121,7 +210,26 @@ function initSchema() {
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN subscription_status TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN current_period_end TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN plan_updated_at TEXT'); } catch (_) {}
+  // Webhook ordering guard: unix seconds (Stripe event.created) of the last
+  // event applied to this org, so stale/out-of-order events can be skipped.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_event_created INTEGER'); } catch (_) {}
+  // Stripe subscription id — storage only (reconciliation/support), never exposed via API.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_subscription_id TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
+
+  // Demo requests from the marketing landing page. No raw IPs are stored:
+  // ip_hash = sha256(IP_HASH_SALT | client ip), computed in routes/demo.js.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS demo_requests (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      email TEXT NOT NULL,
+      agency TEXT,
+      note TEXT,
+      created_at TEXT NOT NULL,
+      ip_hash TEXT
+    )
+  `);
 
   // Per-org monthly usage counters (analyses run; periodKey = YYYY-MM)
   getDb().exec(`
@@ -557,12 +665,50 @@ function incrementUsage(orgId, n, periodKey = currentPeriodKey()) {
   return getUsageCount(orgId, periodKey);
 }
 
+// Atomically reserve `n` analyses against the org's monthly counter, inside a
+// synchronous better-sqlite3 transaction so check+increment cannot race two
+// concurrent requests past the limit. limit == null (unlimited) always
+// reserves — the counter still increments, so usage stats stay intact.
+// Returns { ok, used }: used is the post-reservation count on success, or the
+// current count on refusal (nothing written).
+function reserveUsage(orgId, n, limit, periodKey = currentPeriodKey()) {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.prepare('INSERT OR IGNORE INTO usage_counters (org_id, period_key, analysis_count) VALUES (?, ?, 0)').run(orgId, periodKey);
+    const count = db.prepare('SELECT analysis_count AS c FROM usage_counters WHERE org_id = ? AND period_key = ?').get(orgId, periodKey).c;
+    if (limit != null && count + n > limit) return { ok: false, used: count };
+    db.prepare('UPDATE usage_counters SET analysis_count = analysis_count + ? WHERE org_id = ? AND period_key = ?').run(n, orgId, periodKey);
+    return { ok: true, used: count + n };
+  });
+  return tx();
+}
+
+// Return `n` previously-reserved analyses to the counter (files that failed to
+// process). Floors at 0; n <= 0 and missing rows are no-ops.
+function refundUsage(orgId, n, periodKey = currentPeriodKey()) {
+  if (!(n > 0)) return;
+  getDb().prepare('UPDATE usage_counters SET analysis_count = MAX(0, analysis_count - ?) WHERE org_id = ? AND period_key = ?').run(n, orgId, periodKey);
+}
+
+// --- Demo requests (marketing landing page) ---------------------------------
+
+function insertDemoRequest({ name, email, agency, note, ipHash }) {
+  const id = uuidv4();
+  const createdAt = nowIso();
+  getDb().prepare(`
+    INSERT INTO demo_requests (id, name, email, agency, note, created_at, ip_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, name || null, email, agency || null, note || null, createdAt, ipHash || null);
+  return { id, createdAt };
+}
+
 // --- Billing state (Stripe; attached to the organization) ------------------
 
 function getOrgBilling(orgId) {
   const row = getDb().prepare(`
     SELECT stripe_customer_id AS stripeCustomerId, plan, subscription_status AS subscriptionStatus,
-           current_period_end AS currentPeriodEnd, plan_updated_at AS planUpdatedAt
+           current_period_end AS currentPeriodEnd, plan_updated_at AS planUpdatedAt,
+           stripe_event_created AS stripeEventCreated, stripe_subscription_id AS stripeSubscriptionId
     FROM organizations WHERE id = ?
   `).get(orgId);
   return row || null;
@@ -576,21 +722,40 @@ function findOrgByStripeCustomerId(customerId) {
   return getDb().prepare('SELECT id FROM organizations WHERE stripe_customer_id = ?').get(customerId) || null;
 }
 
-// Sets plan state from a webhook event (idempotent — always sets, never toggles).
-function setOrgPlan(orgId, { plan, subscriptionStatus, currentPeriodEnd }) {
-  getDb().prepare(`
-    UPDATE organizations
-    SET plan = ?, subscription_status = ?, current_period_end = ?, plan_updated_at = ?
-    WHERE id = ?
-  `).run(plan, subscriptionStatus || null, currentPeriodEnd || null, nowIso(), orgId);
+// Sets plan state from a webhook event (idempotent — always sets absolute
+// state, never toggles). Optional fields are written only when the key is
+// present, so a caller can advance the ordering guard / subscription id
+// without clobbering the other:
+//   eventCreated         -> stripe_event_created  (unix seconds; ordering guard)
+//   stripeSubscriptionId -> stripe_subscription_id (pass null to clear on cancel)
+function setOrgPlan(orgId, fields) {
+  const { plan, subscriptionStatus, currentPeriodEnd, eventCreated } = fields;
+  const sets = ['plan = ?', 'subscription_status = ?', 'current_period_end = ?', 'plan_updated_at = ?'];
+  const params = [plan, subscriptionStatus || null, currentPeriodEnd || null, nowIso()];
+  if ('eventCreated' in fields) {
+    sets.push('stripe_event_created = ?');
+    params.push(Number.isFinite(eventCreated) ? eventCreated : null);
+  }
+  if ('stripeSubscriptionId' in fields) {
+    sets.push('stripe_subscription_id = ?');
+    params.push(fields.stripeSubscriptionId || null);
+  }
+  params.push(orgId);
+  getDb().prepare(`UPDATE organizations SET ${sets.join(', ')} WHERE id = ?`).run(...params);
 }
 
 module.exports = {
   getDb,
+  closeDb,
+  startWalCheckpointing,
+  registerGracefulShutdown,
   nowIso,
   currentPeriodKey,
   getUsageCount,
   incrementUsage,
+  reserveUsage,
+  refundUsage,
+  insertDemoRequest,
   getOrgBilling,
   setOrgStripeCustomerId,
   findOrgByStripeCustomerId,

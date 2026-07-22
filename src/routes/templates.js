@@ -7,7 +7,10 @@ const Database = require('better-sqlite3');
 
 const router = express.Router();
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data', 'audit.db');
+// Same resolution as services/db.js (this router holds its own connection to
+// the same file): DATABASE_PATH preferred, DB_PATH legacy alias, local fallback.
+const DB_PATH = process.env.DATABASE_PATH || process.env.DB_PATH
+  || path.join(__dirname, '..', '..', 'data', 'audit.db');
 let db;
 function getDb() {
   if (!db) {

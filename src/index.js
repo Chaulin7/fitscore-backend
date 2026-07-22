@@ -14,8 +14,9 @@ const authRouter = require('./routes/auth');
 const orgRouter = require('./routes/org');
 const billingRouter = require('./routes/billing');
 const teamRouter = require('./routes/team');
+const demoRouter = require('./routes/demo');
 const { migrateLegacyData } = require('./services/authService');
-const { purgeExpiredAudits } = require('./services/db');
+const { getDb, purgeExpiredAudits, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { mutationLimiter } = require('./middleware/rateLimits');
 
 // Optional pino logger (graceful fallback if not installed yet)
@@ -36,20 +37,42 @@ const PORT = process.env.PORT || 3000;
 app.disable('x-powered-by');
 app.set('trust proxy', 1); // Render runs behind a proxy
 
+// --- Per-request CSP nonce ---------------------------------------------------
+// Generated BEFORE helmet so the CSP header and the <script nonce> attributes
+// substituted into the served HTML carry the same value. Must be per-request:
+// a nonce computed once at startup would be guessable and the CSP theater.
+const crypto = require('crypto');
+app.use((req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  next();
+});
+
 // --- Security headers ------------------------------------------------------
-// CSP lists exactly the origins the app loads. The single HTML file relies on
-// inline scripts/styles, so 'unsafe-inline' is required for script/style; we
-// still lock everything else down (object-src none, frame-ancestors none) and
-// allow only the fonts/analytics/Stripe origins actually used. HSTS is enabled
-// only once served over HTTPS (Render/custom domain).
+// CSP lists exactly the origins the app loads. Inline <script> blocks are
+// allowed via a per-request nonce (no 'unsafe-inline' for scripts); styles
+// still need 'unsafe-inline' (inline styles are a separate cleanup). We lock
+// everything else down (object-src none, frame-ancestors none) and allow only
+// the fonts/analytics/Stripe origins actually used. HSTS is enabled only once
+// served over HTTPS (Render/custom domain).
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {
       defaultSrc: ["'self'"],
-      // Inline handlers/scripts in the single-file app require 'unsafe-inline'.
-      // Stripe.js is loaded only if Checkout redirects in-page; allow its host.
-      scriptSrc: ["'self'", "'unsafe-inline'", 'https://plausible.io', 'https://js.stripe.com'],
+      // No 'unsafe-inline': each inline <script> carries a per-request nonce
+      // substituted into the HTML by the template routes below. External
+      // scripts load via src= from the allowlisted hosts (Plausible; Stripe.js
+      // kept defensively — checkout currently uses a full-page redirect).
+      scriptSrc: [
+        "'self'",
+        (req, res) => `'nonce-${res.locals.cspNonce}'`,
+        'https://plausible.io',
+        'https://js.stripe.com',
+      ],
+      // Inline event-handler attributes were removed from the frontend (handlers
+      // are wired via data-action + delegated listeners), so attribute handlers
+      // are blocked by design.
+      scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:'],
@@ -124,7 +147,57 @@ const generalLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeader
 
 // Static frontend
 const path = require('path');
-app.use(express.static(path.join(__dirname, '..', 'public')));
+const fs = require('fs');
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+
+// EU AI Act checklist: public marketing asset at a clean URL, opened inline
+// in the browser tab. Cached for a day — the URL carries no content hash, so
+// a longer max-age would pin stale copies after the file is revised. The file
+// ships in assets/; if absent (dev), this 404s and routes/demo.js logs a
+// warning at boot.
+const CHECKLIST_PDF_PATH = path.join(__dirname, '..', 'assets', 'CVsprings-EU-AI-Act-checklist.pdf');
+app.get('/eu-ai-act-checklist.pdf', (req, res) => {
+  res.sendFile(CHECKLIST_PDF_PATH, {
+    maxAge: '1d',
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="CVsprings-EU-AI-Act-checklist.pdf"',
+    },
+  }, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
+  });
+});
+
+// HTML entry points are templates: their inline <script> tags carry a
+// __CSP_NONCE__ placeholder that must be replaced with the per-request nonce
+// so the tag matches the CSP header of the same response. Read once at
+// startup (they're static templates — no per-request disk I/O) and served
+// with Cache-Control: no-store, because a cached page would hold a stale
+// nonce that no longer matches the fresh CSP header. These routes are
+// registered BEFORE express.static, and static gets index:false, so the raw
+// placeholder files are never reachable (neither via / nor /index.html).
+const HTML_PAGES = ['index.html', 'app.html', 'landing.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html'];
+const htmlTemplates = {};
+for (const page of HTML_PAGES) {
+  htmlTemplates[page] = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8');
+}
+function serveNoncedHtml(page) {
+  return (req, res) => {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.set('Cache-Control', 'no-store');
+    res.send(htmlTemplates[page].replaceAll('__CSP_NONCE__', res.locals.cspNonce));
+  };
+}
+// Routing: "/" is the marketing landing page (index.html); the product app
+// (auth screen + tool) lives at /login and /signup (both serve app.html —
+// the app is a SPA that shows its login/signup modes itself).
+app.get('/', serveNoncedHtml('index.html'));
+app.get('/login', serveNoncedHtml('app.html'));
+app.get('/signup', serveNoncedHtml('app.html'));
+for (const page of HTML_PAGES) {
+  app.get('/' + page, serveNoncedHtml(page));
+}
+app.use(express.static(PUBLIC_DIR, { index: false }));
 
 // --- Routes ---------------------------------------------------------------
 // Session auth (Authorization: Bearer {sessionToken}) protects every /api/*
@@ -140,6 +213,9 @@ app.use('/api/org', generalLimiter, mutationLimiter, orgRouter);
 app.use('/api/billing', generalLimiter, billingRouter);
 // Team routes do their own per-route auth (accept is public, like signup).
 app.use('/api/team', generalLimiter, teamRouter);
+// Demo requests from the landing page: public (no session), with its own
+// stricter per-IP limiter inside the router (5/hour).
+app.use('/api/demo-request', generalLimiter, demoRouter);
 
 // Public, non-personal metadata for static pages (contact + company details
 // from env so the operator sets real values without code edits).
@@ -194,6 +270,13 @@ app.use((err, req, res, next) => {
   res.status(status).json(body);
 });
 
+// Open the database and ensure the FULL schema exists before the server
+// accepts traffic — on a fresh persistent disk (first boot after mounting)
+// no tables exist yet, and any request racing schema creation would 500.
+// better-sqlite3 is synchronous, so this completes before app.listen below.
+// (Also logs the resolved DB path for boot verification in Render logs.)
+getDb();
+
 // One-time legacy data migration: assigns pre-auth records to the
 // "Chaulin (legacy)" organization and creates the owner user from
 // OWNER_EMAIL + OWNER_PASSWORD. Idempotent on every boot.
@@ -221,7 +304,11 @@ function runRetentionPurge() {
 runRetentionPurge();
 setInterval(runRetentionPurge, 24 * 60 * 60 * 1000).unref();
 
-app.listen(PORT, () => {
+// Keep the WAL from growing without bound while the process is up (folds it
+// back into the main DB every 5 minutes; the timer is .unref()'d).
+startWalCheckpointing();
+
+const server = app.listen(PORT, () => {
   const log = logger ? logger.info.bind(logger) : console.log;
   log('CVsprings API listening on http://localhost:' + PORT);
   log(' POST /api/auth/signup        - Create an organization + owner account');
@@ -248,5 +335,10 @@ app.listen(PORT, () => {
   log(' GET  /api/templates          - Templates CRUD (auth required)');
   log(' GET  /health                 - Health check');
 });
+
+// Close the HTTP server and the DB cleanly on deploy/shutdown so better-sqlite3
+// checkpoints the WAL back into fitscore.db instead of leaving the dataset
+// stranded in the -wal sidecar.
+registerGracefulShutdown(server);
 
 module.exports = app;
