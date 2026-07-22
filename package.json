@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "node --test src/**/*.test.js 2>&1 || echo 'No tests found or tests failed'",
+    "test": "node --test src/**/*.test.js",
     "extraction:baseline": "node scripts/extraction-golden.mjs --write",
     "extraction:verify": "node scripts/extraction-golden.mjs --verify"
   },
