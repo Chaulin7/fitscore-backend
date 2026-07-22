@@ -1372,6 +1372,7 @@ async function api(path, options = {}) {
       if (res.status === 401 && data && data.code === 'AUTH_REQUIRED') { try { handleUnauthorized(); } catch (_) {} }
       const err = new Error((data && data.error) || ('HTTP ' + res.status));
       err.status = res.status; err.code = data && data.code; err.field = data && data.field;
+      err.lockedUntil = data && data.lockedUntil;
       throw err;
     }
     return data;
@@ -1531,7 +1532,18 @@ async function doLogin(){
     document.getElementById('authPassword').value = '';
     onAuthed(d);
   } catch (e) {
-    showAuthError(e.message || 'Login failed. Please try again.');
+    if (e && e.code === 'ACCOUNT_LOCKED') {
+      var when = '';
+      try {
+        if (e.lockedUntil) {
+          var dt = new Date(e.lockedUntil);
+          if (!isNaN(dt.getTime())) when = ' until ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+      } catch (_) {}
+      showAuthError('Too many failed sign-in attempts — this account is locked' + when + '. Try again later or reset your password with “Forgot password?”.');
+    } else {
+      showAuthError(e.message || 'Login failed. Please try again.');
+    }
   } finally {
     setAuthBusy('authLoginBtn', false);
   }
