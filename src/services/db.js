@@ -12,6 +12,10 @@ const DB_PATH = process.env.DATABASE_PATH || process.env.DB_PATH
   || path.join(__dirname, '..', '..', 'data', 'audit.db');
 
 let db;
+let checkpointTimer = null;
+let dbClosed = false;
+
+const WAL_CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 function getDb() {
   if (!db) {
@@ -20,12 +24,89 @@ function getDb() {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
+    // WAL best practice: keep synchronous at least NORMAL so an OS/power crash
+    // can't corrupt the database. SQLite's default is FULL; only raise it if
+    // something (e.g. an env-tuned deployment) dropped it below NORMAL. Values:
+    // 0=OFF, 1=NORMAL, 2=FULL, 3=EXTRA.
+    const syncLevel = db.pragma('synchronous', { simple: true });
+    if (typeof syncLevel === 'number' && syncLevel < 1) db.pragma('synchronous = NORMAL');
     initSchema();
     // Boot verification: confirms in Render logs that the app is using the
     // mounted persistent disk, not the ephemeral repo directory.
-    console.log('[db] sqlite database opened', { dbPath: DB_PATH });
+    console.log('[db] sqlite database opened', { dbPath: DB_PATH, synchronous: db.pragma('synchronous', { simple: true }) });
   }
   return db;
+}
+
+// --- WAL checkpointing & graceful shutdown ---------------------------------
+// The production DB runs in WAL mode. Without periodic checkpoints the -wal
+// sidecar grows without bound and the whole dataset lives in that one file
+// until a clean close folds it back into the main .db. We defend both ends:
+// a periodic TRUNCATE checkpoint keeps the WAL small, and a signal handler
+// closes the DB cleanly on deploy (Render sends SIGTERM) so nothing is stranded
+// in the WAL.
+
+// Fold the WAL back into the main database file and reset it to zero length.
+// A checkpoint can legitimately fail / partially complete when readers are
+// active (SQLITE_BUSY), so failures are logged, never thrown.
+function checkpointWal() {
+  if (!db || !db.open) return;
+  try {
+    // Returns [{ busy, log, checkpointed }]; busy > 0 means active readers
+    // blocked a full truncate — harmless, the next run catches up.
+    const [row] = db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('[db] wal checkpoint', row);
+  } catch (err) {
+    console.error('[db] wal checkpoint failed (readers active?):', err.message);
+  }
+}
+
+// Start the periodic WAL checkpoint. .unref() so the timer never keeps the
+// process alive on its own. Idempotent — safe to call more than once.
+function startWalCheckpointing() {
+  if (checkpointTimer) return;
+  getDb(); // ensure the handle is open
+  checkpointTimer = setInterval(checkpointWal, WAL_CHECKPOINT_INTERVAL_MS);
+  checkpointTimer.unref();
+}
+
+// Idempotent clean close: stop the checkpoint timer, fold the WAL back into the
+// main file one last time, then close the handle. Safe to call twice (double
+// signals, or a signal plus a test teardown).
+function closeDb() {
+  if (dbClosed) return;
+  dbClosed = true;
+  if (checkpointTimer) { clearInterval(checkpointTimer); checkpointTimer = null; }
+  if (db && db.open) {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch (err) {
+      console.error('[db] final checkpoint failed:', err.message);
+    }
+    db.close(); // better-sqlite3 also checkpoints on close in WAL mode
+  }
+}
+
+// Graceful shutdown: on SIGTERM/SIGINT (Render sends SIGTERM on every deploy),
+// stop accepting new connections, then close the DB cleanly so the WAL is
+// folded back into fitscore.db. Idempotent against double signals via the
+// shuttingDown guard; a 10s fallback forces exit if a connection won't drain.
+function registerGracefulShutdown(server) {
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[db] received ${signal}, shutting down gracefully`);
+    const finish = () => { closeDb(); process.exit(0); };
+    if (server) {
+      server.close(finish);
+      setTimeout(finish, 10 * 1000).unref();
+    } else {
+      finish();
+    }
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 }
 
 function nowIso() {
@@ -665,6 +746,9 @@ function setOrgPlan(orgId, fields) {
 
 module.exports = {
   getDb,
+  closeDb,
+  startWalCheckpointing,
+  registerGracefulShutdown,
   nowIso,
   currentPeriodKey,
   getUsageCount,

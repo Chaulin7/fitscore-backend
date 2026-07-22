@@ -16,7 +16,7 @@ const billingRouter = require('./routes/billing');
 const teamRouter = require('./routes/team');
 const demoRouter = require('./routes/demo');
 const { migrateLegacyData } = require('./services/authService');
-const { getDb, purgeExpiredAudits } = require('./services/db');
+const { getDb, purgeExpiredAudits, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { mutationLimiter } = require('./middleware/rateLimits');
 
 // Optional pino logger (graceful fallback if not installed yet)
@@ -304,7 +304,11 @@ function runRetentionPurge() {
 runRetentionPurge();
 setInterval(runRetentionPurge, 24 * 60 * 60 * 1000).unref();
 
-app.listen(PORT, () => {
+// Keep the WAL from growing without bound while the process is up (folds it
+// back into the main DB every 5 minutes; the timer is .unref()'d).
+startWalCheckpointing();
+
+const server = app.listen(PORT, () => {
   const log = logger ? logger.info.bind(logger) : console.log;
   log('CVsprings API listening on http://localhost:' + PORT);
   log(' POST /api/auth/signup        - Create an organization + owner account');
@@ -331,5 +335,10 @@ app.listen(PORT, () => {
   log(' GET  /api/templates          - Templates CRUD (auth required)');
   log(' GET  /health                 - Health check');
 });
+
+// Close the HTTP server and the DB cleanly on deploy/shutdown so better-sqlite3
+// checkpoints the WAL back into fitscore.db instead of leaving the dataset
+// stranded in the -wal sidecar.
+registerGracefulShutdown(server);
 
 module.exports = app;

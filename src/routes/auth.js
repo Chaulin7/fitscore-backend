@@ -139,12 +139,32 @@ router.post('/login', loginLimiter, async (req, res) => {
       await auth.verifyPassword('invalid-password-timing-equalizer', '$2a$12$C6UzMDM.H6dfI/f/IKcEeO7ZUbE0fWY6patgK8j8zSGpA0d6P7yqa');
       return genericFail();
     }
-    if (auth.isLocked(user)) return genericFail();
 
+    // Order matters: verify the password BEFORE checking the lock. The distinct
+    // ACCOUNT_LOCKED response reveals that an account exists for this email, so
+    // we only ever emit it once the caller has proven they know the password.
+    // A wrong password always returns the generic INVALID_CREDENTIALS — even on
+    // a locked account — so an attacker probing arbitrary emails can never use
+    // lockout to enumerate which addresses have accounts. This means the bcrypt
+    // compare runs on locked accounts too; we keep incrementing failed_logins on
+    // wrong passwords to preserve brute-force rate limiting. recordLoginFailure()
+    // leaves an existing lock's expiry untouched, so hammering a locked account
+    // can't roll the lockout forward indefinitely.
     const ok = await auth.verifyPassword(password, user.password_hash);
     if (!ok) {
       auth.recordLoginFailure(user);
       return genericFail();
+    }
+
+    // Password is correct. If the account is locked, tell the legitimate owner
+    // why they can't sign in (and when the lock lifts) rather than a misleading
+    // "invalid credentials". HTTP 423 Locked.
+    if (auth.isLocked(user)) {
+      return res.status(423).json({
+        error: 'This account is temporarily locked after too many failed sign-in attempts. Please try again later or reset your password.',
+        code: 'ACCOUNT_LOCKED',
+        lockedUntil: user.locked_until,
+      });
     }
 
     auth.recordLoginSuccess(user);

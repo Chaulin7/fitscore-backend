@@ -126,7 +126,17 @@ function isLocked(user) {
 
 function recordLoginFailure(user) {
   const failed = (user.failed_logins || 0) + 1;
-  const lockedUntil = failed >= MAX_FAILED_LOGINS ? new Date(Date.now() + LOCKOUT_MS).toISOString() : user.locked_until;
+  // Defensive: if the account is ALREADY locked, advance the attempt counter
+  // but keep the existing unlock time — never push locked_until further out.
+  // Otherwise every attempt against a locked account would roll the lockout
+  // another LOCKOUT_MS forward, turning it into a permanent-denial vector
+  // against any known email. Only cross the threshold into a fresh lock when
+  // the account isn't currently locked.
+  const lockedUntil = isLocked(user)
+    ? user.locked_until
+    : (failed >= MAX_FAILED_LOGINS
+        ? new Date(Date.now() + LOCKOUT_MS).toISOString()
+        : user.locked_until);
   getDb().prepare('UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?').run(failed, lockedUntil || null, user.id);
 }
 
