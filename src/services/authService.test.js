@@ -137,6 +137,22 @@ describe('POST /api/auth/login — locked-account responses', () => {
     assert.equal(body.lockedUntil, undefined, 'a wrong password must not leak that the account exists/is locked');
   });
 
+  test('an expired lock resets the failure counter — one wrong password does not re-lock', async () => {
+    const email = await makeUser();
+    // Reproduce the production state: counter pinned above the cap, lock expired.
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    getDb().prepare('UPDATE users SET failed_logins = ?, locked_until = ? WHERE email = ?')
+      .run(8, oneHourAgo, auth.normalizeEmail(email));
+
+    const { status, body } = await login(email, 'the-wrong-password');
+    assert.equal(status, 401);
+    assert.equal(body.code, 'INVALID_CREDENTIALS');
+
+    const user = auth.findUserByEmail(email);
+    assert.equal(auth.isLocked(user), false, 'account is NOT re-locked by a single failure');
+    assert.equal(user.failed_logins, 1, 'counter restarts from this single failure, not from 8');
+  });
+
   test('a successful login clears failed_logins and locked_until', async () => {
     const email = await makeUser();
     // A couple of below-threshold failures first.

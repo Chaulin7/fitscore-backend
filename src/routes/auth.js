@@ -140,6 +140,13 @@ router.post('/login', loginLimiter, async (req, res) => {
       return genericFail();
     }
 
+    // An expired lock resets the failure budget before this attempt is scored:
+    // otherwise a stale past locked_until leaves failed_logins at the cap and a
+    // single wrong password re-locks for another LOCKOUT_MS (one attempt per
+    // quarter hour, forever). After this, failed_logins counts failures since
+    // the last lock expired.
+    auth.resetExpiredLock(user);
+
     // Order matters: verify the password BEFORE checking the lock. The distinct
     // ACCOUNT_LOCKED response reveals that an account exists for this email, so
     // we only ever emit it once the caller has proven they know the password.
@@ -234,7 +241,13 @@ router.post('/request-reset', async (req, res) => {
     if (!user) return respond();
 
     const rawToken = auth.createPasswordReset(user.id);
-    const base = (process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    // Reset links must point at the public customer-facing origin, NOT the
+    // request host — behind Render that host is the *.onrender.com proxy host,
+    // which produces a broken/incorrect link. PUBLIC_APP_URL is the canonical
+    // origin (set in Render); FRONTEND_URL / APP_BASE_URL are accepted as
+    // legacy aliases. The request origin is used only as a dev fallback when
+    // none of these are set.
+    const base = (process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
     const resetLink = `${base}/?reset_token=${rawToken}`;
     try {
       await deliverResetLink(email, resetLink);

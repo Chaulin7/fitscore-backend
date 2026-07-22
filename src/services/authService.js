@@ -124,6 +124,24 @@ function isLocked(user) {
   return !!(user.locked_until && Date.parse(user.locked_until) > Date.now());
 }
 
+// If the account's lock has already expired, clear it and reset the failure
+// counter to 0 BEFORE the current attempt is evaluated. Without this, a stale
+// locked_until in the past leaves failed_logins pinned at the cap, so the very
+// next wrong password re-locks immediately — one attempt per LOCKOUT_MS forever
+// (a slow-motion version of the rolling lockout). The threshold then correctly
+// means "MAX_FAILED_LOGINS failures since the last lock expired", not "ever".
+// Mutates the passed-in user object so the caller sees the cleared state, and
+// returns true when a reset was performed. No-op on a still-active lock.
+function resetExpiredLock(user) {
+  if (user.locked_until && Date.parse(user.locked_until) <= Date.now()) {
+    getDb().prepare('UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?').run(user.id);
+    user.failed_logins = 0;
+    user.locked_until = null;
+    return true;
+  }
+  return false;
+}
+
 function recordLoginFailure(user) {
   const failed = (user.failed_logins || 0) + 1;
   // Defensive: if the account is ALREADY locked, advance the attempt counter
@@ -408,6 +426,7 @@ module.exports = {
   findUserById,
   createUser,
   isLocked,
+  resetExpiredLock,
   recordLoginFailure,
   recordLoginSuccess,
   setUserPassword,
