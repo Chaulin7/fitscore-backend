@@ -9,3 +9,8 @@ dist/
 # Generated forensic-scan output (per-environment, never committed)
 scripts/output/
 data/
+
+# Per-dataset extraction baselines: the committed fixtures use
+# test/golden/extraction-baseline.json; any CV_DATASET_DIR override writes its
+# own extraction-baseline.<slug>.json, which stays local (may hold real-CV hashes).
+test/golden/extraction-baseline.*.json

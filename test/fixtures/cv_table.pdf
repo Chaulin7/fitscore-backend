@@ -1,0 +1,50 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1024 >>
+stream
+BT /F1 13 Tf 1 0 0 1 56 742 Tm (SKILLS MATRIX - CASEY N. DELACROIX) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 710 Tm (Technology) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56 690 Tm (PostgreSQL 14) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56 674 Tm (Docker Compose) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56 658 Tm (React 18 SPA) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56 642 Tm (Node.js 20 API) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56 626 Tm (Terraform IaC) Tj ET
+BT /F1 11 Tf 1 0 0 1 250 710 Tm (Where used) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 250 690 Tm (Primary datastore) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 250 674 Tm (Local orchestration) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 250 658 Tm (Recruiter dashboard) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 250 642 Tm (Scoring service API) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 250 626 Tm (Cloud provisioning) Tj ET
+BT /F1 11 Tf 1 0 0 1 470 710 Tm (Years) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 470 690 Tm (9) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 470 674 Tm (6) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 470 658 Tm (5) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 470 642 Tm (7) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 470 626 Tm (4) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001316 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1413
+%%EOF

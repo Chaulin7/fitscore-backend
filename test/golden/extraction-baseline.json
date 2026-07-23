@@ -1,127 +1,17 @@
 {
-  "cv_01.pdf": {
-    "sha256": "adc276c178155b1eada393903027842c260c8b07cdf8c956e1f0ebdc85d4462f",
-    "chars": 1431,
+  "cv_single_column.pdf": {
+    "sha256": "01f59826754c192653cee73f847a3d9fb9b8c5e75898b50797638ddae7187a00",
+    "chars": 727,
     "pages": 1
   },
-  "cv_02.pdf": {
-    "sha256": "2dda5fb687aaee659d98aeb7b1aac087efec7538ae6e3661b3bc89c891312f4b",
-    "chars": 1191,
+  "cv_table.pdf": {
+    "sha256": "95a60dfcef5aba451c16b6a3ae22a6279d3802d9449759641c9195d07e4c7a3b",
+    "chars": 240,
     "pages": 1
   },
-  "cv_03.pdf": {
-    "sha256": "e29704b9a999429088e5435730d344052e87d8bf9b55d54686e77b780847c964",
-    "chars": 915,
-    "pages": 1
-  },
-  "cv_04.pdf": {
-    "sha256": "46fd9d4a519b4b44013ca34a4f95c1bc62f9714dd5e9fceb0efc6e9904f3cee7",
-    "chars": 951,
-    "pages": 1
-  },
-  "cv_05.pdf": {
-    "sha256": "63f2548ae8f93f0eb711c2bb7914ea46e8971635d9621e090f2a699744ba5b09",
-    "chars": 922,
-    "pages": 1
-  },
-  "cv_06.pdf": {
-    "sha256": "58bc6b1c939e30d88a73e05501bd7227e3e74d1e76763928ec74b64df5538061",
-    "chars": 1085,
-    "pages": 1
-  },
-  "cv_07.pdf": {
-    "sha256": "1daf9931bd647c62a2a4aee6c857b0da252990f7485becbfb86a8f1dfe6d7875",
-    "chars": 974,
-    "pages": 1
-  },
-  "cv_08.pdf": {
-    "sha256": "ae9746ae8a2bd1ff931f017175b5a6a2f764222cc8d015c79bd79c6de25035f6",
-    "chars": 1000,
-    "pages": 1
-  },
-  "cv_09.pdf": {
-    "sha256": "2edbba254e6d54a22bac0fca09a4df08074c98e4415f2da3b02c75c9231f04ab",
-    "chars": 916,
-    "pages": 1
-  },
-  "cv_10.pdf": {
-    "sha256": "e9ec4800449fd9253baabe348483227b29f2567083c1e8407ba3f4644a8045ce",
-    "chars": 799,
-    "pages": 1
-  },
-  "cv_11.pdf": {
-    "sha256": "90c4f026b93c749d0ebe000ccf679a68e56ea3b27c16b4b037a03e63ed76a34c",
-    "chars": 726,
-    "pages": 1
-  },
-  "cv_12.pdf": {
-    "sha256": "880ff59e37676a81a7c000368fc9fa239cf847433717d86e9978b3327f1c32a3",
-    "chars": 815,
-    "pages": 1
-  },
-  "cv_13.pdf": {
-    "sha256": "297559ad11986e645a1b2db95c38c504fb106742557276aca6c261b5f5136b29",
-    "chars": 786,
-    "pages": 1
-  },
-  "cv_14.pdf": {
-    "sha256": "dd94f760a4bbb7e950da0977ed48cc38e1efc82e88ab142f6963de014c0ad67b",
-    "chars": 881,
-    "pages": 1
-  },
-  "cv_15.pdf": {
-    "sha256": "6b289ef0e01f698b534bdaa81e3bb4a78442f10d5a03029e015258ef172e489b",
-    "chars": 725,
-    "pages": 1
-  },
-  "cv_16.pdf": {
-    "sha256": "9ec3cb61f1b2dcf2cd0c51890ed8f4cacce2dc857d3dda88edaa7688ea2b9abf",
-    "chars": 971,
-    "pages": 1
-  },
-  "cv_17.pdf": {
-    "sha256": "015618121b97cc50398f5fa5bdcc7a122791ac3df61c3289bb8f415de0bbe37e",
-    "chars": 838,
-    "pages": 1
-  },
-  "cv_18.pdf": {
-    "sha256": "06a57cec355feb5ac55057228289efe6075b84cd1341d3376d05f4dfcbafbe3c",
-    "chars": 911,
-    "pages": 1
-  },
-  "cv_19.pdf": {
-    "sha256": "144239deb47f7beb1d516d95c7efc8b50b5aada5d09939fe5e50540fa6db008d",
-    "chars": 848,
-    "pages": 1
-  },
-  "cv_20.pdf": {
-    "sha256": "79a37d06b26e9d5d22406be96704b489d16118827efc8594dca5fdae64c18099",
-    "chars": 895,
-    "pages": 1
-  },
-  "cv_21.pdf": {
-    "sha256": "c7deb9b06a2c7a6238b223f4f69fac5df2c798aa19c39d5d973c8f4669efd163",
-    "chars": 777,
-    "pages": 1
-  },
-  "cv_22.pdf": {
-    "sha256": "b56cee89b4fd1b31882d15dcaf6442b1e4379af941d2f543a8b5a528ac5ed632",
-    "chars": 863,
-    "pages": 1
-  },
-  "cv_23.pdf": {
-    "sha256": "2568ab39314a10a7e776bfd27e15f8436ab31f2eb1274862156d0b1e2ed762aa",
-    "chars": 909,
-    "pages": 1
-  },
-  "cv_24.pdf": {
-    "sha256": "1e4a254120bb97c7b0840b0ad5601d88b6c9cf3b367dfa78dd67d9061ea6fcc9",
-    "chars": 723,
-    "pages": 1
-  },
-  "cv_25.pdf": {
-    "sha256": "539872c9df66b79da1f542ab34568d3c57c07ad2266d9dbb26805170cb5bb581",
-    "chars": 1270,
+  "cv_two_column.pdf": {
+    "sha256": "9c88e6e29b48678f3f33b059faf1c31d431be3237ecd3eef0e0bf84f779de9b3",
+    "chars": 533,
     "pages": 1
   }
 }
