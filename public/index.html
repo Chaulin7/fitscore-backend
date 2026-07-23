@@ -54,7 +54,9 @@ nav{border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--p
 nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
 .wordmark{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.01em;text-decoration:none;display:flex;align-items:center;gap:10px}
 .wordmark .wordtext > span{color:var(--stamp)}
-.logomark{width:30px;height:30px;flex:none;display:block;mix-blend-mode:multiply} /* logo.png has a solid white bg; multiply melts it into the paper background */
+/* Shared brand mark: same /brandmark.svg as the app, via CSS mask so colour
+   comes from currentColor (dark-on-paper here, white-on-navy in the app). */
+.logomark{width:30px;height:30px;flex:none;display:inline-block;color:var(--ink);background-color:currentColor;-webkit-mask:url(/brandmark.svg) center/contain no-repeat;mask:url(/brandmark.svg) center/contain no-repeat}
 .navlinks{display:flex;align-items:center;gap:24px;font-size:14px}
 .navlinks a{text-decoration:none;color:var(--ink-soft)}
 .navlinks a:hover{color:var(--ink)}
@@ -178,7 +180,7 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 <nav>
   <div class="wrap">
     <a class="wordmark" href="/" aria-label="CVsprings home">
-      <img class="logomark" src="/logo.png" alt="" aria-hidden="true">
+      <span class="logomark" aria-hidden="true"></span>
       <span class="wordtext">CV<span>springs</span></span>
     </a>
     <div class="navlinks">
