@@ -1,0 +1,50 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1318 >>
+stream
+BT /F1 12 Tf 1 0 0 1 330 700 Tm (PROFESSIONAL EXPERIENCE) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 330 683 Tm (Senior Platform Engineer) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 330 669 Tm (Nimbus Analytics - 2020 to present) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 330 655 Tm (Led migration of billing to event-driven) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 330 641 Tm (services and cut nightly batch time by half.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 330 612 Tm (Software Engineer) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 330 598 Tm (Orchard Systems - 2017 to 2020) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 330 584 Tm (Shipped the customer portal and the) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 330 570 Tm (public API used by forty partner firms.) Tj ET
+BT /F1 16 Tf 1 0 0 1 72 752 Tm (JORDAN A. RIVERA) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 734 Tm (jordan.rivera@example.com  |  \(555\) 0173  |  Marrowfield, Fictitia) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 700 Tm (TECHNICAL SKILLS) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 72 683 Tm (Python, Go, TypeScript) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 72 669 Tm (PostgreSQL, Redis, Kafka) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 72 655 Tm (Docker, Kubernetes, AWS) Tj ET
+BT /F1 12 Tf 1 0 0 1 72 622 Tm (EDUCATION) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 72 605 Tm (BSc Computer Science) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 72 591 Tm (Ashford Hollow University) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 72 577 Tm (2013 to 2017) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001610 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1707
+%%EOF

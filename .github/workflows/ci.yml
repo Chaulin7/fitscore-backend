@@ -31,6 +31,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Verify PDF extraction determinism
+        run: npm run extraction:verify
+
       - name: Verify server health endpoint
         run: |
           node src/index.js &
