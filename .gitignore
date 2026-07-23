@@ -14,3 +14,10 @@ data/
 # test/golden/extraction-baseline.json; any CV_DATASET_DIR override writes its
 # own extraction-baseline.<slug>.json, which stays local (may hold real-CV hashes).
 test/golden/extraction-baseline.*.json
+
+# Editor config: ignore personal VS Code settings, but leave room to commit a
+# genuinely shared .vscode/extensions.json later. Uses `.vscode/*` (not
+# `.vscode/`) so the negation can re-include files — git can't re-include inside
+# a wholly-excluded directory.
+.vscode/*
+!.vscode/extensions.json
