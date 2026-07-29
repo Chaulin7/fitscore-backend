@@ -29,10 +29,17 @@ const assert = require('node:assert/strict');
 const express = require('express');
 
 const { getDb, closeDb, candidateIdFor } = require('../services/db');
+const provenance = require('../services/provenanceCache');
 const auditRouter = require('./audit');
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
+const ORG_AMS = 'org-ams'; // Europe/Amsterdam, for timezone tests
+
+function makeOrg(id, timezone) {
+  getDb().prepare('INSERT INTO organizations (id, name, created_at, timezone) VALUES (?, ?, ?, ?)')
+    .run(id, id, new Date().toISOString(), timezone);
+}
 
 let server;
 let baseUrl;
@@ -56,15 +63,28 @@ async function get(query, orgId = ORG_A) {
   try { body = JSON.parse(text); } catch { body = text; }
   return { status: res.status, body };
 }
+async function post(body, orgId = ORG_A) {
+  const res = await fetch(`${baseUrl}/api/audit`, {
+    method: 'POST', headers: { 'x-test-org': orgId, 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json() };
+}
 
 before(async () => {
   const app = express();
+  app.use(express.json());
   // Stubbed auth: org scope is server-derived here exactly like the real
   // middleware sets req.orgId. The router must never let a query param override it.
   app.use((req, _res, next) => { req.orgId = req.header('x-test-org'); req.userId = 'tester'; next(); });
   app.use('/api/audit', auditRouter);
   await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
   baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  // Existing UTC-boundary assertions below rely on UTC day bounds, so pin the
+  // test orgs to UTC. A separate org exercises Europe/Amsterdam.
+  makeOrg(ORG_A, 'UTC');
+  makeOrg(ORG_B, 'UTC');
+  makeOrg(ORG_AMS, 'Europe/Amsterdam');
 
   // Org A: a spread of dates + decisions + actors.
   seed({ orgId: ORG_A, name: 'Alice', userId: 'a-user', decision: 'shortlist', createdAt: '2026-01-10T09:00:00.000Z' });
@@ -202,5 +222,118 @@ describe('GET /api/audit — action maps to decision', () => {
     const { body } = await get('?action=reject&from=2026-01-01&to=2026-12-31', ORG_A);
     const names = body.rows.map((r) => r.candidateName);
     assert.deepEqual(names, ['Bob']);
+  });
+});
+
+describe('GET /api/audit — org-timezone day boundaries', () => {
+  // 23:30 UTC on Jan 19 is 00:30 local on Jan 20 in Europe/Amsterdam (CET, +01).
+  before(() => {
+    getDb().prepare('INSERT INTO audit_log (id, org_id, candidate_name, user_id, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run('ams-1', ORG_AMS, 'Nacht', 'a-user', '2026-01-19T23:30:00.000Z');
+  });
+
+  test('an event at 00:30 local falls on the correct local day, not the previous one', async () => {
+    const jan20 = await get('?from=2026-01-20&to=2026-01-20', ORG_AMS);
+    assert.equal(jan20.body.total, 1, 'must be included in its local day (Jan 20)');
+    assert.equal(jan20.body.rows[0].candidateName, 'Nacht');
+    assert.equal(jan20.body.timezone, 'Europe/Amsterdam');
+
+    const jan19 = await get('?from=2026-01-19&to=2026-01-19', ORG_AMS);
+    assert.equal(jan19.body.total, 0, 'must NOT appear on the previous UTC day');
+  });
+
+  test('the response advertises the org timezone', async () => {
+    const { body } = await get('', ORG_A);
+    assert.equal(body.timezone, 'UTC');
+  });
+});
+
+describe('POST /api/audit — server-authoritative scoring inputs (analysisId-bound)', () => {
+  // Bind server-side provenance for a specific analysis, as /api/analyze would:
+  // keyed by analysisId, carrying the extraction textSha256 + the exact weights.
+  function rememberAnalysis(orgId, analysisId, textSha256, weights) {
+    provenance.remember(orgId, { analysisId, textSha256, scoringWeights: weights, engineVersion: 'cvsprings-lexical-scorer@test' });
+  }
+  const saveBody = (analysisId, textSha256, clientWeights) => ({
+    candidateName: 'Weighted Wendy', fileName: 'w.pdf', overall: 70,
+    scores: { keywords: 1, skills: 2, experience: 3, education: 4 },
+    weights: clientWeights, // CLIENT weights — must be ignored for weights_json
+    analysisId,
+    analysisDetail: { extraction: { textSha256 } },
+  });
+
+  test('records the SERVER weights, not the client-supplied ones', async () => {
+    const server = { kw: 40, sk: 30, ex: 20, ed: 10 };
+    rememberAnalysis(ORG_A, 'an-server', 'sha-server', server);
+    const { status, body } = await post(saveBody('an-server', 'sha-server', { kw: 90, sk: 10, ex: 0, ed: 0 }), ORG_A);
+    assert.equal(status, 201);
+    assert.deepEqual(body.weightsJson, server, 'weights_json must be what the engine actually used');
+    assert.equal(body.engineVersion, 'cvsprings-lexical-scorer@test');
+  });
+
+  test('Q1: same CV under W1 then W2 — saving the W1 result records W1 (no last-writer clobber)', async () => {
+    const SHA = 'sha-same-cv';
+    const W1 = { kw: 70, sk: 10, ex: 10, ed: 10 };
+    const W2 = { kw: 10, sk: 10, ex: 10, ed: 70 };
+    // Tab A analysed the CV under W1; Tab B analysed the SAME CV under W2. Same
+    // textSha256, but distinct analysisIds.
+    rememberAnalysis(ORG_A, 'an-W1', SHA, W1);
+    rememberAnalysis(ORG_A, 'an-W2', SHA, W2);
+    // Save the W1 result (from Tab A): scores were computed under W1.
+    const saved = await post(saveBody('an-W1', SHA, /*client echo of*/ W1), ORG_A);
+    assert.deepEqual(saved.body.weightsJson, W1, 'the row must record W1, the weights its score was computed under');
+    // And the W2 analysis still resolves independently to W2.
+    const savedB = await post(saveBody('an-W2', SHA, W2), ORG_A);
+    assert.deepEqual(savedB.body.weightsJson, W2);
+  });
+
+  test('batch: 25 candidates in one run each bind their own analysisId + weights', async () => {
+    const SHA = 'sha-batch';
+    const saves = [];
+    for (let i = 0; i < 25; i++) {
+      const w = { kw: i, sk: 25 - i, ex: 0, ed: 75 };
+      rememberAnalysis(ORG_A, `an-batch-${i}`, SHA + '-' + i, w);
+      saves.push(post(saveBody(`an-batch-${i}`, SHA + '-' + i, { kw: 1, sk: 1, ex: 1, ed: 97 }), ORG_A));
+    }
+    const results = await Promise.all(saves);
+    const ids = new Set();
+    for (let i = 0; i < 25; i++) {
+      assert.deepEqual(results[i].body.weightsJson, { kw: i, sk: 25 - i, ex: 0, ed: 75 }, `candidate ${i} weights`);
+      ids.add(results[i].body.id);
+    }
+    assert.equal(ids.size, 25, 'all 25 are distinct rows');
+  });
+
+  test('textSha256 mismatch against a valid analysisId records NULL (defense check), not the bound weights', async () => {
+    rememberAnalysis(ORG_A, 'an-mismatch', 'sha-real', { kw: 40, sk: 30, ex: 20, ed: 10 });
+    const warnings = [];
+    const origWarn = console.warn;
+    console.warn = (...a) => warnings.push(a.join(' '));
+    try {
+      // Valid analysisId, but the echoed extraction sha does NOT match.
+      const { body } = await post(saveBody('an-mismatch', 'sha-TAMPERED', { kw: 1, sk: 1, ex: 1, ed: 97 }), ORG_A);
+      assert.equal(body.weightsJson, null, 'must not record the bound weights on a sha mismatch');
+      assert.equal(body.engineVersion, null);
+    } finally { console.warn = origWarn; }
+    assert.ok(warnings.some((w) => /mismatch/i.test(w)), 'a mismatch is logged server-side');
+  });
+
+  test('a missing/unknown analysisId records NULL (never the client echo)', async () => {
+    const { body } = await post(saveBody('an-never-issued', 'sha-x', { kw: 100, sk: 0, ex: 0, ed: 0 }), ORG_A);
+    assert.equal(body.weightsJson, null);
+    assert.equal(body.engineVersion, null);
+  });
+
+  test('weights_json is immutable — a later edit to the row does not change it', async () => {
+    rememberAnalysis(ORG_A, 'an-immutable', 'sha-immutable', { kw: 55, sk: 15, ex: 15, ed: 15 });
+    const created = await post(saveBody('an-immutable', 'sha-immutable', { kw: 0, sk: 0, ex: 0, ed: 100 }), ORG_A);
+    const id = created.body.id;
+    await fetch(`${baseUrl}/api/audit/${id}`, {
+      method: 'PATCH', headers: { 'x-test-org': ORG_A, 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'shortlist' }),
+    });
+    const after = await get(`?candidateId=${created.body.candidateId}`, ORG_A);
+    const row = after.body.rows.find((r) => r.id === id);
+    assert.deepEqual(row.weightsJson, { kw: 55, sk: 15, ex: 15, ed: 15 }, 'weights snapshot unchanged by a later edit');
+    assert.equal(row.decision, 'shortlist');
   });
 });

@@ -368,7 +368,11 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .audit-flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .audit-sep{color:#9ca3af;font-size:12px}
 .audit-presets{display:flex;gap:4px;flex-wrap:wrap}
-.audit-preset.active{background:#0f2847;color:#fff;border-color:#0f2847}
+.audit-preset.active{background:#0f2847;color:#fff;border-color:#0f2847;font-weight:700;box-shadow:0 0 0 2px rgba(15,40,71,0.25)}
+.audit-tz-label{font-size:11px;color:#6b7280;font-style:italic}
+.history-scoring{padding:12px 20px;border-bottom:1px solid #eef1f6;font-size:12px;color:#374151;line-height:1.6}
+.history-scoring .hs-k{color:#6b7280;font-weight:600}
+.history-scoring .hs-missing{color:#b45309;font-style:italic}
 .ret-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px}
 .ret-preset.active{background:#0f2847;color:#fff;border-color:#0f2847}
 .ret-stats{font-size:12px;color:#374151;margin-top:10px;padding:10px 12px;background:#f8fafc;border:1px solid #e7ebf3;border-radius:8px;line-height:1.7}
@@ -836,6 +840,7 @@ img, video, table { max-width: 100%; }
       <h3 id="history-title">Change history</h3>
       <button type="button" class="x" aria-label="Close" data-history-close>&times;</button>
     </header>
+    <div id="history-scoring" class="history-scoring"></div>
     <ul class="history-list" id="history-list"></ul>
   </div>
 </div>
@@ -1318,11 +1323,11 @@ img, video, table { max-width: 100%; }
       <input class="text-input" type="text" id="auditSearch" placeholder="Search candidate ID…" data-action="filterAuditSearch" style="flex:1;min-width:180px" aria-label="Search by candidate ID">
       <button type="button" class="btn btn-ghost btn-sm" id="auditOrderToggle" data-action="toggleAuditOrder" title="Toggle chronological order">&#8595; Newest first</button>
     </div>
-    <!-- Date range + presets -->
+    <!-- Date range + presets (interpreted as calendar days in the org timezone) -->
     <div class="audit-tb-row audit-flex">
-      <input class="text-input" type="date" id="auditFrom" data-action="filterAuditNow" style="width:150px" aria-label="From date (inclusive)">
+      <input class="text-input" type="date" id="auditFrom" data-action="filterAuditDate" style="width:150px" aria-label="From date (inclusive, org timezone)">
       <span class="audit-sep">to</span>
-      <input class="text-input" type="date" id="auditTo" data-action="filterAuditNow" style="width:150px" aria-label="To date (inclusive)">
+      <input class="text-input" type="date" id="auditTo" data-action="filterAuditDate" style="width:150px" aria-label="To date (inclusive, org timezone)">
       <span class="audit-presets">
         <button type="button" class="btn btn-ghost btn-sm audit-preset" data-action="auditPreset" data-days="7">7d</button>
         <button type="button" class="btn btn-ghost btn-sm audit-preset" data-action="auditPreset" data-days="30">30d</button>
@@ -1330,6 +1335,7 @@ img, video, table { max-width: 100%; }
         <button type="button" class="btn btn-ghost btn-sm audit-preset" data-action="auditPreset" data-days="0">All</button>
       </span>
     </div>
+    <div class="audit-tb-row"><span id="auditTzLabel" class="audit-tz-label"></span></div>
     <!-- Actor + action dropdowns (populated from /api/audit/filters) -->
     <div class="audit-tb-row audit-flex">
       <select class="text-input" id="auditActorFilter" data-action="filterAuditNow" style="flex:1;min-width:140px" aria-label="Filter by actor"><option value="">All actors</option></select>
@@ -2039,12 +2045,28 @@ function _formatChangeWhen(iso) {
   if (diff < 7 * 86400) return Math.round(diff / 86400) + ' d ago';
   return d.toLocaleDateString();
 }
+// The exact weights the engine applied for this assessment (immutable). A NULL
+// snapshot renders as "not recorded" — never as a default or empty weight set.
+function fmtWeightsHtml(w){
+  if(!w||typeof w!=='object')return '<span class="hs-missing">not recorded</span>';
+  const map={kw:'Keywords',sk:'Skills',ex:'Experience',ed:'Education'};
+  const parts=Object.keys(map).filter(k=>w[k]!=null).map(k=>escHtml(map[k])+' '+escHtml(String(w[k])));
+  return parts.length?parts.join(' · '):'<span class="hs-missing">not recorded</span>';
+}
+function renderScoringInputs(rec){
+  const el=document.getElementById('history-scoring');
+  if(!el)return;
+  const ev=(rec&&rec.engineVersion)?escHtml(rec.engineVersion):'<span class="hs-missing">not recorded</span>';
+  el.innerHTML='<div><span class="hs-k">Weights applied:</span> '+fmtWeightsHtml(rec?rec.weightsJson:null)+'</div>'+
+    '<div><span class="hs-k">Engine version:</span> '+ev+'</div>';
+}
 async function openChangeHistory(auditId) {
   const overlay = document.getElementById('history-overlay');
   const list = document.getElementById('history-list');
   if (!overlay || !list) return;
   list.innerHTML = '<li style="padding:16px 20px;color:#9aa6c0;">Loading…</li>';
   overlay.classList.add('open');
+  renderScoringInputs((typeof lastAuditRecords !== 'undefined' ? lastAuditRecords : []).find(r => r && r.id === auditId));
   try {
     const rows = await api('/api/audit/' + encodeURIComponent(auditId) + '/changes');
     if (!Array.isArray(rows) || !rows.length) {
@@ -2073,6 +2095,19 @@ async function openChangeHistory(auditId) {
 // against candidate id OR run id (classified by shape). from/to are inclusive
 // YYYY-MM-DD day bounds. order is the only sort control.
 const auditFilter = { from: '', to: '', search: '', actor: '', action: '', order: 'desc', limit: 50, offset: 0, total: null };
+// Org IANA timezone (from the audit list response); day filters + displayed
+// timestamps are in this zone. created_at itself is stored/returned as UTC.
+let _auditTimezone = 'Europe/Amsterdam';
+function fmtInOrgTz(iso){
+  if(!iso)return '—';
+  try{
+    return new Intl.DateTimeFormat('en-GB',{timeZone:_auditTimezone,day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(iso));
+  }catch(_){try{return new Date(iso).toLocaleString('en-GB');}catch(__){return '—';}}
+}
+function updateAuditTzLabel(){
+  const el=document.getElementById('auditTzLabel');
+  if(el)el.textContent='times shown in '+_auditTimezone;
+}
 let _auditFilterDebounce = null;
 function scheduleAuditReload() {
   if (_auditFilterDebounce) clearTimeout(_auditFilterDebounce);
@@ -2143,6 +2178,30 @@ function restoreAuditFiltersFromUrl() {
   } catch (_) { return false; }
 }
 // Push state -> input controls (used on load, presets, candidate click, clear).
+// Preset date ranges (calendar days, org-tz-agnostic on the client — the server
+// interprets the day strings in the org timezone). 0 = All (no bounds).
+const AUDIT_PRESET_DAYS = [7, 30, 90];
+function auditPresetRange(days) {
+  if (!days) return { from: '', to: '' };
+  const today = new Date();
+  const start = new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000);
+  return { from: start.toISOString().slice(0, 10), to: today.toISOString().slice(0, 10) };
+}
+// Which preset (if any) the current range matches exactly. 0 = All, N = that
+// preset, null = a custom range (no preset active).
+function auditPresetDaysForRange(from, to) {
+  if (!from && !to) return 0;
+  for (const d of AUDIT_PRESET_DAYS) {
+    const r = auditPresetRange(d);
+    if (r.from === from && r.to === to) return d;
+  }
+  return null;
+}
+function setActiveAuditPreset(days) {
+  document.querySelectorAll('.audit-preset').forEach(function (b) {
+    b.classList.toggle('active', parseInt(b.dataset.days, 10) === days);
+  });
+}
 function applyAuditFilterToInputs() {
   const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
   set('auditFrom', auditFilter.from || '');
@@ -2151,6 +2210,8 @@ function applyAuditFilterToInputs() {
   set('auditActorFilter', auditFilter.actor || '');
   set('auditActionFilter', auditFilter.action || '');
   updateAuditOrderButton();
+  // Reflect the active preset from the current range (All when unbounded).
+  setActiveAuditPreset(auditPresetDaysForRange(auditFilter.from, auditFilter.to));
 }
 function updateAuditOrderButton() {
   const b = document.getElementById('auditOrderToggle');
@@ -2482,7 +2543,7 @@ async function saveToAudit(){
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:document.getElementById('roleInput').value.trim(),anonymized:lastResult.anonymized||false,
     appVersion:CVSPRINGS_VERSION,modelId:lastResult.modelId||null,analysisTimestamp:lastResult.analysisTimestamp||null,
-    runNonce:lastResult._runNonce||null,
+    runNonce:lastResult._runNonce||null,analysisId:lastResult.analysisId||null,
     analysisDetail:{found:lastResult.found||[],missing:lastResult.missing||[],skills:lastResult.skills||[],recommendations:lastResult.recommendations||[],matches:lastResult.matches||[],extraction:lastResult.extraction||null}};
   try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
     lastResult._auditId=d.id;toast('Saved to audit log.','success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'single',role:(lastResult&&lastResult.role)||'unknown'}}));}
@@ -2498,7 +2559,7 @@ async function saveSingleBatch(i){
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:res.role||'',anonymized:res.anonymized||false,
     appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
-    runNonce:res._runNonce||null,
+    runNonce:res._runNonce||null,analysisId:res.analysisId||null,
     analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
   try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
     toast('Saved: '+body.candidateName,'success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'batch_row',role:(body&&body.role)||'unknown'}}));}
@@ -2517,7 +2578,7 @@ async function saveAllToAudit(){
       jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
       role:res.role||'',anonymized:res.anonymized||false,
       appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
-      runNonce:res._runNonce||null,
+      runNonce:res._runNonce||null,analysisId:res.analysisId||null,
     analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
     try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;}catch(_){}
   }
@@ -2542,6 +2603,8 @@ async function loadAudit(){
   updateAuditFilterMeta();
   try{
     const resp=await api('/api/audit'+buildAuditQuery());
+    if(resp && resp.timezone)_auditTimezone=resp.timezone;
+    updateAuditTzLabel();
     if(resp && Array.isArray(resp.rows)){
       auditFilter.total=typeof resp.total==='number'?resp.total:resp.rows.length;
       if(typeof resp.limit==='number')auditFilter.limit=resp.limit;
@@ -2596,13 +2659,24 @@ function filterAuditSearch(){
   scheduleAuditReload();
 }
 // Dates + dropdowns: fire immediately.
+// Dropdown changes (actor/action) fire immediately; they don't touch the date
+// preset highlight.
 function filterAuditNow(){
   const v=(id)=>{const e=document.getElementById(id);return e?(e.value||''):'';};
-  auditFilter.from=v('auditFrom');
-  auditFilter.to=v('auditTo');
   auditFilter.actor=v('auditActorFilter');
   auditFilter.action=v('auditActionFilter');
   auditFilter.offset=0;
+  syncAuditUrl();
+  loadAudit();
+}
+// Editing a date input manually applies immediately AND clears any active
+// preset — a manual range is never one of the presets.
+function filterAuditDate(){
+  const v=(id)=>{const e=document.getElementById(id);return e?(e.value||''):'';};
+  auditFilter.from=v('auditFrom');
+  auditFilter.to=v('auditTo');
+  auditFilter.offset=0;
+  setActiveAuditPreset(null);
   syncAuditUrl();
   loadAudit();
 }
@@ -2615,15 +2689,11 @@ function toggleAuditOrder(){
 }
 function auditPreset(el){
   const days=parseInt(el.dataset.days,10)||0;
-  if(days===0){auditFilter.from='';auditFilter.to='';}
-  else{
-    const today=new Date();
-    const start=new Date(Date.now()-(days-1)*24*60*60*1000);
-    auditFilter.from=start.toISOString().slice(0,10);
-    auditFilter.to=today.toISOString().slice(0,10);
-  }
+  const r=auditPresetRange(days);
+  auditFilter.from=r.from;
+  auditFilter.to=r.to;
   auditFilter.offset=0;
-  applyAuditFilterToInputs();
+  applyAuditFilterToInputs(); // writes inputs + highlights this preset
   syncAuditUrl();
   loadAudit();
 }
@@ -2673,7 +2743,7 @@ function renderAuditTable(records){
     tb.innerHTML='<tr><td colspan="12"><div class="empty-state-rich">'+icon+'<div class="empty-title">'+msg+'</div><div class="empty-sub">'+sub+'</div>'+btn+'</div></td></tr>';return;
   }
   tb.innerHTML=records.map(rec=>{
-    const date=rec.createdAt?new Date(rec.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';
+    const date=rec.createdAt?fmtInOrgTz(rec.createdAt):'—';
     const s=rec.overall||0;
     const pill=s>=getScoreThreshold()?'pill-hi':s>=50?'pill-med':'pill-lo';
     return '<tr>'+
@@ -3848,6 +3918,7 @@ const delegatedHandlers = {
     setAutosaveBatch: (el) => setAutosaveBatch(el.checked),
     handleFiles: (el) => handleFiles(el.files),
     filterAuditNow,
+    filterAuditDate,
   },
   input: {
     syncSlider: (el) => { syncSlider(el.dataset.weight); updateWeightSum(); },

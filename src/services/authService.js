@@ -77,7 +77,7 @@ function createOrganization(name) {
 }
 
 function getOrganizationById(id) {
-  const row = getDb().prepare('SELECT id, name, created_at as createdAt, retention_days as retentionDays FROM organizations WHERE id = ?').get(id);
+  const row = getDb().prepare('SELECT id, name, created_at as createdAt, retention_days as retentionDays, timezone FROM organizations WHERE id = ?').get(id);
   return row || null;
 }
 
