@@ -15,7 +15,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
-const { getDb, nowIso } = require('./db');
+const { getDb, nowIso, RETENTION_DEFAULT_DAYS } = require('./db');
 
 const BCRYPT_COST = 12;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -69,7 +69,10 @@ async function verifyPassword(password, passwordHash) {
 
 function createOrganization(name) {
   const org = { id: uuidv4(), name: String(name || '').trim() || 'My Organization', createdAt: nowIso() };
-  getDb().prepare('INSERT INTO organizations (id, name, created_at) VALUES (?, ?, ?)').run(org.id, org.name, org.createdAt);
+  // Set retention explicitly to the conservative default so new orgs on an
+  // existing database get 730 regardless of the column's historical default.
+  getDb().prepare('INSERT INTO organizations (id, name, created_at, retention_days) VALUES (?, ?, ?, ?)')
+    .run(org.id, org.name, org.createdAt, RETENTION_DEFAULT_DAYS);
   return org;
 }
 
