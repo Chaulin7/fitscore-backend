@@ -4,6 +4,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
 const { extractText } = require('../services/parser');
 const provenance = require('../services/provenanceCache');
 const { scoreCV, anonymizeText } = require('../services/scorer');
@@ -234,10 +235,13 @@ router.post('/', upload.single('cv'), async (req, res) => {
     // Usage was reserved atomically at the gate; a success keeps the reservation.
     recordUsage(req, 'analyze_single', 1);
     const extraction = extractionSummary(extracted);
-    // Server-side provenance binding: the audit save later resolves the echoed
-    // sha against this server-held record (see provenanceCache.js).
-    provenance.remember(req.orgId, extraction);
-    res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), extraction, ...results });
+    const analysisId = uuidv4();
+    // Bind THIS analysis's provenance (extraction + the exact weights used +
+    // engine version), keyed by analysisId, so the audit save records them
+    // authoritatively (never the client's echoed weights). The client echoes
+    // analysisId back at save time. See provenanceCache + POST /api/audit.
+    provenance.remember(req.orgId, { analysisId, ...extraction, scoringWeights: weights, engineVersion: MODEL_ID });
+    res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), analysisId, extraction, ...results });
   } catch (err) {
     if (reserved) refundUsage(req.orgId, reserved); // a post-reservation failure returns the reservation
     const status = err.statusCode || 500;
@@ -305,8 +309,9 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
           ? 'Candidate #' + (results.length + 1)
           : path.basename(file.originalname, path.extname(file.originalname));
         const extraction = extractionSummary(extracted);
-        provenance.remember(req.orgId, extraction);
-        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), extraction, ...scored });
+        const analysisId = uuidv4(); // one per candidate, NOT one per batch
+        provenance.remember(req.orgId, { analysisId, ...extraction, scoringWeights: weights, engineVersion: MODEL_ID });
+        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), analysisId, extraction, ...scored });
       } catch (fileErr) {
         results.push({
           candidateName: path.basename(file.originalname, path.extname(file.originalname)),

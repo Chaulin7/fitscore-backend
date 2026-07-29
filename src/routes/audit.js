@@ -1,7 +1,8 @@
 'use strict';
 
 const express = require('express');
-const { insertAudit, deleteAudit, getRoles, getRoleHistory, getAuditById, updateAudit, getAuditChanges, getAuditsByTenant, queryAuditLog, getFilteredAuditRows, getAuditFilterValues, isLegacyCandidateFilter } = require('../services/db');
+const { insertAudit, deleteAudit, getRoles, getRoleHistory, getAuditById, updateAudit, getAuditChanges, getAuditsByTenant, queryAuditLog, getFilteredAuditRows, getAuditFilterValues, isLegacyCandidateFilter, getOrgTimezone } = require('../services/db');
+const { startOfZonedDayUtc, endOfZonedDayUtc, formatInTimeZone } = require('../services/timezone');
 const { analyzeBias } = require('../services/biasAudit');
 const { getOrganizationBranding } = require('../services/authService');
 const { resolveBranding } = require('../services/branding');
@@ -35,12 +36,11 @@ function strOrUndef(v) {
 
 // Parse + validate the shared audit filter query params (used by both the JSON
 // list endpoint and the CSV export so their filtering is byte-for-byte
-// identical). Returns { filters, order, raw } or { error: { status, field,
-// message } }. Dates are inclusive both ends: from -> start of day, to -> end
-// of day. Because created_at is stored as UTC ISO and no per-org timezone is
-// recorded, day boundaries are UTC. A malformed date is a hard 400 — never a
-// silently-dropped filter, which in an audit context is worse than an error.
-function parseAuditFilters(q) {
+// identical). Returns { filters, order, raw, timezone } or { error }. from/to
+// are inclusive calendar days IN THE ORG TIMEZONE, converted to UTC instants
+// (DST-correct per date) for the query; created_at stays stored as UTC ISO. A
+// malformed date is a hard 400 — never a silently-dropped filter.
+function parseAuditFilters(q, timeZone) {
   const raw = {
     from: strOrUndef(q.from), to: strOrUndef(q.to),
     candidateId: strOrUndef(q.candidateId), runId: strOrUndef(q.runId),
@@ -51,11 +51,11 @@ function parseAuditFilters(q) {
 
   if (raw.from != null) {
     if (!isValidIsoDate(raw.from)) return { error: { status: 400, field: 'from', message: 'from must be a valid date (YYYY-MM-DD).' } };
-    filters.from = raw.from + 'T00:00:00.000Z';
+    filters.from = startOfZonedDayUtc(raw.from, timeZone).toISOString();
   }
   if (raw.to != null) {
     if (!isValidIsoDate(raw.to)) return { error: { status: 400, field: 'to', message: 'to must be a valid date (YYYY-MM-DD).' } };
-    filters.to = raw.to + 'T23:59:59.999Z';
+    filters.to = endOfZonedDayUtc(raw.to, timeZone).toISOString();
   }
 
   let order = 'desc';
@@ -69,32 +69,44 @@ function parseAuditFilters(q) {
   filters.actor = raw.actor;
   filters.action = raw.action; // maps to the record's decision (shortlist/hold/reject)
 
-  return { filters, order, raw };
+  return { filters, order, raw, timezone: timeZone };
 }
 
-// Extraction provenance is SERVER-BOUND, never trusted from the client. The
-// echoed extraction object contributes only a lookup key (its textSha256);
-// the stored value is the server-held summary that /api/analyze issued for
-// this org (see services/provenanceCache.js). A sha the server never issued
-// — or one that expired / predates a server restart — stores null provenance
-// rather than a client-controlled echo, so the audit hash stays
-// tamper-evident.
+// Provenance is SERVER-BOUND, never trusted from the client. The save echoes an
+// analysisId (the lookup key) + the extraction object; the stored value is the
+// server-held record /api/analyze issued for this org (see provenanceCache.js).
+// Keyed by analysisId so two analyses of the same CV under different weights
+// never collide. Defense: the bound record's textSha256 must match the echoed
+// one — a mismatch means the binding is wrong about which analysis this is, so
+// its weights can't be trusted; treat it as a miss (null), never falling back
+// to client weights. Missing/expired ids are misses too. A miss stores null
+// provenance rather than a client-controlled echo.
 const provenance = require('../services/provenanceCache');
-function bindExtraction(orgId, echoed) {
-  if (!echoed || typeof echoed !== 'object') return null;
-  return provenance.lookup(orgId, echoed.textSha256);
+function bindAnalysis(orgId, analysisId, echoedExtraction) {
+  if (!analysisId) return null;
+  const rec = provenance.lookup(orgId, String(analysisId));
+  if (!rec) return null; // missing or expired
+  const echoedSha = echoedExtraction && typeof echoedExtraction === 'object' ? echoedExtraction.textSha256 : undefined;
+  if (rec.textSha256 !== echoedSha) {
+    console.warn('[provenance] analysisId/textSha256 mismatch — not binding weights', { orgId, analysisId });
+    return null; // mismatch -> treat as a miss; do not trust the bound weights
+  }
+  return rec;
 }
 
 // POST /api/audit - save an audit record
 router.post('/', async (req, res) => {
   try {
-    const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized, appVersion, modelId, analysisTimestamp, analysisDetail, runNonce } = req.body;
+    const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized, appVersion, modelId, analysisTimestamp, analysisDetail, analysisId, runNonce } = req.body;
     if (!candidateName) return sendError(res, 400, 'VALIDATION_ERROR', 'candidateName is required.', 'candidateName');
     // Provenance (Art. 12): reviewedBy comes from the authenticated session,
     // never from the client payload.
     const reviewedBy = (req.user && req.user.email) || null;
     // Structured detail (keywords/skills/recommendations) for the branded report.
     // Keep only the expected shape; cap sizes so a payload can't bloat the row.
+    // Server-held provenance for THIS analysis, bound by (orgId, analysisId)
+    // with a textSha256 defense check. The client echo is only a lookup key.
+    const bound = bindAnalysis(req.orgId, analysisId, analysisDetail && analysisDetail.extraction);
     let detail = null;
     if (analysisDetail && typeof analysisDetail === 'object') {
       const arr = (v) => Array.isArray(v) ? v.slice(0, 200) : [];
@@ -110,7 +122,7 @@ router.post('/', async (req, res) => {
           cvLineRef: null,
           weight: null,
         })),
-        extraction: bindExtraction(req.orgId, analysisDetail.extraction),
+        extraction: bound,
       };
     }
     const record = insertAudit({
@@ -120,6 +132,11 @@ router.post('/', async (req, res) => {
       analysisTimestamp: analysisTimestamp ? String(analysisTimestamp).slice(0, 40) : null,
       reviewedBy,
       analysisDetail: detail,
+      // Scoring inputs captured SERVER-SIDE from the bound record — never the
+      // client-supplied `weights` (which could differ from what was scored).
+      // NULL when the server can't vouch for them (unknown/expired sha).
+      weightsJson: bound && bound.scoringWeights ? bound.scoringWeights : null,
+      engineVersion: bound && bound.engineVersion ? bound.engineVersion : null,
       // Opaque per-screening-pass grouping hint; the run id is server-minted.
       runNonce: runNonce ? String(runNonce).slice(0, 100) : null,
     }, req.orgId, req.userId || null);
@@ -137,7 +154,8 @@ router.post('/', async (req, res) => {
 // is server-derived (req.orgId) and can never be supplied by the caller.
 router.get('/', async (req, res) => {
   try {
-    const parsed = parseAuditFilters(req.query);
+    const timeZone = getOrgTimezone(req.orgId);
+    const parsed = parseAuditFilters(req.query, timeZone);
     if (parsed.error) return sendError(res, parsed.error.status, 'VALIDATION_ERROR', parsed.error.message, parsed.error.field);
 
     const result = queryAuditLog({
@@ -147,6 +165,7 @@ router.get('/', async (req, res) => {
       limit: req.query.limit,
       offset: req.query.offset,
     });
+    result.timezone = timeZone; // so the client can label + display in org tz
     return res.json(result);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -196,9 +215,19 @@ function csvRow(cells) {
   return cells.map(csvCell).join(',');
 }
 
+// Weights as a compact, unambiguous cell — or the literal "not recorded" so a
+// NULL is never mistaken for a default or empty weight set.
+function weightsCell(w) {
+  if (!w || typeof w !== 'object') return 'not recorded';
+  const keys = ['kw', 'sk', 'ex', 'ed'];
+  const parts = keys.filter((k) => w[k] != null).map((k) => `${k}=${w[k]}`);
+  return parts.length ? parts.join(';') : 'not recorded';
+}
+
 router.get('/export/csv', async (req, res) => {
   try {
-    const parsed = parseAuditFilters(req.query);
+    const timeZone = getOrgTimezone(req.orgId);
+    const parsed = parseAuditFilters(req.query, timeZone);
     if (parsed.error) return sendError(res, parsed.error.status, 'VALIDATION_ERROR', parsed.error.message, parsed.error.field);
 
     const rows = getFilteredAuditRows({ ...parsed.filters, orgId: req.orgId, order: parsed.order });
@@ -211,9 +240,13 @@ router.get('/export/csv', async (req, res) => {
     const meta = [
       csvRow(['CVsprings Audit Log Export']),
       csvRow(['Exported at (UTC)', exportedAt]),
+      // Timezone + resolved UTC window make the covered range unambiguous.
+      csvRow(['Timezone', timeZone]),
+      csvRow(['Resolved window (UTC) from', parsed.filters.from || '(open)']),
+      csvRow(['Resolved window (UTC) to', parsed.filters.to || '(open)']),
       csvRow(['Order', parsed.order]),
-      csvRow(['Filter: from', r.from || '(none)']),
-      csvRow(['Filter: to', r.to || '(none)']),
+      csvRow(['Filter: from (local day)', r.from || '(none)']),
+      csvRow(['Filter: to (local day)', r.to || '(none)']),
       csvRow(['Filter: candidateId', r.candidateId || '(none)']),
       csvRow(['Filter: candidateIsLegacy', r.candidateId ? (candidateIsLegacy ? 'yes' : 'no') : '(n/a)']),
       csvRow(['Filter: runId', r.runId || '(none)']),
@@ -223,13 +256,14 @@ router.get('/export/csv', async (req, res) => {
       '', // blank separator line before the tabular data
     ];
 
-    const header = ['runId', 'candidateId', 'candidateLegacy', 'candidateName', 'fileName', 'overall', 'keywords', 'skills', 'experience', 'education', 'verdict', 'decision', 'note', 'role', 'anonymized', 'actorUserId', 'reviewedBy', 'createdAt'];
+    const header = ['runId', 'candidateId', 'candidateLegacy', 'candidateName', 'fileName', 'overall', 'keywords', 'skills', 'experience', 'education', 'weightsApplied', 'engineVersion', 'verdict', 'decision', 'note', 'role', 'anonymized', 'actorUserId', 'reviewedBy', `createdAt (${timeZone})`];
     const dataRows = rows.map((rec) => csvRow([
       rec.id, rec.candidateId, rec.candidateLegacy ? 'yes' : 'no', rec.candidateName, rec.fileName,
       rec.overall, rec.scores && rec.scores.keywords, rec.scores && rec.scores.skills,
       rec.scores && rec.scores.experience, rec.scores && rec.scores.education,
+      weightsCell(rec.weightsJson), rec.engineVersion || 'not recorded',
       rec.verdict, rec.decision, rec.note, rec.role, rec.anonymized ? 1 : 0,
-      rec.userId, rec.reviewedBy, rec.createdAt,
+      rec.userId, rec.reviewedBy, formatInTimeZone(rec.createdAt, timeZone),
     ]));
 
     const csv = meta.concat([csvRow(header)], dataRows).join('\n');

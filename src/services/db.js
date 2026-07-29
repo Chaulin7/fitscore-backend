@@ -179,6 +179,12 @@ function initSchema() {
   try { getDb().exec('ALTER TABLE audit_log ADD COLUMN candidate_id TEXT'); } catch (_) {}
   // Surrogate candidate identity: opaque per-CV-per-run FK into `candidates`.
   try { getDb().exec('ALTER TABLE audit_log ADD COLUMN candidate_fk TEXT'); } catch (_) {}
+  // Scoring inputs (discrimination evidence): an IMMUTABLE snapshot of the exact
+  // weights the engine applied for THIS assessment (never a preset reference),
+  // plus the scoring-engine version. Captured server-side; NULL when unknown
+  // (e.g. legacy rows) — displayed as "not recorded", never as a default.
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN weights_json TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN engine_version TEXT'); } catch (_) {}
 
   // Backfill updated_at for existing rows
   try { getDb().exec("UPDATE audit_log SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''"); } catch (_) {}
@@ -283,6 +289,9 @@ function initSchema() {
   // (Existing databases keep their column; the reconciliation UPDATE below
   // raises any pre-existing sub-floor value up to the default.)
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN retention_days INTEGER NOT NULL DEFAULT 730'); } catch (_) {}
+  // IANA timezone: audit-log day filters and displayed timestamps are in this
+  // zone (created_at itself stays UTC ISO). Default Europe/Amsterdam (CET/CEST).
+  try { getDb().exec("ALTER TABLE organizations ADD COLUMN timezone TEXT NOT NULL DEFAULT 'Europe/Amsterdam'"); } catch (_) {}
   // Per-org report branding (nullable; falls back to env defaults)
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN brand_display_name TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN brand_logo_url TEXT'); } catch (_) {}
@@ -436,11 +445,11 @@ function insertAudit(data, orgId, userId) {
   const stmt = getDb().prepare(`
     INSERT INTO audit_log
     (id, user_id, org_id, candidate_fk, candidate_name, file_name, overall, keywords_score, skills_score,
-     experience_score, education_score, weights, verdict, decision, note, jd_snippet, role, anonymized,
+     experience_score, education_score, weights, weights_json, engine_version, verdict, decision, note, jd_snippet, role, anonymized,
      app_version, model_id, analysis_timestamp, reviewed_by, analysis_detail, created_at, updated_at)
     VALUES
     (@id, @userId, @orgId, @candidateFk, @candidateName, @fileName, @overall, @keywords, @skills,
-     @experience, @education, @weights, @verdict, @decision, @note, @jdSnippet, @role, @anonymized,
+     @experience, @education, @weights, @weightsJson, @engineVersion, @verdict, @decision, @note, @jdSnippet, @role, @anonymized,
      @appVersion, @modelId, @analysisTimestamp, @reviewedBy, @analysisDetail, @createdAt, @updatedAt)
   `);
   stmt.run({
@@ -461,6 +470,10 @@ function insertAudit(data, orgId, userId) {
     experience: data.scores && data.scores.experience,
     education: data.scores && data.scores.education,
     weights: data.weights ? JSON.stringify(data.weights) : null,
+    // Server-authoritative, immutable snapshot of the weights the engine used
+    // and the engine version. Left NULL when the server can't vouch for them.
+    weightsJson: data.weightsJson ? JSON.stringify(data.weightsJson) : null,
+    engineVersion: data.engineVersion ? String(data.engineVersion).slice(0, 100) : null,
     verdict: data.verdict,
     decision: data.decision,
     note: data.note,
@@ -1128,6 +1141,10 @@ function formatRow(row) {
       education: row.education_score,
     },
     weights: row.weights ? (() => { try { return JSON.parse(row.weights); } catch { return null; } })() : null,
+    // Server-authoritative scoring inputs. null = genuinely not recorded (must
+    // never be rendered as a default or empty weight set by any consumer).
+    weightsJson: row.weights_json ? (() => { try { return JSON.parse(row.weights_json); } catch { return null; } })() : null,
+    engineVersion: row.engine_version || null,
     verdict: row.verdict,
     decision: row.decision,
     note: row.note,
@@ -1142,6 +1159,16 @@ function formatRow(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at || row.created_at,
   };
+}
+
+// Org IANA timezone for audit-log day filters + displayed timestamps. Falls
+// back to the conservative default if unset or invalid.
+function getOrgTimezone(orgId) {
+  try {
+    const row = getDb().prepare('SELECT timezone FROM organizations WHERE id = ?').get(orgId);
+    const tz = row && row.timezone;
+    return (tz && require('./timezone').isValidTimeZone(tz)) ? tz : 'Europe/Amsterdam';
+  } catch (_) { return 'Europe/Amsterdam'; }
 }
 
 // --- Usage metering (per org, per calendar month) --------------------------
@@ -1280,6 +1307,7 @@ module.exports = {
   candidateIdFor,
   backfillLegacyCandidates,
   isLegacyCandidateFilter,
+  getOrgTimezone,
   getAuditById,
   updateAudit,
   deleteAudit,
