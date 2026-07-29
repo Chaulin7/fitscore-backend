@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { insertAudit, getAllAudits, deleteAudit, exportCsv, getRoles, getRoleHistory, getAuditById, updateAudit, getAuditChanges, getAuditsByTenant } = require('../services/db');
+const { insertAudit, deleteAudit, getRoles, getRoleHistory, getAuditById, updateAudit, getAuditChanges, getAuditsByTenant, queryAuditLog, getFilteredAuditRows, getAuditFilterValues, isLegacyCandidateFilter } = require('../services/db');
 const { analyzeBias } = require('../services/biasAudit');
 const { getOrganizationBranding } = require('../services/authService');
 const { resolveBranding } = require('../services/branding');
@@ -15,6 +15,61 @@ function sendError(res, status, code, message, field) {
   if (code) body.code = code;
   if (field) body.field = field;
   return res.status(status).json(body);
+}
+
+// The audit log stays chronological: the only sort control is direction. This
+// two-value whitelist is the sole thing the caller can influence about ORDER BY.
+const ORDER_VALUES = new Set(['asc', 'desc']);
+
+// Strict YYYY-MM-DD validator. Rejects both non-matching shapes and calendar-
+// impossible dates (e.g. 2026-02-31, which Date would silently roll into March).
+function isValidIsoDate(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + 'T00:00:00.000Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+function strOrUndef(v) {
+  return (v == null || v === '') ? undefined : String(v);
+}
+
+// Parse + validate the shared audit filter query params (used by both the JSON
+// list endpoint and the CSV export so their filtering is byte-for-byte
+// identical). Returns { filters, order, raw } or { error: { status, field,
+// message } }. Dates are inclusive both ends: from -> start of day, to -> end
+// of day. Because created_at is stored as UTC ISO and no per-org timezone is
+// recorded, day boundaries are UTC. A malformed date is a hard 400 — never a
+// silently-dropped filter, which in an audit context is worse than an error.
+function parseAuditFilters(q) {
+  const raw = {
+    from: strOrUndef(q.from), to: strOrUndef(q.to),
+    candidateId: strOrUndef(q.candidateId), runId: strOrUndef(q.runId),
+    actor: strOrUndef(q.actor), action: strOrUndef(q.action),
+    order: strOrUndef(q.order),
+  };
+  const filters = {};
+
+  if (raw.from != null) {
+    if (!isValidIsoDate(raw.from)) return { error: { status: 400, field: 'from', message: 'from must be a valid date (YYYY-MM-DD).' } };
+    filters.from = raw.from + 'T00:00:00.000Z';
+  }
+  if (raw.to != null) {
+    if (!isValidIsoDate(raw.to)) return { error: { status: 400, field: 'to', message: 'to must be a valid date (YYYY-MM-DD).' } };
+    filters.to = raw.to + 'T23:59:59.999Z';
+  }
+
+  let order = 'desc';
+  if (raw.order != null) {
+    order = raw.order.toLowerCase();
+    if (!ORDER_VALUES.has(order)) return { error: { status: 400, field: 'order', message: "order must be 'asc' or 'desc'." } };
+  }
+
+  filters.candidateId = raw.candidateId;
+  filters.runId = raw.runId;
+  filters.actor = raw.actor;
+  filters.action = raw.action; // maps to the record's decision (shortlist/hold/reject)
+
+  return { filters, order, raw };
 }
 
 // Extraction provenance is SERVER-BOUND, never trusted from the client. The
@@ -33,7 +88,7 @@ function bindExtraction(orgId, echoed) {
 // POST /api/audit - save an audit record
 router.post('/', async (req, res) => {
   try {
-    const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized, appVersion, modelId, analysisTimestamp, analysisDetail } = req.body;
+    const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized, appVersion, modelId, analysisTimestamp, analysisDetail, runNonce } = req.body;
     if (!candidateName) return sendError(res, 400, 'VALIDATION_ERROR', 'candidateName is required.', 'candidateName');
     // Provenance (Art. 12): reviewedBy comes from the authenticated session,
     // never from the client payload.
@@ -65,6 +120,8 @@ router.post('/', async (req, res) => {
       analysisTimestamp: analysisTimestamp ? String(analysisTimestamp).slice(0, 40) : null,
       reviewedBy,
       analysisDetail: detail,
+      // Opaque per-screening-pass grouping hint; the run id is server-minted.
+      runNonce: runNonce ? String(runNonce).slice(0, 100) : null,
     }, req.orgId, req.userId || null);
     res.status(201).json(record);
   } catch (err) {
@@ -72,47 +129,35 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/audit - list audit records
-// Backward-compatible:
-// - no query params -> returns array of records (legacy)
-// - any of role,decision,search,from,to,limit,offset present -> returns { records, total, limit, offset }
+// GET /api/audit - filtered, paginated, org-scoped audit log.
+// Query params: from, to (inclusive YYYY-MM-DD day bounds), candidateId, runId,
+// actor (user id), action (-> decision), order (asc|desc on time, default desc),
+// limit (default 50, max 200), offset (default 0).
+// Returns { rows, total, limit, offset }. total ignores limit/offset. Org scope
+// is server-derived (req.orgId) and can never be supplied by the caller.
 router.get('/', async (req, res) => {
   try {
-    const { decision, role, search, from, to, limit, offset } = req.query;
-    const usingFilters = search != null || from != null || to != null || limit != null || offset != null;
+    const parsed = parseAuditFilters(req.query);
+    if (parsed.error) return sendError(res, parsed.error.status, 'VALIDATION_ERROR', parsed.error.message, parsed.error.field);
 
-    // Legacy path: no advanced filters
-    if (!usingFilters && !decision && !role) {
-      const records = getAllAudits({ limit: undefined, orgId: req.orgId });
-      return res.json(records);
-    }
+    const result = queryAuditLog({
+      ...parsed.filters,
+      orgId: req.orgId, // server-derived scope — overrides anything in the query
+      order: parsed.order,
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+    return res.json(result);
+  } catch (err) {
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
 
-    // Advanced path: in-memory filter on top of getAllAudits
-    let records = getAllAudits({ decision, role, orgId: req.orgId });
-
-    if (search) {
-      const s = String(search).toLowerCase();
-      records = records.filter((r) =>
-        (r.candidateName || '').toLowerCase().includes(s) ||
-        (r.fileName || '').toLowerCase().includes(s) ||
-        (r.role || '').toLowerCase().includes(s) ||
-        (r.note || '').toLowerCase().includes(s)
-      );
-    }
-    if (from) {
-      const fromTs = Date.parse(from);
-      if (!Number.isNaN(fromTs)) records = records.filter((r) => Date.parse(r.createdAt) >= fromTs);
-    }
-    if (to) {
-      const toTs = Date.parse(to);
-      if (!Number.isNaN(toTs)) records = records.filter((r) => Date.parse(r.createdAt) <= toTs);
-    }
-
-    const total = records.length;
-    const lim = Math.min(Math.max(parseInt(limit) || 50, 1), 500);
-    const off = Math.max(parseInt(offset) || 0, 0);
-    const page = records.slice(off, off + lim);
-    return res.json({ records: page, total, limit: lim, offset: off });
+// GET /api/audit/filters - distinct actor/action values for the filter
+// dropdowns, org-scoped.
+router.get('/filters', async (req, res) => {
+  try {
+    res.json(getAuditFilterValues(req.orgId));
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
@@ -138,10 +183,56 @@ router.get('/roles/:role/history', async (req, res) => {
   }
 });
 
-// GET /api/audit/export/csv - download CSV
+// GET /api/audit/export/csv - download CSV of the audit log.
+// Respects the SAME filter + order params as GET /api/audit (all rows, no
+// pagination). Prepends a self-describing metadata block recording the exact
+// filter parameters and export timestamp, so the file stands on its own when it
+// turns up in an evidence folder.
+function csvCell(v) {
+  if (v == null) return '""';
+  return '"' + String(v).replace(/"/g, '""') + '"';
+}
+function csvRow(cells) {
+  return cells.map(csvCell).join(',');
+}
+
 router.get('/export/csv', async (req, res) => {
   try {
-    const csv = exportCsv({ orgId: req.orgId });
+    const parsed = parseAuditFilters(req.query);
+    if (parsed.error) return sendError(res, parsed.error.status, 'VALIDATION_ERROR', parsed.error.message, parsed.error.field);
+
+    const rows = getFilteredAuditRows({ ...parsed.filters, orgId: req.orgId, order: parsed.order });
+    const exportedAt = new Date().toISOString();
+    const r = parsed.raw;
+    // Record which candidate id was filtered on and whether it is legacy (a
+    // pre-migration hash identity that may merge same-named applicants).
+    const candidateIsLegacy = r.candidateId ? isLegacyCandidateFilter(req.orgId, r.candidateId) : false;
+
+    const meta = [
+      csvRow(['CVsprings Audit Log Export']),
+      csvRow(['Exported at (UTC)', exportedAt]),
+      csvRow(['Order', parsed.order]),
+      csvRow(['Filter: from', r.from || '(none)']),
+      csvRow(['Filter: to', r.to || '(none)']),
+      csvRow(['Filter: candidateId', r.candidateId || '(none)']),
+      csvRow(['Filter: candidateIsLegacy', r.candidateId ? (candidateIsLegacy ? 'yes' : 'no') : '(n/a)']),
+      csvRow(['Filter: runId', r.runId || '(none)']),
+      csvRow(['Filter: actor', r.actor || '(none)']),
+      csvRow(['Filter: action', r.action || '(none)']),
+      csvRow(['Rows in this export', String(rows.length)]),
+      '', // blank separator line before the tabular data
+    ];
+
+    const header = ['runId', 'candidateId', 'candidateLegacy', 'candidateName', 'fileName', 'overall', 'keywords', 'skills', 'experience', 'education', 'verdict', 'decision', 'note', 'role', 'anonymized', 'actorUserId', 'reviewedBy', 'createdAt'];
+    const dataRows = rows.map((rec) => csvRow([
+      rec.id, rec.candidateId, rec.candidateLegacy ? 'yes' : 'no', rec.candidateName, rec.fileName,
+      rec.overall, rec.scores && rec.scores.keywords, rec.scores && rec.scores.skills,
+      rec.scores && rec.scores.experience, rec.scores && rec.scores.education,
+      rec.verdict, rec.decision, rec.note, rec.role, rec.anonymized ? 1 : 0,
+      rec.userId, rec.reviewedBy, rec.createdAt,
+    ]));
+
+    const csv = meta.concat([csvRow(header)], dataRows).join('\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="audit-log.csv"');
     res.send(csv);

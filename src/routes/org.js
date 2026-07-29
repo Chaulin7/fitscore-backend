@@ -16,7 +16,7 @@ const express = require('express');
 const { requireSession } = require('../middleware/auth');
 const auth = require('../services/authService');
 const branding = require('../services/branding');
-const { getAllAudits, getAuditChanges, deleteAllOrgAuditData, getDb } = require('../services/db');
+const { getAllAudits, getAuditChanges, deleteAllOrgAuditData, getDb, validateRetentionDays, getRetentionStats, countPurgeableRows, listPurgeRuns } = require('../services/db');
 
 const router = express.Router();
 
@@ -47,16 +47,39 @@ function requireOwner(req, res, next) {
   return next();
 }
 
-// PATCH /api/org — update retention setting (server-side, org-wide)
+// PATCH /api/org — update retention setting (server-side, org-wide). The floor
+// is enforced here (validateRetentionDays) and re-checked inside the purge job.
 router.patch('/', requireSession, requireOwner, (req, res) => {
   try {
-    const raw = (req.body || {}).retentionDays;
-    const days = Number(raw);
-    if (!Number.isInteger(days) || (days !== 0 && (days < 30 || days > 1095))) {
-      return sendError(res, 400, 'VALIDATION_ERROR', 'retentionDays must be 0 (keep until deleted) or between 30 and 1095.', 'retentionDays');
-    }
-    auth.setOrganizationRetention(req.orgId, days);
-    res.json({ retentionDays: days });
+    const check = validateRetentionDays((req.body || {}).retentionDays);
+    if (!check.ok) return sendError(res, 400, check.code, check.message, 'retentionDays');
+    auth.setOrganizationRetention(req.orgId, check.days);
+    res.json({ retentionDays: check.days });
+  } catch (err) {
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// GET /api/org/retention — retention stats (row count, oldest event, cutoff,
+// last run) + the last 10 purge runs as executional evidence. Owner only.
+router.get('/retention', requireSession, requireOwner, (req, res) => {
+  try {
+    const stats = getRetentionStats(req.orgId);
+    stats.purgeRuns = listPurgeRuns(req.orgId, 10);
+    res.json(stats);
+  } catch (err) {
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// GET /api/org/retention/preview?days=NNN — exact number of rows a purge at
+// `days` retention would delete right now. Drives the lowering-retention
+// confirmation so the admin sees the precise, irreversible impact. Owner only.
+router.get('/retention/preview', requireSession, requireOwner, (req, res) => {
+  try {
+    const check = validateRetentionDays(req.query.days);
+    if (!check.ok) return sendError(res, 400, check.code, check.message, 'days');
+    res.json(countPurgeableRows(req.orgId, check.days));
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }

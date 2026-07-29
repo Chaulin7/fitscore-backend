@@ -365,6 +365,28 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .audit-tb-stack .audit-tb-row{width:100%}
 .audit-tb-stack .audit-tb-actions{display:flex;gap:8px}
 .audit-tb-stack .audit-tb-actions .btn{flex:0 0 auto}
+.audit-flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.audit-sep{color:#9ca3af;font-size:12px}
+.audit-presets{display:flex;gap:4px;flex-wrap:wrap}
+.audit-preset.active{background:#0f2847;color:#fff;border-color:#0f2847}
+.ret-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px}
+.ret-preset.active{background:#0f2847;color:#fff;border-color:#0f2847}
+.ret-stats{font-size:12px;color:#374151;margin-top:10px;padding:10px 12px;background:#f8fafc;border:1px solid #e7ebf3;border-radius:8px;line-height:1.7}
+.ret-stats .ret-k{color:#6b7280}
+.ret-stats .ret-warn{color:#b45309;font-weight:600}
+.ret-runs{width:100%;border-collapse:collapse;font-size:11px}
+.ret-runs th{text-align:left;color:#6b7280;font-weight:600;padding:4px 8px;border-bottom:1px solid #e7ebf3;white-space:nowrap}
+.ret-runs td{padding:4px 8px;border-bottom:1px solid #f1f4f9;color:#374151;white-space:nowrap}
+.ret-runs .st-success{color:#166534}
+.ret-runs .st-error{color:#b91c1c;font-weight:600}
+.ret-runs .st-dryrun{color:#b45309;font-weight:600}
+.ret-runs tr.ret-run-dry td{background:#fffbeb}
+#auditOrderToggle{white-space:nowrap}
+.audit-filter-count{font-size:12px;font-weight:600;color:#0f2847;background:#eef2f9;border:1px solid #dbe3f0;border-radius:999px;padding:3px 10px}
+.audit-cand-link{background:none;border:none;padding:0;margin:0;font:inherit;font-weight:600;color:#0f2847;cursor:pointer;text-align:left}
+.audit-cand-link:hover{text-decoration:underline}
+.legacy-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.03em;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-left:6px;cursor:help;vertical-align:middle}
+.audit-legacy-note{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:12px;line-height:1.5}
 .nav-status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,0.08);color:#cbd5e1;font-size:12px;line-height:1;margin:0 6px}
 .nav-status-pill .dot{width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block}
 .nav-status-pill .dot.ok{background:#22c55e}
@@ -1030,12 +1052,26 @@ img, video, table { max-width: 100%; }
   <div style="font-size:11px;color:#6b7280;margin-top:4px">Updating your password signs you out on all other devices.</div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3>Data Retention</h3>
-  <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:6px">
-    <input class="text-input" type="number" id="setRetentionDays" min="0" max="1095" style="width:90px" aria-label="Audit retention in days">
+  <p style="font-size:12px;color:#6b7280;margin:4px 0 8px">
+    Audit records older than your retention window are <strong>permanently deleted</strong> by a daily job. Keep longer to preserve an evidence trail (the EU AI Act Art. 19 requires at least six months); keep shorter to hold less applicant personal data (GDPR storage limitation). Minimum 180 days. Applies to your whole organization.
+  </p>
+  <div class="ret-presets">
+    <button type="button" class="btn btn-ghost btn-sm ret-preset" data-action="setRetentionPreset" data-days="180">6 months</button>
+    <button type="button" class="btn btn-ghost btn-sm ret-preset" data-action="setRetentionPreset" data-days="365">12 months</button>
+    <button type="button" class="btn btn-ghost btn-sm ret-preset" data-action="setRetentionPreset" data-days="730">24 months</button>
+    <button type="button" class="btn btn-ghost btn-sm ret-preset" data-action="setRetentionPreset" data-days="1095">36 months</button>
+  </div>
+  <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+    <input class="text-input" type="number" id="setRetentionDays" min="180" max="3650" step="1" style="width:90px" aria-label="Audit retention in days">
     <span style="font-size:13px;color:#374151">days</span>
     <button class="btn btn-primary btn-sm" id="retSaveBtn" data-action="saveRetention">Save</button>
   </div>
-  <div style="font-size:11px;color:#6b7280;margin-top:4px">Audit records older than this are <strong>permanently deleted</strong> by a daily job (including their change history). Allowed: 30&ndash;1095, or 0 to keep records until manually deleted. Applies to your whole organization.</div>
+  <div id="retTradeoff" style="font-size:11px;color:#6b7280;margin-top:6px"></div>
+  <div id="retStats" class="ret-stats" style="display:none"></div>
+  <details id="retHistoryWrap" style="margin-top:10px;display:none">
+    <summary style="font-size:12px;color:#0f2847;cursor:pointer;font-weight:600">Recent purge runs (execution evidence)</summary>
+    <div id="retHistory" style="margin-top:8px;overflow-x:auto"></div>
+  </details>
   <div id="retOwnerNote" style="display:none;font-size:11px;color:#9ca3af;margin-top:4px">Only the organization owner can change retention and use the controls below.</div>
   <h3 style="margin-top:18px">Organization Data</h3>
   <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:6px">
@@ -1276,23 +1312,40 @@ img, video, table { max-width: 100%; }
 
 <!-- === AUDIT LOG === -->
 <div class="tab-content main" id="tab-audit">
-  <div class="audit-tb audit-tb-stack">
-    <div class="audit-tb-row"><input class="text-input" type="text" id="auditSearch" placeholder="Search candidate..." data-action="filterAudit" style="width:100%"></div>
-    <div class="audit-tb-row"><select class="text-input" id="auditDecisionFilter" data-action="filterAudit" style="width:100%">
-      <option value="">All decisions</option>
-      <option value="shortlist">Shortlist</option>
-      <option value="hold">Hold</option>
-      <option value="reject">Reject</option>
-    </select></div>
-    <div class="audit-tb-row"><select class="text-input" id="auditRoleFilter" data-action="filterAudit" style="width:100%">
-      <option value="">All roles</option>
-    </select></div>
-    <div class="audit-tb-row audit-tb-actions">
+  <div class="audit-tb audit-tb-stack" role="search" aria-label="Filter audit log">
+    <!-- Search (candidate id OR run id) + chronological toggle -->
+    <div class="audit-tb-row audit-flex">
+      <input class="text-input" type="text" id="auditSearch" placeholder="Search candidate ID…" data-action="filterAuditSearch" style="flex:1;min-width:180px" aria-label="Search by candidate ID">
+      <button type="button" class="btn btn-ghost btn-sm" id="auditOrderToggle" data-action="toggleAuditOrder" title="Toggle chronological order">&#8595; Newest first</button>
+    </div>
+    <!-- Date range + presets -->
+    <div class="audit-tb-row audit-flex">
+      <input class="text-input" type="date" id="auditFrom" data-action="filterAuditNow" style="width:150px" aria-label="From date (inclusive)">
+      <span class="audit-sep">to</span>
+      <input class="text-input" type="date" id="auditTo" data-action="filterAuditNow" style="width:150px" aria-label="To date (inclusive)">
+      <span class="audit-presets">
+        <button type="button" class="btn btn-ghost btn-sm audit-preset" data-action="auditPreset" data-days="7">7d</button>
+        <button type="button" class="btn btn-ghost btn-sm audit-preset" data-action="auditPreset" data-days="30">30d</button>
+        <button type="button" class="btn btn-ghost btn-sm audit-preset" data-action="auditPreset" data-days="90">90d</button>
+        <button type="button" class="btn btn-ghost btn-sm audit-preset" data-action="auditPreset" data-days="0">All</button>
+      </span>
+    </div>
+    <!-- Actor + action dropdowns (populated from /api/audit/filters) -->
+    <div class="audit-tb-row audit-flex">
+      <select class="text-input" id="auditActorFilter" data-action="filterAuditNow" style="flex:1;min-width:140px" aria-label="Filter by actor"><option value="">All actors</option></select>
+      <select class="text-input" id="auditActionFilter" data-action="filterAuditNow" style="flex:1;min-width:140px" aria-label="Filter by action"><option value="">All actions</option></select>
+    </div>
+    <!-- Active-filter count + actions -->
+    <div class="audit-tb-row audit-tb-actions audit-flex">
+      <span id="auditFilterCount" class="audit-filter-count" style="display:none"></span>
+      <button type="button" class="btn btn-ghost btn-sm" id="auditClearBtn" data-action="clearAuditFilters" style="display:none">Clear all</button>
+      <span style="flex:1"></span>
       <button class="btn btn-ghost btn-sm" data-action="loadAudit">&#8635; Refresh</button>
       <button class="btn btn-ghost btn-sm" data-action="exportAuditCsv">Export CSV</button>
     </div>
   </div>
   <div class="msg msg-err" id="auditError"></div>
+  <div id="auditLegacyNote" class="audit-legacy-note" style="display:none"></div>
   <div class="card" style="margin-bottom:0">
     <div style="overflow-x:auto">
       <table class="data-table">
@@ -1662,7 +1715,16 @@ async function changePassword(){
 
 // Data loading only happens here — i.e. only after a successful auth check.
 function initApp(){
+  // Restore any shared audit filter state from the URL, reflect it in the
+  // controls, then load the dropdown values and the filtered log.
+  const hasAuditUrl=restoreAuditFiltersFromUrl();
+  applyAuditFilterToInputs();
+  loadAuditFilterValues().then(applyAuditFilterToInputs);
   loadAudit();
+  if(hasAuditUrl){
+    const btn=document.querySelector('.nav-btn[data-tab="audit"]');
+    if(btn){try{switchTab('audit',btn);}catch(_){}}
+  }
   loadRoles();
   refreshTemplatesCache()
     .then(function(){ renderTplChips(); maybeShowTemplateMigrationBanner(); })
@@ -2007,25 +2069,102 @@ async function openChangeHistory(auditId) {
   }
 }
 // Server-side filter state (Section 2.3)
-const auditFilter = { role: '', decision: '', search: '', limit: 50, offset: 0, total: null, paginated: false };
+// Chronological-only audit filter state. `search` is a single term matched
+// against candidate id OR run id (classified by shape). from/to are inclusive
+// YYYY-MM-DD day bounds. order is the only sort control.
+const auditFilter = { from: '', to: '', search: '', actor: '', action: '', order: 'desc', limit: 50, offset: 0, total: null };
 let _auditFilterDebounce = null;
 function scheduleAuditReload() {
   if (_auditFilterDebounce) clearTimeout(_auditFilterDebounce);
-  _auditFilterDebounce = setTimeout(() => { auditFilter.offset = 0; if (typeof loadAudit === 'function') loadAudit(); }, 300);
+  _auditFilterDebounce = setTimeout(() => { auditFilter.offset = 0; syncAuditUrl(); if (typeof loadAudit === 'function') loadAudit(); }, 300);
+}
+// The search box filters by candidate id (surrogate UUID, or an old hash from a
+// shared link — the backend matches both). Candidate and run ids are both UUIDs
+// now, so the box can't distinguish them; run-id filtering stays available via
+// the runId URL param for old links.
+function classifyIdSearch(v) { return 'candidateId'; }
+function appendAuditFilterParams(p) {
+  if (auditFilter.from) p.set('from', auditFilter.from);
+  if (auditFilter.to) p.set('to', auditFilter.to);
+  const s = (auditFilter.search || '').trim();
+  if (s) p.set(classifyIdSearch(s), s);
+  if (auditFilter.actor) p.set('actor', auditFilter.actor);
+  if (auditFilter.action) p.set('action', auditFilter.action);
+  p.set('order', auditFilter.order);
+  return p;
 }
 function buildAuditQuery() {
-  const p = new URLSearchParams();
-  if (auditFilter.role) p.set('role', auditFilter.role);
-  if (auditFilter.decision) p.set('decision', auditFilter.decision);
-  if (auditFilter.search) p.set('search', auditFilter.search);
-  // Only send pagination params when at least one filter is active (preserves legacy unwrapped response otherwise)
-  const hasFilters = !!(auditFilter.role || auditFilter.decision || auditFilter.search);
-  if (hasFilters) {
-    p.set('limit', String(auditFilter.limit));
-    p.set('offset', String(auditFilter.offset));
+  const p = appendAuditFilterParams(new URLSearchParams());
+  p.set('limit', String(auditFilter.limit));
+  p.set('offset', String(auditFilter.offset));
+  return '?' + p.toString();
+}
+// Export shares the exact filters + order, minus pagination (whole set).
+function buildAuditExportQuery() { return appendAuditFilterParams(new URLSearchParams()).toString(); }
+
+// Count of *filters* active (order is a sort, not a filter). Date range counts once.
+function auditActiveFilterCount() {
+  let n = 0;
+  if (auditFilter.from || auditFilter.to) n++;
+  if ((auditFilter.search || '').trim()) n++;
+  if (auditFilter.actor) n++;
+  if (auditFilter.action) n++;
+  return n;
+}
+// Mirror filter state in the address bar (af_* prefixed so other query params
+// like ?billing= are untouched) so a filtered view can be shared as a link.
+function syncAuditUrl() {
+  try {
+    const u = new URL(window.location.href);
+    ['af_from', 'af_to', 'af_q', 'af_actor', 'af_action', 'af_order'].forEach((k) => u.searchParams.delete(k));
+    if (auditFilter.from) u.searchParams.set('af_from', auditFilter.from);
+    if (auditFilter.to) u.searchParams.set('af_to', auditFilter.to);
+    if ((auditFilter.search || '').trim()) u.searchParams.set('af_q', auditFilter.search.trim());
+    if (auditFilter.actor) u.searchParams.set('af_actor', auditFilter.actor);
+    if (auditFilter.action) u.searchParams.set('af_action', auditFilter.action);
+    if (auditFilter.order && auditFilter.order !== 'desc') u.searchParams.set('af_order', auditFilter.order);
+    history.replaceState(null, '', u.toString());
+  } catch (_) {}
+}
+// Restore filter state from the URL on load. Returns true if any audit filter
+// param was present (so the caller can open the Audit tab).
+function restoreAuditFiltersFromUrl() {
+  try {
+    const u = new URL(window.location.href);
+    const g = (k) => u.searchParams.get(k) || '';
+    auditFilter.from = g('af_from');
+    auditFilter.to = g('af_to');
+    auditFilter.search = g('af_q');
+    auditFilter.actor = g('af_actor');
+    auditFilter.action = g('af_action');
+    const o = g('af_order');
+    auditFilter.order = (o === 'asc' || o === 'desc') ? o : 'desc';
+    return !!(auditFilter.from || auditFilter.to || auditFilter.search || auditFilter.actor || auditFilter.action || o);
+  } catch (_) { return false; }
+}
+// Push state -> input controls (used on load, presets, candidate click, clear).
+function applyAuditFilterToInputs() {
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+  set('auditFrom', auditFilter.from || '');
+  set('auditTo', auditFilter.to || '');
+  set('auditSearch', auditFilter.search || '');
+  set('auditActorFilter', auditFilter.actor || '');
+  set('auditActionFilter', auditFilter.action || '');
+  updateAuditOrderButton();
+}
+function updateAuditOrderButton() {
+  const b = document.getElementById('auditOrderToggle');
+  if (b) b.innerHTML = auditFilter.order === 'asc' ? '&#8593; Oldest first' : '&#8595; Newest first';
+}
+function updateAuditFilterMeta() {
+  const n = auditActiveFilterCount();
+  const cEl = document.getElementById('auditFilterCount');
+  const clr = document.getElementById('auditClearBtn');
+  if (cEl) {
+    cEl.style.display = n > 0 ? '' : 'none';
+    cEl.textContent = n + ' filter' + (n === 1 ? '' : 's') + ' active';
   }
-  const qs = p.toString();
-  return qs ? ('?' + qs) : '';
+  if (clr) clr.style.display = n > 0 ? '' : 'none';
 }
 
 let mode='single',selectedFiles=[],lastResult=null,lastBatchResults=[],lastAuditRecords=[];
@@ -2152,6 +2291,12 @@ function updateWeightSum(){
 }
 function getWeights(){return{kw:+document.getElementById('wKw').value,sk:+document.getElementById('wSk').value,ex:+document.getElementById('wEx').value,ed:+document.getElementById('wEd').value};}
 
+// Opaque per-screening-pass grouping hint. Random, encodes no candidate
+// attributes; the server treats it only as a hint and mints the real run id.
+function newRunNonce(){
+  try{ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(_){}
+  return 'n-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);
+}
 async function analyze(){
   markOnboarded();
   // A real analysis supersedes any sample on screen.
@@ -2185,7 +2330,7 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
       if (e.code === 'INVALID_FILE' || e.code === 'FILE_REJECTED' || e.code === 'PDF_ENCRYPTED') { if (e.field) highlightField(e.field); }
       showErr(errEl, e.message || 'Analysis failed'); return;
     }
-    lastResult={...data,role,file:file.name};
+    lastResult={...data,role,file:file.name,_runNonce:newRunNonce()};
     renderSingleResult(data,file.name,role);
     document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'single', role: role || 'unknown' } }));
   }catch(e){
@@ -2223,7 +2368,8 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     setProgress(80,'Comparing against job description...');
     setProgress(100,'Complete');
     document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'batch', count: (data && data.results && data.results.length) || 0, role: role || 'unknown' } }));
-    lastBatchResults=(data.results||[]).map(res=>({...res,role}));
+    const batchNonce=newRunNonce(); // one screening pass = one run
+    lastBatchResults=(data.results||[]).map(res=>({...res,role,_runNonce:batchNonce}));
     renderBatchResults(data.results,role);
   }catch(e){
     console.error('[analyze]', e && e.status, e && e.code, e && e.message);
@@ -2336,6 +2482,7 @@ async function saveToAudit(){
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:document.getElementById('roleInput').value.trim(),anonymized:lastResult.anonymized||false,
     appVersion:CVSPRINGS_VERSION,modelId:lastResult.modelId||null,analysisTimestamp:lastResult.analysisTimestamp||null,
+    runNonce:lastResult._runNonce||null,
     analysisDetail:{found:lastResult.found||[],missing:lastResult.missing||[],skills:lastResult.skills||[],recommendations:lastResult.recommendations||[],matches:lastResult.matches||[],extraction:lastResult.extraction||null}};
   try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
     lastResult._auditId=d.id;toast('Saved to audit log.','success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'single',role:(lastResult&&lastResult.role)||'unknown'}}));}
@@ -2351,6 +2498,7 @@ async function saveSingleBatch(i){
     jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
     role:res.role||'',anonymized:res.anonymized||false,
     appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
+    runNonce:res._runNonce||null,
     analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
   try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
     toast('Saved: '+body.candidateName,'success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'batch_row',role:(body&&body.role)||'unknown'}}));}
@@ -2369,6 +2517,7 @@ async function saveAllToAudit(){
       jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
       role:res.role||'',anonymized:res.anonymized||false,
       appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
+      runNonce:res._runNonce||null,
     analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
     try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;}catch(_){}
   }
@@ -2390,31 +2539,39 @@ async function loadAudit(){
   const errEl=document.getElementById('auditError');errEl.style.display='none';
   const tb=document.getElementById('auditBody');
   if(tb)tb.innerHTML='<tr><td colspan="12"><div class="empty-state skel" style="height:120px;">Loading…</div></td></tr>';
+  updateAuditFilterMeta();
   try{
     const resp=await api('/api/audit'+buildAuditQuery());
-    if(Array.isArray(resp)){
-      auditFilter.paginated=false;auditFilter.total=resp.length;
-      lastAuditRecords=resp;
-    } else if(resp && Array.isArray(resp.records)){
-      auditFilter.paginated=true;
-      auditFilter.total=typeof resp.total==='number'?resp.total:resp.records.length;
+    if(resp && Array.isArray(resp.rows)){
+      auditFilter.total=typeof resp.total==='number'?resp.total:resp.rows.length;
       if(typeof resp.limit==='number')auditFilter.limit=resp.limit;
       if(typeof resp.offset==='number')auditFilter.offset=resp.offset;
-      lastAuditRecords=resp.records;
+      lastAuditRecords=resp.rows;
+    } else if(Array.isArray(resp)){
+      auditFilter.total=resp.length;lastAuditRecords=resp;
     } else {
-      lastAuditRecords=[];auditFilter.paginated=false;auditFilter.total=0;
+      lastAuditRecords=[];auditFilter.total=0;
     }
-    populateRoleFilter(lastAuditRecords);
     renderAuditTable(lastAuditRecords);
     renderAuditPager();
+    updateAuditLegacyNote(lastAuditRecords);
   }
   catch(e){showErr(errEl,'Could not load: '+(e.message||'error'));handleApiError(e);}
+}
+// Flag pre-migration (legacy) identity wherever it appears — an audit surface
+// that silently presents unreliable identity is worse than one that admits it.
+function updateAuditLegacyNote(records){
+  const el=document.getElementById('auditLegacyNote');
+  if(!el)return;
+  const has=Array.isArray(records)&&records.some(r=>r&&r.candidateLegacy);
+  el.style.display=has?'':'none';
+  if(has)el.innerHTML='⚠ Some rows below carry a <strong>legacy identity</strong> derived from the candidate name (records created before the identity migration). These may merge different applicants who happen to share a name, or split one applicant whose name was formatted differently. Records created after the migration use a reliable per-CV identity.';
 }
 function renderAuditPager(){
   const host=document.getElementById('auditPager');
   if(!host)return;
-  if(!auditFilter.paginated){host.innerHTML='';return;}
   const total=auditFilter.total||0;
+  if(!total){host.innerHTML='';return;}
   const start=total?(auditFilter.offset+1):0;
   const end=Math.min(auditFilter.offset+auditFilter.limit,total);
   const canPrev=auditFilter.offset>0;
@@ -2433,35 +2590,85 @@ document.addEventListener('click',(e)=>{
   if(dir==='prev'&&auditFilter.offset>0){auditFilter.offset=Math.max(0,auditFilter.offset-auditFilter.limit);loadAudit();}
   else if(dir==='next'){auditFilter.offset=auditFilter.offset+auditFilter.limit;loadAudit();}
 });
-function populateRoleFilter(records){
-  const roles=[...new Set(records.map(r=>r.role).filter(Boolean))].sort();
-  const sel=document.getElementById('auditRoleFilter');const cur=sel.value;
-  sel.innerHTML='<option value="">All Roles</option>'+roles.map(r=>'<option value="'+escHtml(r)+'">'+escHtml(r)+'</option>').join('');
-  if(cur)sel.value=cur;
-}
-function filterAudit(){
-  const q=(document.getElementById('auditSearch').value||'').trim();
-  const dec=document.getElementById('auditDecisionFilter').value||'';
-  const role=document.getElementById('auditRoleFilter').value||'';
-  auditFilter.search=q;
-  auditFilter.decision=dec;
-  auditFilter.role=role;
+// Text search: debounced 300ms (scheduleAuditReload resets offset + syncs URL).
+function filterAuditSearch(){
+  auditFilter.search=(document.getElementById('auditSearch').value||'').trim();
   scheduleAuditReload();
 }
+// Dates + dropdowns: fire immediately.
+function filterAuditNow(){
+  const v=(id)=>{const e=document.getElementById(id);return e?(e.value||''):'';};
+  auditFilter.from=v('auditFrom');
+  auditFilter.to=v('auditTo');
+  auditFilter.actor=v('auditActorFilter');
+  auditFilter.action=v('auditActionFilter');
+  auditFilter.offset=0;
+  syncAuditUrl();
+  loadAudit();
+}
+function toggleAuditOrder(){
+  auditFilter.order=auditFilter.order==='asc'?'desc':'asc';
+  auditFilter.offset=0;
+  updateAuditOrderButton();
+  syncAuditUrl();
+  loadAudit();
+}
+function auditPreset(el){
+  const days=parseInt(el.dataset.days,10)||0;
+  if(days===0){auditFilter.from='';auditFilter.to='';}
+  else{
+    const today=new Date();
+    const start=new Date(Date.now()-(days-1)*24*60*60*1000);
+    auditFilter.from=start.toISOString().slice(0,10);
+    auditFilter.to=today.toISOString().slice(0,10);
+  }
+  auditFilter.offset=0;
+  applyAuditFilterToInputs();
+  syncAuditUrl();
+  loadAudit();
+}
+// Clicking a candidate name filters to that candidate's events (by candidate_id).
+function auditFilterCandidate(el){
+  const cid=el.dataset.cid||'';
+  if(!cid)return;
+  auditFilter.search=cid; // classifies to candidateId (16-hex, not a UUID)
+  auditFilter.offset=0;
+  applyAuditFilterToInputs();
+  syncAuditUrl();
+  loadAudit();
+}
+// Populate actor/action dropdowns from the org-scoped distinct-values endpoint.
+async function loadAuditFilterValues(){
+  if(!API)return;
+  try{
+    const data=await api('/api/audit/filters');
+    const cap=(s)=>s?s.charAt(0).toUpperCase()+s.slice(1):s;
+    const actorSel=document.getElementById('auditActorFilter');
+    if(actorSel){
+      actorSel.innerHTML='<option value="">All actors</option>'+(data.actors||[]).map(a=>'<option value="'+escHtml(a.id)+'">'+escHtml(a.label||a.id)+'</option>').join('');
+      actorSel.value=auditFilter.actor||'';
+    }
+    const actionSel=document.getElementById('auditActionFilter');
+    if(actionSel){
+      actionSel.innerHTML='<option value="">All actions</option>'+(data.actions||[]).map(v=>'<option value="'+escHtml(v)+'">'+escHtml(cap(v))+'</option>').join('');
+      actionSel.value=auditFilter.action||'';
+    }
+  }catch(_){}
+}
 function clearAuditFilters(){
-  const sIn=document.getElementById('auditSearch');if(sIn)sIn.value='';
-  const dIn=document.getElementById('auditDecisionFilter');if(dIn)dIn.value='';
-  const rIn=document.getElementById('auditRoleFilter');if(rIn)rIn.value='';
-  auditFilter.search='';auditFilter.decision='';auditFilter.role='';auditFilter.offset=0;
+  auditFilter.from='';auditFilter.to='';auditFilter.search='';auditFilter.actor='';auditFilter.action='';auditFilter.offset=0;
+  // order is a sort control, not a filter — left untouched by "Clear all".
+  applyAuditFilterToInputs();
+  syncAuditUrl();
   loadAudit();
 }
 function renderAuditTable(records){
   const tb=document.getElementById('auditBody');
   if(!records.length){
-    const hasFilters=!!(auditFilter.search||auditFilter.decision||auditFilter.role);
-    const msg=hasFilters?'No audit records match these filters':'No audit records yet';
-    const sub=hasFilters?'Try clearing your filters or adjust the search.':'Analyse a CV and click "Save to audit" to start tracking decisions.';
-    const btn=hasFilters?'<button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px" data-action="clearAuditFilters">Clear filters</button>':'';
+    const hasFilters=auditActiveFilterCount()>0;
+    const msg=hasFilters?'No events match these filters':'No audit events yet';
+    const sub=hasFilters?'Try widening the date range or clearing the filters.':'Analyse a CV and click "Save to audit" to start tracking decisions.';
+    const btn=hasFilters?'<button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px" data-action="clearAuditFilters">Clear all filters</button>':'';
     const icon='<div class="empty-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
     tb.innerHTML='<tr><td colspan="12"><div class="empty-state-rich">'+icon+'<div class="empty-title">'+msg+'</div><div class="empty-sub">'+sub+'</div>'+btn+'</div></td></tr>';return;
   }
@@ -2471,7 +2678,7 @@ function renderAuditTable(records){
     const pill=s>=getScoreThreshold()?'pill-hi':s>=50?'pill-med':'pill-lo';
     return '<tr>'+
       '<td style="font-size:11px;color:#9ca3af;white-space:nowrap">'+date+'</td>'+
-      '<td style="font-weight:600;color:#111827">'+escHtml(rec.candidateName)+(rec.anonymized?' <span style="font-size:10px;color:#9ca3af">(anon)</span>':'')+'</td>'+
+      '<td><button type="button" class="audit-cand-link" data-action="auditFilterCandidate" data-cid="'+escHtml(rec.candidateId||'')+'" title="Show all events for this candidate">'+escHtml(rec.candidateName)+'</button>'+(rec.anonymized?' <span style="font-size:10px;color:#9ca3af">(anon)</span>':'')+(rec.candidateLegacy?' <span class="legacy-badge" title="Pre-migration record: identity was derived from the candidate name, so it may merge different applicants who share a name. Records created after the migration use a reliable per-CV identity.">legacy ID</span>':'')+'</td>'+
       '<td style="color:#6b7280;font-size:12px">'+escHtml(rec.role||'—')+'</td>'+
       '<td><span class="score-pill '+pill+'">'+s+'</span></td>'+
       '<td>'+(rec.scores?.keywords??'—')+'</td><td>'+(rec.scores?.skills??'—')+'</td>'+
@@ -2514,7 +2721,11 @@ async function exportAuditCsv(){
   if(!API)return;
   try{
     const d=await api('/api/auth/download-token',{method:'POST'});
-    const a=document.createElement('a');a.href=API+'/api/audit/export/csv?dt='+encodeURIComponent(d.token);a.download='audit-log.csv';a.click();
+    // Export mirrors the active filters + order so the CSV matches the view.
+    const extra=buildAuditExportQuery();
+    const a=document.createElement('a');
+    a.href=API+'/api/audit/export/csv?dt='+encodeURIComponent(d.token)+(extra?'&'+extra:'');
+    a.download='audit-log.csv';a.click();
   }catch(e){handleApiError(e,'Could not export CSV');}
 }
 
@@ -2772,6 +2983,8 @@ async function populateOrgSettings(){
     });
     const note=document.getElementById('retOwnerNote');
     if(note)note.style.display=isOwner?'none':'block';
+    document.querySelectorAll('.ret-preset').forEach(function(b){b.disabled=!isOwner;});
+    if(isOwner)loadRetentionStats();
     // Report branding — owner only.
     const bsec=document.getElementById('brandingSection');
     if(bsec)bsec.style.display=isOwner?'block':'none';
@@ -2901,14 +3114,111 @@ async function removeMember(id,email){
   try{ await api('/api/team/member/'+encodeURIComponent(id),{method:'DELETE'}); toast('Member removed.','success'); populateTeam(); }
   catch(e){handleApiError(e,'Could not remove member');}
 }
+// Current server-side retention, tracked so we can detect a *lowering* change.
+const RET_FLOOR_DAYS=180;
+let _retentionDays=null;
+function retMonths(days){return Math.round(days/30.44*10)/10;}
+function retentionTradeoff(days){
+  if(!days)return '';
+  const m=Math.round(days/30.44);
+  return 'Keeping ~'+m+' months of audit history. Longer preserves your evidence trail; shorter holds less applicant personal data. Minimum '+RET_FLOOR_DAYS+' days (six-month regulatory floor).';
+}
+function setActiveRetPreset(days){
+  document.querySelectorAll('.ret-preset').forEach(function(b){
+    b.classList.toggle('active',parseInt(b.dataset.days,10)===days);
+  });
+}
+function setRetentionPreset(el){
+  const days=parseInt(el.dataset.days,10);
+  const inp=document.getElementById('setRetentionDays');
+  if(inp)inp.value=days;
+  setActiveRetPreset(days);
+  const t=document.getElementById('retTradeoff');if(t)t.textContent=retentionTradeoff(days);
+}
+async function loadRetentionStats(){
+  if(!API||!getSessionToken())return;
+  try{
+    const s=await api('/api/org/retention');
+    _retentionDays=s.retentionDays;
+    const inp=document.getElementById('setRetentionDays');
+    if(inp&&document.activeElement!==inp)inp.value=s.retentionDays;
+    setActiveRetPreset(s.retentionDays);
+    const t=document.getElementById('retTradeoff');if(t)t.textContent=retentionTradeoff(s.retentionDays);
+    renderRetentionStats(s);
+    renderPurgeRuns(s.purgeRuns||[]);
+  }catch(_){/* non-owners get 403; leave the basic controls */}
+}
+function fmtDate(iso){return iso?new Date(iso).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—';}
+function fmtDateTime(iso){return iso?new Date(iso).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';}
+function renderRetentionStats(s){
+  const el=document.getElementById('retStats');if(!el)return;
+  const nextLine=s.lastPurgeAt
+    ? 'Next purge: within 24h of the daily job (last ran '+fmtDateTime(s.lastPurgeAt)+')'
+    : 'Next purge: within 24h (the daily job has not run yet)';
+  const wouldNow=s.wouldDeleteNow>0
+    ? '<span class="ret-warn">'+s.wouldDeleteNow+' row(s) are past the window and will be removed on the next purge.</span>'
+    : 'No rows are currently past the retention window.';
+  const modeLine=s.purgeMode==='live'
+    ? '<div><span class="ret-k">Purge mode:</span> <strong>Live</strong> — the daily job deletes rows past the window.</div>'
+    : '<div><span class="ret-warn">Purge mode: Dry run</span> — the daily job reports what it would delete but deletes nothing.</div>';
+  el.style.display='';
+  el.innerHTML=
+    modeLine+
+    '<div><span class="ret-k">Audit rows stored:</span> <strong>'+(s.rowCount||0)+'</strong></div>'+
+    '<div><span class="ret-k">Oldest retained event:</span> '+fmtDate(s.oldestCreatedAt)+'</div>'+
+    '<div><span class="ret-k">Deletes events before:</span> '+fmtDate(s.cutoffDate)+' ('+retMonths(s.effectiveRetentionDays)+' months)</div>'+
+    '<div>'+nextLine+'</div>'+
+    '<div>'+wouldNow+'</div>';
+}
+function renderPurgeRuns(runs){
+  const wrap=document.getElementById('retHistoryWrap');
+  const host=document.getElementById('retHistory');
+  if(!wrap||!host)return;
+  if(!runs.length){wrap.style.display='none';host.innerHTML='';return;}
+  wrap.style.display='';
+  host.innerHTML='<table class="ret-runs"><thead><tr>'+
+    '<th>Ran at</th><th>Cutoff</th><th>Rows</th><th>Duration</th><th>Status</th>'+
+    '</tr></thead><tbody>'+
+    runs.map(function(r){
+      const isDry=r.status==='dryrun';
+      const st=r.status==='error'?'st-error':(isDry?'st-dryrun':'st-success');
+      const stTxt=r.status==='error'
+        ? ('error'+(r.errorText?' — '+escHtml(String(r.errorText).slice(0,60)):''))
+        : (isDry?'dry run':'success');
+      const rowsTxt=isDry?((r.rowsDeleted||0)+' would delete'):(r.rowsDeleted||0);
+      return '<tr'+(isDry?' class="ret-run-dry"':'')+'>'+
+        '<td>'+fmtDateTime(r.ranAt)+'</td>'+
+        '<td>'+fmtDate(r.cutoffDate)+'</td>'+
+        '<td>'+rowsTxt+'</td>'+
+        '<td>'+(r.durationMs!=null?r.durationMs+' ms':'—')+'</td>'+
+        '<td class="'+st+'">'+stTxt+'</td>'+
+        '</tr>';
+    }).join('')+'</tbody></table>';
+}
 async function saveRetention(){
   const inp=document.getElementById('setRetentionDays');
   const days=parseInt(inp&&inp.value,10);
-  if(isNaN(days)||(days!==0&&(days<30||days>1095))){toast('Retention must be 0 (keep until deleted) or between 30 and 1095 days.','error');return;}
+  if(isNaN(days)||days<RET_FLOOR_DAYS){
+    toast('Retention must be at least '+RET_FLOOR_DAYS+' days — the EU AI Act sets a six-month floor for automatically generated logs.','error');
+    return;
+  }
+  // Lowering retention permanently deletes rows on the next purge — confirm with
+  // the exact, server-computed count before saving.
+  if(_retentionDays!=null&&days<_retentionDays){
+    let wouldDelete=0;
+    try{const p=await api('/api/org/retention/preview?days='+encodeURIComponent(days));wouldDelete=p.wouldDelete||0;}
+    catch(_){/* fall through — still confirm, just without a precise count */}
+    const msg=wouldDelete>0
+      ? 'Lowering retention to '+days+' days will permanently delete '+wouldDelete+' audit record(s) on the next purge. This is irreversible.'
+      : 'Lowering retention to '+days+' days. No rows are past the new window yet, but records will be permanently deleted as they age past it.';
+    const ok=await confirmModal({title:'Lower retention?',message:msg,confirmLabel:'Lower retention',danger:true});
+    if(!ok)return;
+  }
   const btn=document.getElementById('retSaveBtn');if(btn)btn.disabled=true;
   try{
     await api('/api/org',{method:'PATCH',body:JSON.stringify({retentionDays:days})});
-    toast(days===0?'Retention set: keep until manually deleted.':'Retention set to '+days+' days.','success');
+    toast('Retention set to '+days+' days.','success');
+    await loadRetentionStats();
   }catch(e){handleApiError(e,'Could not save retention');}
   finally{if(btn)btn.disabled=false;}
 }
@@ -3517,7 +3827,7 @@ const delegatedHandlers = {
     focusAuditSearch, doLogout, toggleSettings,
     startCheckout: (el) => startCheckout(el.dataset.plan),
     openBillingPortal, inviteMember, copyInviteLink, saveBranding,
-    saveSettings, changePassword, saveRetention, exportOrgData, deleteAllOrgData,
+    saveSettings, changePassword, saveRetention, setRetentionPreset, exportOrgData, deleteAllOrgData,
     setMode: (el) => setMode(el.dataset.mode),
     trySample, clearSample,
     toggleTplPanel: (el, e) => toggleTplPanel(e),
@@ -3528,7 +3838,7 @@ const delegatedHandlers = {
     sortBatch: (el) => sortBatch(el.dataset.sort),
     loadAudit, exportAuditCsv, loadRoles,
     removeFile: (el) => removeFile(el.dataset.file),
-    clearAuditFilters,
+    clearAuditFilters, toggleAuditOrder, auditPreset, auditFilterCandidate,
     openInfoModal: (el) => openInfoModal(Number(el.dataset.index)),
     switchModalTab: (el) => switchModalTab(Number(el.dataset.index)),
     closeInfoModal,
@@ -3537,12 +3847,12 @@ const delegatedHandlers = {
   change: {
     setAutosaveBatch: (el) => setAutosaveBatch(el.checked),
     handleFiles: (el) => handleFiles(el.files),
-    filterAudit,
+    filterAuditNow,
   },
   input: {
     syncSlider: (el) => { syncSlider(el.dataset.weight); updateWeightSum(); },
     syncInput: (el) => { syncInput(el.dataset.weight); updateWeightSum(); },
-    filterAudit,
+    filterAuditSearch,
   },
 };
 Object.keys(delegatedHandlers).forEach(function(eventType){
