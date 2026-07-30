@@ -1135,6 +1135,7 @@ img, video, table { max-width: 100%; }
         <div class="dz-label" id="dropLabel">Drop PDF or DOCX here, or click to browse</div>
         <div class="dz-sub" id="dropSub">Supports PDF and DOCX &middot; Max 10 MB per file</div>
       </div>
+      <div id="fileListHead" style="display:none;justify-content:space-between;align-items:center;margin-bottom:8px"></div>
       <div class="file-list" id="fileList"></div>
     </div>
   </div>
@@ -2255,9 +2256,13 @@ function setMode(m){
   document.getElementById('uploadCardTitle').textContent=m==='single'?'Upload CV':'Upload CVs (up to 200)';
   document.getElementById('dropLabel').textContent=m==='single'?'Drop PDF or DOCX here, or click to browse':'Drop multiple CVs here, or click to browse';
   document.getElementById('cvInput').multiple=m==='batch';
-  clearResults();selectedFiles=[];renderFileList();
+  clearResults();selectedFiles=[];resetFileInput();renderFileList();
 }
 
+// Reset the file input's value so re-selecting the SAME file(s) still fires a
+// change event (browsers suppress it as "unchanged" otherwise). Defensive:
+// setMode can run before #cvInput exists.
+function resetFileInput(){ const el=document.getElementById('cvInput'); if(el) el.value=''; }
 function handleFiles(files){
   const arr=Array.from(files);
   if(mode==='single'){selectedFiles=arr.slice(0,1);}
@@ -2275,11 +2280,36 @@ function handleFiles(files){
   renderFileList();
 }
 function handleDrop(ev){ev.preventDefault();document.getElementById('dropzone').classList.remove('drag');handleFiles(ev.dataTransfer.files);}
-function removeFile(name){selectedFiles=selectedFiles.filter(f=>f.name!==name);renderFileList();}
+function removeFile(name){selectedFiles=selectedFiles.filter(f=>f.name!==name);resetFileInput();renderFileList();}
+// Remove every staged CV in one action. Confirms first when more than 5 are
+// staged so a full batch isn't wiped by an accidental click.
+async function clearAllFiles(){
+  const n=selectedFiles.length;
+  if(!n)return;
+  if(n>5){
+    const ok=await confirmModal({title:'Remove all CVs',message:'Remove all '+n+' staged CVs?',confirmLabel:'Remove all',danger:true});
+    if(!ok)return;
+  }
+  selectedFiles=[];
+  resetFileInput();
+  renderFileList();
+}
 function renderFileList(){
   document.getElementById('fileList').innerHTML=selectedFiles.map(f=>
     '<div class="file-chip"><span>'+escHtml(f.name)+'</span><button data-action="removeFile" data-file="'+escHtml(f.name)+'">&#x2715;</button></div>'
   ).join('');
+  // File-list header: staged count + one Clear all. Only for batch (or >1 file);
+  // in single mode with one file the per-file remove chip is enough.
+  const head=document.getElementById('fileListHead');
+  if(head){
+    const n=selectedFiles.length;
+    const show=n>0 && (mode==='batch' || n>1);
+    head.style.display=show?'flex':'none';
+    head.innerHTML=show
+      ? '<span style="font-size:12px;color:#6b7280">'+n+' CV'+(n===1?'':'s')+' staged</span>'
+        +'<button type="button" class="btn btn-ghost btn-sm" data-action="clearAllFiles">Clear all</button>'
+      : '';
+  }
 }
 
 function updateWeightSum(){
@@ -2824,7 +2854,7 @@ function clearSample(){
   clearResults();
   const jd=document.getElementById('jdInput');if(jd)jd.value='';
   const role=document.getElementById('roleInput');if(role)role.value='';
-  selectedFiles=[];if(typeof renderFileList==='function')renderFileList();
+  selectedFiles=[];resetFileInput();if(typeof renderFileList==='function')renderFileList();
 }
 function showErr(el,msg){el.className='msg msg-err';el.textContent=msg;el.style.display='block';}
 function showWarn(el,msg){el.className='msg msg-warn';el.textContent=msg;el.style.display='block';}
@@ -3838,6 +3868,7 @@ const delegatedHandlers = {
     sortBatch: (el) => sortBatch(el.dataset.sort),
     loadAudit, exportAuditCsv, loadRoles,
     removeFile: (el) => removeFile(el.dataset.file),
+    clearAllFiles,
     clearAuditFilters, toggleAuditOrder, auditPreset, auditFilterCandidate,
     openInfoModal: (el) => openInfoModal(Number(el.dataset.index)),
     switchModalTab: (el) => switchModalTab(Number(el.dataset.index)),
