@@ -49,10 +49,29 @@ const COLOR = {
   accent: '#3A5BC7',
 };
 
+// Small mono brandmark for the free-tier footer credit. Reuses the brandmark
+// the rest of the product already ships — read once at startup (a static asset,
+// not org data) and recoloured from the source's #000 to the footer's muted
+// tone so it sits with the existing design tokens. pdfmake 0.2.x renders SVG
+// nodes server-side, so no raster copy and no extra dependency is needed.
+const CREDIT_MARK_PATH = path.join(__dirname, '..', '..', 'public', 'brandmark.svg');
+let CREDIT_MARK_SVG = null;
+try {
+  CREDIT_MARK_SVG = require('fs').readFileSync(CREDIT_MARK_PATH, 'utf8').replaceAll('#000', COLOR.muted);
+} catch (_) {
+  // Asset missing (unexpected): degrade to a text-only credit rather than
+  // failing report generation outright.
+}
+
 // Resolve org branding for the report, with safe fallbacks. Only a valid
 // 6-digit #hex colour is accepted; anything else falls back to the default
 // accent. Name falls back to "CVsprings". (Name is rendered as a pdfmake text
 // node, which is not HTML — no injection risk from the string.)
+//
+// showCredit/creditText are pass-through only: whether a credit is owed is
+// decided by services/branding.resolveBranding(), the single entitlement
+// authority. This module never inspects a plan. A doc built without going
+// through that helper (e.g. a direct buildReportDoc() call) renders no credit.
 const DEFAULT_BRAND = { name: 'CVsprings', color: COLOR.accent };
 function resolveReportBranding(branding) {
   const b = branding || {};
@@ -60,7 +79,16 @@ function resolveReportBranding(branding) {
     ? b.color : DEFAULT_BRAND.color;
   const name = (typeof b.name === 'string' && b.name.trim())
     ? b.name.trim() : DEFAULT_BRAND.name;
-  return { name, color };
+  return { name, color, showCredit: !!b.showCredit, creditText: b.creditText || null };
+}
+
+// Footer credit: brandmark beside the credit string, at footer scale. The text
+// is whatever resolveBranding() supplied — never a literal in render code.
+function freeTierCredit(text) {
+  const columns = [];
+  if (CREDIT_MARK_SVG) columns.push({ svg: CREDIT_MARK_SVG, width: 7.5, margin: [0, 0.5, 0, 0] });
+  columns.push({ text: String(text || ''), style: 'foot' });
+  return { width: 'auto', columns, columnGap: 3 };
 }
 
 function band(score) {
@@ -195,8 +223,9 @@ function buildReportDoc(audit, branding) {
     footer: (currentPage, pageCount) => ({
       margin: [48, 0, 48, 24],
       columns: [
-        { text: `Report ID: ${audit.id || '—'}`, style: 'foot' },
-        { text: `Page ${currentPage} of ${pageCount}`, style: 'foot', alignment: 'right' },
+        { text: `Report ID: ${audit.id || '—'}`, style: 'foot', width: '*' },
+        ...(brand.showCredit ? [freeTierCredit(brand.creditText)] : []),
+        { text: `Page ${currentPage} of ${pageCount}`, style: 'foot', alignment: 'right', width: '*' },
       ],
     }),
 
@@ -401,6 +430,11 @@ function streamReport(audit, res, filename, branding) {
   const pdfDoc = printer.createPdfKitDocument(docDef);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${filename || 'cvsprings-report.pdf'}"`);
+  // Branding is plan-dependent and resolved per request, so a cached copy could
+  // outlive a plan change and serve an org the branding it no longer pays for
+  // (or keep nagging one that now does). no-store also keeps candidate PDFs out
+  // of shared caches on the path — these responses go through a CDN proxy.
+  res.setHeader('Cache-Control', 'no-store');
   pdfDoc.pipe(res);
   pdfDoc.end();
 }
