@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { insertAudit, deleteAudit, getRoles, getRoleHistory, getAuditById, updateAudit, getAuditChanges, getAuditsByTenant, queryAuditLog, getFilteredAuditRows, getAuditFilterValues, isLegacyCandidateFilter, getOrgTimezone } = require('../services/db');
+const { insertAudit, deleteAudit, getRoles, getRoleHistory, getAuditById, updateAudit, getAuditChanges, getAuditsByTenant, queryAuditLog, getFilteredAuditRows, getAuditFilterValues, isLegacyCandidateFilter, getOrgTimezone, getOrgBilling } = require('../services/db');
 const { startOfZonedDayUtc, endOfZonedDayUtc, formatInTimeZone } = require('../services/timezone');
 const { analyzeBias } = require('../services/biasAudit');
 const { getOrganizationBranding } = require('../services/authService');
@@ -534,7 +534,10 @@ router.get('/report/:id', async (req, res) => {
   try {
     const record = getAuditById(req.params.id, req.orgId);
     if (!record) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
-    const branding = resolveBranding(getOrganizationBranding(req.orgId));
+    // Branding entitlement is resolved here, at generation time, from the org's
+    // current billing row — so a plan change (including a downgrade) applies to
+    // the very next report with nothing to invalidate.
+    const branding = resolveBranding(getOrganizationBranding(req.orgId), getOrgBilling(req.orgId));
     return streamReport(record, res, `cvsprings-report-${record.id}.pdf`, branding);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
