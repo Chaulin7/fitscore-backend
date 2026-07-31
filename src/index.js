@@ -16,7 +16,7 @@ const billingRouter = require('./routes/billing');
 const teamRouter = require('./routes/team');
 const demoRouter = require('./routes/demo');
 const { migrateLegacyData } = require('./services/authService');
-const { getDb, purgeExpiredAudits, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
+const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { mutationLimiter } = require('./middleware/rateLimits');
 
 // Optional pino logger (graceful fallback if not installed yet)
@@ -176,7 +176,7 @@ app.get('/eu-ai-act-checklist.pdf', (req, res) => {
 // nonce that no longer matches the fresh CSP header. These routes are
 // registered BEFORE express.static, and static gets index:false, so the raw
 // placeholder files are never reachable (neither via / nor /index.html).
-const HTML_PAGES = ['index.html', 'app.html', 'landing.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html'];
+const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html'];
 const htmlTemplates = {};
 for (const page of HTML_PAGES) {
   htmlTemplates[page] = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8');
@@ -286,23 +286,13 @@ migrateLegacyData(logger ? logger.info.bind(logger) : console.log)
     else console.error('[error] legacy data migration failed:', err.message);
   });
 
-// --- Retention purge (GDPR storage limitation) ------------------------------
-// Daily job: hard-deletes audit records (and change history) older than each
-// org's retention setting. Logs counts only — never record contents.
-function runRetentionPurge() {
-  const log = logger ? logger.info.bind(logger) : console.log;
-  try {
-    const { recordsDeleted, changesDeleted, orgsChecked } = purgeExpiredAudits();
-    if (recordsDeleted || changesDeleted) {
-      log(`[retention] Purged ${recordsDeleted} audit record(s) and ${changesDeleted} change row(s) across ${orgsChecked} org(s)`);
-    }
-  } catch (err) {
-    if (logger) logger.error({ err: err.message }, 'retention purge failed');
-    else console.error('[error] retention purge failed:', err.message);
-  }
-}
-runRetentionPurge();
-setInterval(runRetentionPurge, 24 * 60 * 60 * 1000).unref();
+// --- Retention purge (EU AI Act Art. 19 floor + GDPR storage limitation) ----
+// The batched daily job lives in services/db.js: per-org and floor-enforced, it
+// writes one purge_runs record per org per run and an append-only purge audit
+// event, then WAL-checkpoints. The schedule self-gates to ~daily and survives
+// frequent restarts; its timer is .unref()'d and cleared by the graceful
+// shutdown path (closeDb).
+startRetentionSchedule();
 
 // Keep the WAL from growing without bound while the process is up (folds it
 // back into the main DB every 5 minutes; the timer is .unref()'d).

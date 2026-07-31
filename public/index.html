@@ -54,7 +54,9 @@ nav{border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--p
 nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
 .wordmark{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.01em;text-decoration:none;display:flex;align-items:center;gap:10px}
 .wordmark .wordtext > span{color:var(--stamp)}
-.logomark{width:30px;height:30px;flex:none;display:block;mix-blend-mode:multiply} /* logo.png has a solid white bg; multiply melts it into the paper background */
+/* Shared brand mark: same /brandmark.svg as the app, via CSS mask so colour
+   comes from currentColor (dark-on-paper here, white-on-navy in the app). */
+.logomark{width:30px;height:30px;flex:none;display:inline-block;color:var(--ink);background-color:currentColor;-webkit-mask:url(/brandmark.svg) center/contain no-repeat;mask:url(/brandmark.svg) center/contain no-repeat}
 .navlinks{display:flex;align-items:center;gap:24px;font-size:14px}
 .navlinks a{text-decoration:none;color:var(--ink-soft)}
 .navlinks a:hover{color:var(--ink)}
@@ -131,7 +133,12 @@ h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.4vw,36px);l
 .tier li{padding:7px 0;border-top:1px solid var(--rule)}
 .tier li::before{content:"—";margin-right:10px;color:var(--rule)}
 .tier .btn{margin-top:24px;text-align:center}
-.pricing-note{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:20px}
+.included{margin-top:28px;border:1px solid var(--rule);background:var(--panel);padding:24px 28px}
+.included-head{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--stamp);margin-bottom:12px}
+.included ul{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:0 28px;font-size:14px;color:var(--ink-soft)}
+@media(max-width:820px){.included ul{grid-template-columns:1fr}}
+.included li{padding:6px 0}
+.included li::before{content:"—";margin-right:10px;color:var(--rule)}
 
 /* ---------- demo ---------- */
 .demo{padding:80px 0;border-bottom:1px solid var(--rule)}
@@ -178,7 +185,7 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 <nav>
   <div class="wrap">
     <a class="wordmark" href="/" aria-label="CVsprings home">
-      <img class="logomark" src="/logo.png" alt="" aria-hidden="true">
+      <span class="logomark" aria-hidden="true"></span>
       <span class="wordtext">CV<span>springs</span></span>
     </a>
     <div class="navlinks">
@@ -285,46 +292,10 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 <section class="pricing" id="pricing">
   <div class="wrap">
     <div class="section-eyebrow">Pricing</div>
-    <h2>Priced on job profiles, not CV volume.</h2>
-    <div class="tiers">
-      <div class="tier">
-        <h3>Free</h3>
-        <div class="price">€0<small> /month</small></div>
-        <div class="meter">1 active job profile</div>
-        <ul>
-          <li>Deterministic scoring engine</li>
-          <li>Skill &amp; eligibility extraction</li>
-          <li>Basic assessment view</li>
-        </ul>
-        <a class="btn btn-ghost" href="/signup">Start free</a>
-      </div>
-      <div class="tier featured">
-        <div class="badge">Most agencies</div>
-        <h3>Pro</h3>
-        <div class="price">€49<small> /month</small></div>
-        <div class="meter">5 active job profiles</div>
-        <ul>
-          <li>Everything in Free</li>
-          <li>Branded PDF assessment reports</li>
-          <li>Full audit-trail export</li>
-          <li>Unlimited CVs per profile</li>
-        </ul>
-        <a class="btn btn-primary" href="#demo">Book a demo</a>
-      </div>
-      <div class="tier">
-        <h3>Team</h3>
-        <div class="price">€199<small> /month</small></div>
-        <div class="meter">25 active job profiles</div>
-        <ul>
-          <li>Everything in Pro</li>
-          <li>Bias monitoring report</li>
-          <li>Multi-user access</li>
-          <li>Priority support</li>
-        </ul>
-        <a class="btn btn-ghost" href="#demo">Book a demo</a>
-      </div>
-    </div>
-    <div class="pricing-note">An "active job profile" is a role you're currently screening for. Archive it when the role closes — it stops counting.</div>
+    <h2>Simple, transparent pricing.</h2>
+    <!-- Both filled from /plans.js at the bottom of this page — see the note there. -->
+    <div class="tiers" id="pricingTiers"></div>
+    <div class="included" id="pricingIncluded"></div>
   </div>
 </section>
 
@@ -387,6 +358,47 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   </div>
 </footer>
 
+<!-- Shared tier definitions (single source of truth; also used by the in-product Settings). -->
+<script nonce="__CSP_NONCE__" src="/plans.js"></script>
+<script nonce="__CSP_NONCE__">
+(function(){
+  // Pricing cards render from window.CVSPRINGS_PLANS (/plans.js) — the same tier
+  // definitions Settings uses in-product, so price, limit and feature copy is
+  // written once. `baseline` (available on every plan) renders as one shared list
+  // below the cards rather than being repeated identically in all three. Only the
+  // marketing CTA is page-specific, so it lives here rather than in plans.js.
+  var cfg=window.CVSPRINGS_PLANS;
+  var grid=document.getElementById('pricingTiers');
+  var included=document.getElementById('pricingIncluded');
+  if(!cfg||!grid)return;
+  var FALLBACK_CTA={href:'#demo',label:'Book a demo',cls:'btn-ghost'};
+  var CTA={
+    free:{href:'/signup',label:'Start free',cls:'btn-ghost'},
+    pro:{href:'#demo',label:'Book a demo',cls:'btn-primary'},
+    team:{href:'#demo',label:'Book a demo',cls:'btn-ghost'}
+  };
+  var BADGE={pro:'Most agencies'};
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+  grid.innerHTML=(cfg.tiers||[]).map(function(t){
+    var cta=CTA[t.id]||FALLBACK_CTA;
+    return '<div class="tier'+(t.featured?' featured':'')+'">'
+      +(BADGE[t.id]?'<div class="badge">'+esc(BADGE[t.id])+'</div>':'')
+      +'<h3>'+esc(t.name)+'</h3>'
+      +'<div class="price">'+esc(t.priceLabel)+'<small> '+esc(t.per)+'</small></div>'
+      +(t.tagline?'<div class="meter">'+esc(t.tagline)+'</div>':'')
+      +'<ul>'+(t.highlights||[]).map(function(h){return '<li>'+esc(h)+'</li>';}).join('')+'</ul>'
+      +'<a class="btn '+cta.cls+'" href="'+esc(cta.href)+'">'+esc(cta.label)+'</a>'
+      +'</div>';
+  }).join('');
+
+  var baseline=cfg.baseline||[];
+  if(included&&baseline.length){
+    included.innerHTML='<div class="included-head">Included on every plan</div>'
+      +'<ul>'+baseline.map(function(b){return '<li>'+esc(b)+'</li>';}).join('')+'</ul>';
+  }
+})();
+</script>
 <script nonce="__CSP_NONCE__">
 (function(){
   // Repro panel: "Run again" re-stamps run 2 with the current time, same output.

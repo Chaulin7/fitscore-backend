@@ -10,7 +10,12 @@
 //   node scripts/extraction-golden.mjs --write    # write/update the baseline manifest
 //   node scripts/extraction-golden.mjs --verify   # compare against the committed manifest
 //
-// Dataset dir: $CV_DATASET_DIR (defaults to the local validation set).
+// Dataset dir: $CV_DATASET_DIR (defaults to the committed test/fixtures set, so
+// CI and Render run this with zero env config). Baselines are keyed to the
+// dataset: the committed fixtures use the tracked extraction-baseline.json; any
+// other dataset gets its own gitignored extraction-baseline.<slug>.json, so
+// pointing the gate at a private CV corpus never commits real-CV hashes and
+// never drifts against the fixtures baseline.
 // Exit codes: 0 ok; 1 instability or baseline drift; 2 usage/dataset error.
 
 import { createRequire } from 'module';
@@ -22,9 +27,21 @@ const require = createRequire(import.meta.url);
 const { extractPdfText } = require('../src/services/pdfExtractor.js');
 
 const RUNS = 10;
-const DATASET_DIR = process.env.CV_DATASET_DIR
-  || "/Users/jasperjoy/Desktop/claude folder/test cv's";
-const BASELINE_PATH = fileURLToPath(new URL('../test/golden/extraction-baseline.json', import.meta.url));
+const DEFAULT_DATASET_DIR = fileURLToPath(new URL('../test/fixtures', import.meta.url));
+const DATASET_DIR = process.env.CV_DATASET_DIR || DEFAULT_DATASET_DIR;
+
+// Resolve the baseline manifest for a dataset. The default fixtures use the one
+// committed baseline; any override (a non-default CV_DATASET_DIR) reads/writes
+// its own gitignored baseline keyed by a slug of the directory name.
+function baselineFor(datasetDir) {
+  const resolved = path.resolve(datasetDir);
+  if (resolved === path.resolve(DEFAULT_DATASET_DIR)) {
+    return fileURLToPath(new URL('../test/golden/extraction-baseline.json', import.meta.url));
+  }
+  const slug = (path.basename(resolved).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'custom').toLowerCase();
+  return fileURLToPath(new URL(`../test/golden/extraction-baseline.${slug}.json`, import.meta.url));
+}
+const BASELINE_PATH = baselineFor(DATASET_DIR);
 
 const mode = process.argv[2];
 if (mode !== '--write' && mode !== '--verify') {
@@ -109,7 +126,7 @@ if (mode === '--write') {
   console.log(`baseline written: ${path.relative(process.cwd(), BASELINE_PATH)}`);
 } else {
   if (!fs.existsSync(BASELINE_PATH)) {
-    console.error('No committed baseline found — run extraction:baseline first.');
+    console.error(`No baseline for this dataset at ${path.relative(process.cwd(), BASELINE_PATH)} — run extraction:baseline first (with the same CV_DATASET_DIR).`);
     process.exit(2);
   }
   const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));

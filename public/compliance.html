@@ -11,8 +11,8 @@
 body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
 .topbar{background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);padding:0 32px;height:60px;display:flex;align-items:center;gap:20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);position:sticky;top:0;z-index:100}
 .topbar-brand{display:flex;align-items:center;gap:5px;margin-right:auto;text-decoration:none}
-.logo-ring{display:inline-flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:50%;border:2px solid rgba(255,255,255,0.85);flex-shrink:0}
-.logo-ring-img{width:48px;height:48px;object-fit:contain;filter:invert(1) brightness(1.15);mix-blend-mode:screen}
+/* Shared brand mark via CSS mask of /brandmark.svg (single source; colour from currentColor). */
+.brandmark{display:inline-block;flex-shrink:0;width:50px;height:50px;color:#fff;background-color:currentColor;-webkit-mask:url(/brandmark.svg) center/contain no-repeat;mask:url(/brandmark.svg) center/contain no-repeat}
 .brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.4px}
 .brand-name em{font-style:normal;color:#7dd3fc}
 .nav-btn{background:none;border:none;color:rgba(255,255,255,0.65);font:600 13px 'Inter',sans-serif;padding:7px 15px;border-radius:6px;cursor:pointer;letter-spacing:.03em;transition:all .18s;text-decoration:none}
@@ -54,10 +54,10 @@ td:first-child{font-weight:600;color:#0f2847;white-space:nowrap}
 <body>
 <div class="topbar">
   <a class="topbar-brand" href="/">
-    <span class="logo-ring"><img class="logo-ring-img" src="/logo.png" alt="CVsprings logo"></span>
+    <span class="brandmark" aria-hidden="true"></span>
     <span class="brand-name">CV<em>springs</em></span>
   </a>
-  <a class="nav-btn" href="/">App</a>
+  <a class="nav-btn" href="/login">App</a>
   <a class="nav-btn" href="/bias-report.html">Bias &amp; Monitoring</a>
   <a class="nav-btn" href="/privacy.html">Privacy</a>
   <a class="nav-btn" href="/terms.html">Terms</a>
@@ -149,7 +149,7 @@ td:first-child{font-weight:600;color:#0f2847;white-space:nowrap}
 </div>
 
 <footer class="site-footer">
-  CVsprings &mdash; AI-powered candidate fit analysis &nbsp;&middot;&nbsp; <a href="/">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/bias-report.html">Bias &amp; monitoring</a> &nbsp;&middot;&nbsp; <a href="/privacy.html">Privacy Policy</a> &nbsp;&middot;&nbsp; <a href="/terms.html">Terms</a> &nbsp;&middot;&nbsp; <a href="/integrations.html">Integrations</a>
+  CVsprings &mdash; AI-powered candidate fit analysis &nbsp;&middot;&nbsp; <a href="/login">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/bias-report.html">Bias &amp; monitoring</a> &nbsp;&middot;&nbsp; <a href="/privacy.html">Privacy Policy</a> &nbsp;&middot;&nbsp; <a href="/terms.html">Terms</a> &nbsp;&middot;&nbsp; <a href="/integrations.html">Integrations</a>
 </footer>
 
 <script nonce="__CSP_NONCE__">
