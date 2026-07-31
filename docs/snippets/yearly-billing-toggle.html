@@ -1,0 +1,77 @@
+<!--
+  Monthly/Yearly billing toggle — salvaged from the deleted public/landing.html
+  before that page was removed (2026-07-31). NOT wired into any live page.
+
+  Kept because annual billing is a plausible future addition and this is a
+  working, already-designed implementation of the interaction: a segmented
+  Monthly/Yearly control that rewrites every price on the page and persists the
+  choice in localStorage under `cvsprings_price_period`.
+
+  IF YOU REVIVE THIS, three things have changed since it was written:
+
+  1. Prices now come from window.CVSPRINGS_PLANS (public/plans.js), which is the
+     single source of truth for tiers and is rendered by public/index.html and
+     the Settings pane in public/app.html. The `data-base="49"` attribute this
+     script reads no longer exists in the markup. Add a `priceYearly` (or
+     `priceLabelYearly`) field per tier in plans.js and re-render from that
+     rather than reintroducing a hardcoded base price + 0.8 multiplier here.
+  2. The 20% discount below was marketing copy, never a real Stripe price. Real
+     annual billing needs a second Stripe price ID per tier and a `period`
+     argument threaded through POST /api/billing/checkout.
+  3. The palette differs. The CSS uses landing.html's dark variables
+     (--line, --primary); index.html's light palette uses --rule, --ink,
+     --paper, --panel, --stamp. Remap before reuse.
+
+  landing.html also carried the `cvsprings_price_period` value into its
+  waitlist-intent flow (see docs/PHASE_2A_FRONTEND.md §5); that flow is gone
+  too, so nothing reads the stored key today.
+-->
+
+<!-- ── Markup (sat inside the .pricing-head block, above the tier grid) ────── -->
+<div class="toggle" role="tablist" aria-label="Billing period">
+  <button id="period-monthly" class="on" type="button">Monthly</button>
+  <button id="period-yearly" type="button">Yearly</button>
+</div>
+<span class="save-note" id="save-note">Save 20% with yearly billing</span>
+
+<!-- Each price element opted in via data-base (the monthly figure, in euros):
+     <div class="price" data-base="49"><span class="amount">€49</span> <small>/ month</small></div> -->
+
+<!-- ── CSS ─────────────────────────────────────────────────────────────────── -->
+<style>
+  .toggle { display: inline-flex; background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 999px; padding: 4px; margin: 18px 0 4px; }
+  .toggle button { background: transparent; color: rgba(255,255,255,0.7); border: 0; padding: 8px 18px; border-radius: 999px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .toggle button.on { background: var(--primary); color: #fff; }
+  .save-note { display: block; color: #b6c5ff; font-size: 12px; margin-top: 8px; }
+</style>
+
+<!-- ── Behaviour ───────────────────────────────────────────────────────────── -->
+<script nonce="__CSP_NONCE__">
+  (function () {
+    const mBtn = document.getElementById('period-monthly');
+    const yBtn = document.getElementById('period-yearly');
+    const saved = localStorage.getItem('cvsprings_price_period') || 'monthly';
+    function apply(period) {
+      const yearly = period === 'yearly';
+      mBtn.classList.toggle('on', !yearly);
+      yBtn.classList.toggle('on', yearly);
+      document.querySelectorAll('.price[data-base]').forEach(el => {
+        const base = parseInt(el.getAttribute('data-base'), 10);
+        const amt = el.querySelector('.amount');
+        const small = el.querySelector('small');
+        if (yearly) {
+          const yearlyMonthly = Math.round(base * 0.8);
+          amt.textContent = '€' + yearlyMonthly;
+          small.textContent = '/ month, billed yearly';
+        } else {
+          amt.textContent = '€' + base;
+          small.textContent = '/ month';
+        }
+      });
+      localStorage.setItem('cvsprings_price_period', period);
+    }
+    mBtn.addEventListener('click', () => apply('monthly'));
+    yBtn.addEventListener('click', () => apply('yearly'));
+    apply(saved);
+  })();
+</script>

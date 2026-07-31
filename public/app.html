@@ -1383,6 +1383,8 @@ img, video, table { max-width: 100%; }
 </div>
   </div><!-- /tool-section -->
 </div>
+<!-- Shared tier definitions (single source of truth; also used by marketing). -->
+<script nonce="__CSP_NONCE__" src="/plans.js"></script>
 <script nonce="__CSP_NONCE__">
 // Frontend version recorded on every audit record (EU AI Act Art. 12 provenance)
 const CVSPRINGS_VERSION = '1.3.0';
@@ -1785,6 +1787,7 @@ async function populatePlanBilling(){
   try{ me=await api('/api/auth/me'); }catch(_){}
   const b = _billing || await refreshUsage();
   const isOwner = !!(me&&me.user&&me.user.role==='owner');
+  _isOwner = isOwner;
   const plan = (b&&b.plan)||'free';
   const planName = plan==='team'?'Team':plan==='pro'?'Pro':'Free';
   let txt = 'Current plan: <strong>'+planName+'</strong>';
@@ -1792,7 +1795,7 @@ async function populatePlanBilling(){
   if(b && b.subscriptionStatus==='past_due'){ txt += ' &middot; <span class="past-due">payment issue — please update your card</span>'; }
   else if((plan==='pro'||plan==='team')){ txt += ' &middot; unlimited analyses'; }
   line.innerHTML = txt;
-  renderPlanCompare(plan, b);
+  renderPlanCompare(plan);
 
   if(!isOwner){
     if(ownerControls)ownerControls.style.display='none';
@@ -1809,30 +1812,86 @@ async function populatePlanBilling(){
   if(manage)manage.style.display=(paid||b&&b.subscriptionStatus)?'inline-flex':'none';
 }
 
-// Pricing comparison in Settings → Plan & Billing. Prices are hardcoded copy
-// (keep in sync with Stripe prices). {limit} comes from the live usage
-// response; the Team seat text uses the seatLimit cached from
-// GET /api/team/members when available ("multiple members" until known).
-let _seatLimitCache = null;
-function renderPlanCompare(currentPlan, b){
+// Pricing comparison in Settings → Plan & Billing. Tier copy comes from the
+// shared window.CVSPRINGS_PLANS (single source of truth; see /plans.js). Each
+// card is clickable and opens a full "what's included" breakdown for ANY tier —
+// including ones the user is not on.
+let _isOwner = false; // set by populatePlanBilling; gates the upgrade CTA
+function renderPlanCompare(currentPlan){
   const el=document.getElementById('planCompare');
   if(!el)return;
-  const limitTxt=(b&&b.limit!=null)?(b.limit+' analyses/mo'):'limited analyses/mo';
-  const seatTxt=(typeof _seatLimitCache==='number')?('up to '+_seatLimitCache+' members'):'multiple members';
-  const plans=[
-    {id:'free',name:'Free',price:'€0',lines:[limitTxt,'1 user']},
-    {id:'pro',name:'Pro',price:'€49/mo',lines:['unlimited analyses','1 user']},
-    {id:'team',name:'Team',price:'€199/mo',lines:['unlimited analyses',seatTxt]},
-  ];
-  el.innerHTML='<div style="display:flex;gap:8px;margin:10px 0">'+plans.map(function(p){
+  const tiers=(window.CVSPRINGS_PLANS&&window.CVSPRINGS_PLANS.tiers)||[];
+  if(!tiers.length){el.innerHTML='';return;}
+  el.innerHTML='<div style="display:flex;gap:8px;margin:10px 0">'+tiers.map(function(p){
     const cur=p.id===currentPlan;
-    return '<div style="flex:1;border:1px solid '+(cur?'#0f2847':'#e5e7eb')+';border-radius:8px;padding:10px;background:'+(cur?'#f8fafc':'#fff')+'">'
-      +'<div style="font-weight:700;font-size:13px;color:#111827">'+p.name
+    return '<button type="button" data-action="showPlanDetail" data-plan="'+escHtml(p.id)+'" '
+      +'style="flex:1;text-align:left;cursor:pointer;font:inherit;border:1px solid '+(cur?'#0f2847':'#e5e7eb')+';border-radius:8px;padding:10px;background:'+(cur?'#f8fafc':'#fff')+'">'
+      +'<div style="font-weight:700;font-size:13px;color:#111827">'+escHtml(p.name)
       +(cur?' <span style="font-size:10px;background:#0f2847;color:#fff;border-radius:8px;padding:1px 7px;vertical-align:middle">Current</span>':'')+'</div>'
-      +'<div style="font-size:15px;font-weight:800;color:#0f2847;margin:2px 0 6px">'+p.price+'</div>'
-      +p.lines.map(function(l){return '<div style="font-size:11px;color:#6b7280">'+l+'</div>';}).join('')
-      +'</div>';
+      +'<div style="font-size:15px;font-weight:800;color:#0f2847;margin:2px 0 6px">'+escHtml(p.priceLabel)+'<span style="font-size:11px;font-weight:600;color:#6b7280">'+escHtml(p.per||'')+'</span></div>'
+      +(p.highlights||[]).map(function(l){return '<div style="font-size:11px;color:#6b7280">'+escHtml(l)+'</div>';}).join('')
+      +'<div style="font-size:11px;color:#0f2847;font-weight:600;margin-top:6px">View details &rarr;</div>'
+      +'</button>';
   }).join('')+'</div>';
+}
+// Detailed "what's included" for a tier — opens for any tier, including ones the
+// user is NOT on. Reuses the existing modal-backdrop/modal-box pattern.
+const _PLAN_ORDER={free:0,pro:1,team:2};
+function showPlanDetail(el){
+  const planId=el&&el.dataset?el.dataset.plan:null;
+  const cfg=window.CVSPRINGS_PLANS||{};
+  const tier=(cfg.tiers||[]).find(function(t){return t.id===planId;});
+  if(!tier)return;
+  const currentPlan=(_billing&&_billing.plan)||'free';
+  const cur=tier.id===currentPlan;
+  const isUpgrade=!!tier.upgradePlan && (_PLAN_ORDER[tier.id]||0)>(_PLAN_ORDER[currentPlan]||0);
+  const li=function(t,strong){return '<li style="padding:6px 0;border-top:1px solid #f1f4f9;color:'+(strong?'#111827':'#374151')+';font-weight:'+(strong?'600':'400')+'">'+escHtml(t)+'</li>';};
+  const highlights=(tier.highlights||[]).map(function(h){return li(h,true);}).join('');
+  const baseline=(cfg.baseline||[]).map(function(h){return li(h,false);}).join('');
+
+  const backdrop=document.createElement('div');
+  backdrop.className='modal-backdrop'; backdrop.setAttribute('role','dialog'); backdrop.setAttribute('aria-modal','true');
+  // .modal-backdrop sits at z-index 2000, which is fine for #infoModal (opened
+  // from the main app) but not here: this dialog opens from INSIDE the settings
+  // panel, which stays open at z-index 9999 over its 9998 overlay. Without this
+  // the dialog renders correctly and is simply buried — visible in the DOM,
+  // invisible and unclickable to the user. Scoped to this element so the
+  // shared .modal-backdrop rule is left alone.
+  backdrop.style.zIndex='10000';
+  const box=document.createElement('div'); box.className='modal-box'; box.style.maxWidth='460px';
+  box.innerHTML=
+    '<div class="modal-head"><h3>'+escHtml(tier.name)+(cur?' <span style="font-size:11px;background:#0f2847;color:#fff;border-radius:8px;padding:2px 8px;vertical-align:middle">Your plan</span>':'')+'</h3>'
+      +'<button type="button" class="modal-close" aria-label="Close">&times;</button></div>'
+    +'<div class="modal-body">'
+      +'<div style="font-size:24px;font-weight:800;color:#0f2847">'+escHtml(tier.priceLabel)+'<span style="font-size:13px;font-weight:600;color:#6b7280">'+escHtml(tier.per||'')+'</span></div>'
+      +(tier.tagline?'<p style="color:#6b7280;font-size:13px;margin:4px 0 12px">'+escHtml(tier.tagline)+'</p>':'')
+      +'<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:2px">This tier</div>'
+      +'<ul style="list-style:none;margin:0 0 14px;padding:0">'+highlights+'</ul>'
+      +'<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:2px">Included on all plans</div>'
+      +'<ul style="list-style:none;margin:0;padding:0">'+baseline+'</ul>'
+    +'</div><div class="modal-foot"></div>';
+  const foot=box.querySelector('.modal-foot');
+  function cleanup(){ backdrop.classList.remove('open'); setTimeout(function(){try{backdrop.remove();}catch(_){}} ,200); document.removeEventListener('keydown',onKey,true); }
+  function onKey(e){ if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cleanup();} }
+  if(cur){
+    const note=document.createElement('span'); note.style.cssText='flex:1;color:#166534;font-weight:600;font-size:13px'; note.textContent='This is your current plan.';
+    foot.appendChild(note);
+  } else if(isUpgrade && _isOwner){
+    const up=document.createElement('button'); up.type='button'; up.className='btn btn-primary'; up.textContent='Upgrade to '+tier.name;
+    up.addEventListener('click', function(){ cleanup(); if(typeof startCheckout==='function') startCheckout(tier.upgradePlan); });
+    foot.appendChild(up);
+  } else if(isUpgrade){
+    const note=document.createElement('span'); note.style.cssText='flex:1;color:#6b7280;font-size:12px'; note.textContent='Ask your organization owner to upgrade.';
+    foot.appendChild(note);
+  }
+  const closeBtn=document.createElement('button'); closeBtn.type='button'; closeBtn.className='btn btn-ghost'; closeBtn.textContent='Close';
+  closeBtn.addEventListener('click', cleanup);
+  foot.appendChild(closeBtn);
+  box.querySelector('.modal-close').addEventListener('click', cleanup);
+  backdrop.addEventListener('click', function(e){ if(e.target===backdrop) cleanup(); });
+  document.addEventListener('keydown', onKey, true);
+  backdrop.appendChild(box); document.body.appendChild(backdrop);
+  requestAnimationFrame(function(){ backdrop.classList.add('open'); });
 }
 
 async function startCheckout(plan){
@@ -3131,9 +3190,6 @@ async function populateTeam(){
   }
   const onTeam=!!(data.org&&data.org.teamPlan);
   const members=data.members||[];
-  // Cache the seat limit for the pricing comparison (null = unlimited seats).
-  _seatLimitCache=(typeof data.seatLimit==='number')?data.seatLimit:null;
-  if(_billing) renderPlanCompare((_billing.plan)||'free', _billing);
   if(!onTeam){
     body.innerHTML='<div style="color:#374151">Team members are available on the <strong>Team</strong> plan.'
       + (_teamIsOwner?' Upgrade in the <em>Plan &amp; Billing</em> section above.':' Ask your organization owner to upgrade.')+'</div>';
@@ -3926,6 +3982,7 @@ const delegatedHandlers = {
     switchTab: (el) => switchTab(el.dataset.tab, el),
     focusAuditSearch, doLogout, toggleSettings,
     startCheckout: (el) => startCheckout(el.dataset.plan),
+    showPlanDetail,
     openBillingPortal, inviteMember, copyInviteLink, saveBranding,
     saveSettings, changePassword, saveRetention, setRetentionPreset, exportOrgData, deleteAllOrgData,
     setMode: (el) => setMode(el.dataset.mode),
