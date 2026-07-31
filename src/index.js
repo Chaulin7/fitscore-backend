@@ -176,7 +176,7 @@ app.get('/eu-ai-act-checklist.pdf', (req, res) => {
 // nonce that no longer matches the fresh CSP header. These routes are
 // registered BEFORE express.static, and static gets index:false, so the raw
 // placeholder files are never reachable (neither via / nor /index.html).
-const HTML_PAGES = ['index.html', 'app.html', 'landing.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html'];
+const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html'];
 const htmlTemplates = {};
 for (const page of HTML_PAGES) {
   htmlTemplates[page] = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8');
