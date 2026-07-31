@@ -41,6 +41,24 @@ const FREE = { plan: 'free', subscriptionStatus: null };
 const PRO = { plan: 'pro', subscriptionStatus: 'active' };
 const TEAM = { plan: 'team', subscriptionStatus: 'active' };
 
+describe('platform brand identity', () => {
+  // Guarded so a deployment that deliberately white-labels via BRAND_NAME still
+  // passes; unset (the normal case, including CI) this pins the code default.
+  test('the default platform brand is CVsprings, not the legal entity', { skip: !!process.env.BRAND_NAME }, () => {
+    assert.equal(DEFAULT_BRAND_NAME, 'CVsprings');
+  });
+
+  test('report header and free-tier credit name the same brand', { skip: !!process.env.BRAND_NAME }, () => {
+    const doc = buildReportDoc(AUDIT, resolveBranding(NO_BRANDING, FREE));
+    const heading = textsIn(doc.content).find((t) => t.includes('Candidate Assessment Report'));
+    assert.ok(heading.startsWith(DEFAULT_BRAND_NAME), `header was: ${heading}`);
+    assert.ok(
+      FREE_TIER_CREDIT_TEXT.includes(DEFAULT_BRAND_NAME),
+      `header says "${DEFAULT_BRAND_NAME}" but credit says "${FREE_TIER_CREDIT_TEXT}"`,
+    );
+  });
+});
+
 describe('free tier', () => {
   test('custom branding is ignored and the credit is shown', () => {
     const b = resolveBranding(CUSTOM, FREE);

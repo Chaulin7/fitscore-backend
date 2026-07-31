@@ -3,9 +3,9 @@
 /**
  * src/services/branding.js
  *
- * Resolves effective report branding: per-org overrides fall back to env
- * defaults (the Chaulin defaults). Also provides validation used both when
- * saving branding (PATCH /api/org/branding) and when rendering the report.
+ * Resolves effective report branding: per-org overrides fall back to the
+ * platform defaults. Also provides validation used both when saving branding
+ * (PATCH /api/org/branding) and when rendering the report.
  *
  * This module is the SINGLE place that decides whether an org gets its own
  * branding on a report or the platform's. Custom report branding is a paid
@@ -23,7 +23,13 @@
 // disagree about what plan an org is on.
 const { isUnlimited } = require('./billing');
 
-const DEFAULT_BRAND_NAME = process.env.BRAND_NAME || 'Chaulin';
+// The product brand, NOT the operating legal entity (that is Chaulin BV, set
+// via COMPANY_LEGAL_NAME and shown in terms/privacy). This name heads the
+// report, so it must agree with FREE_TIER_CREDIT_TEXT below — a free-tier
+// report reading "Chaulin — Candidate Assessment Report" over a "Made with
+// CVsprings" credit is the drift this default previously caused. Overriding
+// BRAND_NAME re-introduces that mismatch unless the credit is changed too.
+const DEFAULT_BRAND_NAME = process.env.BRAND_NAME || 'CVsprings';
 const DEFAULT_BRAND_COLOR = process.env.BRAND_COLOR || '#0f2847';
 const DEFAULT_BRAND_LOGO_URL = process.env.BRAND_LOGO_URL || null;
 
