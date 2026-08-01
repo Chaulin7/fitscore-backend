@@ -32,6 +32,7 @@ const assert = require('node:assert/strict');
 
 const {
   getDb, closeDb, runRetentionPurge, validateRetentionDays,
+  deleteAllOrgAuditData, countPurgeableRows,
   RETENTION_FLOOR_DAYS, RETENTION_DEFAULT_DAYS,
 } = require('./db');
 
@@ -62,7 +63,20 @@ function seedMany(orgId, count, ageDays) {
   });
   tx(count);
 }
+// feature_requests carries user_email (personal data) and free text, so it is on
+// the same retention clock. created_at is written as an ISO-8601 string with a
+// 'T', exactly like audit_log and like the cutoff the purge computes.
+function seedFeatureRequest(orgId, ageDays, category = 'product') {
+  const id = `fr-${++seq}`;
+  const createdAt = new Date(Date.now() - ageDays * DAY_MS).toISOString();
+  getDb().prepare(`
+    INSERT INTO feature_requests (id, org_id, user_email, category, title, body, plan_tier, status, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'pro', 'new', ?)
+  `).run(id, orgId, `user-${id}@example.com`, category, 'Title ' + id, 'Body for ' + id, createdAt);
+  return id;
+}
 const auditCount = (orgId) => getDb().prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ?').get(orgId).n;
+const featureRequestCount = (orgId) => getDb().prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ?').get(orgId).n;
 const purgeRuns = (orgId) => getDb().prepare('SELECT * FROM purge_runs WHERE org_id = ? ORDER BY ran_at DESC, id DESC').all(orgId);
 const purgeEvents = (orgId) => getDb().prepare("SELECT * FROM audit_changes WHERE org_id = ? AND field = '__retention_purge__'").all(orgId);
 
@@ -230,5 +244,128 @@ describe('dry-run mode', () => {
       if (saved === undefined) delete process.env.RETENTION_PURGE_MODE;
       else process.env.RETENTION_PURGE_MODE = saved;
     }
+  });
+});
+
+// ── feature_requests: same retention clock, same erasure sweep ──────────────
+// Mirrors the audit_log suites above. This table holds user_email, so leaving it
+// out of the lifecycle would keep personal data past the org's own policy.
+
+describe('retention purge covers feature_requests', () => {
+  test('rows older than the cutoff are deleted; recent ones survive', () => {
+    const org = makeOrg(180);
+    seedFeatureRequest(org, 300);
+    seedFeatureRequest(org, 400);
+    seedFeatureRequest(org, 10); // inside the window
+    assert.equal(featureRequestCount(org), 3);
+
+    runRetentionPurge({ mode: 'live' });
+
+    assert.equal(featureRequestCount(org), 1, 'only the in-window request should remain');
+    const [left] = getDb().prepare('SELECT created_at FROM feature_requests WHERE org_id = ?').all(org);
+    assert.ok(Date.now() - Date.parse(left.created_at) < 30 * DAY_MS);
+  });
+
+  test('the cutoff comparison is ISO-8601 with a T, matching how created_at is written', () => {
+    const org = makeOrg(180);
+    const id = seedFeatureRequest(org, 300);
+    const stored = getDb().prepare('SELECT created_at FROM feature_requests WHERE id = ?').get(id).created_at;
+    // A space-separated datetime('now') value would sort BEFORE every ISO string
+    // and silently never match the window. Pin the stored format.
+    assert.match(stored, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    assert.ok(!stored.includes(' '), 'no space-separated datetime() format');
+
+    runRetentionPurge({ mode: 'live' });
+    assert.equal(featureRequestCount(org), 0, 'an ISO-stored row must actually match the ISO cutoff');
+  });
+
+  test('purging org A never touches org B feature requests', () => {
+    const a = makeOrg(180); const b = makeOrg(180);
+    seedFeatureRequest(a, 300); seedFeatureRequest(a, 300);
+    seedFeatureRequest(b, 300);
+
+    runRetentionPurge({ mode: 'live' });
+
+    assert.equal(featureRequestCount(a), 0);
+    assert.equal(featureRequestCount(b), 0, 'both orgs purge, but each on its own rows');
+
+    // And with only A eligible, B is untouched.
+    const c = makeOrg(180); const d = makeOrg(3650);
+    seedFeatureRequest(c, 300); seedFeatureRequest(d, 300);
+    runRetentionPurge({ mode: 'live' });
+    assert.equal(featureRequestCount(c), 0);
+    assert.equal(featureRequestCount(d), 1, 'org D retains for 10 years');
+  });
+
+  test('feature requests count toward the run total and the single purge_runs row', () => {
+    const org = makeOrg(180);
+    seedMany(org, 2, 300);          // 2 audit rows
+    seedFeatureRequest(org, 300);   // 1 feature request
+    seedFeatureRequest(org, 300);   // 1 more
+
+    runRetentionPurge({ mode: 'live' });
+
+    const runs = purgeRuns(org);
+    assert.equal(runs.length, 1, 'still exactly one purge_runs row per org per run');
+    assert.equal(runs[0].rows_deleted, 4, 'audit rows + feature requests are one total');
+    assert.equal(auditCount(org), 0);
+    assert.equal(featureRequestCount(org), 0);
+  });
+
+  test('a dry run counts feature requests but deletes nothing', () => {
+    const org = makeOrg(180);
+    seedMany(org, 3, 300);
+    seedFeatureRequest(org, 300);
+
+    const res = runRetentionPurge({ mode: 'dryrun' });
+
+    assert.equal(res.rowsDeleted, 0, 'a dry run deletes nothing');
+    assert.equal(featureRequestCount(org), 1, 'the feature request survives a dry run');
+    assert.equal(purgeRuns(org)[0].rows_deleted, 4, 'would-delete count spans both tables');
+  });
+
+  test('countPurgeableRows previews the same tables the purge deletes from', () => {
+    const org = makeOrg(180);
+    seedMany(org, 2, 300);
+    seedFeatureRequest(org, 300);
+
+    const preview = countPurgeableRows(org, 180);
+    assert.equal(preview.wouldDelete, 3, 'preview must not understate what the job removes');
+
+    runRetentionPurge({ mode: 'live' });
+    assert.equal(purgeRuns(org)[0].rows_deleted, preview.wouldDelete, 'preview matched reality');
+  });
+});
+
+describe('right to erasure covers feature_requests', () => {
+  test('deleteAllOrgAuditData removes the org feature requests and reports the count', () => {
+    const org = makeOrg(180);
+    seedRow(org, 1); seedRow(org, 1);
+    seedFeatureRequest(org, 1); seedFeatureRequest(org, 200); seedFeatureRequest(org, 1);
+    assert.equal(featureRequestCount(org), 3);
+
+    const res = deleteAllOrgAuditData(org);
+
+    assert.equal(res.recordsDeleted, 2);
+    assert.equal(res.featureRequestsDeleted, 3);
+    assert.equal(featureRequestCount(org), 0, 'no personal data may survive an erasure');
+    assert.equal(auditCount(org), 0);
+  });
+
+  test('erasure is org-scoped', () => {
+    const a = makeOrg(180); const b = makeOrg(180);
+    seedFeatureRequest(a, 1); seedFeatureRequest(b, 1);
+
+    deleteAllOrgAuditData(a);
+
+    assert.equal(featureRequestCount(a), 0);
+    assert.equal(featureRequestCount(b), 1, "another org's requests must be untouched");
+  });
+
+  test('erasure ignores age — even in-window rows go', () => {
+    const org = makeOrg(3650); // nothing would ever be purge-eligible
+    seedFeatureRequest(org, 0);
+    deleteAllOrgAuditData(org);
+    assert.equal(featureRequestCount(org), 0);
   });
 });

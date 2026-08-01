@@ -1010,6 +1010,33 @@ function purgeOrgBatched(db, orgId, cutoffIso, onBatch) {
   return deleted;
 }
 
+// Same batched shape as purgeOrgBatched, for feature_requests. That table holds
+// user_email (personal data about an identified natural person) and free text a
+// submitter can paste anything into, so it belongs on the same retention clock
+// as the audit log rather than living forever.
+//
+// cutoffIso is the caller's `new Date(...).toISOString()` value, and
+// feature_requests.created_at is written by createFeatureRequestIfUnderQuota
+// with the same toISOString(). Both are therefore ISO-8601 with a 'T', which is
+// what makes the lexicographic `created_at < ?` comparison correct. Do NOT
+// switch either side to SQLite's datetime('now') — that renders a space where
+// ISO has a 'T', and ' ' (0x20) sorts before 'T' (0x54), so every ISO row would
+// compare as newer than every space-separated one and the window would silently
+// stop matching. Same trap the quota check documents.
+function purgeOrgFeatureRequestsBatched(db, orgId, cutoffIso, onBatch) {
+  const del = db.prepare(
+    'DELETE FROM feature_requests WHERE id IN (SELECT id FROM feature_requests WHERE org_id = ? AND created_at < ? ORDER BY created_at LIMIT ?)'
+  );
+  let deleted = 0;
+  let changed;
+  do {
+    changed = del.run(orgId, cutoffIso, PURGE_BATCH_SIZE).changes;
+    deleted += changed;
+    if (changed && typeof onBatch === 'function') onBatch(deleted);
+  } while (changed === PURGE_BATCH_SIZE);
+  return deleted;
+}
+
 // The durable "audit event" recording a purge. Written to the append-only
 // audit_changes trail — INSERT is allowed; UPDATE/DELETE are trigger-blocked —
 // and NEVER removed by the retention job (which only ever deletes from
@@ -1054,6 +1081,7 @@ function runRetentionPurge({ now = Date.now(), mode = retentionPurgeMode(), batc
   // Identical predicate to the batched DELETE — used by dryrun to count the
   // exact rows that WOULD be deleted without touching them.
   const countEligible = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?');
+  const countEligibleFeatureRequests = db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at < ?');
 
   let totalAffected = 0; // rows deleted (live) or would-be-deleted (dryrun)
   let orgsFailed = 0;
@@ -1067,9 +1095,15 @@ function runRetentionPurge({ now = Date.now(), mode = retentionPurgeMode(), batc
       let rows;
       if (isLive) {
         rows = purgeOrgBatched(db, org.id, cutoffIso, batchHook ? (n) => batchHook(org.id, n) : null);
+        // Folded into the same total and the same purge_runs row, preserving the
+        // "exactly one purge_runs record per org per run" invariant the zero-row
+        // and dry-run suites assert.
+        rows += purgeOrgFeatureRequestsBatched(db, org.id, cutoffIso);
         if (rows > 0) writePurgeAuditEvent(db, { runId, orgId: org.id, ranAt, cutoffIso, rowsDeleted: rows });
       } else {
-        rows = countEligible.get(org.id, cutoffIso).n; // compute only; delete nothing
+        // compute only; delete nothing
+        rows = countEligible.get(org.id, cutoffIso).n
+             + countEligibleFeatureRequests.get(org.id, cutoffIso).n;
       }
       insertRun.run({ id: runId, orgId: org.id, ranAt, cutoffDate: cutoffIso, rowsDeleted: rows, durationMs: Date.now() - startedAt, status: isLive ? 'success' : 'dryrun', errorText: null });
       totalAffected += rows;
@@ -1122,8 +1156,13 @@ function startRetentionSchedule() {
 function countPurgeableRows(orgId, days, now = Date.now()) {
   const eff = effectiveRetentionDays(days);
   const cutoffIso = new Date(now - eff * DAY_MS).toISOString();
-  const row = getDb().prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso);
-  return { days: eff, cutoffDate: cutoffIso, wouldDelete: row.n };
+  const db = getDb();
+  // Must stay the same predicate over the same tables the purge actually
+  // deletes from, or the "this will remove N rows" preview understates what the
+  // job then does.
+  const row = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso);
+  const fr = db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso);
+  return { days: eff, cutoffDate: cutoffIso, wouldDelete: row.n + fr.n };
 }
 
 // Retention stats for the settings UI: current row count, oldest retained event,
@@ -1135,7 +1174,11 @@ function getRetentionStats(orgId, now = Date.now()) {
   const eff = effectiveRetentionDays(retentionDays);
   const agg = db.prepare('SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM audit_log WHERE org_id = ?').get(orgId);
   const cutoffIso = new Date(now - eff * DAY_MS).toISOString();
-  const wouldDeleteNow = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso).n;
+  // rowCount/oldestCreatedAt above stay audit-log figures (that is what the
+  // retention card reports on), but wouldDeleteNow is a prediction about the
+  // purge job, so it must span every table that job touches.
+  const wouldDeleteNow = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso).n
+    + db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso).n;
   const last = db.prepare('SELECT MAX(ran_at) AS last FROM purge_runs').get();
   return {
     retentionDays,
@@ -1167,17 +1210,25 @@ function deleteAllOrgAuditData(orgId) {
   const db = getDb();
   let recordsDeleted = 0;
   let changesDeleted = 0;
+  let featureRequestsDeleted = 0;
   db.exec('DROP TRIGGER IF EXISTS audit_changes_no_delete');
   try {
     const wipe = db.transaction(() => {
       changesDeleted = db.prepare('DELETE FROM audit_changes WHERE org_id = ?').run(orgId).changes;
       recordsDeleted = db.prepare('DELETE FROM audit_log WHERE org_id = ?').run(orgId).changes;
+      // Right to erasure has to reach feature_requests too: it stores
+      // user_email and free text. Inside the SAME transaction, so an erasure
+      // either removes everything or nothing — a partial wipe would leave
+      // personal data behind while reporting success. Ordered child-then-parent
+      // like the two above (this schema declares no FKs, but the convention is
+      // what keeps that safe if any are ever added).
+      featureRequestsDeleted = db.prepare('DELETE FROM feature_requests WHERE org_id = ?').run(orgId).changes;
     });
     wipe();
   } finally {
     db.exec(AUDIT_CHANGES_NO_DELETE_TRIGGER);
   }
-  return { recordsDeleted, changesDeleted };
+  return { recordsDeleted, changesDeleted, featureRequestsDeleted };
 }
 
 function formatRow(row) {
