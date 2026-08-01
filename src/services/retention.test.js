@@ -32,7 +32,8 @@ const assert = require('node:assert/strict');
 
 const {
   getDb, closeDb, runRetentionPurge, validateRetentionDays,
-  deleteAllOrgAuditData, countPurgeableRows,
+  deleteAllOrgAuditData, countPurgeableRows, getRetentionStats,
+  FEATURE_REQUEST_RETENTION_DAYS,
   RETENTION_FLOOR_DAYS, RETENTION_DEFAULT_DAYS,
 } = require('./db');
 
@@ -247,28 +248,56 @@ describe('dry-run mode', () => {
   });
 });
 
-// ── feature_requests: same retention clock, same erasure sweep ──────────────
-// Mirrors the audit_log suites above. This table holds user_email, so leaving it
-// out of the lifecycle would keep personal data past the org's own policy.
+// ── feature_requests: its OWN retention clock ───────────────────────────────
+// FEATURE_REQUEST_RETENTION_DAYS (365) is deliberately independent of the org's
+// retention_days, which carries the AI Act Art. 19 180-day floor and 3650-day
+// ceiling. Feedback carrying user_email is neither an AI Act log nor candidate
+// data, so it is held to plain data minimisation instead.
 
-describe('retention purge covers feature_requests', () => {
-  test('rows older than the cutoff are deleted; recent ones survive', () => {
-    const org = makeOrg(180);
-    seedFeatureRequest(org, 300);
-    seedFeatureRequest(org, 400);
-    seedFeatureRequest(org, 10); // inside the window
-    assert.equal(featureRequestCount(org), 3);
+const FR_DAYS = FEATURE_REQUEST_RETENTION_DAYS;
+
+describe('feature_requests retention is decoupled from retention_days', () => {
+  test('a high-retention org does NOT keep feature requests past their own window', () => {
+    // The exact case that fails under inheritance: retention_days=3650 would
+    // have kept this for a decade.
+    const org = makeOrg(3650);
+    seedFeatureRequest(org, FR_DAYS + 35);   // past the feature-request window
+    seedFeatureRequest(org, FR_DAYS - 35);   // still inside it
+    seedRow(org, 3000);                      // audit row, still inside 3650 days
 
     runRetentionPurge({ mode: 'live' });
 
-    assert.equal(featureRequestCount(org), 1, 'only the in-window request should remain');
-    const [left] = getDb().prepare('SELECT created_at FROM feature_requests WHERE org_id = ?').all(org);
-    assert.ok(Date.now() - Date.parse(left.created_at) < 30 * DAY_MS);
+    assert.equal(featureRequestCount(org), 1, 'only the in-window feature request survives');
+    assert.equal(auditCount(org), 1, "the org's audit retention is untouched by this change");
+  });
+
+  test('a floor-retention org KEEPS feature requests the audit window would have purged', () => {
+    // The other direction: retention_days=180 would have purged a 300-day-old
+    // feature request. Its own window is 365, so it stays.
+    const org = makeOrg(180);
+    seedFeatureRequest(org, 300);
+    seedRow(org, 300);                       // audit row IS eligible at 180 days
+
+    runRetentionPurge({ mode: 'live' });
+
+    assert.equal(featureRequestCount(org), 1, '300 days is inside the 365-day feature-request window');
+    assert.equal(auditCount(org), 0, 'the audit row still purges on the org window');
+  });
+
+  test('rows past the feature-request window are deleted whatever the org window is', () => {
+    for (const retentionDays of [180, 730, 3650]) {
+      const org = makeOrg(retentionDays);
+      seedFeatureRequest(org, FR_DAYS + 10);
+      seedFeatureRequest(org, FR_DAYS + 200);
+      seedFeatureRequest(org, 10);
+      runRetentionPurge({ mode: 'live' });
+      assert.equal(featureRequestCount(org), 1, `retention_days=${retentionDays} must not change the outcome`);
+    }
   });
 
   test('the cutoff comparison is ISO-8601 with a T, matching how created_at is written', () => {
-    const org = makeOrg(180);
-    const id = seedFeatureRequest(org, 300);
+    const org = makeOrg(3650);
+    const id = seedFeatureRequest(org, FR_DAYS + 35);
     const stored = getDb().prepare('SELECT created_at FROM feature_requests WHERE id = ?').get(id).created_at;
     // A space-separated datetime('now') value would sort BEFORE every ISO string
     // and silently never match the window. Pin the stored format.
@@ -279,61 +308,79 @@ describe('retention purge covers feature_requests', () => {
     assert.equal(featureRequestCount(org), 0, 'an ISO-stored row must actually match the ISO cutoff');
   });
 
-  test('purging org A never touches org B feature requests', () => {
-    const a = makeOrg(180); const b = makeOrg(180);
-    seedFeatureRequest(a, 300); seedFeatureRequest(a, 300);
-    seedFeatureRequest(b, 300);
+  test('purging one org never touches another org feature requests', () => {
+    const a = makeOrg(180);
+    const b = makeOrg(180);
+    seedFeatureRequest(a, FR_DAYS + 35);   // eligible
+    seedFeatureRequest(b, 10);             // not eligible
 
     runRetentionPurge({ mode: 'live' });
 
     assert.equal(featureRequestCount(a), 0);
-    assert.equal(featureRequestCount(b), 0, 'both orgs purge, but each on its own rows');
-
-    // And with only A eligible, B is untouched.
-    const c = makeOrg(180); const d = makeOrg(3650);
-    seedFeatureRequest(c, 300); seedFeatureRequest(d, 300);
-    runRetentionPurge({ mode: 'live' });
-    assert.equal(featureRequestCount(c), 0);
-    assert.equal(featureRequestCount(d), 1, 'org D retains for 10 years');
+    assert.equal(featureRequestCount(b), 1, "another org's in-window request is untouched");
   });
 
-  test('feature requests count toward the run total and the single purge_runs row', () => {
+  test('feature requests fold into the run total and the single purge_runs row', () => {
     const org = makeOrg(180);
-    seedMany(org, 2, 300);          // 2 audit rows
-    seedFeatureRequest(org, 300);   // 1 feature request
-    seedFeatureRequest(org, 300);   // 1 more
+    seedMany(org, 2, 300);                 // 2 audit rows, eligible at 180 days
+    seedFeatureRequest(org, FR_DAYS + 35); // 1 feature request, eligible at 365
+    seedFeatureRequest(org, FR_DAYS + 40); // 1 more
+    seedFeatureRequest(org, 300);          // NOT eligible on its own clock
 
     runRetentionPurge({ mode: 'live' });
 
     const runs = purgeRuns(org);
     assert.equal(runs.length, 1, 'still exactly one purge_runs row per org per run');
-    assert.equal(runs[0].rows_deleted, 4, 'audit rows + feature requests are one total');
+    assert.equal(runs[0].rows_deleted, 4, '2 audit rows + 2 feature requests, on their separate cutoffs');
     assert.equal(auditCount(org), 0);
-    assert.equal(featureRequestCount(org), 0);
+    assert.equal(featureRequestCount(org), 1);
   });
 
-  test('a dry run counts feature requests but deletes nothing', () => {
+  test('a dry run counts feature requests on their own cutoff but deletes nothing', () => {
     const org = makeOrg(180);
-    seedMany(org, 3, 300);
-    seedFeatureRequest(org, 300);
+    seedMany(org, 3, 300);                 // eligible on the audit window
+    seedFeatureRequest(org, FR_DAYS + 35); // eligible on the feature-request window
+    seedFeatureRequest(org, 300);          // inside the feature-request window
 
     const res = runRetentionPurge({ mode: 'dryrun' });
 
     assert.equal(res.rowsDeleted, 0, 'a dry run deletes nothing');
-    assert.equal(featureRequestCount(org), 1, 'the feature request survives a dry run');
-    assert.equal(purgeRuns(org)[0].rows_deleted, 4, 'would-delete count spans both tables');
+    assert.equal(featureRequestCount(org), 2, 'both feature requests survive a dry run');
+    assert.equal(purgeRuns(org)[0].rows_deleted, 4, '3 audit + 1 feature request would go');
   });
 
-  test('countPurgeableRows previews the same tables the purge deletes from', () => {
+  test('countPurgeableRows previews the same cutoffs the purge applies', () => {
     const org = makeOrg(180);
-    seedMany(org, 2, 300);
-    seedFeatureRequest(org, 300);
+    seedMany(org, 2, 300);                 // audit-eligible
+    seedFeatureRequest(org, FR_DAYS + 35); // feature-request-eligible
+    seedFeatureRequest(org, 300);          // audit window would have caught this; its own does not
 
     const preview = countPurgeableRows(org, 180);
-    assert.equal(preview.wouldDelete, 3, 'preview must not understate what the job removes');
+    assert.equal(preview.wouldDelete, 3, 'preview must use the independent feature-request cutoff');
 
     runRetentionPurge({ mode: 'live' });
     assert.equal(purgeRuns(org)[0].rows_deleted, preview.wouldDelete, 'preview matched reality');
+    assert.equal(featureRequestCount(org), 1);
+  });
+
+  test('getRetentionStats.wouldDeleteNow spans both cutoffs; rowCount stays audit-only', () => {
+    const org = makeOrg(180);
+    seedMany(org, 2, 300);                 // audit-eligible
+    seedRow(org, 5);                       // audit, in window
+    seedFeatureRequest(org, FR_DAYS + 35); // feature-request-eligible
+    seedFeatureRequest(org, 300);          // not eligible on its own clock
+
+    const stats = getRetentionStats(org);
+    assert.equal(stats.wouldDeleteNow, 3, '2 audit + 1 feature request');
+    assert.equal(stats.rowCount, 3, 'rowCount is the audit-log figure only');
+    // cutoffDate still describes the AUDIT window (180 days), not the
+    // feature-request one (365) — the two are now different dates.
+    const ageDays = (Date.now() - Date.parse(stats.cutoffDate)) / DAY_MS;
+    assert.ok(Math.abs(ageDays - 180) < 1, `cutoffDate should be ~180 days ago, was ~${Math.round(ageDays)}`);
+    assert.ok(Math.abs(ageDays - FR_DAYS) > 1, 'cutoffDate must not be the feature-request window');
+
+    runRetentionPurge({ mode: 'live' });
+    assert.equal(purgeRuns(org)[0].rows_deleted, 3, 'stats predicted the purge exactly');
   });
 });
 
