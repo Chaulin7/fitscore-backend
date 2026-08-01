@@ -36,6 +36,36 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const RETENTION_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const RETENTION_MIN_GAP_MS = 20 * 60 * 60 * 1000;       // ~daily cadence
 
+// --- Feature requests ("Suggest an improvement", Pro/Team only) -------------
+// The route validates against this list; the table's CHECK constraint below
+// repeats the same three values as literal SQL, because SQLite stores DDL as
+// text and cannot take a bound parameter there. The route is the gate — the
+// CHECK is only a backstop against non-route writers. Widening the set means
+// editing BOTH, and see the note above the table for why the DDL edit alone
+// does nothing to an existing database.
+const FEATURE_REQUEST_CATEGORIES = ['product', 'website', 'other'];
+// Business quota, not an abuse guard: 5 submissions per org per ROLLING 24h.
+// Deliberately counted from stored rows rather than express-rate-limit, whose
+// store is in-memory (lost on every Render deploy), whose window is fixed
+// rather than rolling, and which cannot be made atomic with the INSERT.
+const FEATURE_REQUEST_MAX_PER_WINDOW = Number.parseInt(process.env.FEATURE_REQUEST_DAILY_MAX, 10) > 0
+  ? Number.parseInt(process.env.FEATURE_REQUEST_DAILY_MAX, 10)
+  : 5;
+const FEATURE_REQUEST_WINDOW_MS = 24 * 60 * 60 * 1000;
+// How long a feature request is kept. THE one place this number lives.
+//
+// Deliberately independent of the organization's retention_days, and of the
+// RETENTION_FLOOR_DAYS / RETENTION_MAX_DAYS bounds above. Those exist for the
+// AI Act Art. 12/19 audit trail: the 180-day floor is a regulatory minimum for
+// automatically generated logs, and the 3650-day ceiling lets an org keep that
+// trail for a decade. A product suggestion is neither an AI Act log nor
+// candidate data — it is feedback carrying user_email — so it should be held to
+// plain data minimisation instead: long enough to triage and reply, no longer.
+// Inheriting retention_days would have pulled it both ways at once, keeping
+// feedback for ten years at one org and imposing a regulatory floor on it at
+// another.
+const FEATURE_REQUEST_RETENTION_DAYS = 365;
+
 function getDb() {
   if (!db) {
     const fs = require('fs');
@@ -349,6 +379,50 @@ function initSchema() {
       ip_hash TEXT
     )
   `);
+
+  // In-product feature requests ("Suggest an improvement"), Pro/Team only.
+  // The ROW is the source of truth: the notification email to the product inbox
+  // is a side effect, and a delivery failure never discards a submission.
+  //
+  // plan_tier is a SNAPSHOT of the org's plan at submission time — a request
+  // sent while on Pro stays a Pro-era request after a downgrade. Never
+  // re-derive it from the org's current plan on read.
+  //
+  // created_at is written explicitly as an ISO-8601 UTC string via nowIso(),
+  // deliberately with NO `DEFAULT (datetime('now'))` like audit_log has. The
+  // rolling-24h quota compares created_at against a JS toISOString() cutoff,
+  // and SQLite's datetime('now') renders "2026-07-31 10:22:33" — a space where
+  // ISO has a 'T'. Since ' ' (0x20) sorts before 'T' (0x54), a DEFAULT-stamped
+  // row would compare as older than every ISO row and silently escape the
+  // quota. screening_runs, candidates and demo_requests already do it this way.
+  //
+  // status values: new | reviewing | planned | done | declined. Intentionally
+  // NOT a CHECK constraint — status is the field a triage workflow grows, it is
+  // written by ops rather than by user input, and SQLite cannot ALTER a CHECK.
+  //
+  // The CHECK on category IS worth its cost (closed set, mirrors the frontend
+  // dropdown, guards non-route writers). To widen it later, note that
+  // CREATE TABLE IF NOT EXISTS is a silent no-op on an existing database:
+  // editing the text below changes FRESH databases only. Widening in production
+  // needs a drift-detected 12-step rebuild (create new table, copy, drop,
+  // rename, recreate index) inside one db.transaction().
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS feature_requests (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      user_email TEXT,
+      category TEXT NOT NULL CHECK (category IN ('product','website','other')),
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      plan_tier TEXT,
+      status TEXT NOT NULL DEFAULT 'new',
+      created_at TEXT NOT NULL
+    )
+  `);
+  // Backs the rolling-24h quota (org_id equality + created_at range) as a
+  // covering index, and the newest-first triage listing. Same shape as
+  // idx_audit_log_org_created.
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_feature_requests_org_created ON feature_requests(org_id, created_at DESC)');
 
   // Per-org monthly usage counters (analyses run; periodKey = YYYY-MM)
   getDb().exec(`
@@ -949,6 +1023,36 @@ function purgeOrgBatched(db, orgId, cutoffIso, onBatch) {
   return deleted;
 }
 
+// Same batched shape as purgeOrgBatched, for feature_requests. That table holds
+// user_email (personal data about an identified natural person) and free text a
+// submitter can paste anything into, so it belongs on the same retention clock
+// as the audit log rather than living forever.
+//
+// The cutoff passed here comes from FEATURE_REQUEST_RETENTION_DAYS, NOT from the
+// org's retention_days — see that constant for why the two are separate.
+//
+// It is a `new Date(...).toISOString()` value, and feature_requests.created_at
+// is written by createFeatureRequestIfUnderQuota with the same toISOString().
+// Both are therefore ISO-8601 with a 'T', which is what makes the lexicographic
+// `created_at < ?` comparison correct. Do NOT switch either side to SQLite's
+// datetime('now') — that renders a space where ISO has a 'T', and ' ' (0x20)
+// sorts before 'T' (0x54), so every ISO row would compare as newer than every
+// space-separated one and the window would silently stop matching. Same trap
+// the quota check documents.
+function purgeOrgFeatureRequestsBatched(db, orgId, cutoffIso, onBatch) {
+  const del = db.prepare(
+    'DELETE FROM feature_requests WHERE id IN (SELECT id FROM feature_requests WHERE org_id = ? AND created_at < ? ORDER BY created_at LIMIT ?)'
+  );
+  let deleted = 0;
+  let changed;
+  do {
+    changed = del.run(orgId, cutoffIso, PURGE_BATCH_SIZE).changes;
+    deleted += changed;
+    if (changed && typeof onBatch === 'function') onBatch(deleted);
+  } while (changed === PURGE_BATCH_SIZE);
+  return deleted;
+}
+
 // The durable "audit event" recording a purge. Written to the append-only
 // audit_changes trail — INSERT is allowed; UPDATE/DELETE are trigger-blocked —
 // and NEVER removed by the retention job (which only ever deletes from
@@ -993,6 +1097,7 @@ function runRetentionPurge({ now = Date.now(), mode = retentionPurgeMode(), batc
   // Identical predicate to the batched DELETE — used by dryrun to count the
   // exact rows that WOULD be deleted without touching them.
   const countEligible = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?');
+  const countEligibleFeatureRequests = db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at < ?');
 
   let totalAffected = 0; // rows deleted (live) or would-be-deleted (dryrun)
   let orgsFailed = 0;
@@ -1001,14 +1106,23 @@ function runRetentionPurge({ now = Date.now(), mode = retentionPurgeMode(), batc
     const ranAt = new Date(now).toISOString();
     const days = effectiveRetentionDays(org.retentionDays);
     const cutoffIso = new Date(now - days * DAY_MS).toISOString();
+    // Feature requests run on their own fixed clock, not the org's. Same ISO
+    // format as cutoffIso above and as created_at — never datetime('now').
+    const frCutoffIso = new Date(now - FEATURE_REQUEST_RETENTION_DAYS * DAY_MS).toISOString();
     const runId = uuidv4();
     try {
       let rows;
       if (isLive) {
         rows = purgeOrgBatched(db, org.id, cutoffIso, batchHook ? (n) => batchHook(org.id, n) : null);
+        // Folded into the same total and the same purge_runs row, preserving the
+        // "exactly one purge_runs record per org per run" invariant the zero-row
+        // and dry-run suites assert.
+        rows += purgeOrgFeatureRequestsBatched(db, org.id, frCutoffIso);
         if (rows > 0) writePurgeAuditEvent(db, { runId, orgId: org.id, ranAt, cutoffIso, rowsDeleted: rows });
       } else {
-        rows = countEligible.get(org.id, cutoffIso).n; // compute only; delete nothing
+        // compute only; delete nothing
+        rows = countEligible.get(org.id, cutoffIso).n
+             + countEligibleFeatureRequests.get(org.id, frCutoffIso).n;
       }
       insertRun.run({ id: runId, orgId: org.id, ranAt, cutoffDate: cutoffIso, rowsDeleted: rows, durationMs: Date.now() - startedAt, status: isLive ? 'success' : 'dryrun', errorText: null });
       totalAffected += rows;
@@ -1061,8 +1175,28 @@ function startRetentionSchedule() {
 function countPurgeableRows(orgId, days, now = Date.now()) {
   const eff = effectiveRetentionDays(days);
   const cutoffIso = new Date(now - eff * DAY_MS).toISOString();
-  const row = getDb().prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso);
-  return { days: eff, cutoffDate: cutoffIso, wouldDelete: row.n };
+  const db = getDb();
+  // Must stay the same predicate over the same tables AND the same cutoffs the
+  // purge actually uses, or the "this will remove N rows" preview stops matching
+  // what the job then does. `days`/`cutoffDate` describe the audit-log window
+  // only; feature requests are on their own fixed clock.
+  const frCutoffIso = new Date(now - FEATURE_REQUEST_RETENTION_DAYS * DAY_MS).toISOString();
+  const row = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso);
+  const fr = db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at < ?').get(orgId, frCutoffIso);
+  return {
+    days: eff,
+    cutoffDate: cutoffIso,
+    wouldDelete: row.n + fr.n,          // everything the next purge removes
+    // Split out because the two are governed by different windows and answer
+    // different questions. auditWouldDelete is the part attributable to the
+    // `days` being previewed; the feature-request part happens on its own clock
+    // whatever `days` is set to, so a "lowering retention will delete N" prompt
+    // must use auditWouldDelete or it blames the change for unrelated rows.
+    auditWouldDelete: row.n,
+    featureRequestWouldDelete: fr.n,
+    featureRequestCutoffDate: frCutoffIso,
+    featureRequestRetentionDays: FEATURE_REQUEST_RETENTION_DAYS,
+  };
 }
 
 // Retention stats for the settings UI: current row count, oldest retained event,
@@ -1074,7 +1208,15 @@ function getRetentionStats(orgId, now = Date.now()) {
   const eff = effectiveRetentionDays(retentionDays);
   const agg = db.prepare('SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM audit_log WHERE org_id = ?').get(orgId);
   const cutoffIso = new Date(now - eff * DAY_MS).toISOString();
-  const wouldDeleteNow = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso).n;
+  // rowCount/oldestCreatedAt above stay audit-log figures (that is what the
+  // retention card reports on), but wouldDeleteNow is a prediction about the
+  // purge job, so it must span every table that job touches — each on the cutoff
+  // the job actually applies to it. cutoffDate below remains the audit-log one.
+  const frCutoffIso = new Date(now - FEATURE_REQUEST_RETENTION_DAYS * DAY_MS).toISOString();
+  const auditWouldDeleteNow = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso).n;
+  const frAgg = db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ?').get(orgId);
+  const featureRequestWouldDeleteNow = db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at < ?').get(orgId, frCutoffIso).n;
+  const wouldDeleteNow = auditWouldDeleteNow + featureRequestWouldDeleteNow;
   const last = db.prepare('SELECT MAX(ran_at) AS last FROM purge_runs').get();
   return {
     retentionDays,
@@ -1087,6 +1229,14 @@ function getRetentionStats(orgId, now = Date.now()) {
     oldestCreatedAt: agg.oldest || null,
     cutoffDate: cutoffIso,
     wouldDeleteNow,
+    // Feature requests run on their own fixed window, so the card can show the
+    // date that actually governs them rather than the audit one sitting next to
+    // a count it does not describe.
+    auditWouldDeleteNow,
+    featureRequestRowCount: frAgg.n,
+    featureRequestWouldDeleteNow,
+    featureRequestCutoffDate: frCutoffIso,
+    featureRequestRetentionDays: FEATURE_REQUEST_RETENTION_DAYS,
     lastPurgeAt: last ? last.last : null,
   };
 }
@@ -1106,17 +1256,25 @@ function deleteAllOrgAuditData(orgId) {
   const db = getDb();
   let recordsDeleted = 0;
   let changesDeleted = 0;
+  let featureRequestsDeleted = 0;
   db.exec('DROP TRIGGER IF EXISTS audit_changes_no_delete');
   try {
     const wipe = db.transaction(() => {
       changesDeleted = db.prepare('DELETE FROM audit_changes WHERE org_id = ?').run(orgId).changes;
       recordsDeleted = db.prepare('DELETE FROM audit_log WHERE org_id = ?').run(orgId).changes;
+      // Right to erasure has to reach feature_requests too: it stores
+      // user_email and free text. Inside the SAME transaction, so an erasure
+      // either removes everything or nothing — a partial wipe would leave
+      // personal data behind while reporting success. Ordered child-then-parent
+      // like the two above (this schema declares no FKs, but the convention is
+      // what keeps that safe if any are ever added).
+      featureRequestsDeleted = db.prepare('DELETE FROM feature_requests WHERE org_id = ?').run(orgId).changes;
     });
     wipe();
   } finally {
     db.exec(AUDIT_CHANGES_NO_DELETE_TRIGGER);
   }
-  return { recordsDeleted, changesDeleted };
+  return { recordsDeleted, changesDeleted, featureRequestsDeleted };
 }
 
 function formatRow(row) {
@@ -1230,6 +1388,67 @@ function insertDemoRequest({ name, email, agency, note, ipHash }) {
   return { id, createdAt };
 }
 
+// --- Feature requests ("Suggest an improvement") -----------------------------
+
+// How many requests this org has filed inside the rolling window ending now.
+// Exported mainly so tests and any future usage display can read it without
+// attempting a write.
+function countRecentFeatureRequests(orgId, now = Date.now()) {
+  const since = new Date(now - FEATURE_REQUEST_WINDOW_MS).toISOString();
+  return getDb()
+    .prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at >= ?')
+    .get(orgId, since).n;
+}
+
+// Atomically check the rolling-24h quota and insert, in one synchronous
+// better-sqlite3 transaction — the same check-then-act problem reserveUsage
+// solves for the monthly analysis quota, and for the same reason: two
+// concurrent submissions must not both observe "4 used" and both write.
+//
+// .immediate() matters here and does NOT in reserveUsage: that one opens with
+// an INSERT OR IGNORE, which takes the write lock straight away. This
+// transaction opens with a SELECT, so a default deferred BEGIN would have to
+// upgrade to a write lock mid-transaction and can fail with SQLITE_BUSY_SNAPSHOT
+// under WAL. BEGIN IMMEDIATE takes the write lock up front instead.
+//
+// Returns { ok, used, limit, retryAfterSec, row }. On refusal nothing is
+// written and retryAfterSec says when the oldest in-window row falls out.
+function createFeatureRequestIfUnderQuota({ orgId, userEmail, category, title, body, planTier }, now = Date.now()) {
+  const db = getDb();
+  const since = new Date(now - FEATURE_REQUEST_WINDOW_MS).toISOString();
+  const limit = FEATURE_REQUEST_MAX_PER_WINDOW;
+
+  const tx = db.transaction(() => {
+    const used = db
+      .prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at >= ?')
+      .get(orgId, since).n;
+
+    if (used >= limit) {
+      // Oldest row still inside the window: once it ages out, a slot frees up.
+      const oldest = db
+        .prepare('SELECT created_at AS createdAt FROM feature_requests WHERE org_id = ? AND created_at >= ? ORDER BY created_at ASC LIMIT 1')
+        .get(orgId, since);
+      let retryAfterSec = Math.ceil(FEATURE_REQUEST_WINDOW_MS / 1000);
+      if (oldest) {
+        const freesAt = Date.parse(oldest.createdAt) + FEATURE_REQUEST_WINDOW_MS;
+        retryAfterSec = Math.max(1, Math.ceil((freesAt - now) / 1000));
+      }
+      return { ok: false, used, limit, retryAfterSec, row: null };
+    }
+
+    const id = uuidv4();
+    const createdAt = new Date(now).toISOString();
+    db.prepare(`
+      INSERT INTO feature_requests (id, org_id, user_email, category, title, body, plan_tier, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?)
+    `).run(id, orgId, userEmail || null, category, title, body, planTier || null, createdAt);
+
+    return { ok: true, used: used + 1, limit, retryAfterSec: 0, row: { id, createdAt } };
+  });
+
+  return tx.immediate();
+}
+
 // --- Billing state (Stripe; attached to the organization) ------------------
 
 function getOrgBilling(orgId) {
@@ -1284,6 +1503,12 @@ module.exports = {
   reserveUsage,
   refundUsage,
   insertDemoRequest,
+  countRecentFeatureRequests,
+  createFeatureRequestIfUnderQuota,
+  FEATURE_REQUEST_CATEGORIES,
+  FEATURE_REQUEST_MAX_PER_WINDOW,
+  FEATURE_REQUEST_WINDOW_MS,
+  FEATURE_REQUEST_RETENTION_DAYS,
   getOrgBilling,
   setOrgStripeCustomerId,
   findOrgByStripeCustomerId,

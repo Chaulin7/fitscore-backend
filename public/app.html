@@ -37,7 +37,10 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   color:rgba(255,255,255,0.65);
   font:600 13px 'Inter',sans-serif;
   padding:7px 15px;border-radius:6px;cursor:pointer;
-  letter-spacing:.03em;transition:all .18s;position:relative
+  letter-spacing:.03em;transition:all .18s;position:relative;
+  /* Two-word labels ("Audit Log", "Role History") must stay on one line: once
+     a fifth item joined the bar the row got tight enough for them to wrap. */
+  white-space:nowrap
 }
 .nav-btn:hover{color:#fff;background:rgba(255,255,255,0.1)}
 .nav-btn.active{color:#fff;background:rgba(255,255,255,0.14)}
@@ -508,6 +511,30 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .modal-close{background:none;border:none;font-size:22px;color:#6b7280;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}
 .modal-close:hover{background:#f3f4f6;color:#0a1f3d}
 .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+/* Feature-request nav button. Between 641px (drawer kicks in) and ~900px the
+   nav is still horizontal, and a 22-character label pushes the plan/account
+   chips off the bar — so swap to a short label in that band only. */
+.nav-btn-fr{white-space:nowrap}
+.nav-btn-fr .fr-short{display:none}
+/* The full label only fits alongside the status pill, plan chip and account
+   chip on wide screens; below that the whole topbar-nav wraps to two rows. The
+   drawer (≤640px) has room again, so the short label is for the middle band. */
+@media(max-width:1320px) and (min-width:641px){
+  .nav-btn-fr .fr-long{display:none}
+  .nav-btn-fr .fr-short{display:inline}
+}
+.fr-field{margin-bottom:14px}
+.fr-field label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px}
+.fr-field .text-input{width:100%}
+.fr-field select.text-input{width:100%;height:38px;background:#fff}
+.fr-field textarea.text-input{width:100%;min-height:140px;padding:10px 12px;resize:vertical;font-family:inherit;line-height:1.5}
+.fr-count{font-size:11px;color:#9ca3af;text-align:right;margin-top:4px}
+.fr-msg{display:none;font-size:13px;border-radius:8px;padding:9px 12px;margin-bottom:12px}
+.fr-msg.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
+.fr-msg.warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.fr-upsell{text-align:center;padding:8px 4px 4px}
+.fr-upsell h4{margin:0 0 8px;font-size:16px;color:#0a1f3d}
+.fr-upsell p{margin:0 auto 4px;font-size:13.5px;color:#6b7280;max-width:44ch;line-height:1.55}
 .modal-tabs{display:flex;gap:0;border-bottom:1px solid #e5e7eb;padding:0 24px;flex-shrink:0}
 .modal-tab{background:none;border:none;padding:12px 18px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;letter-spacing:.03em}
 .modal-tab.active{color:#0a1f3d;border-bottom-color:#0f2847}
@@ -949,6 +976,12 @@ img, video, table { max-width: 100%; }
     <button class="nav-btn" data-action="switchTab" data-tab="audit">Audit Log</button>
     <button class="nav-btn" data-action="switchTab" data-tab="history">Role History</button>
     <a class="nav-btn" href="/bias-report.html" style="text-decoration:none;display:inline-block">Bias Report</a>
+    <!-- Inside .topbar-nav deliberately: the ≤640px rules collapse only this
+         element into the mobile drawer, so the button needs no extra CSS to
+         behave on small screens. Carries no data-tab, so switchTab never sees it. -->
+    <button class="nav-btn nav-btn-fr" id="featureRequestNavBtn" type="button" data-action="openFeatureRequest" title="Suggest an improvement">
+      <span class="fr-long">Suggest an improvement</span><span class="fr-short">Suggest</span>
+    </button>
   </nav>
   <span class="nav-status-pill" id="navStatusPill" title="Backend status"><span class="dot" id="navStatusDot"></span><span id="navStatusLabel">Not connected</span></span>
   <button type="button" class="nav-search-btn" id="navSearchBtn" data-action="focusAuditSearch" title="Search audit log" aria-label="Search audit log">
@@ -1756,6 +1789,11 @@ async function refreshUsage(){
 }
 
 function renderPlanChip(b){
+  // Piggyback the feature-request nav visibility on the plan refresh that
+  // already runs on load and after every analysis. First statement, so it also
+  // runs on the !b early-return path below (where _isPaidPlan correctly reads
+  // as false and, in 'hidden' mode, keeps the button hidden).
+  syncFeatureRequestNav();
   const chip=document.getElementById('planChip');
   const label=document.getElementById('planChipLabel');
   if(!chip||!label||!b){ if(chip)chip.style.display='none'; return; }
@@ -1937,6 +1975,168 @@ function showQuotaPrompt(errEl, e){
     if(pro){ pro.style.display='inline-flex'; pro.onclick=function(){ startCheckout('pro'); }; }
     if(team){ team.style.display='inline-flex'; team.onclick=function(){ startCheckout('team'); }; }
   }).catch(function(){});
+}
+
+// === Feature requests (paid-only) ==========================================
+// What free-tier users see for the "Suggest an improvement" entry point:
+//   'upsell' — entry point visible; clicking shows the Available-on-Pro panel
+//   'hidden' — entry point removed from the topbar entirely
+// Flip this ONE value to switch. Purely cosmetic: the server's 403 is the only
+// authorization, so hiding the button is never what keeps free orgs out.
+const FEATURE_REQUEST_FREE_MODE = 'upsell'; // 'upsell' | 'hidden'
+
+// Mirrors billing.isUnlimited() on the server — pro|team AND active|past_due.
+// NOT hasActiveTeamPlan, which is team-only and would lock Pro out. Branching on
+// plan alone would show the form to a cancelled Pro org whose submit then 403s.
+// Fails closed: refreshUsage() swallows errors and leaves _billing null, and a
+// transient billing outage should show the upsell rather than a form that fails.
+function _isPaidPlan(){
+  const b = _billing;
+  if (!b) return false;
+  const paid = b.plan === 'pro' || b.plan === 'team';
+  const ok = b.subscriptionStatus === 'active' || b.subscriptionStatus === 'past_due';
+  return paid && ok;
+}
+
+// Called from renderPlanChip, which already runs on every refreshUsage().
+function syncFeatureRequestNav(){
+  const btn = document.getElementById('featureRequestNavBtn');
+  if (!btn) return;
+  btn.style.display = (_isPaidPlan() || FEATURE_REQUEST_FREE_MODE === 'upsell') ? '' : 'none';
+}
+
+let _frPrevFocus = null;
+function _frMsg(id, text){
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!text) { el.style.display = 'none'; el.textContent = ''; return; }
+  el.textContent = text; // never innerHTML — server strings and user echo
+  el.style.display = 'block';
+}
+function _frClearMessages(){ _frMsg('freqError', ''); _frMsg('freqWarn', ''); }
+
+function clearFeatureRequestForm(){
+  const cat = document.getElementById('freqCategory');
+  const title = document.getElementById('freqTitle');
+  const body = document.getElementById('freqBody');
+  const count = document.getElementById('freqCount');
+  if (cat) cat.value = 'product';
+  if (title) title.value = '';
+  if (body) body.value = '';
+  if (count) count.textContent = '0 / 4000';
+  _frClearMessages();
+}
+
+function countFeatureBody(){
+  const body = document.getElementById('freqBody');
+  const count = document.getElementById('freqCount');
+  if (body && count) count.textContent = body.value.length + ' / 4000';
+}
+
+// Show either the form or the upsell inside the one modal.
+function _frRenderMode(paid){
+  const form = document.getElementById('freqForm');
+  const upsell = document.getElementById('freqUpsell');
+  const submit = document.getElementById('freqSubmitBtn');
+  const upBtn = document.getElementById('freqUpsellBtn');
+  if (form) form.style.display = paid ? '' : 'none';
+  if (upsell) upsell.style.display = paid ? 'none' : '';
+  if (submit) submit.style.display = paid ? '' : 'none';
+  if (upBtn) upBtn.style.display = paid ? 'none' : '';
+}
+
+function openFeatureRequest(){
+  const paid = _isPaidPlan();
+  // Belt and braces: in 'hidden' mode the button is already display:none.
+  if (!paid && FEATURE_REQUEST_FREE_MODE === 'hidden') return;
+  const modal = document.getElementById('freqModal');
+  if (!modal) return;
+  _frPrevFocus = document.activeElement;
+  _frClearMessages();
+  _frRenderMode(paid);
+  modal.classList.add('open');
+  // Match openInfoModal/toggleSettings: without this the page scrolls behind
+  // the fixed backdrop.
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(function(){
+    const first = document.getElementById(paid ? 'freqCategory' : 'freqUpsellBtn');
+    try { if (first) first.focus(); } catch(_){}
+  });
+  // _billing only refreshes on load and after an analysis, so an upgrade made in
+  // another tab would otherwise show a paying customer the upsell until reload.
+  // Re-check in the background and re-render if the verdict changed.
+  refreshUsage().then(function(){
+    syncFeatureRequestNav();
+    const nowPaid = _isPaidPlan();
+    if (nowPaid !== paid && modal.classList.contains('open')) _frRenderMode(nowPaid);
+  }).catch(function(){});
+}
+
+function closeFeatureRequest(){
+  const modal = document.getElementById('freqModal');
+  if (modal) modal.classList.remove('open');
+  document.body.style.overflow = '';
+  // Drafts are per-person: a Cancel followed by a logout must not leave one
+  // user's text sitting in the form for whoever logs in next on this browser.
+  clearFeatureRequestForm();
+  try { if (_frPrevFocus && typeof _frPrevFocus.focus === 'function') _frPrevFocus.focus(); } catch(_){}
+  _frPrevFocus = null;
+}
+
+// The upsell CTA opens the settings panel (z-index 9999). Close this dialog
+// first — otherwise it stays open underneath, and its aria-modal="true" hides
+// the billing panel from assistive tech.
+function openPlansFromFeatureRequest(){
+  closeFeatureRequest();
+  if (typeof toggleSettings === 'function') toggleSettings();
+}
+
+async function submitFeatureRequest(){
+  const btn = document.getElementById('freqSubmitBtn');
+  const category = (document.getElementById('freqCategory')||{}).value || 'product';
+  const title = ((document.getElementById('freqTitle')||{}).value || '').trim();
+  const body = ((document.getElementById('freqBody')||{}).value || '').trim();
+  _frClearMessages();
+
+  // Pre-flight, so obvious mistakes cost no round trip. The server re-validates.
+  if (title.length < 3 || title.length > 120) {
+    _frMsg('freqError', 'Title must be between 3 and 120 characters.');
+    try { document.getElementById('freqTitle').focus(); } catch(_){}
+    return;
+  }
+  if (body.length < 10 || body.length > 4000) {
+    _frMsg('freqError', 'Description must be between 10 and 4000 characters.');
+    try { document.getElementById('freqBody').focus(); } catch(_){}
+    return;
+  }
+
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    await api('/api/feature-requests', { method: 'POST', body: JSON.stringify({ category, title, body }) });
+    toast('Thanks — we’ve got it. We’ll reply to your account email.', 'success');
+    closeFeatureRequest();
+    clearFeatureRequestForm();
+    try { document.dispatchEvent(new CustomEvent('cv:feature_request_submitted', { detail: { category } })); } catch(_){}
+  } catch (e) {
+    // 429 and 403 must be handled BEFORE handleApiError: it collapses every 429
+    // into a generic "going a bit fast" toast, which would destroy the specific
+    // 5-per-24h message this endpoint returns. These three are all about the
+    // form the user is still looking at, so they belong inline, not in a toast.
+    if (e && e.status === 429) {
+      _frMsg('freqWarn', e.message || 'Your organization has reached the limit of 5 feature requests per 24 hours.');
+    } else if (e && e.status === 403) {
+      _frRenderMode(false);
+      _frMsg('freqWarn', e.message || 'Feature requests are available on the Pro and Team plans.');
+      refreshUsage().then(syncFeatureRequestNav).catch(function(){});
+    } else if (e && e.status === 400) {
+      _frMsg('freqError', e.message || 'Please check the form and try again.');
+    } else {
+      handleApiError(e, 'Could not send your feature request');
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
 }
 
 // Post-Checkout return: ?billing=success → strip param, re-poll usage briefly.
@@ -3311,9 +3511,14 @@ function renderRetentionStats(s){
   const nextLine=s.lastPurgeAt
     ? 'Next purge: within 24h of the daily job (last ran '+fmtDateTime(s.lastPurgeAt)+')'
     : 'Next purge: within 24h (the daily job has not run yet)';
-  const wouldNow=s.wouldDeleteNow>0
-    ? '<span class="ret-warn">'+s.wouldDeleteNow+' row(s) are past the window and will be removed on the next purge.</span>'
-    : 'No rows are currently past the retention window.';
+  // Audit rows and feature requests are on separate windows, so name which is
+  // which rather than reporting one total against "the window".
+  const parts=[];
+  if(s.auditWouldDeleteNow>0)parts.push(s.auditWouldDeleteNow+' audit row(s)');
+  if(s.featureRequestWouldDeleteNow>0)parts.push(s.featureRequestWouldDeleteNow+' feature request(s)');
+  const wouldNow=parts.length
+    ? '<span class="ret-warn">'+parts.join(' and ')+' are past their retention window and will be removed on the next purge.</span>'
+    : 'No rows are currently past their retention window.';
   const modeLine=s.purgeMode==='live'
     ? '<div><span class="ret-k">Purge mode:</span> <strong>Live</strong> — the daily job deletes rows past the window.</div>'
     : '<div><span class="ret-warn">Purge mode: Dry run</span> — the daily job reports what it would delete but deletes nothing.</div>';
@@ -3323,6 +3528,11 @@ function renderRetentionStats(s){
     '<div><span class="ret-k">Audit rows stored:</span> <strong>'+(s.rowCount||0)+'</strong></div>'+
     '<div><span class="ret-k">Oldest retained event:</span> '+fmtDate(s.oldestCreatedAt)+'</div>'+
     '<div><span class="ret-k">Deletes events before:</span> '+fmtDate(s.cutoffDate)+' ('+retMonths(s.effectiveRetentionDays)+' months)</div>'+
+    // Its own line with its own date: feature requests are held to a fixed
+    // data-minimisation window, independent of the audit retention above.
+    '<div><span class="ret-k">Feature requests stored:</span> <strong>'+(s.featureRequestRowCount||0)+'</strong>'
+      +' &middot; deleted before '+fmtDate(s.featureRequestCutoffDate)
+      +' ('+retMonths(s.featureRequestRetentionDays||0)+' months, fixed)</div>'+
     '<div>'+nextLine+'</div>'+
     '<div>'+wouldNow+'</div>';
 }
@@ -3362,7 +3572,11 @@ async function saveRetention(){
   // the exact, server-computed count before saving.
   if(_retentionDays!=null&&days<_retentionDays){
     let wouldDelete=0;
-    try{const p=await api('/api/org/retention/preview?days='+encodeURIComponent(days));wouldDelete=p.wouldDelete||0;}
+    // auditWouldDelete, not the combined wouldDelete: this prompt is about the
+    // consequence of lowering AUDIT retention, and feature requests are purged
+    // on their own fixed window whatever this value is set to. Counting them
+    // here would blame the change for deletions it does not cause.
+    try{const p=await api('/api/org/retention/preview?days='+encodeURIComponent(days));wouldDelete=p.auditWouldDelete||0;}
     catch(_){/* fall through — still confirm, just without a precise count */}
     const msg=wouldDelete>0
       ? 'Lowering retention to '+days+' days will permanently delete '+wouldDelete+' audit record(s) on the next purge. This is irreversible.'
@@ -3823,6 +4037,58 @@ function toggleBatchWhy(btn, idx){
     </div>
   </div>
 </div>
+
+<!-- Feature request ("Suggest an improvement"). Static markup following the
+     #infoModal pattern. Keeps the shared .modal-backdrop z-index of 2000 — the
+     10000 override in showPlanDetail exists only because that dialog opens from
+     inside the settings panel (z-index 9999); this one opens from the topbar. -->
+<div id="freqModal" class="modal-backdrop" data-action="closeFeatureRequestBackdrop" role="dialog" aria-modal="true" aria-labelledby="freqModalTitle">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-head">
+      <h3 id="freqModalTitle">Suggest an improvement</h3>
+      <button class="modal-close" type="button" data-action="closeFeatureRequest" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="freqError" class="fr-msg err" role="alert"></div>
+      <div id="freqWarn" class="fr-msg warn" role="status"></div>
+
+      <!-- Paid path -->
+      <div id="freqForm">
+        <p style="font-size:13px;color:#6b7280;margin:0 0 14px">Tell us what would make CVsprings better. It goes straight to the product team, and we reply to your account email.</p>
+        <div class="fr-field">
+          <label for="freqCategory">Category</label>
+          <select id="freqCategory" class="text-input">
+            <option value="product">Product</option>
+            <option value="website">Website</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="fr-field">
+          <label for="freqTitle">Title</label>
+          <input id="freqTitle" class="text-input" type="text" maxlength="120" placeholder="Short summary of your idea">
+        </div>
+        <div class="fr-field">
+          <label for="freqBody">Description</label>
+          <textarea id="freqBody" class="text-input" maxlength="4000" data-action="countFeatureBody" placeholder="What are you trying to do, and what gets in the way?"></textarea>
+          <div class="fr-count" id="freqCount">0 / 4000</div>
+        </div>
+      </div>
+
+      <!-- Free path -->
+      <div id="freqUpsell" class="fr-upsell" style="display:none">
+        <h4>Available on Pro</h4>
+        <p>Feature requests go straight to the product team on the Pro and Team plans, with a reply to your account email.</p>
+        <p>Free plans can still reach us any time via the Support link in the footer.</p>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" type="button" data-action="closeFeatureRequest">Cancel</button>
+      <button class="btn btn-primary" type="button" id="freqSubmitBtn" data-action="submitFeatureRequest">Send request</button>
+      <button class="btn btn-primary" type="button" id="freqUpsellBtn" data-action="openPlansFromFeatureRequest" style="display:none">View plans</button>
+    </div>
+  </div>
+</div>
+
 <script nonce="__CSP_NONCE__">
 // Populate the Support contact row from server config (env), as a mailto with
 // org context prefilled in the subject. No address is hardcoded into the page.
@@ -3874,6 +4140,11 @@ function switchModalTab(idx){
   document.getElementById('infoModalTitle').textContent=idx===0?'How Scores Are Calculated':'About & Contact';
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeInfoModal();});
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  const m=document.getElementById('freqModal');
+  if(m&&m.classList.contains('open'))closeFeatureRequest();
+});
 </script>
 <script nonce="__CSP_NONCE__">
 /* ── Candidate batch notes ── */
@@ -3892,8 +4163,13 @@ function getBatchNote(idx){
 /* ── Keyboard shortcuts ── */
 document.addEventListener('keydown', function(e){
   if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    // Don't let the global Enter shortcut reach through an open dialog: pressing
+    // Enter in the feature-request modal would start an analysis behind it, and
+    // would also swallow Enter-activation of the dialog's own buttons.
+    var fq = document.getElementById('freqModal');
+    if (fq && fq.classList.contains('open')) return;
     var tag = document.activeElement.tagName.toLowerCase();
-    if (tag === 'textarea' || tag === 'input') return;
+    if (tag === 'textarea' || tag === 'input' || tag === 'select') return;
     var btn = document.getElementById('analyzeBtn');
     if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
   }
@@ -4001,6 +4277,8 @@ const delegatedHandlers = {
     switchModalTab: (el) => switchModalTab(Number(el.dataset.index)),
     closeInfoModal,
     closeInfoModalBackdrop: (el, e) => { if (e.target === el) closeInfoModal(); },
+    openFeatureRequest, submitFeatureRequest, closeFeatureRequest, openPlansFromFeatureRequest,
+    closeFeatureRequestBackdrop: (el, e) => { if (e.target === el) closeFeatureRequest(); },
   },
   change: {
     setAutosaveBatch: (el) => setAutosaveBatch(el.checked),
@@ -4012,6 +4290,7 @@ const delegatedHandlers = {
     syncSlider: (el) => { syncSlider(el.dataset.weight); updateWeightSum(); },
     syncInput: (el) => { syncInput(el.dataset.weight); updateWeightSum(); },
     filterAuditSearch,
+    countFeatureBody,
   },
 };
 Object.keys(delegatedHandlers).forEach(function(eventType){

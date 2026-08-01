@@ -15,6 +15,7 @@ const orgRouter = require('./routes/org');
 const billingRouter = require('./routes/billing');
 const teamRouter = require('./routes/team');
 const demoRouter = require('./routes/demo');
+const featureRequestsRouter = require('./routes/featureRequests');
 const { migrateLegacyData } = require('./services/authService');
 const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { mutationLimiter } = require('./middleware/rateLimits');
@@ -234,6 +235,11 @@ app.use('/api/analyze', analyzeLimiter, requireSession, analyzeRouter);
 app.use('/api/audit', generalLimiter, requireSessionOrDownloadToken, mutationLimiter, auditRouter);
 app.use('/api/stats', generalLimiter, requireSession, statsRouter);
 app.use('/api/templates', generalLimiter, requireSession, mutationLimiter, templatesRouter);
+// requireSession BEFORE mutationLimiter is load-bearing: mutationLimiter keys on
+// req.orgId, which requireSession sets. Reversed, every org silently falls back
+// to IP-keying. These two are burst guards; the 5-per-rolling-24h business quota
+// is enforced in SQL inside the route.
+app.use('/api/feature-requests', generalLimiter, requireSession, mutationLimiter, featureRequestsRouter);
 
 // --- /health (DB ping) ----------------------------------------------------
 app.get('/health', async (req, res) => {
@@ -323,6 +329,7 @@ const server = app.listen(PORT, () => {
   log(' GET  /api/audit/report/:id   - HTML candidate report (auth required)');
   log(' GET  /api/stats/overview     - Dashboard summary metrics (auth required)');
   log(' GET  /api/templates          - Templates CRUD (auth required)');
+  log(' POST /api/feature-requests   - Submit a feature request (Pro/Team, auth required)');
   log(' GET  /health                 - Health check');
 });
 

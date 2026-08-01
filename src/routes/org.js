@@ -124,6 +124,15 @@ router.get('/export', sessionOrDownloadToken, requireOwner, (req, res) => {
         id: t.id, name: t.name, role: t.role || '', jobDescription: t.job_description || '',
         weights: t.weights ? JSON.parse(t.weights) : null, createdAt: t.created_at, updatedAt: t.updated_at,
       }));
+    // Included because feature_requests holds user_email plus free text the
+    // submitter wrote — a portability/DSAR export that omitted it would be
+    // incomplete for the very field that makes the table personal data.
+    const featureRequests = getDb().prepare('SELECT * FROM feature_requests WHERE org_id = ? ORDER BY created_at DESC').all(req.orgId)
+      .map((f) => ({
+        id: f.id, category: f.category, title: f.title, body: f.body,
+        planTier: f.plan_tier || null, status: f.status, createdAt: f.created_at,
+        userEmail: f.user_email || null,
+      }));
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="cvsprings-org-export.json"');
     res.send(JSON.stringify({
@@ -131,6 +140,7 @@ router.get('/export', sessionOrDownloadToken, requireOwner, (req, res) => {
       organization: { id: org.id, name: org.name, retentionDays: org.retentionDays, createdAt: org.createdAt },
       auditRecords,
       templates,
+      featureRequests,
     }, null, 2));
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -145,8 +155,8 @@ router.delete('/audit-data', requireSession, requireOwner, (req, res) => {
     if (!org || confirm !== org.name) {
       return sendError(res, 400, 'CONFIRMATION_MISMATCH', 'Type your organization name exactly to confirm deletion.', 'confirm');
     }
-    const { recordsDeleted, changesDeleted } = deleteAllOrgAuditData(req.orgId);
-    res.json({ ok: true, recordsDeleted, changesDeleted });
+    const { recordsDeleted, changesDeleted, featureRequestsDeleted } = deleteAllOrgAuditData(req.orgId);
+    res.json({ ok: true, recordsDeleted, changesDeleted, featureRequestsDeleted });
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
