@@ -3511,9 +3511,14 @@ function renderRetentionStats(s){
   const nextLine=s.lastPurgeAt
     ? 'Next purge: within 24h of the daily job (last ran '+fmtDateTime(s.lastPurgeAt)+')'
     : 'Next purge: within 24h (the daily job has not run yet)';
-  const wouldNow=s.wouldDeleteNow>0
-    ? '<span class="ret-warn">'+s.wouldDeleteNow+' row(s) are past the window and will be removed on the next purge.</span>'
-    : 'No rows are currently past the retention window.';
+  // Audit rows and feature requests are on separate windows, so name which is
+  // which rather than reporting one total against "the window".
+  const parts=[];
+  if(s.auditWouldDeleteNow>0)parts.push(s.auditWouldDeleteNow+' audit row(s)');
+  if(s.featureRequestWouldDeleteNow>0)parts.push(s.featureRequestWouldDeleteNow+' feature request(s)');
+  const wouldNow=parts.length
+    ? '<span class="ret-warn">'+parts.join(' and ')+' are past their retention window and will be removed on the next purge.</span>'
+    : 'No rows are currently past their retention window.';
   const modeLine=s.purgeMode==='live'
     ? '<div><span class="ret-k">Purge mode:</span> <strong>Live</strong> — the daily job deletes rows past the window.</div>'
     : '<div><span class="ret-warn">Purge mode: Dry run</span> — the daily job reports what it would delete but deletes nothing.</div>';
@@ -3523,6 +3528,11 @@ function renderRetentionStats(s){
     '<div><span class="ret-k">Audit rows stored:</span> <strong>'+(s.rowCount||0)+'</strong></div>'+
     '<div><span class="ret-k">Oldest retained event:</span> '+fmtDate(s.oldestCreatedAt)+'</div>'+
     '<div><span class="ret-k">Deletes events before:</span> '+fmtDate(s.cutoffDate)+' ('+retMonths(s.effectiveRetentionDays)+' months)</div>'+
+    // Its own line with its own date: feature requests are held to a fixed
+    // data-minimisation window, independent of the audit retention above.
+    '<div><span class="ret-k">Feature requests stored:</span> <strong>'+(s.featureRequestRowCount||0)+'</strong>'
+      +' &middot; deleted before '+fmtDate(s.featureRequestCutoffDate)
+      +' ('+retMonths(s.featureRequestRetentionDays||0)+' months, fixed)</div>'+
     '<div>'+nextLine+'</div>'+
     '<div>'+wouldNow+'</div>';
 }
@@ -3562,7 +3572,11 @@ async function saveRetention(){
   // the exact, server-computed count before saving.
   if(_retentionDays!=null&&days<_retentionDays){
     let wouldDelete=0;
-    try{const p=await api('/api/org/retention/preview?days='+encodeURIComponent(days));wouldDelete=p.wouldDelete||0;}
+    // auditWouldDelete, not the combined wouldDelete: this prompt is about the
+    // consequence of lowering AUDIT retention, and feature requests are purged
+    // on their own fixed window whatever this value is set to. Counting them
+    // here would blame the change for deletions it does not cause.
+    try{const p=await api('/api/org/retention/preview?days='+encodeURIComponent(days));wouldDelete=p.auditWouldDelete||0;}
     catch(_){/* fall through — still confirm, just without a precise count */}
     const msg=wouldDelete>0
       ? 'Lowering retention to '+days+' days will permanently delete '+wouldDelete+' audit record(s) on the next purge. This is irreversible.'

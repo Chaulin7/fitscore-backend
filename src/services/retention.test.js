@@ -358,9 +358,40 @@ describe('feature_requests retention is decoupled from retention_days', () => {
     const preview = countPurgeableRows(org, 180);
     assert.equal(preview.wouldDelete, 3, 'preview must use the independent feature-request cutoff');
 
+    // Each count comes with the date that governs it, so the UI never shows one
+    // window's date beside the other window's rows.
+    assert.equal(preview.auditWouldDelete, 2, 'the part attributable to the previewed retention_days');
+    assert.equal(preview.featureRequestWouldDelete, 1);
+    assert.equal(preview.featureRequestRetentionDays, FR_DAYS);
+    assert.match(preview.featureRequestCutoffDate, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    assert.notEqual(preview.featureRequestCutoffDate, preview.cutoffDate, 'the two windows are different dates');
+    const frAge = (Date.now() - Date.parse(preview.featureRequestCutoffDate)) / DAY_MS;
+    assert.ok(Math.abs(frAge - FR_DAYS) < 1, `feature-request cutoff should be ~${FR_DAYS}d ago, was ~${Math.round(frAge)}d`);
+
     runRetentionPurge({ mode: 'live' });
     assert.equal(purgeRuns(org)[0].rows_deleted, preview.wouldDelete, 'preview matched reality');
     assert.equal(featureRequestCount(org), 1);
+  });
+
+  test('getRetentionStats reports each window with the date that governs it', () => {
+    const org = makeOrg(180);
+    seedMany(org, 2, 300);                 // audit-eligible
+    seedFeatureRequest(org, FR_DAYS + 35); // feature-request-eligible
+    seedFeatureRequest(org, 300);          // stored, not yet eligible
+
+    const s = getRetentionStats(org);
+
+    assert.equal(s.auditWouldDeleteNow, 2);
+    assert.equal(s.featureRequestWouldDeleteNow, 1);
+    assert.equal(s.wouldDeleteNow, 3, 'the combined total still predicts the whole purge');
+    assert.equal(s.featureRequestRowCount, 2, 'all stored feature requests, not just eligible ones');
+    assert.equal(s.featureRequestRetentionDays, FR_DAYS);
+
+    const auditAge = (Date.now() - Date.parse(s.cutoffDate)) / DAY_MS;
+    const frAge = (Date.now() - Date.parse(s.featureRequestCutoffDate)) / DAY_MS;
+    assert.ok(Math.abs(auditAge - 180) < 1, 'cutoffDate is the audit window');
+    assert.ok(Math.abs(frAge - FR_DAYS) < 1, 'featureRequestCutoffDate is the feature-request window');
+    assert.notEqual(s.cutoffDate, s.featureRequestCutoffDate);
   });
 
   test('getRetentionStats.wouldDeleteNow spans both cutoffs; rowCount stays audit-only', () => {

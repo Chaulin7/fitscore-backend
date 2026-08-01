@@ -1183,7 +1183,20 @@ function countPurgeableRows(orgId, days, now = Date.now()) {
   const frCutoffIso = new Date(now - FEATURE_REQUEST_RETENTION_DAYS * DAY_MS).toISOString();
   const row = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso);
   const fr = db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at < ?').get(orgId, frCutoffIso);
-  return { days: eff, cutoffDate: cutoffIso, wouldDelete: row.n + fr.n };
+  return {
+    days: eff,
+    cutoffDate: cutoffIso,
+    wouldDelete: row.n + fr.n,          // everything the next purge removes
+    // Split out because the two are governed by different windows and answer
+    // different questions. auditWouldDelete is the part attributable to the
+    // `days` being previewed; the feature-request part happens on its own clock
+    // whatever `days` is set to, so a "lowering retention will delete N" prompt
+    // must use auditWouldDelete or it blames the change for unrelated rows.
+    auditWouldDelete: row.n,
+    featureRequestWouldDelete: fr.n,
+    featureRequestCutoffDate: frCutoffIso,
+    featureRequestRetentionDays: FEATURE_REQUEST_RETENTION_DAYS,
+  };
 }
 
 // Retention stats for the settings UI: current row count, oldest retained event,
@@ -1200,8 +1213,10 @@ function getRetentionStats(orgId, now = Date.now()) {
   // purge job, so it must span every table that job touches — each on the cutoff
   // the job actually applies to it. cutoffDate below remains the audit-log one.
   const frCutoffIso = new Date(now - FEATURE_REQUEST_RETENTION_DAYS * DAY_MS).toISOString();
-  const wouldDeleteNow = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso).n
-    + db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at < ?').get(orgId, frCutoffIso).n;
+  const auditWouldDeleteNow = db.prepare('SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND created_at < ?').get(orgId, cutoffIso).n;
+  const frAgg = db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ?').get(orgId);
+  const featureRequestWouldDeleteNow = db.prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at < ?').get(orgId, frCutoffIso).n;
+  const wouldDeleteNow = auditWouldDeleteNow + featureRequestWouldDeleteNow;
   const last = db.prepare('SELECT MAX(ran_at) AS last FROM purge_runs').get();
   return {
     retentionDays,
@@ -1214,6 +1229,14 @@ function getRetentionStats(orgId, now = Date.now()) {
     oldestCreatedAt: agg.oldest || null,
     cutoffDate: cutoffIso,
     wouldDeleteNow,
+    // Feature requests run on their own fixed window, so the card can show the
+    // date that actually governs them rather than the audit one sitting next to
+    // a count it does not describe.
+    auditWouldDeleteNow,
+    featureRequestRowCount: frAgg.n,
+    featureRequestWouldDeleteNow,
+    featureRequestCutoffDate: frCutoffIso,
+    featureRequestRetentionDays: FEATURE_REQUEST_RETENTION_DAYS,
     lastPurgeAt: last ? last.last : null,
   };
 }
