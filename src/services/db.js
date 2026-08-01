@@ -36,6 +36,23 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const RETENTION_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const RETENTION_MIN_GAP_MS = 20 * 60 * 60 * 1000;       // ~daily cadence
 
+// --- Feature requests ("Suggest an improvement", Pro/Team only) -------------
+// The route validates against this list; the table's CHECK constraint below
+// repeats the same three values as literal SQL, because SQLite stores DDL as
+// text and cannot take a bound parameter there. The route is the gate — the
+// CHECK is only a backstop against non-route writers. Widening the set means
+// editing BOTH, and see the note above the table for why the DDL edit alone
+// does nothing to an existing database.
+const FEATURE_REQUEST_CATEGORIES = ['product', 'website', 'other'];
+// Business quota, not an abuse guard: 5 submissions per org per ROLLING 24h.
+// Deliberately counted from stored rows rather than express-rate-limit, whose
+// store is in-memory (lost on every Render deploy), whose window is fixed
+// rather than rolling, and which cannot be made atomic with the INSERT.
+const FEATURE_REQUEST_MAX_PER_WINDOW = Number.parseInt(process.env.FEATURE_REQUEST_DAILY_MAX, 10) > 0
+  ? Number.parseInt(process.env.FEATURE_REQUEST_DAILY_MAX, 10)
+  : 5;
+const FEATURE_REQUEST_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 function getDb() {
   if (!db) {
     const fs = require('fs');
@@ -349,6 +366,50 @@ function initSchema() {
       ip_hash TEXT
     )
   `);
+
+  // In-product feature requests ("Suggest an improvement"), Pro/Team only.
+  // The ROW is the source of truth: the notification email to the product inbox
+  // is a side effect, and a delivery failure never discards a submission.
+  //
+  // plan_tier is a SNAPSHOT of the org's plan at submission time — a request
+  // sent while on Pro stays a Pro-era request after a downgrade. Never
+  // re-derive it from the org's current plan on read.
+  //
+  // created_at is written explicitly as an ISO-8601 UTC string via nowIso(),
+  // deliberately with NO `DEFAULT (datetime('now'))` like audit_log has. The
+  // rolling-24h quota compares created_at against a JS toISOString() cutoff,
+  // and SQLite's datetime('now') renders "2026-07-31 10:22:33" — a space where
+  // ISO has a 'T'. Since ' ' (0x20) sorts before 'T' (0x54), a DEFAULT-stamped
+  // row would compare as older than every ISO row and silently escape the
+  // quota. screening_runs, candidates and demo_requests already do it this way.
+  //
+  // status values: new | reviewing | planned | done | declined. Intentionally
+  // NOT a CHECK constraint — status is the field a triage workflow grows, it is
+  // written by ops rather than by user input, and SQLite cannot ALTER a CHECK.
+  //
+  // The CHECK on category IS worth its cost (closed set, mirrors the frontend
+  // dropdown, guards non-route writers). To widen it later, note that
+  // CREATE TABLE IF NOT EXISTS is a silent no-op on an existing database:
+  // editing the text below changes FRESH databases only. Widening in production
+  // needs a drift-detected 12-step rebuild (create new table, copy, drop,
+  // rename, recreate index) inside one db.transaction().
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS feature_requests (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      user_email TEXT,
+      category TEXT NOT NULL CHECK (category IN ('product','website','other')),
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      plan_tier TEXT,
+      status TEXT NOT NULL DEFAULT 'new',
+      created_at TEXT NOT NULL
+    )
+  `);
+  // Backs the rolling-24h quota (org_id equality + created_at range) as a
+  // covering index, and the newest-first triage listing. Same shape as
+  // idx_audit_log_org_created.
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_feature_requests_org_created ON feature_requests(org_id, created_at DESC)');
 
   // Per-org monthly usage counters (analyses run; periodKey = YYYY-MM)
   getDb().exec(`
@@ -1230,6 +1291,67 @@ function insertDemoRequest({ name, email, agency, note, ipHash }) {
   return { id, createdAt };
 }
 
+// --- Feature requests ("Suggest an improvement") -----------------------------
+
+// How many requests this org has filed inside the rolling window ending now.
+// Exported mainly so tests and any future usage display can read it without
+// attempting a write.
+function countRecentFeatureRequests(orgId, now = Date.now()) {
+  const since = new Date(now - FEATURE_REQUEST_WINDOW_MS).toISOString();
+  return getDb()
+    .prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at >= ?')
+    .get(orgId, since).n;
+}
+
+// Atomically check the rolling-24h quota and insert, in one synchronous
+// better-sqlite3 transaction — the same check-then-act problem reserveUsage
+// solves for the monthly analysis quota, and for the same reason: two
+// concurrent submissions must not both observe "4 used" and both write.
+//
+// .immediate() matters here and does NOT in reserveUsage: that one opens with
+// an INSERT OR IGNORE, which takes the write lock straight away. This
+// transaction opens with a SELECT, so a default deferred BEGIN would have to
+// upgrade to a write lock mid-transaction and can fail with SQLITE_BUSY_SNAPSHOT
+// under WAL. BEGIN IMMEDIATE takes the write lock up front instead.
+//
+// Returns { ok, used, limit, retryAfterSec, row }. On refusal nothing is
+// written and retryAfterSec says when the oldest in-window row falls out.
+function createFeatureRequestIfUnderQuota({ orgId, userEmail, category, title, body, planTier }, now = Date.now()) {
+  const db = getDb();
+  const since = new Date(now - FEATURE_REQUEST_WINDOW_MS).toISOString();
+  const limit = FEATURE_REQUEST_MAX_PER_WINDOW;
+
+  const tx = db.transaction(() => {
+    const used = db
+      .prepare('SELECT COUNT(*) AS n FROM feature_requests WHERE org_id = ? AND created_at >= ?')
+      .get(orgId, since).n;
+
+    if (used >= limit) {
+      // Oldest row still inside the window: once it ages out, a slot frees up.
+      const oldest = db
+        .prepare('SELECT created_at AS createdAt FROM feature_requests WHERE org_id = ? AND created_at >= ? ORDER BY created_at ASC LIMIT 1')
+        .get(orgId, since);
+      let retryAfterSec = Math.ceil(FEATURE_REQUEST_WINDOW_MS / 1000);
+      if (oldest) {
+        const freesAt = Date.parse(oldest.createdAt) + FEATURE_REQUEST_WINDOW_MS;
+        retryAfterSec = Math.max(1, Math.ceil((freesAt - now) / 1000));
+      }
+      return { ok: false, used, limit, retryAfterSec, row: null };
+    }
+
+    const id = uuidv4();
+    const createdAt = new Date(now).toISOString();
+    db.prepare(`
+      INSERT INTO feature_requests (id, org_id, user_email, category, title, body, plan_tier, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?)
+    `).run(id, orgId, userEmail || null, category, title, body, planTier || null, createdAt);
+
+    return { ok: true, used: used + 1, limit, retryAfterSec: 0, row: { id, createdAt } };
+  });
+
+  return tx.immediate();
+}
+
 // --- Billing state (Stripe; attached to the organization) ------------------
 
 function getOrgBilling(orgId) {
@@ -1284,6 +1406,11 @@ module.exports = {
   reserveUsage,
   refundUsage,
   insertDemoRequest,
+  countRecentFeatureRequests,
+  createFeatureRequestIfUnderQuota,
+  FEATURE_REQUEST_CATEGORIES,
+  FEATURE_REQUEST_MAX_PER_WINDOW,
+  FEATURE_REQUEST_WINDOW_MS,
   getOrgBilling,
   setOrgStripeCustomerId,
   findOrgByStripeCustomerId,
