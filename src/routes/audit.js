@@ -382,6 +382,15 @@ function renderBiasReportHtml(report) {
     '.header { background: #0f2847; color: #fff; padding: 28px 36px; border-radius: 8px 8px 0 0; }' +
     '.header h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }' +
     '.header .meta { font-size: 12px; opacity: 0.75; }' +
+    // CVsprings vendor mark. A plain <img>, deliberately not the CSS-mask
+    // technique the static pages use: background-color + mask is dropped by
+    // browsers when "Background graphics" is off, which is the default in the
+    // print dialog — and this document exists to be printed as the compliance
+    // record. An <img> survives that. Uses the white variant because the source
+    // brandmark is #000 and this header is navy.
+    '.brandrow { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }' +
+    '.brandrow img { width: 26px; height: 26px; display: block; }' +
+    '.brandrow .wordmark { font-size: 13px; font-weight: 700; letter-spacing: -.2px; }' +
     '.disclaimer { background: #fffbeb; border: 2px solid #f59e0b; border-radius: 6px; padding: 16px 18px; margin-bottom: 24px; font-size: 13px; line-height: 1.5; color: #78350f; }' +
     '.disclaimer strong { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }' +
     '.body { padding: 28px 36px; }' +
@@ -394,7 +403,10 @@ function renderBiasReportHtml(report) {
     '</style></head><body><div class="page">' +
 
     // Header
-    '<div class="header"><h1>CVsprings Bias Monitoring Report</h1>' +
+    '<div class="header">' +
+    '<div class="brandrow"><img src="/brandmark-white.svg" alt="" width="26" height="26">' +
+    '<span class="wordmark">CVsprings</span></div>' +
+    '<h1>CVsprings Bias Monitoring Report</h1>' +
     '<div class="meta">' + scopeLabel + ' &nbsp;|&nbsp; ' + dateRange + ' &nbsp;|&nbsp; ' + report.scope.totalRecords + ' records analysed &nbsp;|&nbsp; Generated ' + new Date(generatedAt).toUTCString() + '</div></div>' +
 
     '<div class="body">' +
