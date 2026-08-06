@@ -808,8 +808,8 @@ function backfillLegacyCandidates() {
   let linked = 0;
   const tx = db.transaction(() => {
     for (const r of rows) {
-      const orgKey = r.orgId == null ? ' null' : r.orgId;
-      const hashKey = (r.hash == null || r.hash === '') ? ' nohash' : r.hash;
+      const orgKey = r.orgId == null ? '\u0000null' : r.orgId;
+      const hashKey = (r.hash == null || r.hash === '') ? '\u0000nohash' : r.hash;
       const key = orgKey + '|' + hashKey;
       let cid = byKey.get(key);
       if (!cid) {
