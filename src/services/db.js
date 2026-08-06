@@ -337,6 +337,12 @@ function initSchema() {
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_event_created INTEGER'); } catch (_) {}
   // Stripe subscription id — storage only (reconciliation/support), never exposed via API.
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_subscription_id TEXT'); } catch (_) {}
+  // Comped: fully entitled without a Stripe subscription. Set by hand, for the
+  // owner org and for anyone we deliberately carry (design partners, support
+  // cases). Kept as an explicit org flag rather than an email check so no
+  // address is ever hardcoded into an entitlement path — see
+  // services/branding.isCompedOrg().
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN comped INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
 
   // Reconcile retention values below the current regulatory floor. Historically
@@ -1455,7 +1461,8 @@ function getOrgBilling(orgId) {
   const row = getDb().prepare(`
     SELECT stripe_customer_id AS stripeCustomerId, plan, subscription_status AS subscriptionStatus,
            current_period_end AS currentPeriodEnd, plan_updated_at AS planUpdatedAt,
-           stripe_event_created AS stripeEventCreated, stripe_subscription_id AS stripeSubscriptionId
+           stripe_event_created AS stripeEventCreated, stripe_subscription_id AS stripeSubscriptionId,
+           comped
     FROM organizations WHERE id = ?
   `).get(orgId);
   return row || null;

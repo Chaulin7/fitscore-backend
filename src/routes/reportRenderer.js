@@ -14,7 +14,6 @@
 // pdfmake 0.2.x: the package main export IS the server-side PdfPrinter constructor.
 // createPdfKitDocument() returns a synchronous, streamable PDFKit document.
 const PdfPrinter = require('pdfmake');
-const path = require('path');
 
 // pdfmake 0.2.x ships fonts only as base64 in build/vfs_fonts.js (no raw TTFs).
 // Decode them into Buffers so the printer has no filesystem/system-font dependency.
@@ -49,46 +48,85 @@ const COLOR = {
   accent: '#3A5BC7',
 };
 
-// Small mono brandmark for the free-tier footer credit. Reuses the brandmark
-// the rest of the product already ships — read once at startup (a static asset,
-// not org data) and recoloured from the source's #000 to the footer's muted
-// tone so it sits with the existing design tokens. pdfmake 0.2.x renders SVG
-// nodes server-side, so no raster copy and no extra dependency is needed.
-const CREDIT_MARK_PATH = path.join(__dirname, '..', '..', 'public', 'brandmark.svg');
-let CREDIT_MARK_SVG = null;
-try {
-  CREDIT_MARK_SVG = require('fs').readFileSync(CREDIT_MARK_PATH, 'utf8').replaceAll('#000', COLOR.muted);
-} catch (_) {
-  // Asset missing (unexpected): degrade to a text-only credit rather than
-  // failing report generation outright.
-}
+// Every report is branded. What the mark IS — the org's own or the CVsprings
+// brandmark — is decided by services/branding.resolveBranding(), the single
+// entitlement authority; this module never inspects a plan. A doc built
+// without going through that helper still gets the CVsprings mark, because the
+// fallbacks below are the platform's.
+const {
+  resolveBranding, platformBrandName, platformBrandColor, PROVENANCE_PLATFORM, HEADER_MARK_FIT,
+} = require('../services/branding');
 
-// Resolve org branding for the report, with safe fallbacks. Only a valid
-// 6-digit #hex colour is accepted; anything else falls back to the default
-// accent. Name falls back to "CVsprings". (Name is rendered as a pdfmake text
-// node, which is not HTML — no injection risk from the string.)
-//
-// showCredit/creditText are pass-through only: whether a credit is owed is
-// decided by services/branding.resolveBranding(), the single entitlement
-// authority. This module never inspects a plan. A doc built without going
-// through that helper (e.g. a direct buildReportDoc() call) renders no credit.
-const DEFAULT_BRAND = { name: 'CVsprings', color: COLOR.accent };
 function resolveReportBranding(branding) {
   const b = branding || {};
-  const color = (typeof b.color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(b.color))
-    ? b.color : DEFAULT_BRAND.color;
-  const name = (typeof b.name === 'string' && b.name.trim())
-    ? b.name.trim() : DEFAULT_BRAND.name;
-  return { name, color, showCredit: !!b.showCredit, creditText: b.creditText || null };
+  // A caller that skipped resolveBranding() gets a fully-formed platform
+  // brand rather than a hole in the header.
+  if (typeof b.headerLogo !== 'string' || !b.headerLogo) return resolveBranding(null, null);
+  const color = (typeof b.color === 'string' && /^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(b.color))
+    ? b.color : platformBrandColor();
+  const displayName = (typeof b.displayName === 'string' && b.displayName.trim())
+    ? b.displayName.trim() : platformBrandName();
+  return {
+    headerLogo: b.headerLogo,
+    headerLogoType: b.headerLogoType === 'image' ? 'image' : 'svg',
+    headerLogoFit: Array.isArray(b.headerLogoFit) ? b.headerLogoFit : HEADER_MARK_FIT,
+    displayName,
+    color,
+    isCustom: !!b.isCustom,
+  };
 }
 
-// Footer credit: brandmark beside the credit string, at footer scale. The text
-// is whatever resolveBranding() supplied — never a literal in render code.
-function freeTierCredit(text) {
-  const columns = [];
-  if (CREDIT_MARK_SVG) columns.push({ svg: CREDIT_MARK_SVG, width: 7.5, margin: [0, 0.5, 0, 0] });
-  columns.push({ text: String(text || ''), style: 'foot' });
-  return { width: 'auto', columns, columnGap: 3 };
+/**
+ * The header mark node.
+ *
+ * Branches on headerLogoType because the two assets are NOT the same format
+ * and pdfmake needs a different node for each: the CVsprings brandmark is SVG
+ * markup passed as a string to { svg: … }, while a customer logo is a raster
+ * base64 data URI passed to { image: … }. Passing either to the other's node
+ * renders nothing.
+ *
+ * `fit` scales to the box while preserving aspect ratio, so an unusually tall
+ * or wide customer upload cannot push the title block around.
+ */
+function headerMark(brand) {
+  const node = brand.headerLogoType === 'image'
+    ? { image: brand.headerLogo }
+    : { svg: brand.headerLogo };
+  return { ...node, fit: brand.headerLogoFit, width: brand.headerLogoFit[0] };
+}
+
+/**
+ * Provenance footer — on EVERY report, at every tier, custom-branded or not.
+ *
+ * This is an audit artifact, not marketing: it answers "which document is
+ * this, what produced it, and when" for a reader who has only the PDF. Kept
+ * deliberately quiet (footer scale, muted) and assembled from the audit record
+ * plus a hardcoded platform string, so no org setting and no branding field
+ * can reach it. There is no flag that turns it off.
+ */
+function provenanceLine(audit, generatedAtIso) {
+  // Two lines rather than one: at footer scale a single run wraps mid-phrase
+  // ("Generated by / CVsprings"), which reads like a rendering fault on a
+  // document whose whole job is to look trustworthy. Identity first, then
+  // timing and attribution.
+  const identity = [
+    `Report ${audit.id || '—'}`,
+    `Engine ${audit.modelId || 'cvsprings-matcher'}`,
+    `Ruleset ${audit.appVersion || '—'}`,
+  ].join('  ·  ');
+  const timing = [
+    `Assessed ${isoUtc(audit.analysisTimestamp) || '—'}`,
+    `Generated ${generatedAtIso}`,
+    PROVENANCE_PLATFORM,
+  ].join('  ·  ');
+  return { stack: [{ text: identity }, { text: timing }], style: 'provenance' };
+}
+
+// ISO 8601 in UTC, or null if the input is not a usable date.
+function isoUtc(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 function band(score) {
@@ -159,6 +197,10 @@ function scoreRows(scores) {
 function buildReportDoc(audit, branding) {
   const detail = audit.analysisDetail || {};
   const brand = resolveReportBranding(branding);
+  // Stamped once per document so every page's footer agrees. Distinct from the
+  // audit's analysisTimestamp: a report generated today from a June assessment
+  // legitimately carries two different times, and the footer shows both.
+  const generatedAt = new Date().toISOString();
   const matches = normaliseMatches(detail);
   const overall = Math.round(Number(audit.overall ?? 0));
   const b = band(overall);
@@ -220,12 +262,20 @@ function buildReportDoc(audit, branding) {
       ],
     }),
 
+    // Provenance sits on its own line ABOVE the page counter, on every page of
+    // every report. It is not conditional on anything — there is no branding
+    // field and no org setting that reaches this.
     footer: (currentPage, pageCount) => ({
-      margin: [48, 0, 48, 24],
-      columns: [
-        { text: `Report ID: ${audit.id || '—'}`, style: 'foot', width: '*' },
-        ...(brand.showCredit ? [freeTierCredit(brand.creditText)] : []),
-        { text: `Page ${currentPage} of ${pageCount}`, style: 'foot', alignment: 'right', width: '*' },
+      margin: [48, 0, 48, 20],
+      stack: [
+        provenanceLine(audit, generatedAt),
+        {
+          columns: [
+            { text: '', width: '*' },
+            { text: `Page ${currentPage} of ${pageCount}`, style: 'foot', alignment: 'right', width: 'auto' },
+          ],
+          margin: [0, 2, 0, 0],
+        },
       ],
     }),
 
@@ -236,7 +286,8 @@ function buildReportDoc(audit, branding) {
           {
             width: '*',
             stack: [
-              { text: `${brand.name} — Candidate Assessment Report`, style: 'h1' },
+              headerMark(brand),
+              { text: `${brand.displayName} — Candidate Assessment Report`, style: 'h1', margin: [0, 8, 0, 0] },
               { text: name, style: 'subject', color: brand.color },
               {
                 text: [
@@ -336,7 +387,7 @@ function buildReportDoc(audit, branding) {
           'Scoring performed by a deterministic, rule-based matching engine — not a machine-learning model.',
           'No CV content is sent to any third-party AI service. No AI subprocessor is involved.',
           'Output is advisory and supports human review; CVsprings does not make automated decisions.',
-          'Results are fully reproducible: the same CV and job description always produce the same report.',
+          'Scoring is fully reproducible: the same CV and job description always produce the same scores and the same supporting evidence.',
           'Bias auditing follows the documented CVsprings methodology (conservative statistical testing, observational language).',
         ],
         style: 'methodology',
@@ -373,6 +424,9 @@ function buildReportDoc(audit, branding) {
       methodology: { fontSize: 8.5, color: COLOR.muted, lineHeight: 1.3 },
       runHead: { fontSize: 7.5, color: COLOR.muted },
       foot: { fontSize: 7.5, color: COLOR.muted },
+      // Deliberately the quietest type on the page: an audit artifact that has
+      // to be present and legible, not something competing for attention.
+      provenance: { fontSize: 6.5, color: COLOR.muted, lineHeight: 1.15 },
     },
   };
 

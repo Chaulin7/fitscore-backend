@@ -16,6 +16,7 @@ const billingRouter = require('./routes/billing');
 const teamRouter = require('./routes/team');
 const demoRouter = require('./routes/demo');
 const featureRequestsRouter = require('./routes/featureRequests');
+const plansRouter = require('./routes/plans');
 const { migrateLegacyData } = require('./services/authService');
 const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { mutationLimiter } = require('./middleware/rateLimits');
@@ -217,6 +218,9 @@ app.use('/api/team', generalLimiter, teamRouter);
 // Demo requests from the landing page: public (no session), with its own
 // stricter per-IP limiter inside the router (5/hour).
 app.use('/api/demo-request', generalLimiter, demoRouter);
+// Tier table for the pricing page and in-product Settings. Public and
+// cacheable — it is the same copy a logged-out visitor sees on /.
+app.use('/api/plans', generalLimiter, plansRouter);
 
 // Public, non-personal metadata for static pages (contact + company details
 // from env so the operator sets real values without code edits).

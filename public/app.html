@@ -690,6 +690,16 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .auth-note{font-size:12px;color:#6b7280;margin:0}
 #authError{margin-bottom:14px}
 
+/* ── Branding panel: locked state ──
+   Shown, not hidden, when the plan lacks customBranding — the inputs are
+   disabled and the note below explains why. Hiding it made white-labelling
+   undiscoverable to exactly the people who would pay for it. */
+.branding-lock{margin-top:8px;padding:9px 11px;border:1px solid #fde68a;background:#fffbeb;border-radius:7px;font-size:11px;line-height:1.5;color:#78350f}
+.branding-lock strong{display:block;margin-bottom:2px;font-size:11.5px}
+.branding-lock a{color:#0f2847;font-weight:600;text-decoration:underline;margin-left:4px}
+#brandingSection.is-locked .text-input:disabled{background:#f9fafb;color:#9ca3af;cursor:not-allowed}
+#brandingSection.is-locked .btn:disabled{opacity:.5;cursor:not-allowed}
+
 /* ── Topbar account chip ── */
 .account-chip{display:none;align-items:center;gap:8px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.12);
   border-radius:20px;padding:4px 6px 4px 13px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.85);max-width:230px}
@@ -1037,7 +1047,12 @@ img, video, table { max-width: 100%; }
       <input class="text-input" type="text" id="brandColor" placeholder="#0f2847" style="width:110px" aria-label="Brand colour (hex)">
       <button class="btn btn-primary btn-sm" id="brandSaveBtn" data-action="saveBranding">Save</button>
     </div>
-    <div style="font-size:11px;color:#6b7280;margin-top:4px">Applied to candidate PDF reports. Leave blank to use the CVsprings defaults. Logo must be an http(s) URL.</div>
+    <div id="brandingLockNote" class="branding-lock" style="display:none">
+      <strong>White-label reports are on Pro and Team.</strong>
+      Your reports already carry a professional CVsprings mark — upgrade to replace it with your own.
+      <a href="#" data-action="openPlansFromBranding">See plans</a>
+    </div>
+    <div style="font-size:11px;color:#6b7280;margin-top:4px">Replaces the CVsprings mark on your candidate PDF reports. Leave blank to keep it. Logo must be an http(s) URL. Every report carries a provenance footer, which cannot be removed.</div>
   </div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3 style="margin-top:0">Preferences</h3>
@@ -1417,7 +1432,6 @@ img, video, table { max-width: 100%; }
   </div><!-- /tool-section -->
 </div>
 <!-- Shared tier definitions (single source of truth; also used by marketing). -->
-<script nonce="__CSP_NONCE__" src="/plans.js"></script>
 <script nonce="__CSP_NONCE__">
 // Frontend version recorded on every audit record (EU AI Act Art. 12 provenance)
 const CVSPRINGS_VERSION = '1.3.0';
@@ -1823,6 +1837,7 @@ async function populatePlanBilling(){
   if(!line)return;
   let me=null;
   try{ me=await api('/api/auth/me'); }catch(_){}
+  await loadPlans(); // tier copy + capability flags, before anything renders from them
   const b = _billing || await refreshUsage();
   const isOwner = !!(me&&me.user&&me.user.role==='owner');
   _isOwner = isOwner;
@@ -1850,15 +1865,40 @@ async function populatePlanBilling(){
   if(manage)manage.style.display=(paid||b&&b.subscriptionStatus)?'inline-flex':'none';
 }
 
-// Pricing comparison in Settings → Plan & Billing. Tier copy comes from the
-// shared window.CVSPRINGS_PLANS (single source of truth; see /plans.js). Each
-// card is clickable and opens a full "what's included" breakdown for ANY tier —
-// including ones the user is not on.
+// Pricing comparison in Settings → Plan & Billing. Tier copy comes from
+// GET /api/plans, served from src/config/plans.js — the same table the server
+// gates on, so what Settings advertises and what the code enforces cannot
+// disagree. Each card is clickable and opens a full "what's included"
+// breakdown for ANY tier, including ones the user is not on.
 let _isOwner = false; // set by populatePlanBilling; gates the upgrade CTA
+let _plans = null;    // cached /api/plans payload; fetched once per session
+
+// Fetch-once, then serve from memory. Resolves to null on failure so callers
+// degrade to hiding the comparison rather than throwing.
+let _plansPromise = null;
+function loadPlans(){
+  if(_plans)return Promise.resolve(_plans);
+  if(!_plansPromise){
+    _plansPromise=fetch('/api/plans',{headers:{Accept:'application/json'}})
+      .then(function(r){ if(!r.ok)throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(cfg){ _plans=cfg; return cfg; })
+      .catch(function(){ _plansPromise=null; return null; });
+  }
+  return _plansPromise;
+}
+
+// Capability lookup for the CURRENT org's plan. Presentation only — every gate
+// is enforced server-side; this just decides whether a control renders enabled.
+function planCapabilities(planId){
+  const tiers=(_plans&&_plans.tiers)||[];
+  const t=tiers.find(function(x){return x.id===planId;});
+  return (t&&t.capabilities)||{};
+}
+
 function renderPlanCompare(currentPlan){
   const el=document.getElementById('planCompare');
   if(!el)return;
-  const tiers=(window.CVSPRINGS_PLANS&&window.CVSPRINGS_PLANS.tiers)||[];
+  const tiers=(_plans&&_plans.tiers)||[];
   if(!tiers.length){el.innerHTML='';return;}
   el.innerHTML='<div style="display:flex;gap:8px;margin:10px 0">'+tiers.map(function(p){
     const cur=p.id===currentPlan;
@@ -1877,7 +1917,7 @@ function renderPlanCompare(currentPlan){
 const _PLAN_ORDER={free:0,pro:1,team:2};
 function showPlanDetail(el){
   const planId=el&&el.dataset?el.dataset.plan:null;
-  const cfg=window.CVSPRINGS_PLANS||{};
+  const cfg=_plans||{};
   const tier=(cfg.tiers||[]).find(function(t){return t.id===planId;});
   if(!tier)return;
   const currentPlan=(_billing&&_billing.plan)||'free';
@@ -2089,6 +2129,13 @@ function closeFeatureRequest(){
 function openPlansFromFeatureRequest(){
   closeFeatureRequest();
   if (typeof toggleSettings === 'function') toggleSettings();
+}
+
+// The branding panel's upgrade prompt. Plan & Billing is already open in the
+// same Settings pane, just further up, so this scrolls rather than navigates.
+function openPlansFromBranding(){
+  const el = document.getElementById('planCompare') || document.getElementById('planStatusLine');
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function submitFeatureRequest(){
@@ -3344,13 +3391,29 @@ async function populateOrgSettings(){
     if(note)note.style.display=isOwner?'none':'block';
     document.querySelectorAll('.ret-preset').forEach(function(b){b.disabled=!isOwner;});
     if(isOwner)loadRetentionStats();
-    // Report branding — owner only.
+    // Report branding — owner only, and gated on the plan's customBranding
+    // capability rather than on a tier name. The panel stays VISIBLE when the
+    // plan cannot use it, rendered disabled with an inline upgrade prompt:
+    // hiding it made white-labelling undiscoverable, and it previously showed
+    // as fully editable to free owners who could save settings that silently
+    // never applied.
     const bsec=document.getElementById('brandingSection');
     if(bsec)bsec.style.display=isOwner?'block':'none';
-    if(isOwner&&me.org&&me.org.branding){
-      const b=me.org.branding;
-      const setV=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
-      setV('brandName',b.brandDisplayName);setV('brandLogoUrl',b.brandLogoUrl);setV('brandColor',b.brandColor);
+    if(isOwner){
+      await loadPlans();
+      const plan=(_billing&&_billing.plan)||'free';
+      const canBrand=planCapabilities(plan).customBranding===true;
+      ['brandName','brandLogoUrl','brandColor','brandSaveBtn'].forEach(function(id){
+        const el=document.getElementById(id);if(el)el.disabled=!canBrand;
+      });
+      const lock=document.getElementById('brandingLockNote');
+      if(lock)lock.style.display=canBrand?'none':'block';
+      if(bsec)bsec.classList.toggle('is-locked',!canBrand);
+      if(me.org&&me.org.branding){
+        const b=me.org.branding;
+        const setV=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
+        setV('brandName',b.brandDisplayName);setV('brandLogoUrl',b.brandLogoUrl);setV('brandColor',b.brandColor);
+      }
     }
   }catch(_){}
 }
@@ -4278,6 +4341,7 @@ const delegatedHandlers = {
     closeInfoModal,
     closeInfoModalBackdrop: (el, e) => { if (e.target === el) closeInfoModal(); },
     openFeatureRequest, submitFeatureRequest, closeFeatureRequest, openPlansFromFeatureRequest,
+    openPlansFromBranding: (el, e) => { e.preventDefault(); openPlansFromBranding(); },
     closeFeatureRequestBackdrop: (el, e) => { if (e.target === el) closeFeatureRequest(); },
   },
   change: {

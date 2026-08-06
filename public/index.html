@@ -138,6 +138,13 @@ h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.4vw,36px);l
 .included ul{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:0 28px;font-size:14px;color:var(--ink-soft)}
 @media(max-width:820px){.included ul{grid-template-columns:1fr}}
 .included li{padding:6px 0}
+/* Skeleton state: the cards are real markup at real dimensions so the section
+   reserves its final height, with the text greyed to soft bars until the
+   /api/plans fetch resolves. */
+.tier.skel h3,.tier.skel .price,.tier.skel .meter,.tier.skel li,.tier.skel .btn,
+.included[data-skeleton] li{background:var(--rule);color:transparent;border-radius:2px;opacity:.45}
+.tier.skel li::before,.included[data-skeleton] li::before{content:none}
+.tier.skel .btn{border-color:transparent}
 .included li::before{content:"—";margin-right:10px;color:var(--rule)}
 
 /* ---------- demo ---------- */
@@ -293,9 +300,22 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   <div class="wrap">
     <div class="section-eyebrow">Pricing</div>
     <h2>Simple, transparent pricing.</h2>
-    <!-- Both filled from /plans.js at the bottom of this page — see the note there. -->
-    <div class="tiers" id="pricingTiers"></div>
-    <div class="included" id="pricingIncluded"></div>
+    <!-- Both filled from GET /api/plans at the bottom of this page — see the
+         note there. The three cards below are a SKELETON: real markup at the
+         real dimensions so the section holds its height and the page does not
+         reflow when the fetch resolves. Hidden from assistive tech until then. -->
+    <div class="tiers" id="pricingTiers" data-skeleton="1" aria-busy="true">
+      <div class="tier skel" aria-hidden="true"><h3>&nbsp;</h3><div class="price">&nbsp;</div><div class="meter">&nbsp;</div><ul><li>&nbsp;</li><li>&nbsp;</li></ul><span class="btn btn-ghost">&nbsp;</span></div>
+      <div class="tier skel featured" aria-hidden="true"><h3>&nbsp;</h3><div class="price">&nbsp;</div><div class="meter">&nbsp;</div><ul><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li></ul><span class="btn btn-primary">&nbsp;</span></div>
+      <div class="tier skel" aria-hidden="true"><h3>&nbsp;</h3><div class="price">&nbsp;</div><div class="meter">&nbsp;</div><ul><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li></ul><span class="btn btn-ghost">&nbsp;</span></div>
+    </div>
+    <div class="included" id="pricingIncluded" data-skeleton="1" aria-busy="true">
+      <div class="included-head">Included on every plan</div>
+      <ul aria-hidden="true"><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li></ul>
+    </div>
+    <noscript>
+      <p style="margin-top:16px">Pricing needs JavaScript to load. <a href="#demo">Book a demo</a> and we'll walk you through the tiers.</p>
+    </noscript>
   </div>
 </section>
 
@@ -358,19 +378,21 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   </div>
 </footer>
 
-<!-- Shared tier definitions (single source of truth; also used by the in-product Settings). -->
-<script nonce="__CSP_NONCE__" src="/plans.js"></script>
 <script nonce="__CSP_NONCE__">
 (function(){
-  // Pricing cards render from window.CVSPRINGS_PLANS (/plans.js) — the same tier
-  // definitions Settings uses in-product, so price, limit and feature copy is
-  // written once. `baseline` (available on every plan) renders as one shared list
-  // below the cards rather than being repeated identically in all three. Only the
-  // marketing CTA is page-specific, so it lives here rather than in plans.js.
-  var cfg=window.CVSPRINGS_PLANS;
+  // Pricing cards render from GET /api/plans — served from src/config/plans.js,
+  // the same table the server gates on and the same one Settings reads, so
+  // price, limit and feature copy is written once and can never disagree with
+  // what the code enforces. `baseline` (available on every plan) renders as one
+  // shared list below the cards rather than being repeated identically in all
+  // three. Only the marketing CTA is page-specific, so it lives here.
+  //
+  // The markup starts as a skeleton at final dimensions (see #pricingTiers), so
+  // this swap changes text, not layout. On failure the skeleton is replaced with
+  // a link to the demo form rather than left pulsing forever.
   var grid=document.getElementById('pricingTiers');
   var included=document.getElementById('pricingIncluded');
-  if(!cfg||!grid)return;
+  if(!grid)return;
   var FALLBACK_CTA={href:'#demo',label:'Book a demo',cls:'btn-ghost'};
   var CTA={
     free:{href:'/signup',label:'Start free',cls:'btn-ghost'},
@@ -380,23 +402,43 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   var BADGE={pro:'Most agencies'};
   function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-  grid.innerHTML=(cfg.tiers||[]).map(function(t){
-    var cta=CTA[t.id]||FALLBACK_CTA;
-    return '<div class="tier'+(t.featured?' featured':'')+'">'
-      +(BADGE[t.id]?'<div class="badge">'+esc(BADGE[t.id])+'</div>':'')
-      +'<h3>'+esc(t.name)+'</h3>'
-      +'<div class="price">'+esc(t.priceLabel)+'<small> '+esc(t.per)+'</small></div>'
-      +(t.tagline?'<div class="meter">'+esc(t.tagline)+'</div>':'')
-      +'<ul>'+(t.highlights||[]).map(function(h){return '<li>'+esc(h)+'</li>';}).join('')+'</ul>'
-      +'<a class="btn '+cta.cls+'" href="'+esc(cta.href)+'">'+esc(cta.label)+'</a>'
-      +'</div>';
-  }).join('');
+  function render(cfg){
+    grid.innerHTML=(cfg.tiers||[]).map(function(t){
+      var cta=CTA[t.id]||FALLBACK_CTA;
+      return '<div class="tier'+(t.featured?' featured':'')+'">'
+        +(BADGE[t.id]?'<div class="badge">'+esc(BADGE[t.id])+'</div>':'')
+        +'<h3>'+esc(t.name)+'</h3>'
+        +'<div class="price">'+esc(t.priceLabel)+'<small> '+esc(t.per)+'</small></div>'
+        +(t.tagline?'<div class="meter">'+esc(t.tagline)+'</div>':'')
+        +'<ul>'+(t.highlights||[]).map(function(h){return '<li>'+esc(h)+'</li>';}).join('')+'</ul>'
+        +'<a class="btn '+cta.cls+'" href="'+esc(cta.href)+'">'+esc(cta.label)+'</a>'
+        +'</div>';
+    }).join('');
+    grid.removeAttribute('data-skeleton');
+    grid.removeAttribute('aria-busy');
 
-  var baseline=cfg.baseline||[];
-  if(included&&baseline.length){
-    included.innerHTML='<div class="included-head">Included on every plan</div>'
-      +'<ul>'+baseline.map(function(b){return '<li>'+esc(b)+'</li>';}).join('')+'</ul>';
+    var baseline=cfg.baseline||[];
+    if(included&&baseline.length){
+      included.innerHTML='<div class="included-head">Included on every plan</div>'
+        +'<ul>'+baseline.map(function(b){return '<li>'+esc(b)+'</li>';}).join('')+'</ul>';
+      included.removeAttribute('data-skeleton');
+      included.removeAttribute('aria-busy');
+    }
   }
+
+  function fail(){
+    grid.innerHTML='<div class="tier" style="grid-column:1/-1;text-align:center">'
+      +'<p>Pricing could not be loaded just now.</p>'
+      +'<a class="btn btn-primary" href="#demo" style="margin-top:16px">Book a demo</a></div>';
+    grid.removeAttribute('data-skeleton');
+    grid.removeAttribute('aria-busy');
+    if(included)included.style.display='none';
+  }
+
+  fetch('/api/plans',{headers:{Accept:'application/json'}})
+    .then(function(r){ if(!r.ok)throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(cfg){ if(!cfg||!cfg.tiers)throw new Error('malformed'); render(cfg); })
+    .catch(fail);
 })();
 </script>
 <script nonce="__CSP_NONCE__">
