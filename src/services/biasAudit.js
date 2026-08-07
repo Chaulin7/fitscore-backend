@@ -16,6 +16,92 @@
  *   - Confidence degrades visibly with small samples.
  */
 
+const crypto = require('crypto');
+
+// This report's own engine identity. Built the same way MODEL_ID is in
+// routes/analyze.js, but it is NOT that value: the engine that produced a bias
+// report is analyzeBias(), not the lexical scorer. Stamping the scorer's
+// version here would be actively misleading, since a single report aggregates
+// records that may have been scored by several different versions — which is
+// what scoringEngines below reports separately.
+const BIAS_ENGINE_ID = 'cvsprings-bias-audit@' + require('../../package.json').version;
+const RULESET_VERSION = require('../../package.json').version;
+
+// Bumping this changes every fingerprint. Do it only when the input set below
+// changes meaning — not for unrelated edits to this file.
+const FINGERPRINT_VERSION = 1;
+
+/**
+ * A deterministic fingerprint of a bias report's inputs.
+ *
+ * NOT a persistent handle. Bias reports are generated on demand and never
+ * stored, so there is no row to look up — the value identifies the QUERY and
+ * its result set, not a record. The same inputs reproduce the same
+ * fingerprint; a changed one means the underlying records changed, including
+ * by retention purge. The report says so in as many words, because an
+ * identifier that looks like a lookup key but is not is worse than none.
+ *
+ * FROZEN INPUT SET — do not change without bumping FINGERPRINT_VERSION:
+ *   1. FINGERPRINT_VERSION
+ *   2. org id
+ *   3. role filter        (null when unfiltered)
+ *   4. from / to bounds   (null when unbounded)
+ *   5. the sorted set of record ids in scope
+ *
+ * Record ids are audit_log.id — opaque uuidv4 surrogate keys minted server-side
+ * (services/db.insertAudit). No candidate name, file name, or any other
+ * identifying value is hashed, so the fingerprint cannot leak who was in the
+ * set even under a known-input attack.
+ */
+function reportFingerprint({ orgId, role, from, to, recordIds }) {
+  const payload = JSON.stringify({
+    v: FINGERPRINT_VERSION,
+    orgId: orgId || null,
+    role: role || null,
+    from: from || null,
+    to: to || null,
+    records: [...(recordIds || [])].map(String).sort(),
+  });
+  return crypto.createHash('sha256').update(payload).digest('hex').slice(0, 32);
+}
+
+/**
+ * The distinct scoring-engine versions represented in the aggregated records.
+ *
+ * A report spanning more than one is aggregating output from more than one
+ * engine, and its distributions and rates are comparing values that were not
+ * necessarily produced on the same basis. That is a validity caveat about
+ * whether the statistics mean what they appear to mean — so it is surfaced
+ * where the reader meets it before the numbers, not in a footnote.
+ */
+function scoringEngineSpan(records) {
+  const seen = new Set();
+  let unrecorded = 0;
+  for (const r of records) {
+    if (r.modelId) seen.add(String(r.modelId));
+    else unrecorded += 1;
+  }
+  const versions = [...seen].sort();
+  const distinct = versions.length + (unrecorded > 0 ? 1 : 0);
+  const mixed = distinct > 1;
+  let caveat = null;
+  if (mixed) {
+    const listed = versions.length ? versions.join(', ') : null;
+    caveat =
+      'These records were scored by more than one version of the scoring engine'
+      + (listed ? ' (' + listed + ')' : '')
+      + (unrecorded > 0
+        ? ', and ' + unrecorded + ' record' + (unrecorded !== 1 ? 's have' : ' has')
+          + ' no engine version recorded'
+        : '')
+      + '. Scores produced by different versions were not necessarily calculated on the '
+      + 'same basis, so the distributions and rates below compare values that may not be '
+      + 'directly comparable. Read every figure in this report with that in mind, and '
+      + 'narrow the date range to a single engine version if you need a like-for-like view.';
+  }
+  return { versions, unrecorded, distinct, mixed, caveat };
+}
+
 // ---------------------------------------------------------------------------
 // Statistical helpers (pure JS, no dependencies)
 // ---------------------------------------------------------------------------
@@ -308,14 +394,27 @@ function analyzeBias(records, options) {
     }).sort((a, b) => b.count - a.count);
   }
 
+  const scoringEngines = scoringEngineSpan(records);
+
   // Build limitations list (always populated)
   const limitations = [...STANDARD_LIMITATIONS];
   if (reliability === 'insufficient' || reliability === 'low') {
     limitations.unshift('This report covers only ' + totalRecords + ' record' + (totalRecords !== 1 ? 's' : '') + '. Results at this scale are highly sensitive to individual data points and should not be used to draw conclusions about patterns.');
   }
+  // Also listed here so the caveat survives into any consumer that reads only
+  // the limitations — it is rendered prominently above the statistics as well.
+  if (scoringEngines.mixed) limitations.unshift(scoringEngines.caveat);
 
   return {
     generatedAt: new Date().toISOString(),
+    reportFingerprint: reportFingerprint({
+      orgId: options.orgId || null,
+      role, from, to,
+      recordIds: records.map((r) => r.id),
+    }),
+    engine: BIAS_ENGINE_ID,
+    ruleset: RULESET_VERSION,
+    scoringEngines,
     scope: { role, from, to, totalRecords },
     reliability,
     anonymisation,
@@ -360,4 +459,8 @@ function assertSoberLanguage(obj, path) {
   }
 }
 
-module.exports = { analyzeBias, assertSoberLanguage, STANDARD_LIMITATIONS };
+module.exports = {
+  analyzeBias, assertSoberLanguage, STANDARD_LIMITATIONS,
+  reportFingerprint, scoringEngineSpan,
+  BIAS_ENGINE_ID, RULESET_VERSION, FINGERPRINT_VERSION,
+};
