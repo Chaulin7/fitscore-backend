@@ -345,6 +345,28 @@ function initSchema() {
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN comped INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
 
+  // Server-held provenance for a single analysis, claimable by the save that
+  // follows it. Previously an in-memory Map, so every deploy and every idle
+  // spin-down silently voided all outstanding bindings and the saves that
+  // followed recorded the client's numbers instead of the server's. On the
+  // persistent disk it survives restarts, which is the whole point.
+  //
+  // Payload is JSON rather than columns: it is an opaque snapshot handed back
+  // verbatim to the binding check, and its shape belongs to services/
+  // provenanceCache, not to the schema. expires_at is epoch ms.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS analysis_provenance (
+      org_id      TEXT    NOT NULL,
+      analysis_id TEXT    NOT NULL,
+      payload     TEXT    NOT NULL,
+      created_at  INTEGER NOT NULL,
+      expires_at  INTEGER NOT NULL,
+      PRIMARY KEY (org_id, analysis_id)
+    )
+  `);
+  // Drives the expiry sweep; the primary key already covers lookup.
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_provenance_expires ON analysis_provenance(expires_at)');
+
   // Reconcile retention values below the current regulatory floor. Historically
   // the column defaulted to 365 and allowed 0 ("keep forever") plus values as
   // low as 30. Raise any sub-floor value (including 0) up to the conservative

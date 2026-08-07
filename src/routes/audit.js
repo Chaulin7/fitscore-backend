@@ -102,6 +102,13 @@ const BIND_STATE = Object.freeze({
   SHA_MISMATCH: 'sha_mismatch',
 });
 
+// The scorer's composed identifier from a bound record, or null when unbound.
+// One place does this join, so the column's format cannot drift per call site.
+function scorerIdOf(bound) {
+  if (!bound || !bound.scorerEngine || !bound.scorerVersion) return null;
+  return `${bound.scorerEngine}@${bound.scorerVersion}`;
+}
+
 function bindAnalysis(orgId, analysisId, echoedExtraction) {
   if (!analysisId) {
     // Pre-provenance clients, and any save that never went through /api/analyze.
@@ -170,7 +177,13 @@ router.post('/', async (req, res) => {
       // client-supplied `weights` (which could differ from what was scored).
       // NULL when the server can't vouch for them (unknown/expired sha).
       weightsJson: bound && bound.scoringWeights ? bound.scoringWeights : null,
-      engineVersion: bound && bound.engineVersion ? bound.engineVersion : null,
+      // audit_log.engine_version has always held the SCORER's composed id
+      // ("cvsprings-lexical-scorer@1.3.0"), and the CSV column and the change-
+      // history panel both render it as that. The provenance record now keeps
+      // the engine and its version apart, so rejoin them here — the stored
+      // value is unchanged. Never the extractor's version: that is a different
+      // fact, and conflating the two is the bug this replaced.
+      engineVersion: scorerIdOf(bound),
       // Opaque per-screening-pass grouping hint; the run id is server-minted.
       runNonce: runNonce ? String(runNonce).slice(0, 100) : null,
     }, req.orgId, req.userId || null);

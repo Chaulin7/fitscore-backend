@@ -38,6 +38,17 @@ async function validateAndExtract(file, field) {
   return extractText(file.path, file.mimetype);
 }
 
+// Identifies the scoring engine version for provenance records (Art. 12). The
+// scorer is a deterministic lexical matcher, not an LLM; its behaviour changes
+// only with releases, so it is versioned with the package.
+//
+// Kept as two parts, joined into MODEL_ID for the wire and for
+// audit_log.engine_version (whose value must not change). The provenance record
+// carries them separately — see provenanceRecord() below for why.
+const SCORER_ENGINE = 'cvsprings-lexical-scorer';
+const SCORER_VERSION = require('../../package.json').version;
+const MODEL_ID = `${SCORER_ENGINE}@${SCORER_VERSION}`;
+
 // Extraction provenance for the audit block: engine + versions + the SHA-256
 // of the canonical extracted text (computed BEFORE any anonymization).
 function extractionSummary(extracted) {
@@ -48,6 +59,35 @@ function extractionSummary(extracted) {
     textSha256: extracted.sha256,
     pageCount: extracted.meta.pages,
     charCount: extracted.meta.chars,
+  };
+}
+
+/**
+ * The provenance record bound to one analysis.
+ *
+ * Built key-by-key ON PURPOSE. This payload used to be
+ *   { analysisId, ...extraction, scoringWeights, engineVersion: MODEL_ID }
+ * where the spread's `engineVersion` (the EXTRACTOR's — pdfjs 4.2.67) was
+ * silently overwritten by the literal (the SCORER's). The extractor version was
+ * lost outright, and every stored blob paired `engine: 'pdfjs'` with a scorer
+ * version. Never let a spread and a literal share a key here again: name each
+ * field, and let provenanceCache reject anything unexpected.
+ */
+function provenanceRecord(analysisId, extraction, weights) {
+  return {
+    analysisId,
+    // Extraction facts — which reader turned the file into text.
+    extractorEngine: extraction.engine,
+    extractorVersion: extraction.engineVersion,
+    assemblerVersion: extraction.assemblerVersion,
+    textSha256: extraction.textSha256,
+    pageCount: extraction.pageCount,
+    charCount: extraction.charCount,
+    // Scoring facts — which engine turned that text into a score, under which
+    // weights. Kept split; audit_log.engine_version rejoins them.
+    scorerEngine: SCORER_ENGINE,
+    scorerVersion: SCORER_VERSION,
+    scoringWeights: weights,
   };
 }
 
@@ -73,11 +113,6 @@ function reserveQuota(req, res, requested) {
   }
   return { reserved: requested, limit, used: r.used, plan };
 }
-
-// Identifies the scoring engine version for provenance records (Art. 12).
-// The scorer is a deterministic lexical matcher, not an LLM; its behaviour
-// changes only with releases, so it is versioned with the package.
-const MODEL_ID = 'cvsprings-lexical-scorer@' + require('../../package.json').version;
 
 function sendError(res, status, code, message, field) {
   const body = { error: message, code };
@@ -240,7 +275,7 @@ router.post('/', upload.single('cv'), async (req, res) => {
     // engine version), keyed by analysisId, so the audit save records them
     // authoritatively (never the client's echoed weights). The client echoes
     // analysisId back at save time. See provenanceCache + POST /api/audit.
-    provenance.remember(req.orgId, { analysisId, ...extraction, scoringWeights: weights, engineVersion: MODEL_ID });
+    provenance.remember(req.orgId, provenanceRecord(analysisId, extraction, weights));
     res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), analysisId, extraction, ...results });
   } catch (err) {
     if (reserved) refundUsage(req.orgId, reserved); // a post-reservation failure returns the reservation
@@ -310,7 +345,7 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
           : path.basename(file.originalname, path.extname(file.originalname));
         const extraction = extractionSummary(extracted);
         const analysisId = uuidv4(); // one per candidate, NOT one per batch
-        provenance.remember(req.orgId, { analysisId, ...extraction, scoringWeights: weights, engineVersion: MODEL_ID });
+        provenance.remember(req.orgId, provenanceRecord(analysisId, extraction, weights));
         results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), analysisId, extraction, ...scored });
       } catch (fileErr) {
         results.push({

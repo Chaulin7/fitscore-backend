@@ -252,7 +252,12 @@ describe('POST /api/audit — server-authoritative scoring inputs (analysisId-bo
   // Bind server-side provenance for a specific analysis, as /api/analyze would:
   // keyed by analysisId, carrying the extraction textSha256 + the exact weights.
   function rememberAnalysis(orgId, analysisId, textSha256, weights) {
-    provenance.remember(orgId, { analysisId, textSha256, scoringWeights: weights, engineVersion: 'cvsprings-lexical-scorer@test' });
+    // Engine and version are stored SPLIT now; audit_log.engine_version rejoins
+    // them, so the assertions below still expect the composed id unchanged.
+    provenance.remember(orgId, {
+      analysisId, textSha256, scoringWeights: weights,
+      scorerEngine: 'cvsprings-lexical-scorer', scorerVersion: 'test',
+    });
   }
   const saveBody = (analysisId, textSha256, clientWeights) => ({
     candidateName: 'Weighted Wendy', fileName: 'w.pdf', overall: 70,
@@ -344,7 +349,12 @@ describe('POST /api/audit — binding failure is visible', () => {
   // in-memory cache was lost to a restart — was invisible in production and
   // indistinguishable, to the client, from a fully vouched save.
   function rememberAnalysis(orgId, analysisId, textSha256, weights) {
-    provenance.remember(orgId, { analysisId, textSha256, scoringWeights: weights, engineVersion: 'cvsprings-lexical-scorer@test' });
+    // Engine and version are stored SPLIT now; audit_log.engine_version rejoins
+    // them, so the assertions below still expect the composed id unchanged.
+    provenance.remember(orgId, {
+      analysisId, textSha256, scoringWeights: weights,
+      scorerEngine: 'cvsprings-lexical-scorer', scorerVersion: 'test',
+    });
   }
   const saveBody = (analysisId, textSha256) => ({
     candidateName: 'Provenance Pat', fileName: 'p.pdf', overall: 70,

@@ -19,6 +19,7 @@ const featureRequestsRouter = require('./routes/featureRequests');
 const plansRouter = require('./routes/plans');
 const { migrateLegacyData } = require('./services/authService');
 const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
+const { startProvenanceSweep } = require('./services/provenanceCache');
 const { mutationLimiter } = require('./middleware/rateLimits');
 
 // Optional pino logger (graceful fallback if not installed yet)
@@ -307,6 +308,12 @@ startRetentionSchedule();
 // Keep the WAL from growing without bound while the process is up (folds it
 // back into the main DB every 5 minutes; the timer is .unref()'d).
 startWalCheckpointing();
+
+// Expire analysis-provenance bindings past their 24h TTL. Separate from the
+// retention schedule on purpose: this evicts the server's own short-lived
+// records, so it must not inherit RETENTION_PURGE_MODE, which exists to keep
+// candidate data from being deleted by accident. Timer is .unref()'d.
+startProvenanceSweep();
 
 const server = app.listen(PORT, () => {
   const log = logger ? logger.info.bind(logger) : console.log;
