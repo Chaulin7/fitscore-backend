@@ -2868,6 +2868,14 @@ function focusAuditSearch(){
   setTimeout(function(){const el=document.getElementById('auditSearch');if(el){el.focus();el.select&&el.select();}},60);
 }
 function setBatchDecision(i,v){if(lastBatchResults[i])lastBatchResults[i]._decision=v;}
+// Shown when the server saved the record but could not verify the analysis it
+// came from — the scoring inputs are stored as the client reported them rather
+// than as the server produced them. Deliberately plain: this is currently
+// normal after a server restart, and should become rare once the provenance
+// cache is persisted. It is not an error and the record is saved either way.
+const SAVE_UNVERIFIED_MSG = 'Saved to audit log. The server could not verify this analysis, '
+  + 'so the record is stored as reported rather than server-verified.';
+
 async function saveToAudit(){
   if(_sampleActive||(lastResult&&lastResult._isSample)){toast("Sample results can't be saved — upload a real CV to save to the audit log.",'info');return;}
   if(!lastResult||!API)return;
@@ -2882,7 +2890,10 @@ async function saveToAudit(){
     runNonce:lastResult._runNonce||null,analysisId:lastResult.analysisId||null,
     analysisDetail:{found:lastResult.found||[],missing:lastResult.missing||[],skills:lastResult.skills||[],recommendations:lastResult.recommendations||[],matches:lastResult.matches||[],extraction:lastResult.extraction||null}};
   try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
-    lastResult._auditId=d.id;toast('Saved to audit log.','success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'single',role:(lastResult&&lastResult.role)||'unknown'}}));}
+    lastResult._auditId=d.id;
+    if(d.provenance&&d.provenance.vouched===false) toast(SAVE_UNVERIFIED_MSG,'info');
+    else toast('Saved to audit log.','success');
+    document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'single',role:(lastResult&&lastResult.role)||'unknown'}}));}
   catch(e){handleApiError(e,'Network error');}
 }
 async function saveSingleBatch(i){
@@ -2897,15 +2908,17 @@ async function saveSingleBatch(i){
     appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
     runNonce:res._runNonce||null,analysisId:res.analysisId||null,
     analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
-  try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
-    toast('Saved: '+body.candidateName,'success');document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'batch_row',role:(body&&body.role)||'unknown'}}));}
+  try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
+    if(d.provenance&&d.provenance.vouched===false) toast('Saved: '+body.candidateName+' — not server-verified.','info');
+    else toast('Saved: '+body.candidateName,'success');
+    document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'batch_row',role:(body&&body.role)||'unknown'}}));}
   catch(e){handleApiError(e,'Network error');}
 }
 async function saveAllToAudit(){
   if(!API||!lastBatchResults.length)return;
   const ok = await confirmModal({ title:'Save all', message:'Save all '+lastBatchResults.length+' results to the audit log?', confirmLabel:'Save all' });
   if(!ok)return;
-  let saved=0;
+  let saved=0, unverified=0;
   for(const res of lastBatchResults){
     const body={candidateName:res.candidateName||res.fileName,fileName:res.fileName||'',
       overall:res.overall,scores:res.scores,weights:getWeights(),
@@ -2916,9 +2929,14 @@ async function saveAllToAudit(){
       appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
       runNonce:res._runNonce||null,analysisId:res.analysisId||null,
     analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
-    try{await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;}catch(_){}
+    try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;
+      if(d.provenance&&d.provenance.vouched===false)unverified++;}catch(_){}
   }
-  toast(saved+' of '+lastBatchResults.length+' records saved.','success');
+  // One summary line rather than a toast per row: on a 200-CV batch the
+  // per-record detail is noise, but the count that was not server-verified is
+  // exactly what a reader of the audit log needs to know.
+  if(unverified) toast(saved+' of '+lastBatchResults.length+' records saved — '+unverified+' not server-verified.','info');
+  else toast(saved+' of '+lastBatchResults.length+' records saved.','success');
 }
 function exportBatchCsv(){
   if(!lastBatchResults.length)return;
