@@ -1179,7 +1179,7 @@ img, video, table { max-width: 100%; }
     <div class="card-head"><span class="card-title" id="uploadCardTitle">Upload CV</span></div>
     <div class="card-body">
       <div class="dropzone" id="dropzone">
-        <input type="file" id="cvInput" accept=".pdf,.docx" data-action="handleFiles">
+        <input type="file" id="cvInput" accept=".pdf,.docx" data-action="addFiles">
         <div class="dz-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
@@ -2630,24 +2630,65 @@ function setMode(m){
 // change event (browsers suppress it as "unchanged" otherwise). Defensive:
 // setMode can run before #cvInput exists.
 function resetFileInput(){ const el=document.getElementById('cvInput'); if(el) el.value=''; }
-function handleFiles(files){
-  const arr=Array.from(files);
-  if(mode==='single'){selectedFiles=arr.slice(0,1);}
-  else{
-    const errEl=document.getElementById('analyzeError');
-    for(const f of arr)if(!selectedFiles.find(x=>x.name===f.name))selectedFiles.push(f);
-    if(selectedFiles.length>200){
-      const removed=selectedFiles.length-200;
-      selectedFiles=selectedFiles.slice(0,200);
-      if(errEl)showWarn(errEl,'Batch limit is 200 CVs. '+removed+' file'+(removed===1?'':'s')+' ignored — only the first 200 were kept.');
-    }else if(errEl){
-      errEl.style.display='none';
-    }
+
+// Client-side mirror of the server's per-file gate (10 MB/file and 200/batch
+// from src/services/fileSecurity.js; .pdf/.docx from src/routes/analyze.js) so
+// a bad file is caught at selection time instead of after the upload.
+const MAX_FILE_BYTES=10*1024*1024, MAX_BATCH_FILES=200;
+function fileRejectReason(f){
+  if(!/\.(pdf|docx)$/i.test(f.name)) return '"'+f.name+'" was skipped — only PDF and DOCX are supported.';
+  if(f.size>MAX_FILE_BYTES) return '"'+f.name+'" was skipped — it is over the 10 MB per-file limit.';
+  return null;
+}
+
+// Identity of a staged file. The name alone is not unique — two different CVs
+// can both be called cv.pdf — so key on name + size + lastModified.
+function fileKey(f){ return f.name+'::'+f.size+'::'+(f.lastModified||0); }
+
+// The ONE selection entry point: both the #cvInput change handler and the
+// dropzone's drop handler funnel through here so the two paths cannot drift
+// apart. It appends to selectedFiles rather than assigning over it — except in
+// single mode, which by contract holds exactly one CV (analyzeSingle posts one
+// file), and where a new pick is how you correct a wrong one.
+function addFiles(fileList){
+  const arr=Array.from(fileList||[]);
+  const errEl=document.getElementById('analyzeError');
+  const rejected=[],notes=[],accepted=[];
+  for(const f of arr){
+    const why=fileRejectReason(f);
+    // A rejected file only takes itself out: everything already staged, and
+    // every other file in this same selection, stays.
+    if(why) rejected.push(why); else accepted.push(f);
   }
+  if(mode==='single'){
+    if(accepted.length){
+      const keep=accepted[accepted.length-1];
+      selectedFiles=[keep];
+      if(accepted.length>1) notes.push('Single-CV mode holds one CV, so only "'+keep.name+'" was kept. Switch to Batch to score several at once.');
+    }
+  }else{
+    let overflow=0;
+    for(const f of accepted){
+      if(selectedFiles.some(x=>fileKey(x)===fileKey(f))) continue; // already staged — skip, no duplicate chip
+      if(selectedFiles.length>=MAX_BATCH_FILES){ overflow++; continue; }
+      selectedFiles.push(f);
+    }
+    if(overflow) notes.push('Batch limit is '+MAX_BATCH_FILES+' CVs — '+overflow+' file'+(overflow===1?' was':'s were')+' not added. Remove some staged CVs first.');
+  }
+  if(errEl){
+    if(rejected.length) showErr(errEl,rejected.join(' '));
+    else if(notes.length) showWarn(errEl,notes.join(' '));
+    else errEl.style.display='none';
+  }
+  // Clear the input so picking the same file again (e.g. after removing its
+  // chip) still fires change. From here on selectedFiles — never input.files,
+  // which is now empty — is the record of what gets submitted.
+  resetFileInput();
   renderFileList();
 }
-function handleDrop(ev){ev.preventDefault();document.getElementById('dropzone').classList.remove('drag');handleFiles(ev.dataTransfer.files);}
-function removeFile(name){selectedFiles=selectedFiles.filter(f=>f.name!==name);resetFileInput();renderFileList();}
+function handleDrop(ev){ev.preventDefault();document.getElementById('dropzone').classList.remove('drag');addFiles(ev.dataTransfer.files);}
+// Remove by composite key, not name: two staged CVs may share a filename.
+function removeFile(key){selectedFiles=selectedFiles.filter(f=>fileKey(f)!==key);resetFileInput();renderFileList();}
 // Remove every staged CV in one action. Confirms first when more than 5 are
 // staged so a full batch isn't wiped by an accidental click.
 async function clearAllFiles(){
@@ -2663,7 +2704,7 @@ async function clearAllFiles(){
 }
 function renderFileList(){
   document.getElementById('fileList').innerHTML=selectedFiles.map(f=>
-    '<div class="file-chip"><span>'+escHtml(f.name)+'</span><button data-action="removeFile" data-file="'+escHtml(f.name)+'">&#x2715;</button></div>'
+    '<div class="file-chip"><span>'+escHtml(f.name)+'</span><button data-action="removeFile" data-key="'+escHtml(fileKey(f))+'">&#x2715;</button></div>'
   ).join('');
   // File-list header: staged count + one Clear all. Only for batch (or >1 file);
   // in single mode with one file the per-file remove chip is enough.
@@ -4327,7 +4368,7 @@ keepAlive();
    (plus data-* args); they are wired with delegated listeners here. This stays
    in the inline <script> (allowed via the per-request CSP nonce). Handlers are
    namespaced per event type so an element's action only fires for its intended
-   event (e.g. the file input's "handleFiles" fires on change, not on click). */
+   event (e.g. the file input's "addFiles" fires on change, not on click). */
 function toggleMobileNav(el){
   const n = document.querySelector('nav.topbar-nav');
   const o = n.classList.toggle('mobile-open');
@@ -4351,7 +4392,7 @@ const delegatedHandlers = {
     printPage: () => window.print(),
     sortBatch: (el) => sortBatch(el.dataset.sort),
     loadAudit, exportAuditCsv, loadRoles,
-    removeFile: (el) => removeFile(el.dataset.file),
+    removeFile: (el) => removeFile(el.dataset.key),
     clearAllFiles,
     clearAuditFilters, toggleAuditOrder, auditPreset, auditFilterCandidate,
     openInfoModal: (el) => openInfoModal(Number(el.dataset.index)),
@@ -4364,7 +4405,7 @@ const delegatedHandlers = {
   },
   change: {
     setAutosaveBatch: (el) => setAutosaveBatch(el.checked),
-    handleFiles: (el) => handleFiles(el.files),
+    addFiles: (el) => addFiles(el.files),
     filterAuditNow,
     filterAuditDate,
   },
