@@ -6,6 +6,7 @@ const { startOfZonedDayUtc, endOfZonedDayUtc, formatInTimeZone } = require('../s
 const { analyzeBias } = require('../services/biasAudit');
 const { getOrganizationBranding } = require('../services/authService');
 const { resolveBranding } = require('../services/branding');
+const { buildProvenance } = require('../services/provenance');
 const { streamReport } = require('./reportRenderer');
 
 const router = express.Router();
@@ -318,8 +319,17 @@ router.get('/bias-report/pdf', async (req, res) => {
       to: to || undefined,
     });
 
-    const report = analyzeBias(records, { role: role || null, from: from || null, to: to || null });
-    const html = renderBiasReportHtml(report);
+    const report = analyzeBias(records, {
+      role: role || null, from: from || null, to: to || null,
+      orgId: req.orgId, // scopes the report fingerprint; never rendered
+    });
+    // Same entitlement rule and the same resolver as the candidate PDF report:
+    // an org that has white-labelled one document must not find the other still
+    // wearing the CVsprings mark. `on: 'dark'` because this header band is navy.
+    const branding = resolveBranding(
+      getOrganizationBranding(req.orgId), getOrgBilling(req.orgId), { on: 'dark' },
+    );
+    const html = renderBiasReportHtml(report, branding);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
@@ -365,8 +375,32 @@ function tableRow(cells, header) {
   return '<tr>' + cells.map((c) => '<' + tag + ' style="' + style + '">' + esc(String(c == null ? '' : c)) + '</' + tag + '>').join('') + '</tr>';
 }
 
-function renderBiasReportHtml(report) {
-  const { scope, reliability, anonymisation, scoreDistribution, decisionConsistency, roleComparison, limitations, generatedAt } = report;
+/**
+ * @param {object} report    analyzeBias() output
+ * @param {object} [branding] resolveBranding(…, { on: 'dark' }) output. Optional
+ *   so a direct call still renders: omitted, it falls back to platform branding
+ *   on a dark surface rather than to no mark at all.
+ */
+function renderBiasReportHtml(report, branding) {
+  const { scope, reliability, anonymisation, scoreDistribution, decisionConsistency, roleComparison, limitations, generatedAt, scoringEngines } = report;
+  const brand = branding || resolveBranding(null, null, { on: 'dark' });
+
+  // Provenance: same field set, same normalisation and same ISO 8601 UTC as the
+  // candidate PDF report, via the shared builder. Built from the report object
+  // and a hardcoded platform string — no org setting reaches any of it.
+  const prov = buildProvenance({
+    id: report.reportFingerprint,
+    engine: report.engine,
+    ruleset: report.ruleset,
+    generated: generatedAt,
+  });
+
+  // The mark, in whichever form the resolver handed back. `needsPlate` is true
+  // only for a raster logo on this dark band; nothing produces one yet, so the
+  // plate itself is deliberately not built here (see services/branding).
+  const markHtml = brand.headerLogoType === 'image'
+    ? '<img class="mark" src="' + esc(brand.headerLogo) + '" alt="" width="26" height="26">'
+    : '<span class="mark" aria-hidden="true">' + brand.headerLogo + '</span>';
 
   const scopeLabel = scope.role ? 'Role: ' + esc(scope.role) : 'All roles';
   const dateRange = (scope.from || scope.to)
@@ -389,14 +423,23 @@ function renderBiasReportHtml(report) {
     // record. An <img> survives that. Uses the white variant because the source
     // brandmark is #000 and this header is navy.
     '.brandrow { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }' +
-    '.brandrow img { width: 26px; height: 26px; display: block; }' +
+    // The mark is inlined SVG now rather than <img src="/brandmark-white.svg">,
+    // so it survives printing with "Background graphics" off (the print-dialog
+    // default) AND carries whichever mark resolveBranding chose for this org.
+    '.brandrow .mark, .brandrow .mark svg, .brandrow img.mark { width: 26px; height: 26px; display: block; }' +
     '.brandrow .wordmark { font-size: 13px; font-weight: 700; letter-spacing: -.2px; }' +
     '.disclaimer { background: #fffbeb; border: 2px solid #f59e0b; border-radius: 6px; padding: 16px 18px; margin-bottom: 24px; font-size: 13px; line-height: 1.5; color: #78350f; }' +
     '.disclaimer strong { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }' +
     '.body { padding: 28px 36px; }' +
     '.section { margin-bottom: 32px; }' +
     'table { width: 100%; border-collapse: collapse; }' +
-    '.footer { padding: 16px 36px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; display: flex; justify-content: space-between; border-radius: 0 0 8px 8px; }' +
+    '.footer { padding: 16px 36px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; border-radius: 0 0 8px 8px; }' +
+    // Provenance: quiet, monospaced for the fingerprint's sake, and wrapping
+    // rather than overflowing on narrow paper. An audit artifact, not marketing.
+    '.prov-line { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9.5px; line-height: 1.6; color: #6b7280; word-break: break-word; }' +
+    '.prov-note { font-size: 10px; line-height: 1.5; color: #9ca3af; margin-top: 6px; }' +
+    '.caveat { background: #fff7ed; border: 2px solid #ea580c; border-radius: 6px; padding: 16px 18px; margin-bottom: 24px; font-size: 13px; line-height: 1.5; color: #7c2d12; }' +
+    '.caveat strong { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }' +
     '.lim-list { margin: 0; padding-left: 18px; }' +
     '.lim-list li { margin-bottom: 8px; font-size: 13px; line-height: 1.5; color: #374151; }' +
     '@media print { body { background: #fff; } .page { box-shadow: none; border: none; margin: 0; border-radius: 0; } .footer { position: fixed; bottom: 0; width: 100%; } }' +
@@ -404,10 +447,10 @@ function renderBiasReportHtml(report) {
 
     // Header
     '<div class="header">' +
-    '<div class="brandrow"><img src="/brandmark-white.svg" alt="" width="26" height="26">' +
-    '<span class="wordmark">CVsprings</span></div>' +
-    '<h1>CVsprings Bias Monitoring Report</h1>' +
-    '<div class="meta">' + scopeLabel + ' &nbsp;|&nbsp; ' + dateRange + ' &nbsp;|&nbsp; ' + report.scope.totalRecords + ' records analysed &nbsp;|&nbsp; Generated ' + new Date(generatedAt).toUTCString() + '</div></div>' +
+    '<div class="brandrow">' + markHtml +
+    '<span class="wordmark">' + esc(brand.displayName) + '</span></div>' +
+    '<h1>Bias Monitoring Report</h1>' +
+    '<div class="meta">' + scopeLabel + ' &nbsp;|&nbsp; ' + dateRange + ' &nbsp;|&nbsp; ' + report.scope.totalRecords + ' records analysed &nbsp;|&nbsp; Generated ' + esc(prov.generated) + '</div></div>' +
 
     '<div class="body">' +
 
@@ -418,6 +461,15 @@ function renderBiasReportHtml(report) {
     'CVsprings does not hold and cannot analyse protected characteristics (gender, ethnicity, age, disability status). ' +
     'All hiring decisions remain the responsibility of the human recruiter. ' +
     'This document should be read alongside professional legal and HR guidance.</div>' +
+
+    // Mixed scoring-engine caveat. Sits ABOVE the statistics, at disclaimer
+    // weight, because it governs whether the figures below mean what they
+    // appear to mean — a reader who meets it after the charts has already
+    // drawn conclusions from numbers that may not be comparable.
+    ((scoringEngines && scoringEngines.mixed)
+      ? '<div class="caveat"><strong>Before you read these figures</strong>'
+        + esc(scoringEngines.caveat) + '</div>'
+      : '') +
 
     // Reliability banner
     '<div class="section">' + sectionTitle('Data Reliability') + reliabilityBannerHtml(reliability) + '</div>';
@@ -485,8 +537,28 @@ function renderBiasReportHtml(report) {
 
   html += '</div>'; // end body
 
-  // Footer
-  html += '<div class="footer"><span>CVsprings Bias Monitoring Report</span><span>This is a decision-support artifact, not a legal compliance certification.</span></div>';
+  // Footer — provenance on every report at every tier, custom-branded or not.
+  // Same fields, same order and same ISO 8601 UTC as the candidate PDF report.
+  // "Fingerprint", not "Report ID": this document is generated on demand and
+  // never stored, so the value identifies the inputs, not a row anyone can look
+  // up. The note below says so, because an identifier that reads like a lookup
+  // key but is not is worse than none at all.
+  html += '<div class="footer">'
+    + '<div class="prov-line">'
+    + 'Report fingerprint ' + esc(prov.id)
+    + ' &nbsp;·&nbsp; Engine ' + esc(prov.engine)
+    + ' &nbsp;·&nbsp; Ruleset ' + esc(prov.ruleset)
+    + ' &nbsp;·&nbsp; Generated ' + esc(prov.generated)
+    + ' &nbsp;·&nbsp; ' + esc(prov.platform)
+    + '</div>'
+    + '<div class="prov-note">The fingerprint is derived from this report&rsquo;s inputs — the '
+    + 'organisation, the role and date filters, and the exact set of records in scope. Running '
+    + 'the same query again reproduces the same fingerprint; a different one means the '
+    + 'underlying records have changed, including through retention deletion. It is not a '
+    + 'stored reference and cannot be looked up.</div>'
+    + '<div class="prov-note">This is a decision-support artifact, not a legal compliance '
+    + 'certification.</div>'
+    + '</div>';
 
   html += '</div></body>' +
     '<script>window.onload=function(){if(window.location.search.includes("print=1")){window.print();}}</script>' +
@@ -570,3 +642,8 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
+// The bias report's HTML is assembled here rather than in a template, so the
+// only way to assert on what a reader actually sees — the resolved mark, the
+// provenance footer, the mixed-engine caveat — is to render it. Exported for
+// tests only; nothing in the app should reach for this.
+module.exports.__test__ = { renderBiasReportHtml };

@@ -70,6 +70,10 @@ const PROVENANCE = Object.freeze({ platform: PROVENANCE_PLATFORM });
 // customer logo can push the title block around.
 const HEADER_MARK_FIT = Object.freeze([104, 34]);
 
+// Ink for the CVsprings mark when it sits on a dark band (the bias report's
+// navy header). Pure white, matching public/brandmark-white.svg exactly.
+const ON_DARK_MARK_COLOR = '#fff';
+
 // Only http(s) absolute URLs are allowed for the logo (no data:, javascript:, etc.).
 function isSafeHttpUrl(value) {
   if (typeof value !== 'string' || !value) return false;
@@ -141,10 +145,14 @@ function isEntitledToCustomBranding(orgBilling) {
  *
  * @param {object|null} orgBranding  row from getOrganizationBranding()
  * @param {object|null} orgBilling   row from getOrgBilling() — the org's CURRENT plan
+ * @param {object}      [options]
+ * @param {'light'|'dark'} [options.on='light']  the surface the mark lands on
  * @returns {{
  *   headerLogo: string,
  *   headerLogoType: 'svg'|'image',
  *   headerLogoFit: [number, number],
+ *   surface: 'light'|'dark',
+ *   needsPlate: boolean,
  *   displayName: string,
  *   isCustom: boolean,
  *   color: string,
@@ -160,6 +168,23 @@ function isEntitledToCustomBranding(orgBilling) {
  * The renderer branches on the type and never assumes the two are the same
  * format.
  *
+ * `options.on` is the SURFACE, not a colour. The candidate report puts the
+ * mark on white; the bias report's header band is navy. Naming the context
+ * rather than taking a hex keeps the presentational decision here, where the
+ * mark is chosen — and it is the only form of the question that has an answer
+ * for a raster logo, which cannot be recoloured at all. There is exactly one
+ * asset either way: public/brandmark-white.svg is a byte-for-byte #000->#fff
+ * recolour of the source, so tintedBrandmark() reproduces it. (That file stays
+ * on disk for the static marketing pages, whose plain <img> cannot inherit
+ * currentColor; it is simply no longer a server-render asset.)
+ *
+ * `needsPlate` is the signal a dark surface cannot solve on its own: an
+ * uploaded raster logo in dark ink would be invisible on a dark band, and no
+ * amount of tinting fixes a PNG. When true, the document should render the
+ * mark on a light plate. NOTHING CONSUMES IT YET — no raster logos exist until
+ * uploads land — but the condition is real and cheaper to carry now than to
+ * rediscover when a customer's logo disappears.
+ *
  * `displayName` is the ORG-FACING header name: the org's own when it has
  * white-labelled, the CVsprings product name otherwise. It is never the legal
  * entity, at any tier, under any BRAND_NAME. That is distinct from
@@ -170,9 +195,13 @@ function isEntitledToCustomBranding(orgBilling) {
  * read rows and this returns a new object every time, so a plan change takes
  * effect on the very next report.
  */
-function resolveBranding(orgBranding, orgBilling) {
+function resolveBranding(orgBranding, orgBilling, options) {
   const b = orgBranding || {};
   const entitled = isEntitledToCustomBranding(orgBilling);
+  // Anything that is not the string 'dark' is a light surface. Unknown values
+  // fall to the default rather than throwing: a mis-typed option should not
+  // take a report down.
+  const surface = (options && options.on === 'dark') ? 'dark' : 'light';
 
   // ---- header mark: the org's own logo, else the CVsprings brandmark -------
   // Custom logos are NOT wired up yet. brandLogoUrl is a remote http(s) URL and
@@ -194,10 +223,16 @@ function resolveBranding(orgBranding, orgBilling) {
     ? b.brandColor.trim()
     : platformBrandColor();
 
+  // The CVsprings mark takes the surface's ink; a customer's raster logo is
+  // used as uploaded, because it cannot be recoloured.
+  const markColor = surface === 'dark' ? ON_DARK_MARK_COLOR : platformBrandColor();
+
   return {
-    headerLogo: isCustom ? customLogo : tintedBrandmark(platformBrandColor()),
+    headerLogo: isCustom ? customLogo : tintedBrandmark(markColor),
     headerLogoType: isCustom ? 'image' : 'svg',
     headerLogoFit: HEADER_MARK_FIT,
+    surface,
+    needsPlate: surface === 'dark' && isCustom,
     displayName,
     isCustom,
     color,
@@ -225,6 +260,7 @@ module.exports = {
   LEGAL_ENTITY_NAMES,
   PROVENANCE_PLATFORM,
   HEADER_MARK_FIT,
+  ON_DARK_MARK_COLOR,
   isSafeHttpUrl,
   isValidColor,
   isLegalEntityName,
