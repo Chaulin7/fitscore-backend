@@ -252,7 +252,12 @@ describe('POST /api/audit — server-authoritative scoring inputs (analysisId-bo
   // Bind server-side provenance for a specific analysis, as /api/analyze would:
   // keyed by analysisId, carrying the extraction textSha256 + the exact weights.
   function rememberAnalysis(orgId, analysisId, textSha256, weights) {
-    provenance.remember(orgId, { analysisId, textSha256, scoringWeights: weights, engineVersion: 'cvsprings-lexical-scorer@test' });
+    // Engine and version are stored SPLIT now; audit_log.engine_version rejoins
+    // them, so the assertions below still expect the composed id unchanged.
+    provenance.remember(orgId, {
+      analysisId, textSha256, scoringWeights: weights,
+      scorerEngine: 'cvsprings-lexical-scorer', scorerVersion: 'test',
+    });
   }
   const saveBody = (analysisId, textSha256, clientWeights) => ({
     candidateName: 'Weighted Wendy', fileName: 'w.pdf', overall: 70,
@@ -335,5 +340,103 @@ describe('POST /api/audit — server-authoritative scoring inputs (analysisId-bo
     const row = after.body.rows.find((r) => r.id === id);
     assert.deepEqual(row.weightsJson, { kw: 55, sk: 15, ex: 15, ed: 15 }, 'weights snapshot unchanged by a later edit');
     assert.equal(row.decision, 'shortlist');
+  });
+});
+
+describe('POST /api/audit — binding failure is visible', () => {
+  // Every failure path used to return a bare null and an ordinary 201. Only the
+  // sha mismatch logged anything, so the COMMON failure — a save after the
+  // in-memory cache was lost to a restart — was invisible in production and
+  // indistinguishable, to the client, from a fully vouched save.
+  function rememberAnalysis(orgId, analysisId, textSha256, weights) {
+    // Engine and version are stored SPLIT now; audit_log.engine_version rejoins
+    // them, so the assertions below still expect the composed id unchanged.
+    provenance.remember(orgId, {
+      analysisId, textSha256, scoringWeights: weights,
+      scorerEngine: 'cvsprings-lexical-scorer', scorerVersion: 'test',
+    });
+  }
+  const saveBody = (analysisId, textSha256) => ({
+    candidateName: 'Provenance Pat', fileName: 'p.pdf', overall: 70,
+    scores: { keywords: 1, skills: 2, experience: 3, education: 4 },
+    weights: { kw: 25, sk: 25, ex: 25, ed: 25 },
+    ...(analysisId === undefined ? {} : { analysisId }),
+    analysisDetail: { extraction: { textSha256 } },
+  });
+
+  // Capture console.info AND console.warn so a path's level is asserted, not
+  // just that something was written somewhere.
+  async function captureLogs(fn) {
+    const info = []; const warn = [];
+    const oi = console.info; const ow = console.warn;
+    console.info = (...a) => info.push(a.map(String).join(' '));
+    console.warn = (...a) => warn.push(a.map(String).join(' '));
+    try { return { result: await fn(), info, warn }; }
+    finally { console.info = oi; console.warn = ow; }
+  }
+
+  test('a vouched save reports vouched:true and logs nothing', async () => {
+    rememberAnalysis(ORG_A, 'an-vis-ok', 'sha-vis-ok', { kw: 40, sk: 30, ex: 20, ed: 10 });
+    const { result, info, warn } = await captureLogs(() => post(saveBody('an-vis-ok', 'sha-vis-ok'), ORG_A));
+    assert.equal(result.status, 201);
+    assert.equal(result.body.provenance.vouched, true);
+    assert.equal(result.body.provenance.state, 'vouched');
+    assert.equal(info.length + warn.length, 0, 'a normal save should be quiet');
+  });
+
+  test('no analysisId: vouched:false, state no_analysis_id, logged at info', async () => {
+    const { result, info, warn } = await captureLogs(() => post(saveBody(undefined, 'sha-none'), ORG_A));
+    assert.equal(result.status, 201, 'the save still succeeds');
+    assert.equal(result.body.provenance.vouched, false);
+    assert.equal(result.body.provenance.state, 'no_analysis_id');
+    assert.ok(info.some((l) => /no analysisId/i.test(l)), 'must be logged');
+    assert.equal(warn.length, 0, 'not a warning — plenty of saves legitimately have none');
+  });
+
+  test('unknown/expired analysisId: vouched:false, state unbound, logged at info', async () => {
+    const { result, info, warn } = await captureLogs(() => post(saveBody('an-vis-never-issued', 'sha-x'), ORG_A));
+    assert.equal(result.status, 201);
+    assert.equal(result.body.provenance.vouched, false);
+    assert.equal(result.body.provenance.state, 'unbound');
+    assert.ok(info.some((l) => /not held/i.test(l)), 'the common failure must now be countable');
+    assert.equal(warn.length, 0);
+  });
+
+  test('sha mismatch: vouched:false, state sha_mismatch, logged at WARN not info', async () => {
+    rememberAnalysis(ORG_A, 'an-vis-mismatch', 'sha-real', { kw: 40, sk: 30, ex: 20, ed: 10 });
+    const { result, info, warn } = await captureLogs(() => post(saveBody('an-vis-mismatch', 'sha-TAMPERED'), ORG_A));
+    assert.equal(result.body.provenance.vouched, false);
+    assert.equal(result.body.provenance.state, 'sha_mismatch');
+    assert.ok(warn.some((l) => /mismatch/i.test(l)), 'a mismatch is a louder event than a miss');
+    assert.ok(!info.some((l) => /not held/i.test(l)), 'must not be reported as a plain miss');
+  });
+
+  test('the three failure states are distinguishable from one another', async () => {
+    rememberAnalysis(ORG_A, 'an-vis-d', 'sha-d', { kw: 1, sk: 1, ex: 1, ed: 97 });
+    const states = await Promise.all([
+      post(saveBody(undefined, 's'), ORG_A),
+      post(saveBody('an-vis-not-issued-2', 's'), ORG_A),
+      post(saveBody('an-vis-d', 'sha-WRONG'), ORG_A),
+      post(saveBody('an-vis-d', 'sha-d'), ORG_A),
+    ]).then((rs) => rs.map((r) => r.body.provenance.state));
+    assert.deepEqual(states, ['no_analysis_id', 'unbound', 'sha_mismatch', 'vouched']);
+    assert.equal(new Set(states).size, 4, 'each path must be separately identifiable');
+  });
+
+  test('the record itself is still returned unchanged alongside provenance', async () => {
+    rememberAnalysis(ORG_A, 'an-vis-shape', 'sha-shape', { kw: 40, sk: 30, ex: 20, ed: 10 });
+    const { body } = await post(saveBody('an-vis-shape', 'sha-shape'), ORG_A);
+    // Additive: the pre-existing fields are exactly where callers expect them.
+    assert.equal(body.candidateName, 'Provenance Pat');
+    assert.deepEqual(body.weightsJson, { kw: 40, sk: 30, ex: 20, ed: 10 });
+    assert.equal(body.engineVersion, 'cvsprings-lexical-scorer@test');
+    assert.ok(body.id);
+  });
+
+  test('an unvouched save still writes the row — it is flagged, not rejected', async () => {
+    const { body } = await post(saveBody('an-vis-still-writes', 'sha-y'), ORG_A);
+    assert.ok(body.id, 'the recruiter does not lose their work');
+    assert.equal(body.weightsJson, null, 'but nothing unvouched is recorded as vouched');
+    assert.equal(body.engineVersion, null);
   });
 });

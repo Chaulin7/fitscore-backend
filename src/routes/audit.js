@@ -83,16 +83,56 @@ function parseAuditFilters(q, timeZone) {
 // to client weights. Missing/expired ids are misses too. A miss stores null
 // provenance rather than a client-controlled echo.
 const provenance = require('../services/provenanceCache');
+/**
+ * Resolve an echoed analysisId to the server-held record for this org.
+ *
+ * Returns { bound, state }:
+ *   bound — the server's record, or null when it cannot be vouched for
+ *   state — why, so the caller can log it and tell the client
+ *
+ * Every failure path used to return a bare null and only the mismatch logged,
+ * which meant the COMMON failure — a save after the in-memory cache was lost to
+ * a restart — was completely invisible in production and indistinguishable, to
+ * the client, from a fully vouched save.
+ */
+const BIND_STATE = Object.freeze({
+  VOUCHED: 'vouched',
+  NO_ANALYSIS_ID: 'no_analysis_id',
+  UNBOUND: 'unbound',       // never issued, or issued and since lost/expired
+  SHA_MISMATCH: 'sha_mismatch',
+});
+
+// The scorer's composed identifier from a bound record, or null when unbound.
+// One place does this join, so the column's format cannot drift per call site.
+function scorerIdOf(bound) {
+  if (!bound || !bound.scorerEngine || !bound.scorerVersion) return null;
+  return `${bound.scorerEngine}@${bound.scorerVersion}`;
+}
+
 function bindAnalysis(orgId, analysisId, echoedExtraction) {
-  if (!analysisId) return null;
+  if (!analysisId) {
+    // Pre-provenance clients, and any save that never went through /api/analyze.
+    console.info('[provenance] save carried no analysisId — storing client-asserted', { orgId });
+    return { bound: null, state: BIND_STATE.NO_ANALYSIS_ID };
+  }
   const rec = provenance.lookup(orgId, String(analysisId));
-  if (!rec) return null; // missing or expired
+  if (!rec) {
+    // Expected after a restart while the cache is in-memory; should become rare
+    // once it is persisted. Logged at info because today it is normal, not a
+    // fault — but it must be countable, which it previously was not.
+    console.info('[provenance] analysisId not held (unissued, expired, or lost to a restart)'
+      + ' — storing client-asserted', { orgId, analysisId });
+    return { bound: null, state: BIND_STATE.UNBOUND };
+  }
   const echoedSha = echoedExtraction && typeof echoedExtraction === 'object' ? echoedExtraction.textSha256 : undefined;
   if (rec.textSha256 !== echoedSha) {
+    // Distinct from the above on purpose: the server DID issue this id, and the
+    // text it was issued for is not the text being saved against it. That is a
+    // different kind of event and warrants a louder level.
     console.warn('[provenance] analysisId/textSha256 mismatch — not binding weights', { orgId, analysisId });
-    return null; // mismatch -> treat as a miss; do not trust the bound weights
+    return { bound: null, state: BIND_STATE.SHA_MISMATCH };
   }
-  return rec;
+  return { bound: rec, state: BIND_STATE.VOUCHED };
 }
 
 // POST /api/audit - save an audit record
@@ -107,7 +147,7 @@ router.post('/', async (req, res) => {
     // Keep only the expected shape; cap sizes so a payload can't bloat the row.
     // Server-held provenance for THIS analysis, bound by (orgId, analysisId)
     // with a textSha256 defense check. The client echo is only a lookup key.
-    const bound = bindAnalysis(req.orgId, analysisId, analysisDetail && analysisDetail.extraction);
+    const { bound, state: provenanceState } = bindAnalysis(req.orgId, analysisId, analysisDetail && analysisDetail.extraction);
     let detail = null;
     if (analysisDetail && typeof analysisDetail === 'object') {
       const arr = (v) => Array.isArray(v) ? v.slice(0, 200) : [];
@@ -137,11 +177,24 @@ router.post('/', async (req, res) => {
       // client-supplied `weights` (which could differ from what was scored).
       // NULL when the server can't vouch for them (unknown/expired sha).
       weightsJson: bound && bound.scoringWeights ? bound.scoringWeights : null,
-      engineVersion: bound && bound.engineVersion ? bound.engineVersion : null,
+      // audit_log.engine_version has always held the SCORER's composed id
+      // ("cvsprings-lexical-scorer@1.3.0"), and the CSV column and the change-
+      // history panel both render it as that. The provenance record now keeps
+      // the engine and its version apart, so rejoin them here — the stored
+      // value is unchanged. Never the extractor's version: that is a different
+      // fact, and conflating the two is the bug this replaced.
+      engineVersion: scorerIdOf(bound),
       // Opaque per-screening-pass grouping hint; the run id is server-minted.
       runNonce: runNonce ? String(runNonce).slice(0, 100) : null,
     }, req.orgId, req.userId || null);
-    res.status(201).json(record);
+    // Tell the client whether this save was vouched. Additive: the record is
+    // returned exactly as before, with provenance alongside it. Without this a
+    // recruiter had no way to know a save stored their own numbers back at them
+    // rather than the server's.
+    res.status(201).json({
+      ...record,
+      provenance: { vouched: provenanceState === BIND_STATE.VOUCHED, state: provenanceState },
+    });
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
