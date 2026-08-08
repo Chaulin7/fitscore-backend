@@ -243,3 +243,102 @@ describe('no entry cap', () => {
     assert.ok(provenance._count() > 5000);
   });
 });
+
+describe('a batch binds all or nothing', () => {
+  // remember() runs once per candidate, so a 200-CV batch used to do 200
+  // individual writes. A batch interrupted midway — deploy, crash, spin-down —
+  // left an arbitrary prefix bound and the rest not: the saves that followed
+  // would be vouched for some candidates and silently client-asserted for the
+  // others, with nothing on the record to say which were which.
+  const batch = (n, over = () => ({})) =>
+    Array.from({ length: n }, (_, i) => record(nextId(), over(i)));
+
+  test('a completed batch binds every candidate', () => {
+    const recs = batch(200);
+    const written = provenance.rememberMany(ORG, recs);
+    assert.equal(written, 200);
+    for (const r of recs) {
+      const got = provenance.lookup(ORG, r.analysisId);
+      assert.ok(got, `${r.analysisId} must be bound`);
+      assert.equal(got.textSha256, r.textSha256, 'each candidate keeps its own record');
+    }
+  });
+
+  test('each candidate keeps its own weights, not the last writer\'s', () => {
+    const recs = batch(25, (i) => ({ scoringWeights: { kw: i, sk: 25 - i, ex: 0, ed: 75 } }));
+    provenance.rememberMany(ORG, recs);
+    recs.forEach((r, i) => {
+      assert.deepEqual(provenance.lookup(ORG, r.analysisId).scoringWeights,
+        { kw: i, sk: 25 - i, ex: 0, ed: 75 });
+    });
+  });
+
+  test('a batch that throws partway binds NONE — no partial prefix', () => {
+    const recs = batch(50);
+    // Poison one in the middle with a value JSON.stringify refuses. Serialising
+    // happens inside the transaction, so this fails after 29 rows have been
+    // written — exactly the partial-prefix shape being defended against.
+    recs[30].scoringWeights = { kw: 1n };
+    const before = provenance._count();
+    assert.throws(() => provenance.rememberMany(ORG, recs));
+    assert.equal(provenance._count(), before, 'the transaction must have rolled back');
+    for (const r of recs) {
+      assert.equal(provenance.lookup(ORG, r.analysisId), null,
+        `${r.analysisId} must NOT be bound — not even the ones before the failure`);
+    }
+  });
+
+  test('a malformed record aborts the batch before anything is written', () => {
+    const recs = batch(10);
+    recs[7].engineVersion = 'the colliding key, back again';
+    const before = provenance._count();
+    assert.throws(() => provenance.rememberMany(ORG, recs), /unexpected keys/);
+    assert.equal(provenance._count(), before);
+    assert.equal(provenance.lookup(ORG, recs[0].analysisId), null,
+      'validation runs over the whole set before the transaction opens');
+  });
+
+  test('a record with no analysisId aborts the batch', () => {
+    const recs = batch(5);
+    delete recs[2].analysisId;
+    assert.throws(() => provenance.rememberMany(ORG, recs), /no analysisId/);
+    assert.equal(provenance.lookup(ORG, recs[0].analysisId), null);
+  });
+
+  test('an empty batch is a no-op, not an error', () => {
+    const before = provenance._count();
+    assert.equal(provenance.rememberMany(ORG, []), 0);
+    assert.equal(provenance.rememberMany(ORG, null), 0);
+    assert.equal(provenance.rememberMany(null, batch(2)), 0);
+    assert.equal(provenance._count(), before);
+  });
+
+  test('batched writes are readable exactly as single ones are', () => {
+    // lookup() is untouched by this change; prove it treats both identically.
+    const viaSingle = record(nextId());
+    const viaBatch = record(nextId());
+    provenance.remember(ORG, viaSingle);
+    provenance.rememberMany(ORG, [viaBatch]);
+    assert.deepEqual(provenance.lookup(ORG, viaSingle.analysisId), viaSingle);
+    assert.deepEqual(provenance.lookup(ORG, viaBatch.analysisId), viaBatch);
+  });
+
+  test('the single-analysis path still drops one bad record without throwing', () => {
+    // remember() is deliberately NOT all-or-nothing: it binds one analysis, and
+    // failing it must not 500 the request the user is waiting on.
+    const id = nextId();
+    const orig = console.error; console.error = () => {};
+    try {
+      assert.doesNotThrow(() => provenance.remember(ORG, { ...record(id), engineVersion: 'x' }));
+    } finally { console.error = orig; }
+    assert.equal(provenance.lookup(ORG, id), null);
+  });
+
+  test('a better-sqlite3 transaction cannot span an await — why callers collect first', () => {
+    // Pins the constraint that shapes the route: wrapping the batch loop where
+    // it stands is not merely awkward, it throws AND still writes the rows
+    // outside any transaction.
+    const tx = db().transaction(async () => { await Promise.resolve(); });
+    assert.throws(() => tx(), /cannot return a promise/i);
+  });
+});

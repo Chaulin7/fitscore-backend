@@ -62,10 +62,22 @@ const ALLOWED_KEYS = Object.freeze([
  * Idempotent per (orgId, analysisId): a re-issue replaces and re-dates the row
  * rather than erroring, matching the Map's set() semantics.
  */
+const INSERT_SQL = `
+  INSERT INTO analysis_provenance (org_id, analysis_id, payload, created_at, expires_at)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(org_id, analysis_id) DO UPDATE SET
+    payload = excluded.payload, created_at = excluded.created_at, expires_at = excluded.expires_at
+`;
+
+// Keys outside ALLOWED_KEYS, or [] when the record is clean.
+function unexpectedKeys(record) {
+  return Object.keys(record).filter((k) => !ALLOWED_KEYS.includes(k));
+}
+
 function remember(orgId, record) {
   if (!orgId || !record || typeof record.analysisId !== 'string') return;
 
-  const unexpected = Object.keys(record).filter((k) => !ALLOWED_KEYS.includes(k));
+  const unexpected = unexpectedKeys(record);
   if (unexpected.length) {
     // Loud, but not fatal to the analysis the user is waiting on: drop the
     // binding rather than serve a 500, and make the cause obvious in the logs.
@@ -75,12 +87,58 @@ function remember(orgId, record) {
   }
 
   const now = Date.now();
-  db().prepare(`
-    INSERT INTO analysis_provenance (org_id, analysis_id, payload, created_at, expires_at)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(org_id, analysis_id) DO UPDATE SET
-      payload = excluded.payload, created_at = excluded.created_at, expires_at = excluded.expires_at
-  `).run(orgId, record.analysisId, JSON.stringify(record), now, now + TTL_MS);
+  db().prepare(INSERT_SQL)
+    .run(orgId, record.analysisId, JSON.stringify(record), now, now + TTL_MS);
+}
+
+/**
+ * Store the provenance for a whole batch, atomically.
+ *
+ * One transaction, so an interrupted batch — deploy, crash, spin-down — leaves
+ * EVERY candidate unbound rather than an arbitrary prefix bound and the rest
+ * not. A partial prefix is the worst outcome available: the saves that follow
+ * would be vouched for some candidates and silently client-asserted for the
+ * others, with nothing on the record to say which were which.
+ *
+ * Callers must collect the records and call this AFTER their async work: a
+ * better-sqlite3 transaction is synchronous and cannot span an await. It throws
+ * "Transaction function cannot return a promise" if you try — and the writes
+ * still land, one at a time, outside the transaction.
+ *
+ * Validates the whole set BEFORE opening the transaction. Unlike remember(),
+ * which logs and drops a single malformed record, one bad record here aborts
+ * the batch: an all-or-nothing set must not ship with a silent hole in it.
+ *
+ * @throws if any record is malformed, or if the commit fails
+ * @returns {number} records written
+ */
+function rememberMany(orgId, records) {
+  if (!orgId || !Array.isArray(records) || records.length === 0) return 0;
+
+  for (const rec of records) {
+    if (!rec || typeof rec.analysisId !== 'string') {
+      throw new Error('provenance batch contains a record with no analysisId');
+    }
+    const unexpected = unexpectedKeys(rec);
+    if (unexpected.length) {
+      throw new Error(
+        `provenance batch record ${rec.analysisId} has unexpected keys: ${unexpected.join(', ')}`,
+      );
+    }
+  }
+
+  const now = Date.now();
+  const stmt = db().prepare(INSERT_SQL);
+  // Serialising inside the transaction means a payload that cannot be
+  // stringified rolls the whole batch back, rather than binding the records
+  // that happened to come before it.
+  const tx = db().transaction((recs) => {
+    for (const rec of recs) {
+      stmt.run(orgId, rec.analysisId, JSON.stringify(rec), now, now + TTL_MS);
+    }
+  });
+  tx(records);
+  return records.length;
 }
 
 /**
@@ -153,7 +211,7 @@ function _count() {
 }
 
 module.exports = {
-  remember, lookup,
+  remember, rememberMany, lookup,
   sweepExpired, startProvenanceSweep, stopProvenanceSweep,
   TTL_MS, SWEEP_INTERVAL_MS, ALLOWED_KEYS, _count,
 };
