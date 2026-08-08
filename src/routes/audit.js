@@ -448,11 +448,16 @@ function renderBiasReportHtml(report, branding) {
     generated: generatedAt,
   });
 
-  // The mark, in whichever form the resolver handed back. `needsPlate` is true
-  // only for a raster logo on this dark band; nothing produces one yet, so the
-  // plate itself is deliberately not built here (see services/branding).
+  // The mark, in whichever form the resolver handed back.
+  //
+  // needsPlate is true for a raster logo on this dark band. A customer's PNG is
+  // used as uploaded — it cannot be recoloured the way the CVsprings mark can —
+  // so a logo drawn in dark ink would be invisible on navy. The plate is a
+  // light rounded panel behind it, which is what a print designer would do and
+  // costs nothing for logos that would have been legible anyway.
   const markHtml = brand.headerLogoType === 'image'
-    ? '<img class="mark" src="' + esc(brand.headerLogo) + '" alt="" width="26" height="26">'
+    ? '<span class="mark markimg' + (brand.needsPlate ? ' plate' : '') + '">'
+      + '<img src="' + esc(brand.headerLogo) + '" alt=""></span>'
     : '<span class="mark" aria-hidden="true">' + brand.headerLogo + '</span>';
 
   const scopeLabel = scope.role ? 'Role: ' + esc(scope.role) : 'All roles';
@@ -479,7 +484,17 @@ function renderBiasReportHtml(report, branding) {
     // The mark is inlined SVG now rather than <img src="/brandmark-white.svg">,
     // so it survives printing with "Background graphics" off (the print-dialog
     // default) AND carries whichever mark resolveBranding chose for this org.
-    '.brandrow .mark, .brandrow .mark svg, .brandrow img.mark { width: 26px; height: 26px; display: block; }' +
+    '.brandrow .mark, .brandrow .mark svg { width: 26px; height: 26px; display: block; }' +
+    // An uploaded logo keeps its aspect ratio inside the same 26px band; object-fit
+    // contains it rather than distorting a wide or tall upload. Width is allowed
+    // to grow to a bounded maximum so a wordmark-style logo is not squashed.
+    '.brandrow .markimg { width: auto; max-width: 104px; height: 26px; display: block; }' +
+    '.brandrow .markimg img { max-width: 104px; max-height: 26px; width: auto; height: auto; object-fit: contain; display: block; }' +
+    // needsPlate: a light panel so a dark-ink raster logo is legible on the navy
+    // band. print-color-adjust keeps it when "Background graphics" is off, which
+    // is the print-dialog default and this document exists to be printed.
+    '.brandrow .plate { background: #fff; border-radius: 4px; padding: 3px 5px; height: auto; '
+      + '-webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
     '.brandrow .wordmark { font-size: 13px; font-weight: 700; letter-spacing: -.2px; }' +
     '.disclaimer { background: #fffbeb; border: 2px solid #f59e0b; border-radius: 6px; padding: 16px 18px; margin-bottom: 24px; font-size: 13px; line-height: 1.5; color: #78350f; }' +
     '.disclaimer strong { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }' +

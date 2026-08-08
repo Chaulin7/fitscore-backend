@@ -4,6 +4,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { requireSession } = require('../middleware/auth');
 const auth = require('../services/authService');
+const brandingService = require('../services/branding');
 const { getDb } = require('../services/db');
 
 const router = express.Router();
@@ -197,7 +198,10 @@ router.post('/logout', requireSession, (req, res) => {
 
 router.get('/me', requireSession, (req, res) => {
   const org = auth.getOrganizationById(req.orgId);
-  const branding = auth.getOrganizationBranding(req.orgId);
+  // publicBranding strips the stored logo: it is up to ~512KB and this endpoint
+  // runs on every page load. The client gets hasLogo and fetches the image from
+  // GET /api/org/branding/logo only when it needs to show it.
+  const branding = brandingService.publicBranding(auth.getOrganizationBranding(req.orgId));
   res.json({
     user: { email: req.user.email, orgId: req.orgId, role: req.user.role },
     org: { name: org ? org.name : null, retentionDays: org ? org.retentionDays : null, branding },

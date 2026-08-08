@@ -326,6 +326,16 @@ function initSchema() {
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN brand_display_name TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN brand_logo_url TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN brand_color TEXT'); } catch (_) {}
+  // Uploaded white-label logo, stored as a base64 data URI rather than a file.
+  // It is exactly the form pdfmake's { image: … } node wants, so rendering does
+  // no I/O; it rides the existing database backup instead of needing a second
+  // story; and nothing outside the DB file depends on the persistent disk.
+  // Validated by magic bytes and pixel bounds before it ever gets here — see
+  // services/fileSecurity.validateLogoUpload. Retained through a downgrade: the
+  // resolver stops SERVING it when entitlement lapses, and a re-subscribing org
+  // gets its logo back. (brand_logo_url above is the dead URL field this
+  // replaces; kept for now so the UI can prompt affected orgs to re-upload.)
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN brand_logo_data TEXT'); } catch (_) {}
   // Billing (Stripe subscriptions, attached to the organization)
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN stripe_customer_id TEXT'); } catch (_) {}
   try { getDb().exec("ALTER TABLE organizations ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'"); } catch (_) {}

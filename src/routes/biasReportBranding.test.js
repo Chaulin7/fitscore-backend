@@ -187,9 +187,49 @@ describe('needsPlate', () => {
     assert.equal(resolveBranding(CUSTOM, PRO, { on: 'dark' }).needsPlate, false);
   });
 
-  test('nothing consumes it yet — the signal exists, the plate does not', () => {
-    const { html } = biasHtml(CUSTOM, PRO);
-    assert.ok(!html.includes('plate'), 'plate rendering was deliberately deferred');
+  // PR #59 asserted here that the plate was deliberately NOT built, pinning a
+  // temporary state. Logo uploads make needsPlate reachable in production, so
+  // that deferral has come due and the assertion inverts.
+  test('a raster logo on the dark header renders on a light plate', () => {
+    const report = analyzeBias(RECORDS(), { orgId: 'org-1' });
+    const branding = {
+      ...resolveBranding(CUSTOM, PRO, { on: 'dark' }),
+      headerLogo: 'data:image/png;base64,iVBORw0KGgo=', headerLogoType: 'image',
+      isCustom: true, needsPlate: true,
+    };
+    const html = renderBiasReportHtml(report, branding);
+    assert.ok(/class="mark markimg plate"/.test(html), 'plate class missing from the mark');
+    assert.ok(html.includes('.brandrow .plate'), 'plate styling missing');
+    assert.ok(/print-color-adjust: exact/.test(html),
+      'the plate must survive printing with background graphics off');
+  });
+
+  test('no plate when the mark is the tintable CVsprings SVG', () => {
+    const { html } = biasHtml(NO_BRANDING, FREE);
+    assert.ok(!/markimg plate/.test(html), 'the SVG mark is recoloured, it needs no plate');
+  });
+
+  test('no plate for a raster logo on a light surface', () => {
+    const report = analyzeBias(RECORDS(), { orgId: 'org-1' });
+    const branding = {
+      ...resolveBranding(CUSTOM, PRO, { on: 'dark' }),
+      headerLogo: 'data:image/png;base64,iVBORw0KGgo=', headerLogoType: 'image',
+      isCustom: true, needsPlate: false,
+    };
+    assert.ok(!/markimg plate/.test(renderBiasReportHtml(report, branding)));
+  });
+
+  test('an uploaded logo is bounded on the dark header, not stretched', () => {
+    const report = analyzeBias(RECORDS(), { orgId: 'org-1' });
+    const branding = {
+      ...resolveBranding(CUSTOM, PRO, { on: 'dark' }),
+      headerLogo: 'data:image/png;base64,iVBORw0KGgo=', headerLogoType: 'image',
+      isCustom: true, needsPlate: true,
+    };
+    const html = renderBiasReportHtml(report, branding);
+    assert.ok(html.includes('object-fit: contain'), 'aspect ratio must be preserved');
+    assert.ok(/max-width: 104px/.test(html) && /max-height: 26px/.test(html),
+      'the mark must be bounded in both axes');
   });
 });
 

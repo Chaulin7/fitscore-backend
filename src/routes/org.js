@@ -13,10 +13,12 @@
  */
 
 const express = require('express');
+const multer = require('multer');
 const { requireSession } = require('../middleware/auth');
 const auth = require('../services/authService');
 const branding = require('../services/branding');
-const { getAllAudits, getAuditChanges, deleteAllOrgAuditData, getDb, validateRetentionDays, getRetentionStats, countPurgeableRows, listPurgeRuns } = require('../services/db');
+const fileSec = require('../services/fileSecurity');
+const { getAllAudits, getAuditChanges, deleteAllOrgAuditData, getDb, getOrgBilling, validateRetentionDays, getRetentionStats, countPurgeableRows, listPurgeRuns } = require('../services/db');
 
 const router = express.Router();
 
@@ -107,7 +109,88 @@ router.patch('/branding', requireSession, requireOwner, (req, res) => {
       brandLogoUrl: logo || null,
       brandColor: color || null,
     });
-    res.json(auth.getOrganizationBranding(req.orgId));
+    res.json(branding.publicBranding(auth.getOrganizationBranding(req.orgId)));
+  } catch (err) {
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// --- White-label logo -------------------------------------------------------
+// Upload, preview and removal. Held in memory only: the buffer arrives from
+// multer, is validated by content, and is stored as a base64 data URI on the
+// org row. Nothing is written to disk at any point, including temporarily.
+
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  // The edge cap. An oversized upload is refused by multer before the body is
+  // absorbed, rather than after. 384KB raw lands under ~512KB once base64'd.
+  limits: { fileSize: fileSec.MAX_LOGO_BYTES, files: 1, fields: 4 },
+}).single('logo');
+
+/**
+ * The same entitlement rule the resolver uses, enforced server-side.
+ *
+ * Deliberately calls branding.isEntitledToCustomBranding rather than
+ * re-deriving it: a second gate could disagree with the one that decides what
+ * actually renders, and then the UI would accept a logo the report ignores.
+ */
+function requireCustomBranding(req, res, next) {
+  if (!branding.isEntitledToCustomBranding(getOrgBilling(req.orgId))) {
+    return sendError(res, 403, 'UPGRADE_REQUIRED',
+      'White-label logos are available on the Pro and Team plans.', 'logo');
+  }
+  return next();
+}
+
+// POST /api/org/branding/logo — multipart, field name "logo" (owner + entitled)
+router.post('/branding/logo', requireSession, requireOwner, requireCustomBranding, (req, res) => {
+  logoUpload(req, res, (uploadErr) => {
+    if (uploadErr) {
+      // multer's own rejection, including the size cap firing at the edge.
+      const tooBig = uploadErr.code === 'LIMIT_FILE_SIZE';
+      return sendError(res, 400, tooBig ? 'INVALID_FILE' : 'UPLOAD_FAILED',
+        tooBig
+          ? `Logo is larger than the ${Math.round(fileSec.MAX_LOGO_BYTES / 1024)} KB limit.`
+          : (uploadErr.message || 'Upload failed.'),
+        'logo');
+    }
+    try {
+      const image = fileSec.validateLogoUpload(req.file && req.file.buffer, 'logo');
+      auth.setOrganizationLogo(req.orgId, image.dataUri);
+      res.json({
+        ...branding.publicBranding(auth.getOrganizationBranding(req.orgId)),
+        logo: { type: image.type, width: image.width, height: image.height },
+      });
+    } catch (e) {
+      // validateLogoUpload throws INVALID_FILE with a message written for a
+      // human — surface it rather than a generic failure.
+      return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'logo');
+    }
+  });
+});
+
+// GET /api/org/branding/logo — the stored image, for the Settings preview.
+// Owner-only and not entitlement-gated: an org whose plan lapsed can still see
+// what it has stored, which is what the "your logo is retained" promise means.
+router.get('/branding/logo', requireSession, requireOwner, (req, res) => {
+  try {
+    const dataUri = branding.uploadedLogoDataUri(auth.getOrganizationBranding(req.orgId));
+    if (!dataUri) return sendError(res, 404, 'NOT_FOUND', 'No logo uploaded.', 'logo');
+    const [meta, b64] = dataUri.split(',');
+    res.setHeader('Content-Type', meta.slice(5).replace(';base64', ''));
+    // Org-specific and changeable; never let a shared cache hold it.
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(Buffer.from(b64, 'base64'));
+  } catch (err) {
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// DELETE /api/org/branding/logo — revert to the CVsprings mark (owner + entitled)
+router.delete('/branding/logo', requireSession, requireOwner, requireCustomBranding, (req, res) => {
+  try {
+    auth.setOrganizationLogo(req.orgId, null);
+    res.json(branding.publicBranding(auth.getOrganizationBranding(req.orgId)));
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }

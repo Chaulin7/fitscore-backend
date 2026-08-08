@@ -88,13 +88,29 @@ function setOrganizationRetention(id, days) {
 
 // Per-org report branding (nullable). Raw values; callers validate/escape.
 function getOrganizationBranding(id) {
-  const row = getDb().prepare('SELECT brand_display_name AS brandDisplayName, brand_logo_url AS brandLogoUrl, brand_color AS brandColor FROM organizations WHERE id = ?').get(id);
-  return row || { brandDisplayName: null, brandLogoUrl: null, brandColor: null };
+  const row = getDb().prepare('SELECT brand_display_name AS brandDisplayName, brand_logo_url AS brandLogoUrl, brand_color AS brandColor, brand_logo_data AS brandLogoData FROM organizations WHERE id = ?').get(id);
+  return row || { brandDisplayName: null, brandLogoUrl: null, brandColor: null, brandLogoData: null };
 }
 
 function setOrganizationBranding(id, { brandDisplayName, brandLogoUrl, brandColor }) {
   getDb().prepare('UPDATE organizations SET brand_display_name = ?, brand_logo_url = ?, brand_color = ? WHERE id = ?')
     .run(brandDisplayName || null, brandLogoUrl || null, brandColor || null, id);
+}
+
+// The uploaded logo is set and cleared on its own, never as part of the text
+// branding save: it arrives as multipart on a different endpoint, and a text
+// save must not be able to blank it by omission.
+function setOrganizationLogo(id, dataUri) {
+  getDb().prepare('UPDATE organizations SET brand_logo_data = ? WHERE id = ?').run(dataUri || null, id);
+}
+
+// Whether a logo is stored, without hauling a ~512KB string around. Used by the
+// branding read path, which must not put the image in every /api/auth/me.
+function hasOrganizationLogo(id) {
+  const row = getDb().prepare(
+    'SELECT brand_logo_data IS NOT NULL AND brand_logo_data <> \'\' AS present FROM organizations WHERE id = ?',
+  ).get(id);
+  return !!(row && row.present);
 }
 
 // --- Users -------------------------------------------------------------------
@@ -415,6 +431,8 @@ module.exports = {
   setOrganizationRetention,
   getOrganizationBranding,
   setOrganizationBranding,
+  setOrganizationLogo,
+  hasOrganizationLogo,
   listOrgUsers,
   countOrgUsers,
   countOrgOwners,

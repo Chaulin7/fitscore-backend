@@ -243,13 +243,41 @@ function resolveBranding(orgBranding, orgBilling, options) {
 /**
  * An org's uploaded logo as a base64 data URI, or null.
  *
- * Always null today — there is no upload path, and the remote brandLogoUrl is
- * deliberately not fetched (see resolveBranding). Isolated as a function so the
- * follow-up that adds uploads has exactly one place to fill in, and so the
- * renderer's { image: … } branch is reachable in tests by stubbing it.
+ * The value is written only by the upload endpoint, which validates it by magic
+ * bytes and pixel bounds first (services/fileSecurity.validateLogoUpload), so
+ * anything stored here is already a PNG or JPEG within limits. The shape is
+ * re-checked cheaply here anyway: this string goes straight into a server-side
+ * renderer, and a row edited by hand should not reach pdfmake.
+ *
+ * brandLogoUrl — the old remote-URL field — is deliberately NOT consulted.
+ * Fetching an org-controlled URL during report generation would add an SSRF
+ * surface and an uptime dependency on a third-party host.
  */
-function uploadedLogoDataUri(_orgBranding) {
-  return null;
+const LOGO_DATA_URI = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/;
+
+function uploadedLogoDataUri(orgBranding) {
+  const v = orgBranding && orgBranding.brandLogoData;
+  if (typeof v !== 'string' || !v) return null;
+  return LOGO_DATA_URI.test(v) ? v : null;
+}
+
+/**
+ * The branding row as it may be sent to a client.
+ *
+ * Strips brandLogoData — it is up to ~512KB, and GET /api/auth/me runs on every
+ * page load. Callers get a boolean and fetch the image itself from
+ * GET /api/org/branding/logo when they actually need to show it.
+ */
+function publicBranding(orgBranding) {
+  const b = orgBranding || {};
+  return {
+    brandDisplayName: b.brandDisplayName || null,
+    brandColor: b.brandColor || null,
+    // Retained so the UI can prompt orgs that configured the old, never-rendered
+    // URL field to upload the image instead. Nothing reads it at render time.
+    brandLogoUrl: b.brandLogoUrl || null,
+    hasLogo: uploadedLogoDataUri(b) != null,
+  };
 }
 
 module.exports = {
@@ -266,5 +294,7 @@ module.exports = {
   isLegalEntityName,
   isCompedOrg,
   isEntitledToCustomBranding,
+  uploadedLogoDataUri,
+  publicBranding,
   resolveBranding,
 };
