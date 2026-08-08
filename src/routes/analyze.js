@@ -320,6 +320,12 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     reserved = req.files.length;
 
     const results = [];
+    // Provenance is COLLECTED here and committed in one transaction after the
+    // loop, not written per candidate. Two reasons: a better-sqlite3
+    // transaction is synchronous and cannot span the `await` below, and a batch
+    // interrupted midway must leave every candidate unbound rather than an
+    // arbitrary prefix bound and the rest not. See provenance.rememberMany.
+    const pendingProvenance = [];
 
     for (const file of req.files) {
       filePaths.push(file.path);
@@ -345,7 +351,7 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
           : path.basename(file.originalname, path.extname(file.originalname));
         const extraction = extractionSummary(extracted);
         const analysisId = uuidv4(); // one per candidate, NOT one per batch
-        provenance.remember(req.orgId, provenanceRecord(analysisId, extraction, weights));
+        pendingProvenance.push(provenanceRecord(analysisId, extraction, weights));
         results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), analysisId, extraction, ...scored });
       } catch (fileErr) {
         results.push({
@@ -354,6 +360,22 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
           error: fileErr.message
         });
       }
+    }
+
+    // Bind the whole batch, or none of it. Every await is behind us, so the
+    // synchronous transaction is safe here.
+    try {
+      provenance.rememberMany(req.orgId, pendingProvenance);
+    } catch (provErr) {
+      // Fail closed on the CLAIM, open on the work. The analysis still returns
+      // — losing a scored batch over a provenance write would be a far worse
+      // trade — but the analysisIds are withdrawn, so the client cannot echo an
+      // id the server does not hold. Saves then record honestly as
+      // client-asserted: POST /api/audit reports provenance.vouched=false and
+      // the app tells the recruiter the analysis could not be verified.
+      console.error('[provenance] batch binding failed — returning results unvouched',
+        { org: req.orgId, count: pendingProvenance.length, message: provErr && provErr.message });
+      for (const r of results) delete r.analysisId;
     }
 
     results.sort((a, b) => (b.overall || 0) - (a.overall || 0));
