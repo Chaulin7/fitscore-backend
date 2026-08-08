@@ -25,8 +25,8 @@
  * than marketing and must mean the same thing on every document we emit.
  *
  * Injected values must be validated/escaped by the caller before they reach
- * HTML. This module only validates structure (URL scheme, colour shape) and
- * length; HTML-escaping happens at render time.
+ * HTML. This module only validates structure (colour shape, logo data-URI
+ * shape) and length; HTML-escaping happens at render time.
  */
 
 // Entitlement is expressed ONCE, as a capability flag on the plan table.
@@ -73,17 +73,6 @@ const HEADER_MARK_FIT = Object.freeze([104, 34]);
 // Ink for the CVsprings mark when it sits on a dark band (the bias report's
 // navy header). Pure white, matching public/brandmark-white.svg exactly.
 const ON_DARK_MARK_COLOR = '#fff';
-
-// Only http(s) absolute URLs are allowed for the logo (no data:, javascript:, etc.).
-function isSafeHttpUrl(value) {
-  if (typeof value !== 'string' || !value) return false;
-  try {
-    const u = new URL(value);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch (_) {
-    return false;
-  }
-}
 
 // Accept #rgb / #rrggbb hex colours only.
 function isValidColor(value) {
@@ -289,7 +278,6 @@ module.exports = {
   PROVENANCE_PLATFORM,
   HEADER_MARK_FIT,
   ON_DARK_MARK_COLOR,
-  isSafeHttpUrl,
   isValidColor,
   isLegalEntityName,
   isCompedOrg,

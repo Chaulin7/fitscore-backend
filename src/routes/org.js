@@ -92,21 +92,23 @@ router.patch('/branding', requireSession, requireOwner, (req, res) => {
   try {
     const body = req.body || {};
     const name = body.brandDisplayName == null ? null : String(body.brandDisplayName).trim();
-    const logo = body.brandLogoUrl == null ? null : String(body.brandLogoUrl).trim();
     const color = body.brandColor == null ? null : String(body.brandColor).trim();
 
     if (name && name.length > 80) {
       return sendError(res, 400, 'VALIDATION_ERROR', 'Display name too long (max 80 characters).', 'brandDisplayName');
     }
-    if (logo && !branding.isSafeHttpUrl(logo)) {
-      return sendError(res, 400, 'VALIDATION_ERROR', 'Logo URL must be an http(s) URL.', 'brandLogoUrl');
-    }
     if (color && !branding.isValidColor(color)) {
       return sendError(res, 400, 'VALIDATION_ERROR', 'Colour must be a hex value like #0f2847.', 'brandColor');
     }
+    // brandLogoUrl is no longer accepted: logos are uploaded (POST
+    // /branding/logo), and the URL was never rendered. Any value a client still
+    // sends is ignored rather than stored. The COLUMN and the read path stay
+    // for now, so the UI can prompt orgs that configured a URL to upload the
+    // image — see branding.publicBranding.
+    const existing = auth.getOrganizationBranding(req.orgId);
     auth.setOrganizationBranding(req.orgId, {
       brandDisplayName: name || null,
-      brandLogoUrl: logo || null,
+      brandLogoUrl: existing.brandLogoUrl || null, // preserved, never written from the request
       brandColor: color || null,
     });
     res.json(branding.publicBranding(auth.getOrganizationBranding(req.orgId)));
