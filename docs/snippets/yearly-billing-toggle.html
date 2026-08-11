@@ -9,12 +9,18 @@
 
   IF YOU REVIVE THIS, three things have changed since it was written:
 
-  1. Prices now come from window.CVSPRINGS_PLANS (public/plans.js), which is the
-     single source of truth for tiers and is rendered by public/index.html and
-     the Settings pane in public/app.html. The `data-base="49"` attribute this
-     script reads no longer exists in the markup. Add a `priceYearly` (or
-     `priceLabelYearly`) field per tier in plans.js and re-render from that
-     rather than reintroducing a hardcoded base price + 0.8 multiplier here.
+  1. Prices now come from src/config/plans.js, the single source of truth for
+     tiers. It is a server-side module: the browser reads the marketing-safe
+     view over GET /api/plans (src/routes/plans.js), which is what both
+     public/index.html and the Settings pane in public/app.html render from.
+     This replaced public/plans.js, a browser-only copy that exposed
+     window.CVSPRINGS_PLANS and was deleted on 2026-08-06 — neither that file
+     nor that global exists any more, so nothing on the page is populated
+     synchronously before first paint. The `data-base="49"` attribute this
+     script reads no longer exists in the markup either. Add a `priceYearly`
+     (or `priceLabelYearly`) field per tier in src/config/plans.js, expose it
+     through the /api/plans view, and re-render from that rather than
+     reintroducing a hardcoded base price + 0.8 multiplier here.
   2. The 20% discount below was marketing copy, never a real Stripe price. Real
      annual billing needs a second Stripe price ID per tier and a `period`
      argument threaded through POST /api/billing/checkout.

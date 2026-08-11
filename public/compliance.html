@@ -135,12 +135,12 @@ td:first-child{font-weight:600;color:#0f2847;white-space:nowrap}
       <p>Clients can paste this into job postings or applicant communications to meet their own transparency duties:</p>
       <div class="notice-box">
         <div class="notice-lang">English</div>
-        <button class="copy-btn" onclick="copyNotice('noticeEn',this)">Copy</button>
+        <button class="copy-btn" type="button" data-action="copyNotice" data-target="noticeEn">Copy</button>
         <span id="noticeEn">As part of our selection process, applications may be assessed with the support of an AI-based tool (CVsprings) that compares CV content against the job requirements. The tool produces an advisory score only; all decisions are made by our recruiters. You may request information about this process or ask for a human-only review by contacting us.</span>
       </div>
       <div class="notice-box">
         <div class="notice-lang">Nederlands</div>
-        <button class="copy-btn" onclick="copyNotice('noticeNl',this)">Copy</button>
+        <button class="copy-btn" type="button" data-action="copyNotice" data-target="noticeNl">Copy</button>
         <span id="noticeNl">Als onderdeel van onze selectieprocedure kunnen sollicitaties worden beoordeeld met ondersteuning van een AI-tool (CVsprings) die de inhoud van het cv vergelijkt met de functie-eisen. De tool geeft uitsluitend een adviserende score; alle beslissingen worden genomen door onze recruiters. U kunt informatie over dit proces opvragen of verzoeken om een beoordeling door uitsluitend een mens door contact met ons op te nemen.</span>
       </div>
     </div>
@@ -156,8 +156,15 @@ td:first-child{font-weight:600;color:#0f2847;white-space:nowrap}
 </footer>
 
 <script nonce="__CSP_NONCE__">
-function copyNotice(id, btn){
-  var text = document.getElementById(id).textContent;
+/* Event delegation (CSP hardening) — same shape as public/app.html.
+   Helmet sets script-src-attr 'none', so an onclick attribute is not merely
+   discouraged here, it is blocked: these two buttons were inert in production.
+   Interactive elements carry data-action (plus data-* args) and are wired with
+   a delegated listener, which stays in this inline <script> via the per-request
+   nonce. */
+function copyNotice(el){
+  var btn = el;
+  var text = document.getElementById(el.dataset.target).textContent;
   function done(ok){
     var prev = btn.textContent;
     btn.textContent = ok ? 'Copied!' : 'Copy failed';
@@ -175,6 +182,18 @@ function copyNotice(id, btn){
     } catch (e) { done(false); }
   }
 }
+const delegatedHandlers = {
+  click: { copyNotice },
+};
+Object.keys(delegatedHandlers).forEach(function(eventType){
+  const map = delegatedHandlers[eventType];
+  document.addEventListener(eventType, function(e){
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const fn = map[el.dataset.action];
+    if (typeof fn === 'function') fn(el, e);
+  });
+});
 </script>
 </body>
 </html>
