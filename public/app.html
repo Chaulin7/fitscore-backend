@@ -394,6 +394,16 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .audit-cand-link:hover{text-decoration:underline}
 .legacy-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.03em;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-left:6px;cursor:help;vertical-align:middle}
 .audit-legacy-note{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:12px;line-height:1.5}
+/* Bias monitoring report generator (Audit tab). The scope line is the point of
+   the block, so it reads at the same weight as the button rather than as fine
+   print — a recruiter must never be surprised by what the report covers. */
+.bias-gen{background:#f7f9fc;border:1px solid #dbe3f0;border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.bias-gen-main{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.bias-gen-how{font-size:12px;color:#0f2847;text-decoration:underline;white-space:nowrap}
+.bias-gen-scope{font-size:12.5px;color:#334155;margin-top:9px;line-height:1.5}
+.bias-gen-scope strong{color:#0f2847;font-weight:700}
+.bias-gen-unsupported{display:block;color:#92400e;margin-top:3px}
+.bias-gen-note{font-size:11px;color:#6b7280;margin-top:6px;line-height:1.5}
 .nav-status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,0.08);color:#cbd5e1;font-size:12px;line-height:1;margin:0 6px}
 .nav-status-pill .dot{width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block}
 .nav-status-pill .dot.ok{background:#22c55e}
@@ -996,7 +1006,10 @@ img, video, table { max-width: 100%; }
     <button class="nav-btn active" data-action="switchTab" data-tab="analyzer">Analyzer</button>
     <button class="nav-btn" data-action="switchTab" data-tab="audit">Audit Log</button>
     <button class="nav-btn" data-action="switchTab" data-tab="history">Role History</button>
-    <a class="nav-btn" href="/bias-report.html" style="text-decoration:none;display:inline-block">Bias Report</a>
+    <!-- Named for what the page is. It is the static methodology explainer, not
+         a report — the document a recruiter generates for their own data lives
+         in the Audit tab, and the two must never be mistaken for each other. -->
+    <a class="nav-btn" href="/bias-report.html" style="text-decoration:none;display:inline-block">How bias monitoring works</a>
     <!-- Inside .topbar-nav deliberately: the ≤640px rules collapse only this
          element into the mobile drawer, so the button needs no extra CSS to
          behave on small screens. Carries no data-tab, so switchTab never sees it. -->
@@ -1423,6 +1436,19 @@ img, video, table { max-width: 100%; }
       <button class="btn btn-ghost btn-sm" data-action="loadAudit">&#8635; Refresh</button>
       <button class="btn btn-ghost btn-sm" data-action="exportAuditCsv">Export CSV</button>
     </div>
+  </div>
+  <!-- Bias monitoring report generator. Sits with the export controls because
+       it is the other org-scoped artifact the Audit tab produces, and it reads
+       the same active filter state rather than asking for scope a second time.
+       Deliberately never disabled: the report always renders and its own
+       reliability banner does the honest work at small sample sizes. -->
+  <div class="bias-gen" id="biasGen">
+    <div class="bias-gen-main">
+      <button type="button" class="btn btn-primary btn-sm" id="biasGenBtn" data-action="openBiasReport">Open bias monitoring report</button>
+      <a class="bias-gen-how" href="/bias-report.html" target="_blank" rel="noopener">How bias monitoring works &#8599;</a>
+    </div>
+    <div class="bias-gen-scope" id="biasGenScope"></div>
+    <div class="bias-gen-note">Opens a print-optimised page in a new tab &mdash; use your browser&rsquo;s Print &rarr; Save as PDF to keep a copy.</div>
   </div>
   <div class="msg msg-err" id="auditError"></div>
   <div id="auditLegacyNote" class="audit-legacy-note" style="display:none"></div>
@@ -2558,6 +2584,9 @@ function updateAuditFilterMeta() {
     cEl.textContent = n + ' filter' + (n === 1 ? '' : 's') + ' active';
   }
   if (clr) clr.style.display = n > 0 ? '' : 'none';
+  // The generator's scope line tracks the same state, so it refreshes here
+  // rather than needing its own hook on every filter control.
+  if (typeof updateBiasGenScope === 'function') updateBiasGenScope();
 }
 
 let mode='single',selectedFiles=[],lastResult=null,lastBatchResults=[],lastAuditRecords=[];
@@ -2629,7 +2658,11 @@ function switchTab(n,btn){
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+n).classList.add('active');btn.classList.add('active');
-  if(n==='audit')loadAudit();if(n==='history')loadRoles();
+  // The generator's scope line is stated up front, not only once rows arrive —
+  // loadAudit bails early when the backend is unreachable, and an empty scope
+  // line next to a live button is exactly the ambiguity it exists to prevent.
+  if(n==='audit'){updateBiasGenScope();loadAudit();}
+  if(n==='history')loadRoles();
 }
 
 async function ping(){
@@ -3217,6 +3250,70 @@ async function exportAuditCsv(){
     a.href=API+'/api/audit/export/csv?dt='+encodeURIComponent(d.token)+(extra?'&'+extra:'');
     a.download='audit-log.csv';a.click();
   }catch(e){handleApiError(e,'Could not export CSV');}
+}
+
+// --- Bias monitoring report -------------------------------------------------
+// The report endpoint takes role + from/to only. The Audit tab has no role
+// control, so every report it generates is all-roles; the date bounds are the
+// tab's own, sent as the same inclusive org-local day strings the list endpoint
+// receives so the report covers exactly the range the table is showing.
+function buildBiasReportQuery() {
+  const p = new URLSearchParams();
+  if (auditFilter.from) p.set('from', auditFilter.from);
+  if (auditFilter.to) p.set('to', auditFilter.to);
+  return p.toString();
+}
+// 'YYYY-MM-DD' -> '1 Aug 2026'. Formatted from the parts rather than through
+// Date, which would reinterpret the org-local day in the browser's zone and can
+// shift it by one.
+const BIAS_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDayLabel(day) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || '');
+  if (!m) return day || '';
+  return String(parseInt(m[3], 10)) + ' ' + BIAS_MONTHS[parseInt(m[2], 10) - 1] + ' ' + m[1];
+}
+// What the generated report will actually cover, in the recruiter's words. No
+// filters is a valid scope meaning the whole organisation, and it is stated
+// outright rather than left to be inferred from an empty filter bar.
+function biasReportScope() {
+  const from = auditFilter.from, to = auditFilter.to;
+  let range;
+  if (from && to) range = fmtDayLabel(from) + ' to ' + fmtDayLabel(to);
+  else if (from) range = fmtDayLabel(from) + ' onwards';
+  else if (to) range = 'everything up to ' + fmtDayLabel(to);
+  else range = 'all dates';
+  // Filters the endpoint cannot honour. Naming them is the whole point: a
+  // recruiter looking at a table narrowed to one actor must not assume the
+  // report was narrowed the same way.
+  const ignored = [];
+  if ((auditFilter.search || '').trim()) ignored.push('candidate');
+  if (auditFilter.actor) ignored.push('actor');
+  if (auditFilter.action) ignored.push('action');
+  return { range, unbounded: !from && !to, ignored };
+}
+function updateBiasGenScope() {
+  const el = document.getElementById('biasGenScope');
+  if (!el) return;
+  const s = biasReportScope();
+  let html = 'Covers <strong>' + escHtml(s.range) + '</strong>, <strong>all roles</strong>'
+    + (s.unbounded ? ' &mdash; every record in your organisation' : '') + '.';
+  if (s.ignored.length) {
+    const list = s.ignored.length === 1
+      ? s.ignored[0]
+      : s.ignored.slice(0, -1).join(', ') + ' and ' + s.ignored[s.ignored.length - 1];
+    html += '<span class="bias-gen-unsupported">Your ' + escHtml(list) + ' filter'
+      + (s.ignored.length === 1 ? ' is' : 's are')
+      + ' not applied &mdash; bias reports are scoped by date only.</span>';
+  }
+  el.innerHTML = html;
+}
+// Never gated on record count: the report is designed to render at any size and
+// carry its own reliability banner. Hiding it on a small dataset would hide the
+// banner that exists to be honest about exactly that.
+function openBiasReport() {
+  if (!API) return;
+  const q = buildBiasReportQuery();
+  openWithDownloadToken(API + '/api/audit/bias-report/pdf' + (q ? '?' + q : ''));
 }
 
 async function loadRoles(){
@@ -4479,7 +4576,7 @@ const delegatedHandlers = {
     saveAllToAudit, exportBatchCsv,
     printPage: () => window.print(),
     sortBatch: (el) => sortBatch(el.dataset.sort),
-    loadAudit, exportAuditCsv, loadRoles,
+    loadAudit, exportAuditCsv, openBiasReport, loadRoles,
     removeFile: (el) => removeFile(el.dataset.key),
     clearAllFiles,
     clearAuditFilters, toggleAuditOrder, auditPreset, auditFilterCandidate,

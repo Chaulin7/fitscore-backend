@@ -102,6 +102,56 @@ function scoringEngineSpan(records) {
   return { versions, unrecorded, distinct, mixed, caveat };
 }
 
+/**
+ * The distinct roles represented in the aggregated records, with their counts.
+ *
+ * The same validity problem as scoringEngineSpan, from a different direction. A
+ * candidate is scored against the job description for their own role, so the
+ * score distribution for one role is not the distribution for another — they
+ * differ by construction, not because of anything the report is looking for.
+ * Aggregating across roles therefore produces means, medians and rates over
+ * values that were never on a common scale. Surfaced above the statistics for
+ * the same reason the engine caveat is: a reader who meets it afterwards has
+ * already drawn conclusions from the figures.
+ */
+function roleSpan(records) {
+  const counts = new Map();
+  let unlabelled = 0;
+  for (const r of records) {
+    if (r.role) {
+      const key = String(r.role);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    } else {
+      unlabelled += 1;
+    }
+  }
+  // Commonest first so the reader sees what dominates the aggregate; name as
+  // tiebreak keeps the ordering deterministic for a given record set.
+  const roles = [...counts.entries()]
+    .map(([role, count]) => ({ role, count }))
+    .sort((a, b) => b.count - a.count || a.role.localeCompare(b.role));
+  const distinct = roles.length + (unlabelled > 0 ? 1 : 0);
+  const mixed = distinct > 1;
+  let caveat = null;
+  if (mixed) {
+    const listed = roles.map((r) => r.role + ' (' + r.count + ')').join(', ');
+    caveat =
+      'These records span more than one role'
+      + (listed ? ': ' + listed : '')
+      + (unlabelled > 0
+        ? (listed ? ', and ' : ': ') + unlabelled + ' record' + (unlabelled !== 1 ? 's have' : ' has')
+          + ' no role recorded'
+        : '')
+      + '. Each candidate is scored against the job description for their own role, so '
+      + 'score distributions differ between roles by construction. The means, medians and '
+      + 'rates below aggregate across all of them and therefore compare values that are '
+      + 'not directly comparable. Read every figure in this report with that in mind, and '
+      + 'use the per-role comparison below rather than the aggregate figures when you need '
+      + 'a like-for-like view.';
+  }
+  return { roles, unlabelled, distinct, mixed, caveat };
+}
+
 // ---------------------------------------------------------------------------
 // Statistical helpers (pure JS, no dependencies)
 // ---------------------------------------------------------------------------
@@ -395,14 +445,17 @@ function analyzeBias(records, options) {
   }
 
   const scoringEngines = scoringEngineSpan(records);
+  const roles = roleSpan(records);
 
   // Build limitations list (always populated)
   const limitations = [...STANDARD_LIMITATIONS];
   if (reliability === 'insufficient' || reliability === 'low') {
     limitations.unshift('This report covers only ' + totalRecords + ' record' + (totalRecords !== 1 ? 's' : '') + '. Results at this scale are highly sensitive to individual data points and should not be used to draw conclusions about patterns.');
   }
-  // Also listed here so the caveat survives into any consumer that reads only
-  // the limitations — it is rendered prominently above the statistics as well.
+  // Also listed here so the caveats survive into any consumer that reads only
+  // the limitations — both are rendered prominently above the statistics too.
+  // Unshifted role-then-engine so the list order matches the rendered order.
+  if (roles.mixed) limitations.unshift(roles.caveat);
   if (scoringEngines.mixed) limitations.unshift(scoringEngines.caveat);
 
   return {
@@ -415,6 +468,7 @@ function analyzeBias(records, options) {
     engine: BIAS_ENGINE_ID,
     ruleset: RULESET_VERSION,
     scoringEngines,
+    roles,
     scope: { role, from, to, totalRecords },
     reliability,
     anonymisation,
@@ -461,6 +515,6 @@ function assertSoberLanguage(obj, path) {
 
 module.exports = {
   analyzeBias, assertSoberLanguage, STANDARD_LIMITATIONS,
-  reportFingerprint, scoringEngineSpan,
+  reportFingerprint, scoringEngineSpan, roleSpan,
   BIAS_ENGINE_ID, RULESET_VERSION, FINGERPRINT_VERSION,
 };
