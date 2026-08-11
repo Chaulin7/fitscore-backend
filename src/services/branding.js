@@ -25,8 +25,8 @@
  * than marketing and must mean the same thing on every document we emit.
  *
  * Injected values must be validated/escaped by the caller before they reach
- * HTML. This module only validates structure (URL scheme, colour shape) and
- * length; HTML-escaping happens at render time.
+ * HTML. This module only validates structure (colour shape, logo data-URI
+ * shape) and length; HTML-escaping happens at render time.
  */
 
 // Entitlement is expressed ONCE, as a capability flag on the plan table.
@@ -73,17 +73,6 @@ const HEADER_MARK_FIT = Object.freeze([104, 34]);
 // Ink for the CVsprings mark when it sits on a dark band (the bias report's
 // navy header). Pure white, matching public/brandmark-white.svg exactly.
 const ON_DARK_MARK_COLOR = '#fff';
-
-// Only http(s) absolute URLs are allowed for the logo (no data:, javascript:, etc.).
-function isSafeHttpUrl(value) {
-  if (typeof value !== 'string' || !value) return false;
-  try {
-    const u = new URL(value);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch (_) {
-    return false;
-  }
-}
 
 // Accept #rgb / #rrggbb hex colours only.
 function isValidColor(value) {
@@ -243,13 +232,41 @@ function resolveBranding(orgBranding, orgBilling, options) {
 /**
  * An org's uploaded logo as a base64 data URI, or null.
  *
- * Always null today — there is no upload path, and the remote brandLogoUrl is
- * deliberately not fetched (see resolveBranding). Isolated as a function so the
- * follow-up that adds uploads has exactly one place to fill in, and so the
- * renderer's { image: … } branch is reachable in tests by stubbing it.
+ * The value is written only by the upload endpoint, which validates it by magic
+ * bytes and pixel bounds first (services/fileSecurity.validateLogoUpload), so
+ * anything stored here is already a PNG or JPEG within limits. The shape is
+ * re-checked cheaply here anyway: this string goes straight into a server-side
+ * renderer, and a row edited by hand should not reach pdfmake.
+ *
+ * brandLogoUrl — the old remote-URL field — is deliberately NOT consulted.
+ * Fetching an org-controlled URL during report generation would add an SSRF
+ * surface and an uptime dependency on a third-party host.
  */
-function uploadedLogoDataUri(_orgBranding) {
-  return null;
+const LOGO_DATA_URI = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/;
+
+function uploadedLogoDataUri(orgBranding) {
+  const v = orgBranding && orgBranding.brandLogoData;
+  if (typeof v !== 'string' || !v) return null;
+  return LOGO_DATA_URI.test(v) ? v : null;
+}
+
+/**
+ * The branding row as it may be sent to a client.
+ *
+ * Strips brandLogoData — it is up to ~512KB, and GET /api/auth/me runs on every
+ * page load. Callers get a boolean and fetch the image itself from
+ * GET /api/org/branding/logo when they actually need to show it.
+ */
+function publicBranding(orgBranding) {
+  const b = orgBranding || {};
+  return {
+    brandDisplayName: b.brandDisplayName || null,
+    brandColor: b.brandColor || null,
+    // Retained so the UI can prompt orgs that configured the old, never-rendered
+    // URL field to upload the image instead. Nothing reads it at render time.
+    brandLogoUrl: b.brandLogoUrl || null,
+    hasLogo: uploadedLogoDataUri(b) != null,
+  };
 }
 
 module.exports = {
@@ -261,10 +278,11 @@ module.exports = {
   PROVENANCE_PLATFORM,
   HEADER_MARK_FIT,
   ON_DARK_MARK_COLOR,
-  isSafeHttpUrl,
   isValidColor,
   isLegalEntityName,
   isCompedOrg,
   isEntitledToCustomBranding,
+  uploadedLogoDataUri,
+  publicBranding,
   resolveBranding,
 };

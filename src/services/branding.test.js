@@ -21,6 +21,7 @@ const assert = require('node:assert/strict');
 
 const {
   resolveBranding,
+  publicBranding,
   isEntitledToCustomBranding,
   isCompedOrg,
   platformBrandName,
@@ -39,6 +40,10 @@ const CUSTOM = {
   brandColor: '#ff0066',
 };
 const NO_BRANDING = { brandDisplayName: null, brandLogoUrl: null, brandColor: null };
+
+// A real 1x1 PNG. Small enough to inline, valid enough to be a genuine data URI.
+const PNG_DATA_URI = 'data:image/png;base64,'
+  + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 const FREE = { plan: 'free', subscriptionStatus: null };
 const PRO = { plan: 'pro', subscriptionStatus: 'active' };
@@ -151,15 +156,75 @@ describe('the fallback chain', () => {
     assert.deepEqual(resolveBranding(NO_BRANDING, TEAM), resolveBranding(NO_BRANDING, PRO));
   });
 
-  test('brandLogoUrl is NOT read by the render path', () => {
-    // Deliberate: fetching an org-controlled remote URL during report
-    // generation would add an SSRF surface and a third-party uptime
-    // dependency. Uploads land in a follow-up; until then isCustom is false
-    // for every org, however the URL field is configured.
+  // Same intent as before uploads existed — the remote URL must never reach the
+  // render path — but the assertion has to change, because the field's
+  // replacement genuinely IS read now. Then: "no logo is ever used". Now: "the
+  // UPLOADED logo is used, and the URL still is not."
+  test('brandLogoUrl is still NOT read by the render path', () => {
+    // Fetching an org-controlled remote URL during report generation would add
+    // an SSRF surface and a third-party uptime dependency. Uploads replaced it;
+    // the URL field remains only so the UI can prompt affected orgs.
     const b = resolveBranding({ ...CUSTOM, brandLogoUrl: 'https://evil.example/x.png' }, PRO);
-    assert.equal(b.isCustom, false);
+    assert.equal(b.isCustom, false, 'a URL alone must not make a logo custom');
     assert.equal(b.headerLogoType, 'svg');
     assert.ok(!JSON.stringify(b).includes('evil.example'));
+  });
+
+  test('an uploaded logo IS read, and wins over the CVsprings mark', () => {
+    const b = resolveBranding({ ...CUSTOM, brandLogoData: PNG_DATA_URI }, PRO);
+    assert.equal(b.isCustom, true);
+    assert.equal(b.headerLogoType, 'image');
+    assert.equal(b.headerLogo, PNG_DATA_URI);
+  });
+
+  test('a stored value that is not a PNG/JPEG data URI is refused', () => {
+    // Defence in depth: the upload endpoint validates by magic bytes, but this
+    // string goes straight into a server-side renderer, so a row edited by hand
+    // must not reach pdfmake.
+    for (const bad of [
+      'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+      'https://acme.example/logo.png',
+      'data:text/html;base64,PHNjcmlwdD4=',
+      'javascript:alert(1)',
+      'data:image/png;base64,not base64!!',
+      '',
+    ]) {
+      const b = resolveBranding({ ...CUSTOM, brandLogoData: bad }, PRO);
+      assert.equal(b.isCustom, false, `must refuse: ${bad.slice(0, 40)}`);
+      assert.equal(b.headerLogoType, 'svg');
+    }
+  });
+
+  test('a lapsed org keeps its logo stored but stops having it served', () => {
+    const org = { ...CUSTOM, brandLogoData: PNG_DATA_URI };
+    assert.equal(resolveBranding(org, PRO).isCustom, true);
+    // Downgrade: the org row is untouched, only billing changed.
+    const lapsed = resolveBranding(org, { plan: 'pro', subscriptionStatus: 'canceled' });
+    assert.equal(lapsed.isCustom, false, 'entitlement lapse must stop it being served');
+    assert.equal(lapsed.headerLogoType, 'svg');
+    assert.equal(org.brandLogoData, PNG_DATA_URI, 'the stored value must be untouched');
+    // ...and re-subscribing restores it, with no re-upload.
+    assert.equal(resolveBranding(org, PRO).isCustom, true);
+  });
+
+  test('a free org with a logo somehow stored does not get it served', () => {
+    const b = resolveBranding({ ...CUSTOM, brandLogoData: PNG_DATA_URI }, FREE);
+    assert.equal(b.isCustom, false);
+    assert.equal(b.headerLogoType, 'svg');
+  });
+
+  test('a comped org gets its uploaded logo', () => {
+    const b = resolveBranding({ ...CUSTOM, brandLogoData: PNG_DATA_URI }, COMPED);
+    assert.equal(b.isCustom, true);
+    assert.equal(b.headerLogoType, 'image');
+  });
+
+  test('publicBranding never leaks the stored image', () => {
+    const pub = publicBranding({ ...CUSTOM, brandLogoData: PNG_DATA_URI });
+    assert.equal(pub.hasLogo, true);
+    assert.equal(pub.brandLogoData, undefined, 'the ~512KB blob must not ride /api/auth/me');
+    assert.ok(!JSON.stringify(pub).includes('base64'));
+    assert.equal(pub.brandLogoUrl, CUSTOM.brandLogoUrl, 'retained for the migration prompt');
   });
 });
 
