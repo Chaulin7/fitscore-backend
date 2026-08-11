@@ -329,25 +329,59 @@ router.get('/export/csv', async (req, res) => {
   }
 });
 
+// Parse the bias-report scope params on exactly the same day semantics as the
+// audit list endpoint: from/to are INCLUSIVE calendar days in the org timezone,
+// resolved to UTC instants (DST-correct per date) for the query, and a
+// malformed date is a hard 400 rather than a silently-dropped filter.
+//
+// Doing this by hand here was a real defect. The raw 'YYYY-MM-DD' went straight
+// into a string comparison against the UTC ISO created_at, so `to` excluded its
+// own day entirely ('2026-08-01T10:00:00Z' <= '2026-08-01' is false) and `from`
+// ignored the org offset. The Audit tab and the report it generates would have
+// disagreed about the same visible date range.
+//
+// Returns { role, day: { from, to }, query: { from, to } } or { error }. `day`
+// holds the calendar strings the caller asked for — they are what the report
+// header shows and what the fingerprint is taken over; `query` holds the
+// instants the record fetch actually filters on.
+function parseBiasScope(q, timeZone) {
+  const role = strOrUndef(q.role);
+  const fromDay = strOrUndef(q.from);
+  const toDay = strOrUndef(q.to);
+  const query = {};
+
+  if (fromDay != null) {
+    if (!isValidIsoDate(fromDay)) return { error: { status: 400, field: 'from', message: 'from must be a valid date (YYYY-MM-DD).' } };
+    query.from = startOfZonedDayUtc(fromDay, timeZone).toISOString();
+  }
+  if (toDay != null) {
+    if (!isValidIsoDate(toDay)) return { error: { status: 400, field: 'to', message: 'to must be a valid date (YYYY-MM-DD).' } };
+    query.to = endOfZonedDayUtc(toDay, timeZone).toISOString();
+  }
+
+  return { role: role || null, day: { from: fromDay || null, to: toDay || null }, query };
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/audit/bias-report
-// Query params: role (optional), from, to (optional ISO dates)
+// Query params: role (optional), from, to (optional inclusive org-local days)
 // Returns the structured bias analysis JSON.
 // ---------------------------------------------------------------------------
 router.get('/bias-report', async (req, res) => {
   try {
     if (!req.orgId) return sendError(res, 401, 'AUTH_REQUIRED', 'Unauthorized');
 
-    const { role, from, to } = req.query;
+    const scope = parseBiasScope(req.query, getOrgTimezone(req.orgId));
+    if (scope.error) return sendError(res, scope.error.status, 'INVALID_FILTER', scope.error.message, scope.error.field);
 
     // Fetch org-scoped records with optional filters
     const records = getAuditsByTenant(req.orgId, {
-      role: role || undefined,
-      from: from || undefined,
-      to: to || undefined,
+      role: scope.role || undefined,
+      from: scope.query.from,
+      to: scope.query.to,
     });
 
-    const report = analyzeBias(records, { role: role || null, from: from || null, to: to || null });
+    const report = analyzeBias(records, { role: scope.role, from: scope.day.from, to: scope.day.to });
     res.json(report);
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -364,16 +398,17 @@ router.get('/bias-report/pdf', async (req, res) => {
   try {
     if (!req.orgId) return sendError(res, 401, 'AUTH_REQUIRED', 'Unauthorized');
 
-    const { role, from, to } = req.query;
+    const scope = parseBiasScope(req.query, getOrgTimezone(req.orgId));
+    if (scope.error) return sendError(res, scope.error.status, 'INVALID_FILTER', scope.error.message, scope.error.field);
 
     const records = getAuditsByTenant(req.orgId, {
-      role: role || undefined,
-      from: from || undefined,
-      to: to || undefined,
+      role: scope.role || undefined,
+      from: scope.query.from,
+      to: scope.query.to,
     });
 
     const report = analyzeBias(records, {
-      role: role || null, from: from || null, to: to || null,
+      role: scope.role, from: scope.day.from, to: scope.day.to,
       orgId: req.orgId, // scopes the report fingerprint; never rendered
     });
     // Same entitlement rule and the same resolver as the candidate PDF report:
@@ -435,7 +470,7 @@ function tableRow(cells, header) {
  *   on a dark surface rather than to no mark at all.
  */
 function renderBiasReportHtml(report, branding) {
-  const { scope, reliability, anonymisation, scoreDistribution, decisionConsistency, roleComparison, limitations, generatedAt, scoringEngines } = report;
+  const { scope, reliability, anonymisation, scoreDistribution, decisionConsistency, roleComparison, limitations, generatedAt, scoringEngines, roles } = report;
   const brand = branding || resolveBranding(null, null, { on: 'dark' });
 
   // Provenance: same field set, same normalisation and same ISO 8601 UTC as the
@@ -537,6 +572,16 @@ function renderBiasReportHtml(report, branding) {
     ((scoringEngines && scoringEngines.mixed)
       ? '<div class="caveat"><strong>Before you read these figures</strong>'
         + esc(scoringEngines.caveat) + '</div>'
+      : '') +
+
+    // Mixed-role caveat, at the same weight and for the same reason as the
+    // engine one above: it governs whether the aggregate statistics mean what
+    // they appear to mean. Scoring a candidate against their own role's job
+    // description makes cross-role distributions incomparable by construction,
+    // so this has to be read before the figures, not after them.
+    ((roles && roles.mixed)
+      ? '<div class="caveat"><strong>Before you read these figures</strong>'
+        + esc(roles.caveat) + '</div>'
       : '') +
 
     // Reliability banner

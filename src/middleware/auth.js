@@ -60,8 +60,16 @@ function requireSession(req, res, next) {
   return next();
 }
 
-// Paths (relative to the /api/audit mount) that may authenticate via ?dt=
-const DOWNLOAD_TOKEN_PATHS = [/^\/report\/[^/]+$/, /^\/export\/csv$/];
+// Paths (relative to the /api/audit mount) that may authenticate via ?dt=.
+// Strictly the GETs a browser opens in a new tab or window, which cannot carry
+// an Authorization header. Anchored one path at a time — the JSON bias-report
+// endpoint is deliberately absent, because nothing opens it in a window and a
+// single-use token is a weaker credential than a session.
+const DOWNLOAD_TOKEN_PATHS = [
+  /^\/report\/[^/]+$/,
+  /^\/export\/csv$/,
+  /^\/bias-report\/pdf$/,
+];
 
 function requireSessionOrDownloadToken(req, res, next) {
   const dt = req.query && req.query.dt;
