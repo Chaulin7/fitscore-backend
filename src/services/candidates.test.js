@@ -33,8 +33,15 @@ const {
 } = require('./db');
 
 let seq = 0;
+// insertAudit takes a SERVER-CONSTRUCTED provenance record plus the recruiter's
+// own input; the candidate name and file name are facts about the analysis and
+// so arrive in `bound`, not as loose arguments. Candidate identity, run
+// grouping and org scoping — what this file actually tests — are unchanged.
 const save = (orgId, name, opts = {}) =>
-  insertAudit({ candidateName: name, fileName: (opts.file || name) + '.pdf', role: opts.role || 'Engineer', runNonce: opts.nonce, decision: opts.decision }, orgId, opts.user || 'user-1');
+  insertAudit({
+    bound: { candidateName: name, fileName: (opts.file || name) + '.pdf' },
+    role: opts.role || 'Engineer', runNonce: opts.nonce, decision: opts.decision,
+  }, orgId, opts.user || 'user-1');
 const runOf = (candidateId) => getDb().prepare('SELECT run_id AS r FROM candidates WHERE id = ?').get(candidateId).r;
 const orgOfCandidate = (candidateId) => getDb().prepare('SELECT org_id AS o FROM candidates WHERE id = ?').get(candidateId).o;
 

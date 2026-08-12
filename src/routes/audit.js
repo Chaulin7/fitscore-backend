@@ -100,100 +100,165 @@ const BIND_STATE = Object.freeze({
   NO_ANALYSIS_ID: 'no_analysis_id',
   UNBOUND: 'unbound',       // never issued, or issued and since lost/expired
   SHA_MISMATCH: 'sha_mismatch',
+  STALE_BINDING: 'stale_binding', // issued before field binding shipped
 });
 
-// The scorer's composed identifier from a bound record, or null when unbound.
+// The binding rules in force when a row was written. NULL on every row saved
+// before field binding — those rows carry client-asserted scores, weights and
+// anonymisation, and must stay distinguishable from rows that do not. Never
+// backfilled: a pre-fix row dressed as post-fix is the one outcome worse than
+// an honestly-marked one.
+const BINDING_VERSION = 1;
+
+// The scorer's composed identifier from a bound record.
 // One place does this join, so the column's format cannot drift per call site.
 function scorerIdOf(bound) {
   if (!bound || !bound.scorerEngine || !bound.scorerVersion) return null;
   return `${bound.scorerEngine}@${bound.scorerVersion}`;
 }
 
-function bindAnalysis(orgId, analysisId, echoedExtraction) {
+/**
+ * Resolve an analysisId to the server-held record, or refuse the save.
+ *
+ * FAILS CLOSED. This used to degrade to client-supplied values on a miss and
+ * flag the row `vouched:false` — but the row still landed, and in the audit log
+ * it was visually identical to a vouched one. The record is now the only source
+ * for the row, so a miss has nothing to fall back to and must not write.
+ *
+ * Returns { ok:true, bound, state } or { ok:false, status, code, message, state }.
+ *
+ * `sha_mismatch` is retained in BIND_STATE for historical rows but is no longer
+ * reachable: the client sends no extraction to compare against, because it
+ * sends nothing about the analysis at all.
+ */
+function resolveBinding(orgId, analysisId) {
   if (!analysisId) {
-    // Pre-provenance clients, and any save that never went through /api/analyze.
-    console.info('[provenance] save carried no analysisId — storing client-asserted', { orgId });
-    return { bound: null, state: BIND_STATE.NO_ANALYSIS_ID };
+    return {
+      ok: false, status: 400, code: 'ANALYSIS_ID_REQUIRED', state: BIND_STATE.NO_ANALYSIS_ID,
+      message: 'This result cannot be saved because it is not linked to an analysis. Re-run the analysis and save from the new result.',
+    };
   }
-  const rec = provenance.lookup(orgId, String(analysisId));
-  if (!rec) {
-    // Expected after a restart while the cache is in-memory; should become rare
-    // once it is persisted. Logged at info because today it is normal, not a
-    // fault — but it must be countable, which it previously was not.
-    console.info('[provenance] analysisId not held (unissued, expired, or lost to a restart)'
-      + ' — storing client-asserted', { orgId, analysisId });
-    return { bound: null, state: BIND_STATE.UNBOUND };
+  const info = provenance.inspect(orgId, String(analysisId));
+
+  // Issued before field binding shipped: the payload holds scoring inputs only,
+  // with no scores, verdict or anonymisation flag to write. Deliberately its
+  // OWN code rather than folding into expiry — for the first 30 days after
+  // release this is the likely cause, and a customer hitting it should be told
+  // what happened rather than have it guessed at.
+  if (info.found && !info.expired && info.stale) {
+    return {
+      ok: false, status: 409, code: 'ANALYSIS_PREDATES_BINDING', state: BIND_STATE.STALE_BINDING,
+      message: 'This analysis ran before an update that changed how results are recorded, so it cannot be saved. Re-run the analysis and save from the new result.',
+      ageMs: info.ageMs,
+    };
   }
-  const echoedSha = echoedExtraction && typeof echoedExtraction === 'object' ? echoedExtraction.textSha256 : undefined;
-  if (rec.textSha256 !== echoedSha) {
-    // Distinct from the above on purpose: the server DID issue this id, and the
-    // text it was issued for is not the text being saved against it. That is a
-    // different kind of event and warrants a louder level.
-    console.warn('[provenance] analysisId/textSha256 mismatch — not binding weights', { orgId, analysisId });
-    return { bound: null, state: BIND_STATE.SHA_MISMATCH };
+  if (!info.found || info.expired || !info.record) {
+    return {
+      ok: false, status: 409, code: 'ANALYSIS_EXPIRED', state: BIND_STATE.UNBOUND,
+      message: 'This analysis has expired and can no longer be saved. Re-run it to save the result.',
+      ageMs: info.ageMs,
+    };
   }
-  return { bound: rec, state: BIND_STATE.VOUCHED };
+  return { ok: true, bound: info.record, state: BIND_STATE.VOUCHED, ageMs: info.ageMs };
+}
+
+// Every fail-closed rejection, with its cause and the analyse->save gap.
+//
+// The 30-day TTL is a judgement call made without operational evidence. If real
+// usage clusters near the limit, this is the only place that will say so before
+// somebody loses a batch — and the gap is unreconstructable after the fact,
+// because the rejected row is never written and the binding is swept.
+function logBindingRejection(orgId, analysisId, outcome) {
+  const gapHours = typeof outcome.ageMs === 'number'
+    ? Math.round((outcome.ageMs / 3600000) * 10) / 10
+    : null;
+  console.warn('[provenance] save rejected — not written', {
+    orgId,
+    analysisId: analysisId ? String(analysisId) : null,
+    cause: outcome.state,
+    code: outcome.code,
+    // null when the binding was never found at all, so no analysis time exists
+    // to measure from. Distinct from 0.
+    analyseToSaveGapHours: gapHours,
+    ttlHours: provenance.TTL_MS / 3600000,
+  });
+}
+
+// The ONLY things a save may carry. Two categories, and nothing else:
+//   - the lookup key for the analysis (analysisId)
+//   - the recruiter's own input (decision, note, role) plus an opaque grouping
+//     hint (runNonce) that the server resolves to a server-minted run id
+//
+// `role` sits with decision and note deliberately. The dividing line is
+// "attestation about what the engine did" versus "recruiter classification" —
+// role is how a human filed the screening, not a fact about the analysis, and
+// the server never sees it at analyse time.
+//
+// Everything else about the analysis is read from the provenance record. This
+// is the single enforcement point: the raw payload is destructured HERE and
+// never reaches the write, so there is no per-field validation to forget and no
+// way for a fifteenth field to sneak in behind a reviewer.
+function acceptedInput(body) {
+  const b = body && typeof body === 'object' ? body : {};
+  const str = (v, n) => (v == null ? null : String(v).slice(0, n));
+  return {
+    analysisId: str(b.analysisId, 100),
+    decision: str(b.decision, 40),
+    note: str(b.note, 2000),
+    role: str(b.role, 120),
+    runNonce: str(b.runNonce, 100),
+  };
 }
 
 // POST /api/audit - save an audit record
 router.post('/', async (req, res) => {
   try {
-    const { candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized, appVersion, modelId, analysisTimestamp, analysisDetail, analysisId, runNonce } = req.body;
-    if (!candidateName) return sendError(res, 400, 'VALIDATION_ERROR', 'candidateName is required.', 'candidateName');
-    // Provenance (Art. 12): reviewedBy comes from the authenticated session,
-    // never from the client payload.
-    const reviewedBy = (req.user && req.user.email) || null;
-    // Structured detail (keywords/skills/recommendations) for the branded report.
-    // Keep only the expected shape; cap sizes so a payload can't bloat the row.
-    // Server-held provenance for THIS analysis, bound by (orgId, analysisId)
-    // with a textSha256 defense check. The client echo is only a lookup key.
-    const { bound, state: provenanceState } = bindAnalysis(req.orgId, analysisId, analysisDetail && analysisDetail.extraction);
-    let detail = null;
-    if (analysisDetail && typeof analysisDetail === 'object') {
-      const arr = (v) => Array.isArray(v) ? v.slice(0, 200) : [];
-      detail = {
-        found: arr(analysisDetail.found).map((k) => String(k).slice(0, 80)),
-        missing: arr(analysisDetail.missing).map((k) => String(k).slice(0, 80)),
-        skills: arr(analysisDetail.skills).map((s) => ({ name: String((s && s.name) || '').slice(0, 80), found: !!(s && s.found) })),
-        recommendations: arr(analysisDetail.recommendations).map((r) => ({ icon: String((r && r.icon) || '').slice(0, 12), text: String((r && r.text) || '').slice(0, 500) })),
-        matches: arr(analysisDetail.matches).slice(0, 60).map((m) => ({
-          requirement: String((m && m.requirement) || '').slice(0, 80),
-          matched: !!(m && m.matched),
-          evidence: m && m.evidence != null ? String(m.evidence).slice(0, 300) : null,
-          cvLineRef: null,
-          weight: null,
-        })),
-        extraction: bound,
-      };
+    // From here down `req.body` is not consulted again. Anything the client
+    // sent about scores, weights, verdict, anonymisation, candidate name, file
+    // name, model id or timestamps is discarded unread — not validated, not
+    // sanitised, not defaulted. It has no path to the row.
+    const input = acceptedInput(req.body);
+
+    const binding = resolveBinding(req.orgId, input.analysisId);
+    if (!binding.ok) {
+      logBindingRejection(req.orgId, input.analysisId, binding);
+      // No row is written. A record that cannot be vouched for must not exist
+      // rather than exist and look like one that can.
+      return sendError(res, binding.status, binding.code, binding.message, 'analysisId');
     }
+    const bound = binding.bound;
+
+    // Provenance (Art. 12): reviewedBy comes from the authenticated session.
+    const reviewedBy = (req.user && req.user.email) || null;
+
     const record = insertAudit({
-      candidateName, fileName, overall, scores, weights, verdict, decision, note, jdSnippet, role, anonymized,
-      appVersion: appVersion ? String(appVersion).slice(0, 50) : null,
-      modelId: modelId ? String(modelId).slice(0, 100) : null,
-      analysisTimestamp: analysisTimestamp ? String(analysisTimestamp).slice(0, 40) : null,
+      // Everything the engine did, from the server's own record of doing it.
+      bound,
+      // The recruiter's own input.
+      decision: input.decision,
+      note: input.note,
+      role: input.role,
+      runNonce: input.runNonce,
+      // Session-derived.
       reviewedBy,
-      analysisDetail: detail,
-      // Scoring inputs captured SERVER-SIDE from the bound record — never the
-      // client-supplied `weights` (which could differ from what was scored).
-      // NULL when the server can't vouch for them (unknown/expired sha).
-      weightsJson: bound && bound.scoringWeights ? bound.scoringWeights : null,
       // audit_log.engine_version has always held the SCORER's composed id
       // ("cvsprings-lexical-scorer@1.3.0"), and the CSV column and the change-
-      // history panel both render it as that. The provenance record now keeps
-      // the engine and its version apart, so rejoin them here — the stored
-      // value is unchanged. Never the extractor's version: that is a different
-      // fact, and conflating the two is the bug this replaced.
+      // history panel both render it as that. The provenance record keeps the
+      // engine and its version apart, so rejoin them here. Never the
+      // extractor's version: that is a different fact, and conflating the two
+      // is a bug this already had once.
       engineVersion: scorerIdOf(bound),
-      // Opaque per-screening-pass grouping hint; the run id is server-minted.
-      runNonce: runNonce ? String(runNonce).slice(0, 100) : null,
+      // Per-row binding provenance. Version says which rules were in force;
+      // state says what happened under them. Fail-closed means VOUCHED is the
+      // only state a written row can currently carry — the column exists so a
+      // future partial binding can say otherwise without a migration.
+      bindingVersion: BINDING_VERSION,
+      bindingState: binding.state,
     }, req.orgId, req.userId || null);
-    // Tell the client whether this save was vouched. Additive: the record is
-    // returned exactly as before, with provenance alongside it. Without this a
-    // recruiter had no way to know a save stored their own numbers back at them
-    // rather than the server's.
+
     res.status(201).json({
       ...record,
-      provenance: { vouched: provenanceState === BIND_STATE.VOUCHED, state: provenanceState },
+      provenance: { vouched: true, state: binding.state, bindingVersion: BINDING_VERSION },
     });
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);

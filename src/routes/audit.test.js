@@ -248,195 +248,244 @@ describe('GET /api/audit — org-timezone day boundaries', () => {
   });
 });
 
-describe('POST /api/audit — server-authoritative scoring inputs (analysisId-bound)', () => {
-  // Bind server-side provenance for a specific analysis, as /api/analyze would:
-  // keyed by analysisId, carrying the extraction textSha256 + the exact weights.
-  function rememberAnalysis(orgId, analysisId, textSha256, weights) {
-    // Engine and version are stored SPLIT now; audit_log.engine_version rejoins
-    // them, so the assertions below still expect the composed id unchanged.
+describe('POST /api/audit — the row is built from the binding, not the payload', () => {
+  // REPLACES two blocks that asserted the previous contract, in which an
+  // unbindable save still wrote a row carrying the client's own numbers and
+  // flagged it `vouched:false`. The row landed either way and looked identical
+  // in the audit log to one the server could stand behind. It now fails closed:
+  // no binding, no row.
+  //
+  // The payload no longer has a path to the write at all — POST /api/audit
+  // accepts analysisId, decision, note, role and runNonce and drops the rest
+  // unread — so these assert that injected values have NO effect, rather than
+  // that each one is individually sanitised.
+
+  // A complete server record, as routes/analyze.provenanceRecord() builds one.
+  function rememberAnalysis(orgId, analysisId, over = {}) {
     provenance.remember(orgId, {
-      analysisId, textSha256, scoringWeights: weights,
+      analysisId,
+      bindingVersion: provenance.PAYLOAD_VERSION,
+      extractorEngine: 'pdfjs', extractorVersion: '4.2.67', assemblerVersion: '1.0.0',
+      textSha256: 'sha-' + analysisId, pageCount: 2, charCount: 4096,
       scorerEngine: 'cvsprings-lexical-scorer', scorerVersion: 'test',
+      scoringWeights: { kw: 40, sk: 30, ex: 20, ed: 10 },
+      overall: 72,
+      scores: { keywords: 70, skills: 80, experience: 65, education: 75 },
+      verdict: 'Good Match',
+      analysisDetail: { found: ['a'], missing: [], skills: [], matches: [], recommendations: [{ icon: 'i', text: 'do the thing' }] },
+      anonymized: false,
+      candidateName: 'Bound Bella', fileName: 'bella.pdf',
+      jdSnippet: 'a job description',
+      modelId: 'cvsprings-lexical-scorer@test',
+      analysisTimestamp: '2026-08-12T09:00:00.000Z',
+      appVersion: '1.3.0',
+      ...over,
     });
   }
-  const saveBody = (analysisId, textSha256, clientWeights) => ({
-    candidateName: 'Weighted Wendy', fileName: 'w.pdf', overall: 70,
-    scores: { keywords: 1, skills: 2, experience: 3, education: 4 },
-    weights: clientWeights, // CLIENT weights — must be ignored for weights_json
-    analysisId,
-    analysisDetail: { extraction: { textSha256 } },
-  });
 
-  test('records the SERVER weights, not the client-supplied ones', async () => {
-    const server = { kw: 40, sk: 30, ex: 20, ed: 10 };
-    rememberAnalysis(ORG_A, 'an-server', 'sha-server', server);
-    const { status, body } = await post(saveBody('an-server', 'sha-server', { kw: 90, sk: 10, ex: 0, ed: 0 }), ORG_A);
+  // Everything a hostile or merely stale client might send. None of it may
+  // reach the row.
+  const INJECTED = {
+    candidateName: 'Injected Ivan', fileName: 'injected.pdf',
+    overall: 99, scores: { keywords: 99, skills: 99, experience: 99, education: 99 },
+    weights: { kw: 90, sk: 10, ex: 0, ed: 0 },
+    verdict: 'Excellent Match', anonymized: true,
+    jdSnippet: 'injected jd', appVersion: '9.9.9',
+    modelId: 'evil-scorer@1.0.0', analysisTimestamp: '1999-01-01T00:00:00.000Z',
+    analysisDetail: { found: ['injected'], recommendations: [{ icon: 'x', text: 'injected' }] },
+    engineVersion: 'evil@1', bindingVersion: 99, bindingState: 'vouched',
+    reviewedBy: 'attacker@example.com', userId: 'someone-else', orgId: 'org-b',
+  };
+
+  test('injected weight values have no effect on the recorded weights', async () => {
+    rememberAnalysis(ORG_A, 'an-inject');
+    const { status, body } = await post({ analysisId: 'an-inject', ...INJECTED }, ORG_A);
     assert.equal(status, 201);
-    assert.deepEqual(body.weightsJson, server, 'weights_json must be what the engine actually used');
+    assert.deepEqual(body.weightsJson, { kw: 40, sk: 30, ex: 20, ed: 10 });
+  });
+
+  test('no injected field reaches the row — one assertion per field', async () => {
+    rememberAnalysis(ORG_A, 'an-inject-all');
+    const { body } = await post({ analysisId: 'an-inject-all', ...INJECTED }, ORG_A);
+    assert.equal(body.candidateName, 'Bound Bella');
+    assert.equal(body.fileName, 'bella.pdf');
+    assert.equal(body.overall, 72);
+    assert.deepEqual(body.scores, { keywords: 70, skills: 80, experience: 65, education: 75 });
+    assert.equal(body.verdict, 'Good Match');
+    assert.equal(body.anonymized, false);
+    assert.equal(body.jdSnippet, 'a job description');
+    assert.equal(body.appVersion, '1.3.0');
+    assert.equal(body.modelId, 'cvsprings-lexical-scorer@test');
+    assert.equal(body.analysisTimestamp, '2026-08-12T09:00:00.000Z');
     assert.equal(body.engineVersion, 'cvsprings-lexical-scorer@test');
+    assert.equal(body.bindingVersion, 1, 'the client cannot set its own binding version');
   });
 
-  test('Q1: same CV under W1 then W2 — saving the W1 result records W1 (no last-writer clobber)', async () => {
-    const SHA = 'sha-same-cv';
-    const W1 = { kw: 70, sk: 10, ex: 10, ed: 10 };
-    const W2 = { kw: 10, sk: 10, ex: 10, ed: 70 };
-    // Tab A analysed the CV under W1; Tab B analysed the SAME CV under W2. Same
-    // textSha256, but distinct analysisIds.
-    rememberAnalysis(ORG_A, 'an-W1', SHA, W1);
-    rememberAnalysis(ORG_A, 'an-W2', SHA, W2);
-    // Save the W1 result (from Tab A): scores were computed under W1.
-    const saved = await post(saveBody('an-W1', SHA, /*client echo of*/ W1), ORG_A);
-    assert.deepEqual(saved.body.weightsJson, W1, 'the row must record W1, the weights its score was computed under');
-    // And the W2 analysis still resolves independently to W2.
-    const savedB = await post(saveBody('an-W2', SHA, W2), ORG_A);
-    assert.deepEqual(savedB.body.weightsJson, W2);
+  test('the recruiter fields ARE taken from the payload — they are the only ones', async () => {
+    rememberAnalysis(ORG_A, 'an-human');
+    const { body } = await post({
+      analysisId: 'an-human', decision: 'shortlist', note: 'strong on Go', role: 'Backend Engineer',
+    }, ORG_A);
+    assert.equal(body.decision, 'shortlist');
+    assert.equal(body.note, 'strong on Go');
+    assert.equal(body.role, 'Backend Engineer');
   });
 
-  test('batch: 25 candidates in one run each bind their own analysisId + weights', async () => {
-    const SHA = 'sha-batch';
-    const saves = [];
-    for (let i = 0; i < 25; i++) {
-      const w = { kw: i, sk: 25 - i, ex: 0, ed: 75 };
-      rememberAnalysis(ORG_A, `an-batch-${i}`, SHA + '-' + i, w);
-      saves.push(post(saveBody(`an-batch-${i}`, SHA + '-' + i, { kw: 1, sk: 1, ex: 1, ed: 97 }), ORG_A));
+  test('recorded weights match engine-applied weights across configurations', async () => {
+    const configs = [
+      { kw: 40, sk: 30, ex: 20, ed: 10 },
+      { kw: 25, sk: 25, ex: 25, ed: 25 },
+      { kw: 70, sk: 10, ex: 10, ed: 10 },
+      { kw: 0, sk: 0, ex: 0, ed: 100 },
+    ];
+    for (const [i, w] of configs.entries()) {
+      const id = 'an-cfg-' + i;
+      rememberAnalysis(ORG_A, id, { scoringWeights: w });
+      // Every save claims a different, wrong weight set.
+      const { body } = await post({ analysisId: id, weights: { kw: 1, sk: 2, ex: 3, ed: 94 } }, ORG_A);
+      assert.deepEqual(body.weightsJson, w, 'config ' + i);
     }
-    const results = await Promise.all(saves);
-    const ids = new Set();
-    for (let i = 0; i < 25; i++) {
-      assert.deepEqual(results[i].body.weightsJson, { kw: i, sk: 25 - i, ex: 0, ed: 75 }, `candidate ${i} weights`);
-      ids.add(results[i].body.id);
-    }
-    assert.equal(ids.size, 25, 'all 25 are distinct rows');
   });
 
-  test('textSha256 mismatch against a valid analysisId records NULL (defense check), not the bound weights', async () => {
-    rememberAnalysis(ORG_A, 'an-mismatch', 'sha-real', { kw: 40, sk: 30, ex: 20, ed: 10 });
-    const warnings = [];
-    const origWarn = console.warn;
-    console.warn = (...a) => warnings.push(a.join(' '));
-    try {
-      // Valid analysisId, but the echoed extraction sha does NOT match.
-      const { body } = await post(saveBody('an-mismatch', 'sha-TAMPERED', { kw: 1, sk: 1, ex: 1, ed: 97 }), ORG_A);
-      assert.equal(body.weightsJson, null, 'must not record the bound weights on a sha mismatch');
-      assert.equal(body.engineVersion, null);
-    } finally { console.warn = origWarn; }
-    assert.ok(warnings.some((w) => /mismatch/i.test(w)), 'a mismatch is logged server-side');
+  test('a slider moved between analyse and save cannot change the record', async () => {
+    // The drift case, and the reason this is structural rather than validated:
+    // the client used to read the sliders at SAVE time, so moving one after
+    // analysing rewrote the recorded weights against an unchanged score. No
+    // attacker required.
+    const applied = { kw: 40, sk: 30, ex: 20, ed: 10 };
+    rememberAnalysis(ORG_A, 'an-drift', { scoringWeights: applied });
+    const movedSliders = { kw: 10, sk: 10, ex: 10, ed: 70 };
+    const { body } = await post({ analysisId: 'an-drift', weights: movedSliders }, ORG_A);
+    assert.deepEqual(body.weightsJson, applied);
+    assert.notDeepEqual(body.weightsJson, movedSliders);
   });
 
-  test('a missing/unknown analysisId records NULL (never the client echo)', async () => {
-    const { body } = await post(saveBody('an-never-issued', 'sha-x', { kw: 100, sk: 0, ex: 0, ed: 0 }), ORG_A);
-    assert.equal(body.weightsJson, null);
-    assert.equal(body.engineVersion, null);
+  test('anonymized comes from the server, not any client assertion', async () => {
+    // The bias report's primary grouping dimension.
+    rememberAnalysis(ORG_A, 'an-anon-true', { anonymized: true });
+    const a = await post({ analysisId: 'an-anon-true', anonymized: false }, ORG_A);
+    assert.equal(a.body.anonymized, true);
+
+    rememberAnalysis(ORG_A, 'an-anon-false', { anonymized: false });
+    const b = await post({ analysisId: 'an-anon-false', anonymized: true }, ORG_A);
+    assert.equal(b.body.anonymized, false);
+  });
+
+  test('scores come from the engine, and a claimed overall cannot move them', async () => {
+    rememberAnalysis(ORG_A, 'an-scores', {
+      overall: 41, scores: { keywords: 40, skills: 42, experience: 39, education: 44 },
+    });
+    const { body } = await post({ analysisId: 'an-scores', overall: 100, scores: { keywords: 100, skills: 100, experience: 100, education: 100 } }, ORG_A);
+    assert.equal(body.overall, 41);
+    assert.deepEqual(body.scores, { keywords: 40, skills: 42, experience: 39, education: 44 });
+  });
+
+  test('verdict is the engine band, not concatenated recommendation prose', async () => {
+    rememberAnalysis(ORG_A, 'an-verdict', { verdict: 'Partial Match' });
+    const { body } = await post({ analysisId: 'an-verdict', verdict: 'do the thing and the other thing' }, ORG_A);
+    assert.equal(body.verdict, 'Partial Match');
+    // The prose still has a home; it simply is not the verdict.
+    assert.ok(body.analysisDetail.recommendations.some((r) => /do the thing/.test(r.text)));
+  });
+
+  test('the legacy client weights column is no longer written', async () => {
+    rememberAnalysis(ORG_A, 'an-legacy');
+    const { body } = await post({ analysisId: 'an-legacy', weights: { kw: 90, sk: 10, ex: 0, ed: 0 } }, ORG_A);
+    assert.equal(body.weights, null, 'the retained legacy column must stay NULL on new rows');
+    const raw = getDb().prepare('SELECT weights FROM audit_log WHERE id = ?').get(body.id);
+    assert.equal(raw.weights, null);
   });
 
   test('weights_json is immutable — a later edit to the row does not change it', async () => {
-    rememberAnalysis(ORG_A, 'an-immutable', 'sha-immutable', { kw: 55, sk: 15, ex: 15, ed: 15 });
-    const created = await post(saveBody('an-immutable', 'sha-immutable', { kw: 0, sk: 0, ex: 0, ed: 100 }), ORG_A);
-    const id = created.body.id;
-    await fetch(`${baseUrl}/api/audit/${id}`, {
-      method: 'PATCH', headers: { 'x-test-org': ORG_A, 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'shortlist' }),
+    rememberAnalysis(ORG_A, 'an-immutable');
+    const { body } = await post({ analysisId: 'an-immutable' }, ORG_A);
+    await fetch(`${baseUrl}/api/audit/${body.id}`, {
+      method: 'PATCH', headers: { 'x-test-org': ORG_A, 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'reject', note: 'changed my mind' }),
     });
-    const after = await get(`?candidateId=${created.body.candidateId}`, ORG_A);
-    const row = after.body.rows.find((r) => r.id === id);
-    assert.deepEqual(row.weightsJson, { kw: 55, sk: 15, ex: 15, ed: 15 }, 'weights snapshot unchanged by a later edit');
-    assert.equal(row.decision, 'shortlist');
+    const after = getDb().prepare('SELECT weights_json AS w FROM audit_log WHERE id = ?').get(body.id);
+    assert.deepEqual(JSON.parse(after.w), { kw: 40, sk: 30, ex: 20, ed: 10 });
   });
 });
 
-describe('POST /api/audit — binding failure is visible', () => {
-  // Every failure path used to return a bare null and an ordinary 201. Only the
-  // sha mismatch logged anything, so the COMMON failure — a save after the
-  // in-memory cache was lost to a restart — was invisible in production and
-  // indistinguishable, to the client, from a fully vouched save.
-  function rememberAnalysis(orgId, analysisId, textSha256, weights) {
-    // Engine and version are stored SPLIT now; audit_log.engine_version rejoins
-    // them, so the assertions below still expect the composed id unchanged.
-    provenance.remember(orgId, {
-      analysisId, textSha256, scoringWeights: weights,
-      scorerEngine: 'cvsprings-lexical-scorer', scorerVersion: 'test',
+describe('POST /api/audit — fails closed', () => {
+  async function captureWarn(fn) {
+    const warn = []; const ow = console.warn;
+    console.warn = (...a) => warn.push(a.map((x) => (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(' '));
+    try { return { result: await fn(), warn }; } finally { console.warn = ow; }
+  }
+  const rowCount = (orgId) => getDb().prepare('SELECT COUNT(*) AS c FROM audit_log WHERE org_id = ?').get(orgId).c;
+
+  test('an unknown analysisId is rejected and writes NO row', async () => {
+    const before = rowCount(ORG_A);
+    const { status, body } = await post({ analysisId: 'never-issued', decision: 'shortlist' }, ORG_A);
+    assert.equal(status, 409);
+    assert.equal(body.code, 'ANALYSIS_EXPIRED');
+    assert.equal(rowCount(ORG_A), before, 'a row that cannot be vouched for must not exist');
+  });
+
+  test('a missing analysisId is rejected with its own code', async () => {
+    const before = rowCount(ORG_A);
+    const { status, body } = await post({ decision: 'shortlist' }, ORG_A);
+    assert.equal(status, 400);
+    assert.equal(body.code, 'ANALYSIS_ID_REQUIRED');
+    assert.equal(rowCount(ORG_A), before);
+  });
+
+  test('an expired binding is rejected', async () => {
+    provenance.remember(ORG_A, {
+      analysisId: 'an-expired', bindingVersion: provenance.PAYLOAD_VERSION,
+      scorerEngine: 'e', scorerVersion: 'v', scoringWeights: { kw: 40, sk: 30, ex: 20, ed: 10 },
+      overall: 50, scores: { keywords: 1, skills: 2, experience: 3, education: 4 },
+      verdict: 'Partial Match', anonymized: false, candidateName: 'X', fileName: 'x.pdf',
     });
-  }
-  const saveBody = (analysisId, textSha256) => ({
-    candidateName: 'Provenance Pat', fileName: 'p.pdf', overall: 70,
-    scores: { keywords: 1, skills: 2, experience: 3, education: 4 },
-    weights: { kw: 25, sk: 25, ex: 25, ed: 25 },
-    ...(analysisId === undefined ? {} : { analysisId }),
-    analysisDetail: { extraction: { textSha256 } },
+    getDb().prepare('UPDATE analysis_provenance SET expires_at = ? WHERE analysis_id = ?')
+      .run(Date.now() - 1000, 'an-expired');
+    const { status, body } = await post({ analysisId: 'an-expired' }, ORG_A);
+    assert.equal(status, 409);
+    assert.equal(body.code, 'ANALYSIS_EXPIRED');
+    assert.match(body.error, /re-run/i, 'the message must tell the user what to do');
   });
 
-  // Capture console.info AND console.warn so a path's level is asserted, not
-  // just that something was written somewhere.
-  async function captureLogs(fn) {
-    const info = []; const warn = [];
-    const oi = console.info; const ow = console.warn;
-    console.info = (...a) => info.push(a.map(String).join(' '));
-    console.warn = (...a) => warn.push(a.map(String).join(' '));
-    try { return { result: await fn(), info, warn }; }
-    finally { console.info = oi; console.warn = ow; }
-  }
-
-  test('a vouched save reports vouched:true and logs nothing', async () => {
-    rememberAnalysis(ORG_A, 'an-vis-ok', 'sha-vis-ok', { kw: 40, sk: 30, ex: 20, ed: 10 });
-    const { result, info, warn } = await captureLogs(() => post(saveBody('an-vis-ok', 'sha-vis-ok'), ORG_A));
-    assert.equal(result.status, 201);
-    assert.equal(result.body.provenance.vouched, true);
-    assert.equal(result.body.provenance.state, 'vouched');
-    assert.equal(info.length + warn.length, 0, 'a normal save should be quiet');
+  test('a pre-binding payload is DISTINGUISHABLE from ordinary expiry', async () => {
+    // The deploy window: cached before this shipped, still live, but holding
+    // scoring inputs only. A customer hitting this in the first 30 days should
+    // be told what happened rather than have it guessed at.
+    getDb().prepare(
+      'INSERT INTO analysis_provenance (org_id, analysis_id, payload, created_at, expires_at) VALUES (?,?,?,?,?)',
+    ).run(ORG_A, 'an-old-shape', JSON.stringify({
+      analysisId: 'an-old-shape', scorerEngine: 'e', scorerVersion: 'v',
+      scoringWeights: { kw: 40, sk: 30, ex: 20, ed: 10 },
+    }), Date.now(), Date.now() + 3600000);
+    const { status, body } = await post({ analysisId: 'an-old-shape' }, ORG_A);
+    assert.equal(status, 409);
+    assert.equal(body.code, 'ANALYSIS_PREDATES_BINDING');
+    assert.notEqual(body.code, 'ANALYSIS_EXPIRED');
   });
 
-  test('no analysisId: vouched:false, state no_analysis_id, logged at info', async () => {
-    const { result, info, warn } = await captureLogs(() => post(saveBody(undefined, 'sha-none'), ORG_A));
-    assert.equal(result.status, 201, 'the save still succeeds');
-    assert.equal(result.body.provenance.vouched, false);
-    assert.equal(result.body.provenance.state, 'no_analysis_id');
-    assert.ok(info.some((l) => /no analysisId/i.test(l)), 'must be logged');
-    assert.equal(warn.length, 0, 'not a warning — plenty of saves legitimately have none');
+  test('every rejection logs its cause and the analyse->save gap in hours', async () => {
+    provenance.remember(ORG_A, {
+      analysisId: 'an-gap', bindingVersion: provenance.PAYLOAD_VERSION,
+      scorerEngine: 'e', scorerVersion: 'v', scoringWeights: { kw: 40, sk: 30, ex: 20, ed: 10 },
+      overall: 50, scores: { keywords: 1, skills: 2, experience: 3, education: 4 },
+      verdict: 'Partial Match', anonymized: false, candidateName: 'X', fileName: 'x.pdf',
+    });
+    // Age it 100 hours and expire it.
+    const hundredHoursAgo = Date.now() - 100 * 3600000;
+    getDb().prepare('UPDATE analysis_provenance SET created_at = ?, expires_at = ? WHERE analysis_id = ?')
+      .run(hundredHoursAgo, Date.now() - 1000, 'an-gap');
+    const { warn } = await captureWarn(() => post({ analysisId: 'an-gap' }, ORG_A));
+    const line = warn.find((l) => /save rejected/.test(l));
+    assert.ok(line, 'a rejection must be logged');
+    assert.match(line, /analyseToSaveGapHours/);
+    assert.match(line, /"cause":"unbound"/);
+    assert.match(line, /100/, 'the gap must be reported in hours, for tuning the TTL');
   });
 
-  test('unknown/expired analysisId: vouched:false, state unbound, logged at info', async () => {
-    const { result, info, warn } = await captureLogs(() => post(saveBody('an-vis-never-issued', 'sha-x'), ORG_A));
-    assert.equal(result.status, 201);
-    assert.equal(result.body.provenance.vouched, false);
-    assert.equal(result.body.provenance.state, 'unbound');
-    assert.ok(info.some((l) => /not held/i.test(l)), 'the common failure must now be countable');
-    assert.equal(warn.length, 0);
-  });
-
-  test('sha mismatch: vouched:false, state sha_mismatch, logged at WARN not info', async () => {
-    rememberAnalysis(ORG_A, 'an-vis-mismatch', 'sha-real', { kw: 40, sk: 30, ex: 20, ed: 10 });
-    const { result, info, warn } = await captureLogs(() => post(saveBody('an-vis-mismatch', 'sha-TAMPERED'), ORG_A));
-    assert.equal(result.body.provenance.vouched, false);
-    assert.equal(result.body.provenance.state, 'sha_mismatch');
-    assert.ok(warn.some((l) => /mismatch/i.test(l)), 'a mismatch is a louder event than a miss');
-    assert.ok(!info.some((l) => /not held/i.test(l)), 'must not be reported as a plain miss');
-  });
-
-  test('the three failure states are distinguishable from one another', async () => {
-    rememberAnalysis(ORG_A, 'an-vis-d', 'sha-d', { kw: 1, sk: 1, ex: 1, ed: 97 });
-    const states = await Promise.all([
-      post(saveBody(undefined, 's'), ORG_A),
-      post(saveBody('an-vis-not-issued-2', 's'), ORG_A),
-      post(saveBody('an-vis-d', 'sha-WRONG'), ORG_A),
-      post(saveBody('an-vis-d', 'sha-d'), ORG_A),
-    ]).then((rs) => rs.map((r) => r.body.provenance.state));
-    assert.deepEqual(states, ['no_analysis_id', 'unbound', 'sha_mismatch', 'vouched']);
-    assert.equal(new Set(states).size, 4, 'each path must be separately identifiable');
-  });
-
-  test('the record itself is still returned unchanged alongside provenance', async () => {
-    rememberAnalysis(ORG_A, 'an-vis-shape', 'sha-shape', { kw: 40, sk: 30, ex: 20, ed: 10 });
-    const { body } = await post(saveBody('an-vis-shape', 'sha-shape'), ORG_A);
-    // Additive: the pre-existing fields are exactly where callers expect them.
-    assert.equal(body.candidateName, 'Provenance Pat');
-    assert.deepEqual(body.weightsJson, { kw: 40, sk: 30, ex: 20, ed: 10 });
-    assert.equal(body.engineVersion, 'cvsprings-lexical-scorer@test');
-    assert.ok(body.id);
-  });
-
-  test('an unvouched save still writes the row — it is flagged, not rejected', async () => {
-    const { body } = await post(saveBody('an-vis-still-writes', 'sha-y'), ORG_A);
-    assert.ok(body.id, 'the recruiter does not lose their work');
-    assert.equal(body.weightsJson, null, 'but nothing unvouched is recorded as vouched');
-    assert.equal(body.engineVersion, null);
+  test('a rejection with no binding at all reports a null gap, not zero', async () => {
+    const { warn } = await captureWarn(() => post({ analysisId: 'nothing-here' }, ORG_A));
+    const line = warn.find((l) => /save rejected/.test(l));
+    assert.match(line, /"analyseToSaveGapHours":null/);
   });
 });
+
