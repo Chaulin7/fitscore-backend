@@ -451,9 +451,9 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .footer-bottom{max-width:900px;margin:20px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.4)}
 @media(max-width:600px){.how-banner{flex-direction:column}.how-step:not(:last-child)::after{display:none}.footer-inner{grid-template-columns:1fr}}
 
-/* Settings panel */
-.settings-btn{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:6px 10px;cursor:pointer;color:rgba(255,255,255,0.8);font-size:18px;line-height:1;transition:all .18s;position:relative}
-.settings-btn:hover{background:rgba(255,255,255,0.2);color:#fff}
+/* Settings panel. The .settings-btn gear that used to open it from the bar is
+   gone — Settings is an item in the account dropdown now — so its rules went
+   with it. The panel itself is unchanged; only its trigger moved. */
 .settings-panel{display:none;position:fixed;top:54px;right:16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:9999;min-width:340px;max-height:calc(100vh - 70px);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .settings-panel.open{display:block}
 .settings-panel h3{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin:0 0 10px}
@@ -521,18 +521,11 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .modal-close{background:none;border:none;font-size:22px;color:#6b7280;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}
 .modal-close:hover{background:#f3f4f6;color:#0a1f3d}
 .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
-/* Feature-request nav button. Between 641px (drawer kicks in) and ~900px the
-   nav is still horizontal, and a 22-character label pushes the plan/account
-   chips off the bar — so swap to a short label in that band only. */
-.nav-btn-fr{white-space:nowrap}
-.nav-btn-fr .fr-short{display:none}
-/* The full label only fits alongside the status pill, plan chip and account
-   chip on wide screens; below that the whole topbar-nav wraps to two rows. The
-   drawer (≤640px) has room again, so the short label is for the middle band. */
-@media(max-width:1320px) and (min-width:641px){
-  .nav-btn-fr .fr-long{display:none}
-  .nav-btn-fr .fr-short{display:inline}
-}
+/* The .nav-btn-fr label-swap rules lived here: between 641px and ~1320px the
+   full "Suggest an improvement" label pushed the plan and account chips off the
+   bar, so the label shortened in that band. That was a symptom of too many
+   items in one non-wrapping row — the entry now lives in the account dropdown,
+   which has room for the full label at every width, so the workaround is gone. */
 .fr-field{margin-bottom:14px}
 .fr-field label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px}
 .fr-field .text-input{width:100%}
@@ -721,13 +714,33 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .logo-actions label.btn{margin:0}
 .logo-hint{font-size:10.5px;color:#6b7280}
 
-/* ── Topbar account chip ── */
-.account-chip{display:none;align-items:center;gap:8px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.12);
-  border-radius:20px;padding:4px 6px 4px 13px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.85);max-width:230px}
-.account-chip .acct-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
-.account-chip button{background:rgba(255,255,255,0.12);border:none;border-radius:14px;color:#fff;font:600 11px 'Inter',sans-serif;padding:4px 10px;cursor:pointer;transition:background .15s}
-.account-chip button:hover{background:rgba(255,255,255,0.25)}
-@media(max-width:640px){.account-chip .acct-email{display:none}.account-chip{padding-left:6px}}
+/* ── Topbar account menu (avatar trigger + dropdown) ──
+   Replaces the old email-address chip. The avatar is fixed-width, so the bar's
+   right-hand group no longer grows with the length of the signed-in address. */
+.account-menu{display:none;position:relative;flex-shrink:0}
+.account-menu.authed{display:block}
+.account-avatar{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.12);color:#fff;font:700 14px 'Inter',sans-serif;line-height:1;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  transition:background .15s,border-color .15s}
+.account-avatar:hover{background:rgba(255,255,255,0.22)}
+.account-avatar:focus-visible{outline:2px solid #7dd3fc;outline-offset:2px}
+.account-avatar[aria-expanded="true"]{background:rgba(255,255,255,0.24);border-color:rgba(255,255,255,0.35)}
+.account-dropdown{position:absolute;top:calc(100% + 8px);right:0;min-width:248px;z-index:300;
+  background:#0f2847;border:1px solid rgba(255,255,255,0.14);border-radius:10px;padding:6px;
+  box-shadow:0 12px 28px rgba(0,0,0,0.45)}
+.account-dropdown[hidden]{display:none}
+.acct-dd-head{padding:8px 10px 10px}
+.acct-dd-email{font-size:12.5px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-dd-status{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.acct-dd-sep{height:1px;background:rgba(255,255,255,0.12);margin:4px 0}
+.acct-dd-item{display:block;width:100%;box-sizing:border-box;text-align:left;background:none;border:none;
+  color:rgba(255,255,255,0.85);font:500 13px 'Inter',sans-serif;padding:9px 10px;border-radius:6px;
+  cursor:pointer;text-decoration:none;transition:background .15s,color .15s}
+.acct-dd-item:hover{background:rgba(255,255,255,0.12);color:#fff}
+.acct-dd-item:focus-visible{outline:2px solid #7dd3fc;outline-offset:-2px}
+.acct-dd-danger{color:#fca5a5}
+.acct-dd-danger:hover{background:rgba(239,68,68,0.18);color:#fecaca}
 
 /* ── Topbar plan/usage chip ── */
 .plan-chip{display:none;align-items:center;gap:6px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.12);
@@ -738,6 +751,12 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .plan-chip.clickable{cursor:pointer}
 .plan-chip.clickable:hover{background:rgba(255,255,255,0.16)}
 @media(max-width:640px){.plan-chip{padding:4px 9px}}
+/* Both chips now live in the account dropdown rather than the bar. Same colour
+   semantics — green dot for connected, amber for a plan warning — at the
+   smaller scale a status row wants. The margin the status pill carried for the
+   bar is dropped; the dropdown's flex gap spaces them. */
+.acct-dd-status .plan-chip,
+.acct-dd-status .nav-status-pill{margin:0;font-size:11px;padding:3px 9px}
 /* Plan & Billing settings buttons */
 .plan-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .plan-status-line{font-size:12px;color:#374151;margin-top:4px}
@@ -876,13 +895,21 @@ img, video, table { max-width: 100%; }
 .welcome-banner-btn:hover{background:#1d3a72}
 .welcome-banner-btn:active{background:#0b1e3d}
 @media(max-width:760px){.welcome-banner-form{flex-basis:100%}.welcome-banner-text{flex-basis:100%}}
-    /* === Mobile top-bar fix (added) === */
+    /* === Mobile top-bar === */
     .mobile-menu-button{display:none;background:none;border:none;color:rgba(255,255,255,0.85);font-size:22px;line-height:1;padding:6px 10px;border-radius:6px;cursor:pointer;align-items:center;justify-content:center}
-    @media (max-width: 640px){
+    /* 900px, not 640px. The three primary links plus the brand and the account
+       avatar stop fitting comfortably well above phone widths, and the old
+       640px threshold is what let the row overflow across the tablet range.
+       The avatar and its dropdown stay visible at every width — only the
+       primary links collapse. */
+    @media (max-width: 900px){
       .topbar-nav{display:none}
       .mobile-menu-button{display:flex}
-      .topbar-nav.mobile-open{display:flex;flex-direction:column;position:absolute;top:54px;left:0;right:0;background:#0f2847;padding:8px;gap:4px;z-index:200;box-shadow:0 8px 20px rgba(0,0,0,0.35)}
+      .topbar-nav.mobile-open{display:flex;flex-direction:column;position:absolute;top:100%;left:0;right:0;background:#0f2847;padding:8px;gap:4px;z-index:200;box-shadow:0 8px 20px rgba(0,0,0,0.35)}
       .topbar-nav.mobile-open .nav-btn{font-size:14px;padding:10px 12px;text-align:left}
+      /* The underline marker is centred on the label, which reads as stray on a
+         left-aligned full-width drawer row. */
+      .topbar-nav.mobile-open .nav-btn.active::after{display:none}
     }
 </style>
 <!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
@@ -1001,29 +1028,48 @@ img, video, table { max-width: 100%; }
     <span class="brandmark" aria-hidden="true"></span>
     <span class="brand-name">CV<em>springs</em></span>
   </a>
-  <button class="mobile-menu-button" type="button" aria-label="Open menu" aria-expanded="false" data-action="toggleMobileNav">☰</button>
-  <nav class="topbar-nav">
+  <button class="mobile-menu-button" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="topbarNav" data-action="toggleMobileNav">☰</button>
+  <!-- Only the three primary destinations live in the bar. Everything else moved
+       into the account menu: a single non-wrapping row could not hold six items
+       plus the chips, and the settings icon was the one pushed off-screen. -->
+  <nav class="topbar-nav" id="topbarNav">
     <button class="nav-btn active" data-action="switchTab" data-tab="analyzer">Analyzer</button>
     <button class="nav-btn" data-action="switchTab" data-tab="audit">Audit Log</button>
     <button class="nav-btn" data-action="switchTab" data-tab="history">Role History</button>
-    <!-- Named for what the page is. It is the static methodology explainer, not
-         a report — the document a recruiter generates for their own data lives
-         in the Audit tab, and the two must never be mistaken for each other. -->
-    <a class="nav-btn" href="/bias-report.html" style="text-decoration:none;display:inline-block">How bias monitoring works</a>
-    <!-- Inside .topbar-nav deliberately: the ≤640px rules collapse only this
-         element into the mobile drawer, so the button needs no extra CSS to
-         behave on small screens. Carries no data-tab, so switchTab never sees it. -->
-    <button class="nav-btn nav-btn-fr" id="featureRequestNavBtn" type="button" data-action="openFeatureRequest" title="Suggest an improvement">
-      <span class="fr-long">Suggest an improvement</span><span class="fr-short">Suggest</span>
-    </button>
   </nav>
-  <span class="nav-status-pill" id="navStatusPill" title="Backend status"><span class="dot" id="navStatusDot"></span><span id="navStatusLabel">Not connected</span></span>
   <button type="button" class="nav-search-btn" id="navSearchBtn" data-action="focusAuditSearch" title="Search audit log" aria-label="Search audit log">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
   </button>
-  <span class="plan-chip" id="planChip" title="Your plan"><span class="plan-dot"></span><span id="planChipLabel"></span></span>
-  <span class="account-chip" id="accountChip"><span class="acct-email" id="accountEmail"></span><button type="button" id="logoutBtn" data-action="doLogout">Logout</button></span>
-  <button class="settings-btn" data-action="toggleSettings" title="Settings" aria-label="Open settings">&#9881;</button>
+  <!-- Account menu. The trigger is an avatar rather than the email address: the
+       email was the widest variable-width element in the bar, so it drove the
+       overflow it now sits inside. -->
+  <div class="account-menu" id="accountMenu">
+    <button type="button" class="account-avatar" id="accountAvatarBtn" data-action="toggleAccountMenu"
+            aria-haspopup="menu" aria-expanded="false" aria-controls="accountDropdown" aria-label="Account menu">
+      <span id="accountAvatarLetter" aria-hidden="true"></span>
+    </button>
+    <div class="account-dropdown" id="accountDropdown" role="menu" aria-labelledby="accountAvatarBtn" hidden>
+      <!-- Identity + status. Not menu items: nothing here is actionable, so they
+           carry no role="menuitem" and are skipped by menu arrow navigation. -->
+      <div class="acct-dd-head">
+        <div class="acct-dd-email" id="accountEmail"></div>
+        <div class="acct-dd-status">
+          <span class="plan-chip" id="planChip" title="Your plan"><span class="plan-dot"></span><span id="planChipLabel"></span></span>
+          <span class="nav-status-pill" id="navStatusPill" title="Backend status"><span class="dot" id="navStatusDot"></span><span id="navStatusLabel">Not connected</span></span>
+        </div>
+      </div>
+      <div class="acct-dd-sep" role="separator"></div>
+      <button type="button" class="acct-dd-item" role="menuitem" data-action="toggleSettings">Settings</button>
+      <!-- Same id as before so syncFeatureRequestNav still shows/hides it by plan. -->
+      <button type="button" class="acct-dd-item" role="menuitem" id="featureRequestNavBtn" data-action="openFeatureRequest">Suggest an improvement</button>
+      <!-- The static methodology explainer, not a report — the document a
+           recruiter generates for their own data lives in the Audit tab. Same
+           route as before; only its position in the chrome changed. -->
+      <a class="acct-dd-item" role="menuitem" href="/bias-report.html">How bias monitoring works</a>
+      <div class="acct-dd-sep" role="separator"></div>
+      <button type="button" class="acct-dd-item acct-dd-danger" role="menuitem" id="logoutBtn" data-action="doLogout">Log out</button>
+    </div>
+  </div>
 </div>
 
 <!-- Config bar -->
@@ -1663,18 +1709,109 @@ function setAuthBusy(btnId, busy){
   }
 }
 
+// ── Account menu ────────────────────────────────────────────────────────────
+// Avatar trigger + dropdown holding Settings, Suggest, the bias explainer and
+// Log out, plus the email and the plan/connection status rows. Wired through
+// the delegated data-action map like everything else — Helmet sets
+// script-src-attr 'none', so an inline handler here would be dead markup.
+
+// First character of the account email, for the avatar. Falls back to a glyph
+// rather than an empty circle when the address starts with something unusable.
+function accountInitial(email){
+  const m = /[a-z0-9]/i.exec(String(email || ''));
+  return m ? m[0].toUpperCase() : '?';
+}
+function accountMenuEls(){
+  return {
+    btn: document.getElementById('accountAvatarBtn'),
+    dd: document.getElementById('accountDropdown'),
+    menu: document.getElementById('accountMenu'),
+  };
+}
+function isAccountMenuOpen(){
+  const { dd } = accountMenuEls();
+  return !!dd && !dd.hidden;
+}
+// Only items that are actually rendered: the Suggest entry is hidden by plan
+// (syncFeatureRequestNav), and a hidden item must not swallow an arrow press.
+function accountMenuItems(){
+  const { dd } = accountMenuEls();
+  if (!dd) return [];
+  return [...dd.querySelectorAll('[role="menuitem"]')]
+    .filter((el) => el.offsetParent !== null);
+}
+function openAccountMenu(focusFirst){
+  const { btn, dd } = accountMenuEls();
+  if (!btn || !dd) return;
+  dd.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  if (focusFirst) { const items = accountMenuItems(); if (items.length) items[0].focus(); }
+}
+function closeAccountMenu(restoreFocus){
+  const { btn, dd } = accountMenuEls();
+  if (!btn || !dd || dd.hidden) return;
+  dd.hidden = true;
+  btn.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) btn.focus();
+}
+// e.detail is 0 for a click synthesised from Enter/Space on a <button> and 1+
+// for a real pointer click, which is how the keyboard path knows to move focus
+// into the menu while a mouse click just opens it.
+function toggleAccountMenu(el, e){
+  if (isAccountMenuOpen()) closeAccountMenu(true);
+  else openAccountMenu(!!e && e.detail === 0);
+}
+
 function updateAccountChip(){
-  const chip = document.getElementById('accountChip');
-  if (!chip) return;
+  const { menu, btn } = accountMenuEls();
   let email = '', orgName = '';
   try { email = localStorage.getItem(USER_EMAIL_KEY) || ''; orgName = localStorage.getItem(ORG_NAME_KEY) || ''; } catch (_) {}
   const authed = !!(getSessionToken() && email);
-  chip.style.display = authed ? 'flex' : 'none';
+  if (menu) menu.classList.toggle('authed', authed);
+  if (!authed) closeAccountMenu(false);
   const el = document.getElementById('accountEmail');
   if (el) { el.textContent = email; el.title = orgName ? (email + ' · ' + orgName) : email; }
+  const letter = document.getElementById('accountAvatarLetter');
+  if (letter) letter.textContent = accountInitial(email);
+  // The avatar shows one character, so the accessible name carries the address.
+  if (btn) btn.setAttribute('aria-label', email ? ('Account menu for ' + email) : 'Account menu');
   // Hide the plan chip whenever we're not authenticated.
   if (!authed) { const pc = document.getElementById('planChip'); if (pc) pc.style.display = 'none'; }
 }
+
+// Dismissal + in-menu keyboard handling. Registered once, at document level, in
+// the same spirit as the delegated click map.
+document.addEventListener('click', function(e){
+  const { menu } = accountMenuEls();
+  // A click inside the menu is either the trigger (handled by delegation) or an
+  // item (handled below), so only outside clicks dismiss here. No focus
+  // restore: the user is already looking somewhere else.
+  if (isAccountMenuOpen() && menu && !menu.contains(e.target)) closeAccountMenu(false);
+});
+document.addEventListener('click', function(e){
+  // Activating any item closes the menu. Runs after the delegated handler that
+  // does the work, so Settings has already opened before the menu goes away.
+  if (!isAccountMenuOpen()) return;
+  const item = e.target.closest('[role="menuitem"]');
+  if (item) closeAccountMenu(false);
+});
+document.addEventListener('keydown', function(e){
+  if (!isAccountMenuOpen()) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeAccountMenu(true); return; }
+  if (e.key === 'Tab') { closeAccountMenu(false); return; }
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
+  const items = accountMenuItems();
+  if (!items.length) return;
+  e.preventDefault();
+  const i = items.indexOf(document.activeElement);
+  let next;
+  if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = items.length - 1;
+  else if (e.key === 'ArrowDown') next = i < 0 ? 0 : (i + 1) % items.length;
+  else if (e.key === 'ArrowUp') next = i < 0 ? items.length - 1 : (i - 1 + items.length) % items.length;
+  else return;
+  items[next].focus();
+});
 
 function onAuthed(d){
   try {
@@ -4563,7 +4700,7 @@ const delegatedHandlers = {
   click: {
     toggleMobileNav,
     switchTab: (el) => switchTab(el.dataset.tab, el),
-    focusAuditSearch, doLogout, toggleSettings,
+    focusAuditSearch, doLogout, toggleSettings, toggleAccountMenu,
     startCheckout: (el) => startCheckout(el.dataset.plan),
     showPlanDetail,
     openBillingPortal, inviteMember, copyInviteLink, saveBranding,

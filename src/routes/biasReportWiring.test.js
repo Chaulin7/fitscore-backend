@@ -579,8 +579,18 @@ describe('the Audit tab markup wires the action up', () => {
     assert.doesNotMatch(btn, /disabled/);
   });
 
-  test('the nav item points at the methodology page and is named for it', () => {
-    assert.match(APP_HTML, /<a class="nav-btn" href="\/bias-report\.html"[^>]*>How bias monitoring works<\/a>/);
+  // The explainer link moved out of the top nav and into the account dropdown
+  // when the header was restructured for overflow. What matters has not changed
+  // — it is named for the page it opens, and it is not the generator — so the
+  // assertion follows it rather than pinning it to the bar.
+  test('the explainer link points at the methodology page and is named for it', () => {
+    assert.match(APP_HTML, /<a class="acct-dd-item" role="menuitem" href="\/bias-report\.html">How bias monitoring works<\/a>/);
+  });
+
+  test('the explainer is no longer a top-nav item', () => {
+    const nav = /<nav class="topbar-nav"[^>]*>([\s\S]*?)<\/nav>/.exec(APP_HTML);
+    assert.ok(nav, 'the primary nav must still exist');
+    assert.doesNotMatch(nav[1], /bias-report\.html/);
   });
 
   test('the methodology links elsewhere in the app are untouched', () => {
