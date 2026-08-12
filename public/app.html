@@ -2817,6 +2817,9 @@ async function analyzeSingle(file,jd,weights,anon,role,errEl){
   try{
     const fd=new FormData();fd.append('cv',file);fd.append('jobDescription',jd);
     fd.append('weights',JSON.stringify(weights));fd.append('anonymize',anon?'true':'false');
+    // Declared here, not at save time, so it is bound to the analysis. This
+    // records WHEN the build was declared, not that the declaration is true.
+    fd.append('appVersion',CVSPRINGS_VERSION);
     let data;
     try { data = await api('/api/analyze', {method:'POST', body:fd}); }
     catch (e) {
@@ -2851,6 +2854,7 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     const fd=new FormData();files.forEach(f=>fd.append('cvs',f));
     fd.append('jobDescription',jd);fd.append('weights',JSON.stringify(weights));
     fd.append('anonymize',anon?'true':'false');
+    fd.append('appVersion',CVSPRINGS_VERSION);
     setProgress(30,'Extracting text from CV...');
     let data;
     try { data = await api('/api/analyze/batch', {method:'POST', body:fd}); }
@@ -2967,74 +2971,77 @@ function focusAuditSearch(){
   setTimeout(function(){const el=document.getElementById('auditSearch');if(el){el.focus();el.select&&el.select();}},60);
 }
 function setBatchDecision(i,v){if(lastBatchResults[i])lastBatchResults[i]._decision=v;}
-// Shown when the server saved the record but could not verify the analysis it
-// came from — the scoring inputs are stored as the client reported them rather
-// than as the server produced them. Deliberately plain: this is currently
-// normal after a server restart, and should become rare once the provenance
-// cache is persisted. It is not an error and the record is saved either way.
-const SAVE_UNVERIFIED_MSG = 'Saved to audit log. The server could not verify this analysis, '
-  + 'so the record is stored as reported rather than server-verified.';
+// A save the server would not vouch for used to be written anyway and flagged
+// with a soft note. It is now refused outright: the audit row is built entirely
+// from the server's record of the analysis, so a missing record leaves nothing
+// to write, and a row that cannot be vouched for must not sit in the log
+// looking identical to one that can.
+//
+// The server distinguishes an ordinary expiry from an analysis that predates
+// field binding, because for the first 30 days after release the latter is the
+// likely cause and the user should be told which it was, not left to guess.
+function bindingErrorText(e){
+  const code = e && (e.code || (e.body && e.body.code));
+  const msg = e && (e.message || (e.body && e.body.error));
+  if (code === 'ANALYSIS_EXPIRED' || code === 'ANALYSIS_PREDATES_BINDING' || code === 'ANALYSIS_ID_REQUIRED') {
+    return msg || 'This analysis can no longer be saved — re-run it.';
+  }
+  return msg || 'Could not save to the audit log.';
+}
 
 async function saveToAudit(){
   if(_sampleActive||(lastResult&&lastResult._isSample)){toast("Sample results can't be saved — upload a real CV to save to the audit log.",'info');return;}
   if(!lastResult||!API)return;
-  const body={candidateName:lastResult.candidateName||lastResult.file.replace(/\.[^.]+$/,''),fileName:lastResult.file,
-    overall:lastResult.overall,scores:lastResult.scores,weights:getWeights(),
-    verdict:(lastResult.recommendations||[]).map(r=>r.text).join(' '),
+  // Only the analysis id and the recruiter's own input. Everything about the
+  // analysis — scores, weights, verdict, anonymisation, candidate and file
+  // name, model id, timestamps — is read server-side from the provenance record
+  // bound at /api/analyze. Sending them would be pointless: the server discards
+  // the rest of the body unread.
+  const body={analysisId:lastResult.analysisId||null,
     decision:document.getElementById('decisionSelect').value,
     note:document.getElementById('noteInput').value.trim(),
-    jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
-    role:document.getElementById('roleInput').value.trim(),anonymized:lastResult.anonymized||false,
-    appVersion:CVSPRINGS_VERSION,modelId:lastResult.modelId||null,analysisTimestamp:lastResult.analysisTimestamp||null,
-    runNonce:lastResult._runNonce||null,analysisId:lastResult.analysisId||null,
-    analysisDetail:{found:lastResult.found||[],missing:lastResult.missing||[],skills:lastResult.skills||[],recommendations:lastResult.recommendations||[],matches:lastResult.matches||[],extraction:lastResult.extraction||null}};
+    role:document.getElementById('roleInput').value.trim(),
+    runNonce:lastResult._runNonce||null};
   try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
     lastResult._auditId=d.id;
-    if(d.provenance&&d.provenance.vouched===false) toast(SAVE_UNVERIFIED_MSG,'info');
-    else toast('Saved to audit log.','success');
+    toast('Saved to audit log.','success');
     document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'single',role:(lastResult&&lastResult.role)||'unknown'}}));}
-  catch(e){handleApiError(e,'Network error');}
+  catch(e){toast(bindingErrorText(e),'error',7000);}
 }
 async function saveSingleBatch(i){
   if(!API||!lastBatchResults[i])return;
   const res=lastBatchResults[i];
-  const body={candidateName:res.candidateName||res.fileName,fileName:res.fileName||'',
-    overall:res.overall,scores:res.scores,weights:getWeights(),
-    verdict:(res.recommendations||[]).map(r=>r.text).join(' '),
+  // Same five inputs as the single save; see saveToAudit. The candidate name
+  // shown in the toast is the client's copy of what the server returned at
+  // analyse time — display only, and no longer what gets written.
+  const body={analysisId:res.analysisId||null,
     decision:res._decision||'',note:'',
-    jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
-    role:res.role||'',anonymized:res.anonymized||false,
-    appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
-    runNonce:res._runNonce||null,analysisId:res.analysisId||null,
-    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
+    role:res.role||'',
+    runNonce:res._runNonce||null};
   try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});
-    if(d.provenance&&d.provenance.vouched===false) toast('Saved: '+body.candidateName+' — not server-verified.','info');
-    else toast('Saved: '+body.candidateName,'success');
+    toast('Saved: '+(d.candidateName||res.candidateName||res.fileName),'success');
     document.dispatchEvent(new CustomEvent('cv:audit_saved',{detail:{mode:'batch_row',role:(body&&body.role)||'unknown'}}));}
-  catch(e){handleApiError(e,'Network error');}
+  catch(e){toast(bindingErrorText(e),'error',7000);}
 }
 async function saveAllToAudit(){
   if(!API||!lastBatchResults.length)return;
   const ok = await confirmModal({ title:'Save all', message:'Save all '+lastBatchResults.length+' results to the audit log?', confirmLabel:'Save all' });
   if(!ok)return;
-  let saved=0, unverified=0;
+  let saved=0, rejected=0, lastErr=null;
   for(const res of lastBatchResults){
-    const body={candidateName:res.candidateName||res.fileName,fileName:res.fileName||'',
-      overall:res.overall,scores:res.scores,weights:getWeights(),
-      verdict:(res.recommendations||[]).map(r=>r.text).join(' '),
+    // Same five inputs as the single save; see saveToAudit.
+    const body={analysisId:res.analysisId||null,
       decision:res._decision||'',note:'',
-      jdSnippet:document.getElementById('jdInput').value.trim().slice(0,300),
-      role:res.role||'',anonymized:res.anonymized||false,
-      appVersion:CVSPRINGS_VERSION,modelId:res.modelId||null,analysisTimestamp:res.analysisTimestamp||null,
-      runNonce:res._runNonce||null,analysisId:res.analysisId||null,
-    analysisDetail:{found:res.found||[],missing:res.missing||[],skills:res.skills||[],recommendations:res.recommendations||[],matches:res.matches||[],extraction:res.extraction||null}};
-    try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;
-      if(d.provenance&&d.provenance.vouched===false)unverified++;}catch(_){}
+      role:res.role||'',
+      runNonce:res._runNonce||null};
+    try{const d=await api('/api/audit',{method:'POST',body:JSON.stringify(body)});saved++;}
+    catch(e){rejected++;lastErr=e;}
   }
   // One summary line rather than a toast per row: on a 200-CV batch the
-  // per-record detail is noise, but the count that was not server-verified is
-  // exactly what a reader of the audit log needs to know.
-  if(unverified) toast(saved+' of '+lastBatchResults.length+' records saved — '+unverified+' not server-verified.','info');
+  // per-record detail is noise. A rejection is no longer a quality caveat on a
+  // saved row — the row was not written at all — so it is reported as a
+  // failure, with the server's reason rather than a generic count.
+  if(rejected) toast(saved+' of '+lastBatchResults.length+' saved. '+rejected+' could not be saved: '+bindingErrorText(lastErr),'error',7000);
   else toast(saved+' of '+lastBatchResults.length+' records saved.','success');
 }
 function exportBatchCsv(){

@@ -49,6 +49,20 @@ function record(analysisId, over = {}) {
     scorerEngine: 'cvsprings-lexical-scorer',
     scorerVersion: '1.3.0',
     scoringWeights: { kw: 40, sk: 30, ex: 20, ed: 10 },
+    // Scoring OUTPUTS and analysis context. The record is the sole source for
+    // the audit row now, so it has to carry everything the row records as fact.
+    bindingVersion: provenance.PAYLOAD_VERSION,
+    overall: 72,
+    scores: { keywords: 70, skills: 80, experience: 65, education: 75 },
+    verdict: 'Good Match',
+    analysisDetail: { found: [], missing: [], skills: [], matches: [], recommendations: [] },
+    anonymized: false,
+    candidateName: 'Candidate',
+    fileName: 'cv.pdf',
+    jdSnippet: 'a job description',
+    modelId: 'cvsprings-lexical-scorer@1.3.0',
+    analysisTimestamp: '2026-08-12T09:00:00.000Z',
+    appVersion: '1.3.0',
     ...over,
   };
 }
@@ -104,6 +118,76 @@ describe('the two engine versions are separate facts', () => {
 
   test('the allowed key set is exactly what analyze builds', () => {
     assert.deepEqual([...provenance.ALLOWED_KEYS].sort(), Object.keys(record('x')).sort());
+  });
+
+  test('the key set carries scoring OUTPUTS, not just inputs', () => {
+    // The gap this closed: the record held the weights the engine used but not
+    // what it produced, so the audit row took overall/scores/verdict/anonymized
+    // from the client and the bias report computed over client-asserted numbers.
+    for (const k of ['overall', 'scores', 'verdict', 'anonymized']) {
+      assert.ok(provenance.ALLOWED_KEYS.includes(k), `${k} must be server-held`);
+    }
+  });
+});
+
+describe('inspect() — why a binding is unusable, not just that it is', () => {
+  test('reports a live record with its age', () => {
+    const id = nextId();
+    provenance.remember(ORG, record(id));
+    const got = provenance.inspect(ORG, id);
+    assert.equal(got.found, true);
+    assert.equal(got.expired, false);
+    assert.equal(got.stale, false);
+    assert.ok(got.record);
+    assert.ok(got.ageMs >= 0 && got.ageMs < 60000);
+  });
+
+  test('an id the server never issued is a plain miss with no age to report', () => {
+    const got = provenance.inspect(ORG, 'never-issued');
+    assert.equal(got.found, false);
+    assert.equal(got.ageMs, null, 'no analysis time exists to measure a gap from');
+  });
+
+  test('an expired record is found, flagged expired, and still reports its age', () => {
+    // The age is the whole point: it is what tells us whether a real user's
+    // analyse->save gap is approaching the TTL, and it is unreconstructable
+    // once the sweep removes the row.
+    const id = nextId();
+    rememberExpiringAt(ORG, record(id), Date.now() - 1000);
+    const got = provenance.inspect(ORG, id);
+    assert.equal(got.found, true);
+    assert.equal(got.expired, true);
+    assert.ok(typeof got.ageMs === 'number');
+  });
+
+  test('inspect does NOT delete an expired row, so the age survives the log line', () => {
+    const id = nextId();
+    rememberExpiringAt(ORG, record(id), Date.now() - 1000);
+    provenance.inspect(ORG, id);
+    assert.equal(provenance.inspect(ORG, id).found, true, 'the sweep removes it, not the read');
+  });
+
+  test('a payload from before field binding is stale, not expired', () => {
+    // This is the deploy-window case. It must be distinguishable from ordinary
+    // expiry so a customer hitting it can be told what actually happened.
+    const id = nextId();
+    const old = record(id);
+    delete old.bindingVersion;
+    // Written straight to the table: remember() would reject the shape, which
+    // is itself the point — only rows predating this release look like this.
+    db().prepare(
+      'INSERT INTO analysis_provenance (org_id, analysis_id, payload, created_at, expires_at) VALUES (?,?,?,?,?)',
+    ).run(ORG, id, JSON.stringify(old), Date.now(), Date.now() + 3600000);
+    const got = provenance.inspect(ORG, id);
+    assert.equal(got.found, true);
+    assert.equal(got.expired, false);
+    assert.equal(got.stale, true, 'must not be reported as an ordinary miss');
+  });
+
+  test('org scoping holds — another org cannot inspect this binding', () => {
+    const id = nextId();
+    provenance.remember(ORG, record(id));
+    assert.equal(provenance.inspect('other-org', id).found, false);
   });
 });
 
@@ -171,8 +255,17 @@ describe('expiry', () => {
     assert.ok(provenance._count() < before);
   });
 
-  test('the default TTL is still 24h', () => {
-    assert.equal(provenance.TTL_MS, 24 * 60 * 60 * 1000);
+  // Was 24h. The TTL stopped being a cache bound and became a deadline: the
+  // record is the only source for the audit row, so expiry now REJECTS the save
+  // instead of degrading it to client values. It therefore has to cover the
+  // slowest legitimate analyse->save gap, not the median one.
+  test('the TTL is 30 days', () => {
+    assert.equal(provenance.TTL_MS, 30 * 24 * 60 * 60 * 1000);
+  });
+
+  test('the TTL comfortably exceeds a weekend and a hiring-manager round trip', () => {
+    const days = provenance.TTL_MS / (24 * 60 * 60 * 1000);
+    assert.ok(days >= 14, `a fail-closed TTL of ${days}d is too tight to review a batch`);
   });
 });
 

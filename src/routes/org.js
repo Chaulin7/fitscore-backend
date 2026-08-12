@@ -203,7 +203,21 @@ router.get('/export', sessionOrDownloadToken, requireOwner, (req, res) => {
   try {
     const org = auth.getOrganizationById(req.orgId);
     const records = getAllAudits({ orgId: req.orgId });
-    const auditRecords = records.map((r) => ({ ...r, changeHistory: getAuditChanges(r.id, req.orgId) }));
+    // The spread carried BOTH weight columns, so the export presented the
+    // legacy client-asserted `weights` beside the server-vouched `weightsJson`
+    // with nothing to say which was which. The legacy value is still exported —
+    // this is a portability/DSAR export and dropping a stored field would make
+    // it incomplete — but under a name that says what it is, and alongside the
+    // binding fields that date the row.
+    const auditRecords = records.map((r) => {
+      const { weights: legacyClientWeights, ...rest } = r;
+      return {
+        ...rest,
+        // Present only on pre-binding rows; null once binding_version is set.
+        legacyClientAssertedWeights: legacyClientWeights,
+        changeHistory: getAuditChanges(r.id, req.orgId),
+      };
+    });
     const templates = getDb().prepare('SELECT * FROM templates WHERE org_id = ? ORDER BY updated_at DESC').all(req.orgId)
       .map((t) => ({
         id: t.id, name: t.name, role: t.role || '', jobDescription: t.job_description || '',

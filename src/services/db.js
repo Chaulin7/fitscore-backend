@@ -215,6 +215,18 @@ function initSchema() {
   // (e.g. legacy rows) — displayed as "not recorded", never as a default.
   try { getDb().exec('ALTER TABLE audit_log ADD COLUMN weights_json TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE audit_log ADD COLUMN engine_version TEXT'); } catch (_) {}
+  // Per-row binding provenance. NEVER backfilled: NULL means the row was
+  // written before field binding, when scores, weights and the anonymisation
+  // flag were client-asserted. binding_version records which rules were in
+  // force; binding_state records what happened under them.
+  //
+  // The legacy `weights` column above is RETAINED and no longer written. Rows
+  // from 2026-04-18 (original schema) to 2026-07-29 (weights_json added) have
+  // it populated and weights_json NULL — for those rows it is the only weight
+  // record that exists, so dropping the column would destroy history on an
+  // Art. 12 record-keeping table rather than tidy it.
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN binding_version INTEGER'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE audit_log ADD COLUMN binding_state TEXT'); } catch (_) {}
 
   // Backfill updated_at for existing rows
   try { getDb().exec("UPDATE audit_log SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''"); } catch (_) {}
@@ -548,50 +560,75 @@ function initSchema() {
 // run, and its id is carried onto the audit_log row as candidate_fk. Two saves
 // with the same candidate_name get two distinct candidates — that is the fix.
 // The legacy candidate_id hash is intentionally left NULL for new rows.
+/**
+ * Write one audit row.
+ *
+ * Takes a SERVER-CONSTRUCTED provenance record (`bound`) plus the recruiter's
+ * own input. It has no access to the request payload and never did receive one
+ * here — the caller destructures the accepted inputs and drops the rest, so
+ * there is nothing client-supplied in scope for a field to be read from.
+ *
+ * Every scoring fact below comes from `bound`. The legacy `weights` column is
+ * deliberately absent from the INSERT: it is retained for historical rows and
+ * never written again.
+ */
 function insertAudit(data, orgId, userId) {
+  const bound = data.bound || {};
   const id = uuidv4();
   const nowMs = Date.now();
   const now = new Date(nowMs).toISOString();
   const runId = resolveRunForNonce(orgId, userId, data.runNonce, data.role, nowMs);
-  const candidateFk = createCandidate(orgId, runId, data.candidateName, data.fileName, null, now);
+  const candidateFk = createCandidate(orgId, runId, bound.candidateName, bound.fileName, null, now);
   const stmt = getDb().prepare(`
     INSERT INTO audit_log
     (id, user_id, org_id, candidate_fk, candidate_name, file_name, overall, keywords_score, skills_score,
-     experience_score, education_score, weights, weights_json, engine_version, verdict, decision, note, jd_snippet, role, anonymized,
-     app_version, model_id, analysis_timestamp, reviewed_by, analysis_detail, created_at, updated_at)
+     experience_score, education_score, weights_json, engine_version, verdict, decision, note, jd_snippet, role, anonymized,
+     app_version, model_id, analysis_timestamp, reviewed_by, analysis_detail, binding_version, binding_state, created_at, updated_at)
     VALUES
     (@id, @userId, @orgId, @candidateFk, @candidateName, @fileName, @overall, @keywords, @skills,
-     @experience, @education, @weights, @weightsJson, @engineVersion, @verdict, @decision, @note, @jdSnippet, @role, @anonymized,
-     @appVersion, @modelId, @analysisTimestamp, @reviewedBy, @analysisDetail, @createdAt, @updatedAt)
+     @experience, @education, @weightsJson, @engineVersion, @verdict, @decision, @note, @jdSnippet, @role, @anonymized,
+     @appVersion, @modelId, @analysisTimestamp, @reviewedBy, @analysisDetail, @bindingVersion, @bindingState, @createdAt, @updatedAt)
   `);
+  const scores = bound.scores || {};
   stmt.run({
     id,
     userId: userId || 'legacy',
     orgId: orgId || null,
     candidateFk,
-    appVersion: data.appVersion || null,
-    modelId: data.modelId || null,
-    analysisTimestamp: data.analysisTimestamp || null,
-    reviewedBy: data.reviewedBy || null,
-    analysisDetail: data.analysisDetail ? JSON.stringify(data.analysisDetail) : null,
-    candidateName: data.candidateName,
-    fileName: data.fileName,
-    overall: data.overall,
-    keywords: data.scores && data.scores.keywords,
-    skills: data.scores && data.scores.skills,
-    experience: data.scores && data.scores.experience,
-    education: data.scores && data.scores.education,
-    weights: data.weights ? JSON.stringify(data.weights) : null,
-    // Server-authoritative, immutable snapshot of the weights the engine used
-    // and the engine version. Left NULL when the server can't vouch for them.
-    weightsJson: data.weightsJson ? JSON.stringify(data.weightsJson) : null,
+    // --- from the server's record of the analysis -----------------------
+    appVersion: bound.appVersion || null,
+    modelId: bound.modelId ? String(bound.modelId).slice(0, 100) : null,
+    analysisTimestamp: bound.analysisTimestamp ? String(bound.analysisTimestamp).slice(0, 40) : null,
+    analysisDetail: bound.analysisDetail ? JSON.stringify(bound.analysisDetail) : null,
+    candidateName: bound.candidateName,
+    fileName: bound.fileName,
+    overall: bound.overall,
+    keywords: scores.keywords,
+    skills: scores.skills,
+    experience: scores.experience,
+    education: scores.education,
+    // Immutable snapshot of the weights the engine applied, captured at
+    // execution time — not re-read from config, which could have changed
+    // between the run and the save.
+    weightsJson: bound.scoringWeights ? JSON.stringify(bound.scoringWeights) : null,
     engineVersion: data.engineVersion ? String(data.engineVersion).slice(0, 100) : null,
-    verdict: data.verdict,
+    // The engine's band from getVerdict(overall). This column used to hold the
+    // client's concatenated recommendation prose, which is not a verdict and
+    // contradicted the bands documented on the public methodology page. The
+    // prose still lives in analysis_detail.recommendations, so nothing is lost.
+    verdict: bound.verdict == null ? null : String(bound.verdict).slice(0, 100),
+    jdSnippet: bound.jdSnippet == null ? null : String(bound.jdSnippet).slice(0, 300),
+    // The bias report's primary grouping dimension, and the server's own
+    // decision at scoring time rather than a claim made at save time.
+    anonymized: bound.anonymized ? 1 : 0,
+    // --- the recruiter's own input --------------------------------------
     decision: data.decision,
     note: data.note,
-    jdSnippet: data.jdSnippet,
     role: data.role,
-    anonymized: data.anonymized ? 1 : 0,
+    // --- session-derived + binding provenance ---------------------------
+    reviewedBy: data.reviewedBy || null,
+    bindingVersion: data.bindingVersion == null ? null : Number(data.bindingVersion),
+    bindingState: data.bindingState || null,
     createdAt: now,
     updatedAt: now,
   });
@@ -952,44 +989,6 @@ function getAuditFilterValues(orgId) {
   return { actors, actions };
 }
 
-// Export as CSV (org-scoped)
-function exportCsv(filters = {}) {
-  const rows = getAllAudits(filters);
-  const headers = ['id','candidateName','fileName','overall','keywords','skills','experience','education','weights','verdict','decision','note','jdSnippet','role','anonymized','appVersion','modelId','analysisTimestamp','reviewedBy','createdAt','updatedAt'];
-  const csvRows = [headers.join(',')];
-  for (const row of rows) {
-    const formatted = formatRow(row);
-    csvRows.push([
-      esc(formatted.id),
-      esc(formatted.candidateName),
-      esc(formatted.fileName),
-      formatted.overall,
-      formatted.scores.keywords,
-      formatted.scores.skills,
-      formatted.scores.experience,
-      formatted.scores.education,
-      esc(JSON.stringify(formatted.weights)),
-      esc(formatted.verdict),
-      esc(formatted.decision),
-      esc(formatted.note),
-      esc(formatted.jdSnippet),
-      esc(formatted.role),
-      formatted.anonymized ? 1 : 0,
-      esc(formatted.appVersion),
-      esc(formatted.modelId),
-      esc(formatted.analysisTimestamp),
-      esc(formatted.reviewedBy),
-      esc(formatted.createdAt),
-      esc(formatted.updatedAt),
-    ].join(','));
-  }
-  return csvRows.join('\n');
-}
-
-function esc(v) {
-  if (v == null) return '""';
-  return '"' + String(v).replace(/"/g, '""') + '"';
-}
 
 // --- Retention (GDPR storage limitation) -----------------------------------
 // audit_changes is guarded by append-only triggers; retention/erasure jobs are
@@ -1336,10 +1335,18 @@ function formatRow(row) {
       experience: row.experience_score,
       education: row.education_score,
     },
+    // LEGACY, read-only. Client-asserted weights from before field binding; no
+    // longer written. Present only on rows whose binding_version is NULL, where
+    // it may be the sole weight record. Consumers should prefer weightsJson and
+    // must not present this as server-vouched.
     weights: row.weights ? (() => { try { return JSON.parse(row.weights); } catch { return null; } })() : null,
     // Server-authoritative scoring inputs. null = genuinely not recorded (must
     // never be rendered as a default or empty weight set by any consumer).
     weightsJson: row.weights_json ? (() => { try { return JSON.parse(row.weights_json); } catch { return null; } })() : null,
+    // Which binding rules were in force, and what happened under them.
+    // bindingVersion null = pre-binding row (client-asserted scoring fields).
+    bindingVersion: row.binding_version == null ? null : Number(row.binding_version),
+    bindingState: row.binding_state || null,
     engineVersion: row.engine_version || null,
     verdict: row.verdict,
     decision: row.decision,
@@ -1576,7 +1583,6 @@ module.exports = {
   updateAudit,
   deleteAudit,
   getAuditChanges,
-  exportCsv,
   getRoles,
   getRoleHistory,
 };

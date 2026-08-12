@@ -73,9 +73,13 @@ function extractionSummary(extracted) {
  * version. Never let a spread and a literal share a key here again: name each
  * field, and let provenanceCache reject anything unexpected.
  */
-function provenanceRecord(analysisId, extraction, weights) {
+function provenanceRecord({
+  analysisId, extraction, weights, scored, anonymize,
+  candidateName, fileName, jobDescription, appVersion, analysisTimestamp,
+}) {
   return {
     analysisId,
+    bindingVersion: provenance.PAYLOAD_VERSION,
     // Extraction facts — which reader turned the file into text.
     extractorEngine: extraction.engine,
     extractorVersion: extraction.engineVersion,
@@ -88,6 +92,38 @@ function provenanceRecord(analysisId, extraction, weights) {
     scorerEngine: SCORER_ENGINE,
     scorerVersion: SCORER_VERSION,
     scoringWeights: weights,
+    // Scoring OUTPUTS. Previously computed here and discarded, leaving the
+    // client to assert them back at save time — which meant the bias report's
+    // distributions and score bands were built from numbers the browser sent.
+    // `verdict` is the engine's band (getVerdict(overall)), not the
+    // concatenated recommendation prose the client used to send under that name.
+    overall: scored.overall,
+    scores: scored.scores,
+    verdict: scored.verdict,
+    analysisDetail: {
+      found: scored.found,
+      missing: scored.missing,
+      skills: scored.skills,
+      matches: scored.matches,
+      recommendations: scored.recommendations,
+    },
+    // Analysis context the audit row records as fact. `anonymized` is the
+    // server's own decision at scoring time (see the anonymize flag below) —
+    // it is the bias report's PRIMARY grouping dimension, so a client-asserted
+    // value would put the whole report's only grouping in the browser's hands.
+    anonymized: !!anonymize,
+    candidateName,
+    fileName,
+    jdSnippet: String(jobDescription || '').trim().slice(0, 300),
+    modelId: MODEL_ID,
+    analysisTimestamp,
+    // LIMIT OF THIS BINDING, stated plainly: this records WHEN the client
+    // declared its build version, not that the declaration is true. Only the
+    // browser knows its own build, and no server-side design can verify it.
+    // What binding buys is that the value is fixed at analysis time and cannot
+    // be changed at save time — not that it is honest. Do not read it as
+    // stronger than that.
+    appVersion: appVersion == null ? null : String(appVersion).slice(0, 50),
   };
 }
 
@@ -271,12 +307,16 @@ router.post('/', upload.single('cv'), async (req, res) => {
     recordUsage(req, 'analyze_single', 1);
     const extraction = extractionSummary(extracted);
     const analysisId = uuidv4();
-    // Bind THIS analysis's provenance (extraction + the exact weights used +
-    // engine version), keyed by analysisId, so the audit save records them
-    // authoritatively (never the client's echoed weights). The client echoes
-    // analysisId back at save time. See provenanceCache + POST /api/audit.
-    provenance.remember(req.orgId, provenanceRecord(analysisId, extraction, weights));
-    res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), analysisId, extraction, ...results });
+    const analysisTimestamp = new Date().toISOString();
+    // Bind THIS analysis, keyed by analysisId. The record is now the SOLE
+    // source for the audit row: POST /api/audit reads everything from here and
+    // accepts nothing about the analysis from the client. See provenanceCache.
+    provenance.remember(req.orgId, provenanceRecord({
+      analysisId, extraction, weights, scored: results, anonymize,
+      candidateName, fileName: req.file.originalname,
+      jobDescription, appVersion: req.body.appVersion, analysisTimestamp,
+    }));
+    res.json({ candidateName, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp, analysisId, extraction, ...results });
   } catch (err) {
     if (reserved) refundUsage(req.orgId, reserved); // a post-reservation failure returns the reservation
     const status = err.statusCode || 500;
@@ -351,8 +391,13 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
           : path.basename(file.originalname, path.extname(file.originalname));
         const extraction = extractionSummary(extracted);
         const analysisId = uuidv4(); // one per candidate, NOT one per batch
-        pendingProvenance.push(provenanceRecord(analysisId, extraction, weights));
-        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp: new Date().toISOString(), analysisId, extraction, ...scored });
+        const analysisTimestamp = new Date().toISOString();
+        pendingProvenance.push(provenanceRecord({
+          analysisId, extraction, weights, scored, anonymize,
+          candidateName, fileName: file.originalname,
+          jobDescription, appVersion: req.body.appVersion, analysisTimestamp,
+        }));
+        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp, analysisId, extraction, ...scored });
       } catch (fileErr) {
         results.push({
           candidateName: path.basename(file.originalname, path.extname(file.originalname)),

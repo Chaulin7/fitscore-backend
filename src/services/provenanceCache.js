@@ -40,19 +40,57 @@ function db() {
   return require('./db').getDb();
 }
 
-const TTL_MS = 24 * 60 * 60 * 1000;            // provenance is claimable for 24h after analysis
+// 30 days, up from 24 hours.
+//
+// The TTL used to be a cache bound: an expired entry degraded the save to
+// client-supplied values. It is now a DEADLINE — the record is the sole source
+// for the audit row, so expiry rejects the save outright. That changes what the
+// number has to be sized against: not the median analyse->save gap but the
+// slowest legitimate one. A Friday-afternoon batch reviewed on Monday already
+// breaks 24h; a shortlist that goes to a hiring manager and comes back breaks a
+// week. 30 days covers a hiring cycle including holidays.
+//
+// Cost is small: a payload is roughly 600-800 bytes, so 10k analyses/month
+// retains ~8MB and 100k/month ~80MB, and the sweep is indexed on expires_at.
+// Well below the 180-day retention floor for audit data.
+//
+// This is a judgement call with no operational evidence behind it. Every
+// fail-closed rejection logs its analyse->save gap (see routes/audit.js) so the
+// number can be revisited against real usage rather than re-guessed.
+const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000;      // hourly expiry sweep
+
+// The shape of the stored payload. Bumped when the key set changes in a way
+// that makes an older payload unusable for an audit write — which is exactly
+// what happened here: payloads written before field binding hold scoring INPUTS
+// only, and an audit row now needs the OUTPUTS too. A row carrying an older
+// version is not a cache miss and must not be reported as one; the save is
+// rejected with its own code so a customer can be told what actually happened.
+const PAYLOAD_VERSION = 1;
 
 // The exact key set a provenance record may carry. remember() rejects anything
 // else, which is the guard against the bug this replaced: a spread and a
 // literal sharing `engineVersion`, where the extractor's version was silently
 // overwritten by the scorer's. A typo or a reintroduced spread now fails loudly
 // at the point of writing rather than producing a plausible-looking record.
+//
+// Extended for field binding: the audit row is now written ENTIRELY from this
+// record plus the recruiter's own input, so every field the row needs has to be
+// here. Scoring outputs (overall/scores/verdict) and the anonymisation flag
+// were previously computed server-side and thrown away, leaving the client to
+// assert them at save time.
 const ALLOWED_KEYS = Object.freeze([
-  'analysisId',
+  'analysisId', 'bindingVersion',
+  // Extraction facts — which reader turned the file into text.
   'extractorEngine', 'extractorVersion', 'assemblerVersion',
   'textSha256', 'pageCount', 'charCount',
+  // Scoring inputs — which engine, under which weights.
   'scorerEngine', 'scorerVersion', 'scoringWeights',
+  // Scoring outputs — what the engine actually produced.
+  'overall', 'scores', 'verdict', 'analysisDetail',
+  // Analysis context the row records as fact.
+  'anonymized', 'candidateName', 'fileName', 'jdSnippet',
+  'modelId', 'analysisTimestamp', 'appVersion',
 ]);
 
 /**
@@ -172,6 +210,48 @@ function lookup(orgId, analysisId) {
 }
 
 /**
+ * Everything known about one binding, WITHOUT deleting anything.
+ *
+ * lookup() collapses "never issued", "expired" and "corrupt" into a single
+ * null, which was fine when a miss silently degraded the save. It is not fine
+ * now: the save is rejected, so the caller has to tell the user which of those
+ * happened, and has to read created_at to report how long the analyse->save gap
+ * actually was. Expired rows are left for the sweep rather than deleted on
+ * read, so the timing is still readable while the rejection is being logged.
+ *
+ * Returns { found, expired, stale, createdAt, expiresAt, ageMs, record }.
+ *   found   — a row exists for (orgId, analysisId)
+ *   expired — it exists but is past its TTL
+ *   stale   — it exists and is live, but predates the current PAYLOAD_VERSION
+ *   record  — the parsed payload, or null when absent/unparseable
+ */
+function inspect(orgId, analysisId) {
+  const miss = { found: false, expired: false, stale: false, createdAt: null, expiresAt: null, ageMs: null, record: null };
+  if (!orgId || typeof analysisId !== 'string' || !analysisId) return miss;
+  const row = db().prepare(
+    'SELECT payload, created_at AS createdAt, expires_at AS expiresAt FROM analysis_provenance WHERE org_id = ? AND analysis_id = ?',
+  ).get(orgId, analysisId);
+  if (!row) return miss;
+
+  const now = Date.now();
+  const base = {
+    found: true,
+    expired: now > row.expiresAt,
+    createdAt: row.createdAt,
+    expiresAt: row.expiresAt,
+    ageMs: now - row.createdAt,
+  };
+
+  let record = null;
+  try { record = JSON.parse(row.payload); } catch (err) {
+    console.error('[provenance] stored payload is not valid JSON',
+      { orgId, analysisId, message: err && err.message });
+    return { ...base, stale: false, record: null };
+  }
+  return { ...base, stale: record.bindingVersion !== PAYLOAD_VERSION, record };
+}
+
+/**
  * Delete every expired binding. Returns the number removed.
  *
  * Deliberately NOT routed through runRetentionPurge(): that path is gated
@@ -211,7 +291,7 @@ function _count() {
 }
 
 module.exports = {
-  remember, rememberMany, lookup,
+  remember, rememberMany, lookup, inspect,
   sweepExpired, startProvenanceSweep, stopProvenanceSweep,
-  TTL_MS, SWEEP_INTERVAL_MS, ALLOWED_KEYS, _count,
+  TTL_MS, SWEEP_INTERVAL_MS, ALLOWED_KEYS, PAYLOAD_VERSION, _count,
 };
