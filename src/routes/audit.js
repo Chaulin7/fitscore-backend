@@ -509,6 +509,8 @@ function renderBiasReportHtml(report, branding) {
     '.header { background: #0f2847; color: #fff; padding: 28px 36px; border-radius: 8px 8px 0 0; }' +
     '.header h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }' +
     '.header .meta { font-size: 12px; opacity: 0.75; }' +
+    '.header .explainer { font-size: 12px; margin-top: 10px; }' +
+    '.header .explainer a { color: #7dd3fc; text-decoration: underline; }' +
     // CVsprings vendor mark. A plain <img>, deliberately not the CSS-mask
     // technique the static pages use: background-color + mask is dropped by
     // browsers when "Background graphics" is off, which is the default in the
@@ -545,7 +547,7 @@ function renderBiasReportHtml(report, branding) {
     '.caveat strong { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }' +
     '.lim-list { margin: 0; padding-left: 18px; }' +
     '.lim-list li { margin-bottom: 8px; font-size: 13px; line-height: 1.5; color: #374151; }' +
-    '@media print { body { background: #fff; } .page { box-shadow: none; border: none; margin: 0; border-radius: 0; } .footer { position: fixed; bottom: 0; width: 100%; } }' +
+    '@media print { body { background: #fff; } .page { box-shadow: none; border: none; margin: 0; border-radius: 0; } .footer { position: fixed; bottom: 0; width: 100%; } .header .explainer { display: none; } }' +
     '</style></head><body><div class="page">' +
 
     // Header
@@ -553,7 +555,13 @@ function renderBiasReportHtml(report, branding) {
     '<div class="brandrow">' + markHtml +
     '<span class="wordmark">' + esc(brand.displayName) + '</span></div>' +
     '<h1>Bias Monitoring Report</h1>' +
-    '<div class="meta">' + scopeLabel + ' &nbsp;|&nbsp; ' + dateRange + ' &nbsp;|&nbsp; ' + report.scope.totalRecords + ' records analysed &nbsp;|&nbsp; Generated ' + esc(prov.generated) + '</div></div>' +
+    '<div class="meta">' + scopeLabel + ' &nbsp;|&nbsp; ' + dateRange + ' &nbsp;|&nbsp; ' + report.scope.totalRecords + ' records analysed &nbsp;|&nbsp; Generated ' + esc(prov.generated) + '</div>' +
+    // The methodology explainer, from the one place a reader is most likely to
+    // want it: looking at their own figures and asking how they were produced.
+    // Screen only — this document exists to be printed as the compliance
+    // record, and a live link is an affordance of the browser view, not part of
+    // the artifact handed to a DPO.
+    '<div class="explainer"><a href="/bias-report.html">How bias monitoring works</a></div></div>' +
 
     '<div class="body">' +
 
