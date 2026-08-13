@@ -521,11 +521,16 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .modal-close{background:none;border:none;font-size:22px;color:#6b7280;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}
 .modal-close:hover{background:#f3f4f6;color:#0a1f3d}
 .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
-/* The .nav-btn-fr label-swap rules lived here: between 641px and ~1320px the
-   full "Suggest an improvement" label pushed the plan and account chips off the
-   bar, so the label shortened in that band. That was a symptom of too many
-   items in one non-wrapping row — the entry now lives in the account dropdown,
-   which has room for the full label at every width, so the workaround is gone. */
+/* A .nav-btn-fr rule pair lived here, swapping "Suggest an improvement" for
+   "Suggest" between 641px and 1320px, with a comment claiming that fixed the
+   overflow in that band.
+   IT NEVER DID. Measured, the pre-restructure row — long labels, the email chip
+   and the gear — needed ~1435-1481px of content width. Even with the short
+   label it did not fit at 641px, or at 1320px. The workaround narrowed the
+   overflow slightly and hid the fact that the row was ~600px over budget on a
+   1280px laptop, which is why the settings icon went off-screen.
+   The label is simply "Suggest" at every width now, and the row collapses at
+   1100px, which is where it genuinely fits. See the breakpoint below. */
 .fr-field{margin-bottom:14px}
 .fr-field label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px}
 .fr-field .text-input{width:100%}
@@ -751,12 +756,18 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .plan-chip.clickable{cursor:pointer}
 .plan-chip.clickable:hover{background:rgba(255,255,255,0.16)}
 @media(max-width:640px){.plan-chip{padding:4px 9px}}
-/* Both chips now live in the account dropdown rather than the bar. Same colour
-   semantics — green dot for connected, amber for a plan warning — at the
-   smaller scale a status row wants. The margin the status pill carried for the
-   bar is dropped; the dropdown's flex gap spaces them. */
-.acct-dd-status .plan-chip,
-.acct-dd-status .nav-status-pill{margin:0;font-size:11px;padding:3px 9px}
+/* Both chips are back in the bar at full size, with their original colour
+   semantics — green dot for connected, amber for a plan warning.
+   Below 640px the row carries brand, hamburger, Connected, search, Pro and the
+   avatar, which measures ~420px against ~359px available on a 375px phone. The
+   Connected LABEL is the cheapest ~65px to reclaim: the dot already carries the
+   state (grey/green/red) and the title attribute still names it, so dropping
+   the word costs nothing a colour-blind user was relying on. Pro keeps its
+   label — "Pro" is three characters and is the one a recruiter looks for. */
+@media(max-width:640px){
+  .nav-status-pill .conn-label{display:none}
+  .nav-status-pill{padding:4px 8px;margin:0 2px}
+}
 /* Plan & Billing settings buttons */
 .plan-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .plan-status-line{font-size:12px;color:#374151;margin-top:4px}
@@ -897,12 +908,22 @@ img, video, table { max-width: 100%; }
 @media(max-width:760px){.welcome-banner-form{flex-basis:100%}.welcome-banner-text{flex-basis:100%}}
     /* === Mobile top-bar === */
     .mobile-menu-button{display:none;background:none;border:none;color:rgba(255,255,255,0.85);font-size:22px;line-height:1;padding:6px 10px;border-radius:6px;cursor:pointer;align-items:center;justify-content:center}
-    /* 900px, not 640px. The three primary links plus the brand and the account
-       avatar stop fitting comfortably well above phone widths, and the old
-       640px threshold is what let the row overflow across the tablet range.
+    /* 1100px, raised from 900px when the inline items were restored.
+       MEASURED, at Inter 600 13px (+-8%), for
+       brand | 5 nav items | Connected | search | Pro | avatar:
+         content needed   ~997-1028px
+         available @901px  837px  (901 - 64px topbar padding)
+         => overflow       ~160-191px, first fits at ~1060-1090px
+       So 900px was ~180px short and would have reproduced the original
+       off-screen bug in a narrower band. The alternative was compressing the
+       row — dot-only Connected, tighter gaps, tighter padding — which lands
+       within ~1px of the limit at the optimistic end of that estimate and is
+       the same shrink-to-fit approach that caused the overflow in the first
+       place. The breakpoint is the honest lever: the inline row renders only
+       where it genuinely fits, and 900-1100px gets a working drawer.
        The avatar and its dropdown stay visible at every width — only the
        primary links collapse. */
-    @media (max-width: 900px){
+    @media (max-width: 1100px){
       .topbar-nav{display:none}
       .mobile-menu-button{display:flex}
       .topbar-nav.mobile-open{display:flex;flex-direction:column;position:absolute;top:100%;left:0;right:0;background:#0f2847;padding:8px;gap:4px;z-index:200;box-shadow:0 8px 20px rgba(0,0,0,0.35)}
@@ -1029,17 +1050,29 @@ img, video, table { max-width: 100%; }
     <span class="brand-name">CV<em>springs</em></span>
   </a>
   <button class="mobile-menu-button" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="topbarNav" data-action="toggleMobileNav">☰</button>
-  <!-- Only the three primary destinations live in the bar. Everything else moved
-       into the account menu: a single non-wrapping row could not hold six items
-       plus the chips, and the settings icon was the one pushed off-screen. -->
+  <!-- The overflow was one overlong label, not the item count. "How bias
+       monitoring works" (25 chars) and "Suggest an improvement" (22) together
+       cost ~180px of a row that was already over budget. Shortened, both fit
+       inline again — see the 1100px breakpoint below for the measured figures. -->
   <nav class="topbar-nav" id="topbarNav">
     <button class="nav-btn active" data-action="switchTab" data-tab="analyzer">Analyzer</button>
     <button class="nav-btn" data-action="switchTab" data-tab="audit">Audit Log</button>
     <button class="nav-btn" data-action="switchTab" data-tab="history">Role History</button>
+    <!-- The static methodology explainer, not a report — the document a
+         recruiter generates for their own data lives in the Audit tab. Same
+         route it has always had; only the label is shorter. -->
+    <a class="nav-btn" href="/bias-report.html">Bias monitoring</a>
+    <!-- Keeps id="featureRequestNavBtn" so syncFeatureRequestNav still shows and
+         hides it by plan. Inside .topbar-nav so it collapses into the drawer
+         with the rest; carries no data-tab, so switchTab never sees it. -->
+    <button class="nav-btn" id="featureRequestNavBtn" type="button" data-action="openFeatureRequest" title="Suggest an improvement">Suggest</button>
   </nav>
+  <span class="nav-status-pill" id="navStatusPill" title="Backend status"><span class="dot" id="navStatusDot"></span><span class="conn-label" id="navStatusLabel">Not connected</span></span>
   <button type="button" class="nav-search-btn" id="navSearchBtn" data-action="focusAuditSearch" title="Search audit log" aria-label="Search audit log">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
   </button>
+  <!-- Immediately left of the avatar, where it sat relative to the email chip. -->
+  <span class="plan-chip" id="planChip" title="Your plan"><span class="plan-dot"></span><span id="planChipLabel"></span></span>
   <!-- Account menu. The trigger is an avatar rather than the email address: the
        email was the widest variable-width element in the bar, so it drove the
        overflow it now sits inside. -->
@@ -1049,23 +1082,16 @@ img, video, table { max-width: 100%; }
       <span id="accountAvatarLetter" aria-hidden="true"></span>
     </button>
     <div class="account-dropdown" id="accountDropdown" role="menu" aria-labelledby="accountAvatarBtn" hidden>
-      <!-- Identity + status. Not menu items: nothing here is actionable, so they
-           carry no role="menuitem" and are skipped by menu arrow navigation. -->
+      <!-- Identity. Not a menu item: nothing here is actionable, so it carries
+           no role="menuitem" and is skipped by menu arrow navigation. The plan
+           and connection chips moved back to the bar — the avatar freed the
+           width the email chip used to take, so they no longer need to hide in
+           here to fit. -->
       <div class="acct-dd-head">
         <div class="acct-dd-email" id="accountEmail"></div>
-        <div class="acct-dd-status">
-          <span class="plan-chip" id="planChip" title="Your plan"><span class="plan-dot"></span><span id="planChipLabel"></span></span>
-          <span class="nav-status-pill" id="navStatusPill" title="Backend status"><span class="dot" id="navStatusDot"></span><span id="navStatusLabel">Not connected</span></span>
-        </div>
       </div>
       <div class="acct-dd-sep" role="separator"></div>
       <button type="button" class="acct-dd-item" role="menuitem" data-action="toggleSettings">Settings</button>
-      <!-- Same id as before so syncFeatureRequestNav still shows/hides it by plan. -->
-      <button type="button" class="acct-dd-item" role="menuitem" id="featureRequestNavBtn" data-action="openFeatureRequest">Suggest an improvement</button>
-      <!-- The static methodology explainer, not a report — the document a
-           recruiter generates for their own data lives in the Audit tab. Same
-           route as before; only its position in the chrome changed. -->
-      <a class="acct-dd-item" role="menuitem" href="/bias-report.html">How bias monitoring works</a>
       <div class="acct-dd-sep" role="separator"></div>
       <button type="button" class="acct-dd-item acct-dd-danger" role="menuitem" id="logoutBtn" data-action="doLogout">Log out</button>
     </div>

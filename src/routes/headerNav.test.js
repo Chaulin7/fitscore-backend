@@ -52,52 +52,84 @@ function extractFunction(name) {
   return APP_HTML.slice(start, i + 1);
 }
 
-describe('primary nav holds exactly the three destinations', () => {
-  test('the nav exists and contains three tab buttons', () => {
+describe('primary nav holds the five inline destinations', () => {
+  // WAS "exactly the three destinations". The restructure that moved Bias
+  // monitoring and Suggest out treated the overflow as an item-count problem;
+  // it was one overlong label. "How bias monitoring works" (25 chars) and
+  // "Suggest an improvement" (22) cost ~180px between them. Shortened, both fit
+  // inline — and the row collapses at 1100px, where it measurably fits.
+  test('the nav exists and contains the three tab buttons', () => {
     assert.ok(NAV, 'topbar-nav must exist');
     const tabs = [...NAV[1].matchAll(/data-tab="([a-z]+)"/g)].map((m) => m[1]);
     assert.deepEqual(tabs, ['analyzer', 'audit', 'history']);
   });
 
-  test('nothing else lives in the bar nav', () => {
-    const buttons = NAV[1].match(/<button|<a\b/g) || [];
-    assert.equal(buttons.length, 3, `expected 3 nav items, found ${buttons.length}`);
+  test('the nav holds five items in the target order', () => {
+    const items = [...NAV[1].matchAll(/<(?:button|a)\b[^>]*>([^<]+)</g)].map((m) => m[1].trim());
+    assert.deepEqual(items, ['Analyzer', 'Audit Log', 'Role History', 'Bias monitoring', 'Suggest']);
   });
 
-  test('Suggest and Settings are gone from the nav', () => {
-    assert.doesNotMatch(NAV[1], /openFeatureRequest/);
+  test('the bias link is relabelled but keeps its destination', () => {
+    assert.match(NAV[1], /<a class="nav-btn" href="\/bias-report\.html">Bias monitoring<\/a>/);
+    // The label is what overflowed; the route was never the problem.
+    assert.doesNotMatch(NAV[1], /How bias monitoring works/);
+  });
+
+  test('Suggest is inline and keeps the id that plan-gates it', () => {
+    assert.match(NAV[1], /id="featureRequestNavBtn"/);
+    assert.match(NAV[1], /data-action="openFeatureRequest"/);
+    // syncFeatureRequestNav() shows/hides it by plan and addresses it by id.
+    assert.match(APP_HTML, /function syncFeatureRequestNav\(\)[\s\S]{0,200}getElementById\('featureRequestNavBtn'\)/);
+  });
+
+  test('the long labels that caused the overflow are gone from the bar', () => {
+    assert.doesNotMatch(TOPBAR[1], /Suggest an improvement<\/button>/);
+    assert.doesNotMatch(TOPBAR[1], /How bias monitoring works/);
+  });
+
+  test('Settings stays out of the nav — it is in the account menu', () => {
     assert.doesNotMatch(NAV[1], /toggleSettings/);
   });
 
-  test('the standalone settings gear button is gone from the bar', () => {
+  test('the standalone settings gear button is still gone from the bar', () => {
     assert.ok(TOPBAR, 'topbar must exist');
     assert.doesNotMatch(TOPBAR[1], /class="settings-btn"/);
   });
 
-  test('the plan chip and status pill are no longer direct bar children', () => {
-    // They still exist — they moved into the dropdown's status row.
-    assert.match(APP_HTML, /id="planChip"/);
-    assert.match(APP_HTML, /id="navStatusPill"/);
+  test('the plan chip and status pill are back as direct bar children', () => {
+    // They moved into the dropdown when the row was over budget. The avatar
+    // freed the width the email chip took, so they no longer need to hide.
     assert.ok(DROPDOWN, 'account dropdown must exist');
-    assert.match(DROPDOWN[1], /id="planChip"/);
-    assert.match(DROPDOWN[1], /id="navStatusPill"/);
+    assert.match(TOPBAR[1], /id="navStatusPill"/);
+    assert.match(TOPBAR[1], /id="planChip"/);
+    assert.doesNotMatch(DROPDOWN[1], /id="planChip"/);
+    assert.doesNotMatch(DROPDOWN[1], /id="navStatusPill"/);
+  });
+
+  test('the bar order is logo, nav, Connected, search, Pro, avatar', () => {
+    const order = [...TOPBAR[1].matchAll(/id="(topbarNav|navStatusPill|navSearchBtn|planChip|accountAvatarBtn)"/g)].map((m) => m[1]);
+    assert.deepEqual(order, ['topbarNav', 'navStatusPill', 'navSearchBtn', 'planChip', 'accountAvatarBtn']);
   });
 });
 
 describe('account dropdown contents', () => {
-  test('it carries the four moved entries', () => {
+  test('it carries Settings and Log out', () => {
+    // WAS "the four moved entries". Bias monitoring and Suggest went back to
+    // the bar; the plan and connection chips went with them. What remains is
+    // the conventional account-menu payload.
     assert.ok(DROPDOWN, 'account dropdown must exist');
-    for (const re of [
-      /data-action="toggleSettings"/,
-      /data-action="openFeatureRequest"/,
-      /href="\/bias-report\.html"/,
-      /data-action="doLogout"/,
-    ]) assert.match(DROPDOWN[1], re);
+    assert.match(DROPDOWN[1], /data-action="toggleSettings"/);
+    assert.match(DROPDOWN[1], /data-action="doLogout"/);
+  });
+
+  test('the entries that returned to the bar are not duplicated here', () => {
+    assert.doesNotMatch(DROPDOWN[1], /openFeatureRequest/);
+    assert.doesNotMatch(DROPDOWN[1], /bias-report\.html/);
   });
 
   test('every actionable entry is a menuitem', () => {
     const items = DROPDOWN[1].match(/role="menuitem"/g) || [];
-    assert.equal(items.length, 4, 'Settings, Suggest, explainer, Log out');
+    assert.equal(items.length, 2, 'Settings and Log out');
   });
 
   test('the email header row is NOT a menuitem — it is not actionable', () => {
@@ -112,8 +144,8 @@ describe('account dropdown contents', () => {
     assert.match(APP_HTML, /\.plan-chip \.plan-dot\{[^}]*background:#4ade80/);
   });
 
-  test('the route is unchanged — still /bias-report.html', () => {
-    assert.match(DROPDOWN[1], /href="\/bias-report\.html"/);
+  test('the route is unchanged — still /bias-report.html, now from the bar', () => {
+    assert.match(NAV[1], /href="\/bias-report\.html"/);
   });
 });
 
@@ -200,19 +232,28 @@ describe('keyboard and dismissal behaviour is registered', () => {
   });
 });
 
-describe('mobile breakpoint', () => {
-  test('primary links collapse below 900px', () => {
-    assert.match(APP_HTML, /@media \(max-width: 900px\)\{[\s\S]*?\.topbar-nav\{display:none\}/);
+describe('collapse breakpoint', () => {
+  // RAISED from 900px to 1100px when the inline items came back. Measured, the
+  // five-item row plus Connected, search, Pro and the avatar needs ~997-1028px
+  // of content width; a 901px viewport offers 837px. 900px would have put the
+  // row ~180px over budget and reproduced the original off-screen bug in a
+  // narrower band, so the breakpoint moved to where the row actually fits.
+  test('primary links collapse below 1100px', () => {
+    assert.match(APP_HTML, /@media \(max-width: 1100px\)\{[\s\S]*?\.topbar-nav\{display:none\}/);
+  });
+
+  test('the old 900px collapse is gone', () => {
+    assert.doesNotMatch(APP_HTML, /@media \(max-width: 900px\)\{[\s\S]{0,200}\.topbar-nav\{display:none\}/);
   });
 
   test('the hamburger appears at the same breakpoint', () => {
-    const block = /@media \(max-width: 900px\)\{([\s\S]*?)\n {4}\}/.exec(APP_HTML);
-    assert.ok(block, 'the 900px block must exist');
+    const block = /@media \(max-width: 1100px\)\{([\s\S]*?)\n {4}\}/.exec(APP_HTML);
+    assert.ok(block, 'the 1100px block must exist');
     assert.match(block[1], /\.mobile-menu-button\{display:flex\}/);
   });
 
   test('the account menu is NOT hidden at that breakpoint', () => {
-    const block = /@media \(max-width: 900px\)\{([\s\S]*?)\n {4}\}/.exec(APP_HTML);
+    const block = /@media \(max-width: 1100px\)\{([\s\S]*?)\n {4}\}/.exec(APP_HTML);
     assert.doesNotMatch(block[1], /\.account-menu\{display:none\}/);
     assert.doesNotMatch(block[1], /\.account-avatar\{display:none\}/);
   });
@@ -224,10 +265,25 @@ describe('mobile breakpoint', () => {
     assert.match(APP_HTML, /<nav class="topbar-nav" id="topbarNav">/);
   });
 
-  test('the superseded 640px label-swap workaround is gone', () => {
-    // The rules, not the comment explaining why they were removed.
+  test('the superseded label-swap workaround stays gone', () => {
     assert.doesNotMatch(MARKUP, /\.nav-btn-fr\s*[{.]/);
     assert.doesNotMatch(MARKUP, /class="[^"]*\bfr-(short|long)\b/);
+  });
+
+  test('below 640px the Connected label drops to the dot alone', () => {
+    // Measured: brand, hamburger, Connected, search, Pro and the avatar come to
+    // ~419px against ~359px available on a 375px phone. The label is the
+    // cheapest ~65px to reclaim; the dot still carries the state and the title
+    // attribute still names it.
+    assert.match(APP_HTML, /@media\(max-width:640px\)\{[\s\S]{0,200}\.nav-status-pill \.conn-label\{display:none\}/);
+    assert.match(APP_HTML, /<span class="conn-label" id="navStatusLabel">/);
+  });
+
+  test('the Pro label is NOT dropped at narrow widths', () => {
+    // Three characters, and the one a recruiter looks for. Only the Connected
+    // label is sacrificed, and only because its dot already carries the state.
+    assert.doesNotMatch(APP_HTML, /#planChipLabel\s*\{[^}]*display:\s*none/);
+    assert.doesNotMatch(APP_HTML, /\.plan-chip\s+span\s*\{[^}]*display:\s*none/);
   });
 });
 

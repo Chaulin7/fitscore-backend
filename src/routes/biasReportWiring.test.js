@@ -579,18 +579,20 @@ describe('the Audit tab markup wires the action up', () => {
     assert.doesNotMatch(btn, /disabled/);
   });
 
-  // The explainer link moved out of the top nav and into the account dropdown
-  // when the header was restructured for overflow. What matters has not changed
-  // — it is named for the page it opens, and it is not the generator — so the
-  // assertion follows it rather than pinning it to the bar.
+  // The link has moved twice: out of the top nav into the account dropdown when
+  // the header was restructured, then back to the nav under a shorter label
+  // once the overflow was traced to the label rather than the item count. What
+  // matters has never changed — it points at the methodology page and it is not
+  // the generator — so the assertion tracks those two facts, not its position.
   test('the explainer link points at the methodology page and is named for it', () => {
-    assert.match(APP_HTML, /<a class="acct-dd-item" role="menuitem" href="\/bias-report\.html">How bias monitoring works<\/a>/);
+    assert.match(APP_HTML, /<a class="nav-btn" href="\/bias-report\.html">Bias monitoring<\/a>/);
   });
 
-  test('the explainer is no longer a top-nav item', () => {
+  test('it is a nav link, not the generator', () => {
     const nav = /<nav class="topbar-nav"[^>]*>([\s\S]*?)<\/nav>/.exec(APP_HTML);
     assert.ok(nav, 'the primary nav must still exist');
-    assert.doesNotMatch(nav[1], /bias-report\.html/);
+    assert.match(nav[1], /bias-report\.html/);
+    assert.doesNotMatch(nav[1], /openBiasReport/, 'the generator lives in the Audit tab');
   });
 
   test('the methodology links elsewhere in the app are untouched', () => {
