@@ -232,6 +232,67 @@ describe('keyboard and dismissal behaviour is registered', () => {
   });
 });
 
+describe('bar alignment: nav hard left, cluster hard right', () => {
+  // The regression: .topbar-brand carried margin-right:auto. It predates the
+  // restructure and was invisible for as long as the bar overflowed, because an
+  // auto margin can only absorb free space and there was none. Once the row fit
+  // again it absorbed ALL of it right after the logo, floating the nav into the
+  // middle of the bar. Not justify-content, not flex-grow — neither is present.
+  test('the brand does not carry an auto margin', () => {
+    const brand = /\.topbar-brand\{([^}]*)\}/.exec(APP_HTML);
+    assert.ok(brand, '.topbar-brand must exist');
+    assert.doesNotMatch(brand[1], /margin-right:\s*auto/);
+    assert.doesNotMatch(brand[1], /margin:\s*[^;]*auto/);
+  });
+
+  test('the topbar uses no justify-content and the brand does not grow', () => {
+    const bar = /\.topbar\{([\s\S]*?)\}/.exec(APP_HTML);
+    assert.doesNotMatch(bar[1], /justify-content/);
+    const brand = /\.topbar-brand\{([^}]*)\}/.exec(APP_HTML);
+    assert.doesNotMatch(brand[1], /flex-grow|flex:\s*[1-9]/);
+  });
+
+  test('exactly one auto margin holds the free space, and it is on the pill', () => {
+    // One gap in the bar, between the nav and the right-hand cluster.
+    const autos = [...APP_HTML.matchAll(/^\s*(\.(?:topbar|nav|plan|account)[\w-]*)\{[^}]*margin[^;}]*auto/gm)]
+      .map((m) => m[1]);
+    assert.deepEqual([...new Set(autos)], ['.nav-status-pill']);
+  });
+
+  test('the pill keeps its auto margin at narrow widths too', () => {
+    // The nav is display:none below 1100px and a hidden element's margins do
+    // not apply, which is why the auto margin cannot live on .topbar-nav.
+    const narrow = /@media\(max-width:640px\)\{[\s\S]*?\.nav-status-pill\{([^}]*)\}/.exec(APP_HTML);
+    assert.ok(narrow, 'the 640px pill rule must exist');
+    assert.match(narrow[1], /auto/, 'the right cluster would collapse leftward without it');
+  });
+});
+
+describe('the bias link is visually identical to the tab buttons', () => {
+  test('nav-btn cancels the UA underline on the class, not inline', () => {
+    // It was cancelled by style="text-decoration:none" on that one element,
+    // which was dropped when the link was restored. Base state, not hover.
+    const btn = /\.nav-btn\{([\s\S]*?)\n\}/.exec(APP_HTML);
+    assert.ok(btn, '.nav-btn must exist');
+    assert.match(btn[1], /text-decoration:none/);
+  });
+
+  test('the link carries no inline style of its own', () => {
+    const link = /<a class="nav-btn" href="\/bias-report\.html"[^>]*>/.exec(APP_HTML);
+    assert.ok(link, 'the bias link must exist');
+    assert.doesNotMatch(link[0], /style=/);
+  });
+
+  test('hover and focus cannot reintroduce an underline', () => {
+    assert.match(APP_HTML, /\.nav-btn:hover,\.nav-btn:focus\{text-decoration:none\}/);
+  });
+
+  test('it shares the same class as the tab buttons, so hover/active match', () => {
+    const items = [...NAV[1].matchAll(/<(?:button|a)\s+class="([^"]*)"/g)].map((m) => m[1]);
+    for (const cls of items) assert.match(cls, /\bnav-btn\b/);
+  });
+});
+
 describe('collapse breakpoint', () => {
   // RAISED from 900px to 1100px when the inline items came back. Measured, the
   // five-item row plus Connected, search, Pro and the avatar needs ~997-1028px
