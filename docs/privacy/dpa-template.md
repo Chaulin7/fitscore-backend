@@ -8,7 +8,7 @@
 
 - **[Client legal name]** — the recruiter's organization, acting as data
   **Controller** ("Client"); and
-- **Chaulin [TODO: full legal name / registered address of the operating entity]**,
+- **Joyaco BV (KvK 42135911, BTW NL005523705B04) [TODO: registered address]**,
   operator of CVsprings, acting as data **Processor** ("Processor").
 
 ## 1. Subject matter and duration

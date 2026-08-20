@@ -358,6 +358,12 @@ function consumeDownloadToken(token) {
 
 // --- Legacy data migration ------------------------------------------------------
 
+// DELIBERATELY NOT RENAMED with the operating entity (src/config/legal.js).
+// This is not a display name — it is a primary key by another name. getLegacyOrg()
+// finds the row with `WHERE name = ?`, so changing the string stops matching the
+// organization that already exists in production, and the next boot creates a
+// second one while every pre-auth audit record stays attached to the first.
+// Renaming it is a data migration, not an edit.
 const LEGACY_ORG_NAME = 'Chaulin (legacy)';
 
 function getLegacyOrg() {

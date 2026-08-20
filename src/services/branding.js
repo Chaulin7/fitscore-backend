@@ -34,10 +34,11 @@
 const { capabilitiesFor } = require('../config/plans');
 const { isUnlimited } = require('./billing');
 const { tintedBrandmark } = require('./brandmark');
+const { LEGAL_NAME } = require('../config/legal');
 
-// The product brand, NOT the operating legal entity (that is Chaulin BV, set
-// via COMPANY_LEGAL_NAME and shown in terms/privacy). This name heads the
-// report for orgs that have not white-labelled it.
+// The product brand, NOT the operating legal entity (that is LEGAL_NAME in
+// src/config/legal.js, shown in the site footer and in terms/privacy). This
+// name heads the report for orgs that have not white-labelled it.
 //
 // BRAND_NAME / BRAND_COLOR are read at CALL time, not captured at module load,
 // so the guard against a hostile value is testable directly and so a config
@@ -48,8 +49,32 @@ const BRAND_COLOR_FALLBACK = '#0f2847';
 // The legal entity must never appear as a brand on a report. BRAND_NAME is
 // operator-supplied, so a misconfigured deployment could otherwise put it in
 // the header; resolveBranding() rejects it below and falls back to the product
-// name. Kept as a list so a rename adds a value rather than editing logic.
-const LEGAL_ENTITY_NAMES = Object.freeze(['Chaulin', 'Chaulin BV', 'Chaulin B.V.']);
+// name.
+//
+// The CURRENT entity is derived from the one place it is defined rather than
+// restated here, so a rename cannot leave this guard watching a name nobody
+// uses while the new one walks into a report header.
+const LEGAL_ENTITY_BARE = LEGAL_NAME.replace(/\s+B\.?\s*V\.?$/i, '').trim();
+const CURRENT_LEGAL_NAMES = [LEGAL_NAME, LEGAL_ENTITY_BARE, `${LEGAL_ENTITY_BARE} B.V.`];
+
+/**
+ * Entity names this operation has RETIRED. APPEND-ONLY — never prune it.
+ *
+ * Deriving from LEGAL_NAME fixes the guard for the current entity but silently
+ * un-guards the previous one, and a retired name is exactly the value that
+ * outlives the rename: it sits in a deployment's env until someone remembers to
+ * clear it. COMPANY_LEGAL_NAME=Chaulin BV is still set in Render as this is
+ * written, months after that entity stopped being the operator. Nothing about
+ * the rename reached out and unset it, and nothing ever will.
+ *
+ * So entries here stay forever. They cost one string comparison each and they
+ * are never wrong: a name that was once the operating entity must never head a
+ * report, whether or not it is the operating entity today. The only maintenance
+ * this list needs is an append on the next rename.
+ */
+const RETIRED_LEGAL_NAMES = Object.freeze(['Chaulin', 'Chaulin BV', 'Chaulin B.V.']);
+
+const LEGAL_ENTITY_NAMES = Object.freeze([...CURRENT_LEGAL_NAMES, ...RETIRED_LEGAL_NAMES]);
 
 /**
  * The provenance footer's platform string.
@@ -87,7 +112,7 @@ function isLegalEntityName(value) {
 
 // The platform brand name, guarded against a deployment that has pointed
 // BRAND_NAME at the legal entity. Falls back to the product name rather than
-// trusting the env — a misconfigured operator cannot put "Chaulin" on a report.
+// trusting the env — a misconfigured operator cannot put the entity on a report.
 function platformBrandName() {
   const configured = process.env.BRAND_NAME || BRAND_NAME_FALLBACK;
   return isLegalEntityName(configured) ? BRAND_NAME_FALLBACK : configured;
@@ -275,6 +300,7 @@ module.exports = {
   platformBrandName,
   platformBrandColor,
   LEGAL_ENTITY_NAMES,
+  RETIRED_LEGAL_NAMES,
   PROVENANCE_PLATFORM,
   HEADER_MARK_FIT,
   ON_DARK_MARK_COLOR,
