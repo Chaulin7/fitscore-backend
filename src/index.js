@@ -19,6 +19,7 @@ const featureRequestsRouter = require('./routes/featureRequests');
 const plansRouter = require('./routes/plans');
 const { productJsonLd } = require('./config/plans');
 const { configuredBaseUrl, warnDeprecatedAliases } = require('./config/appUrl');
+const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE: LEGAL_FOOTER_LINE } = require('./config/legal');
 const { migrateLegacyData } = require('./services/authService');
 const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { startProvenanceSweep } = require('./services/provenanceCache');
@@ -193,10 +194,17 @@ const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.h
 // warnDeprecatedAliases below, which says so at boot).
 const pricingJsonLd = JSON.stringify(productJsonLd(configuredBaseUrl()))
   .replaceAll('<', '\\u003c');
+// Legal entity details (art. 3:15d BW) are substituted the same way and for
+// the same reason: they are constant per deploy, and they must be in the HTML
+// the server sends rather than fetched afterwards, so a visitor without JS
+// still sees them. Every page in HTML_PAGES carries both placeholders in its
+// footer — src/config/legal.test.js fails the build if one stops doing so.
 const htmlTemplates = {};
 for (const page of HTML_PAGES) {
   htmlTemplates[page] = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8')
-    .replaceAll('__PRICING_JSONLD__', pricingJsonLd);
+    .replaceAll('__PRICING_JSONLD__', pricingJsonLd)
+    .replaceAll('__LEGAL_FOOTER__', LEGAL_FOOTER_LINE)
+    .replaceAll('__LEGAL_NAME__', LEGAL_NAME);
 }
 function serveNoncedHtml(page) {
   return (req, res) => {
@@ -254,7 +262,12 @@ app.get('/api/meta', generalLimiter, (req, res) => {
     privacyContact: process.env.PRIVACY_CONTACT_EMAIL || null,
     supportEmail: process.env.SUPPORT_EMAIL || null,
     company: {
-      legalName: process.env.COMPANY_LEGAL_NAME || null,
+      // From src/config/legal.js, not COMPANY_LEGAL_NAME. That variable is
+      // still set to a stale entity name on existing deployments, and reading
+      // it here would let /terms.html contradict the footer on the same page.
+      legalName: LEGAL_NAME,
+      kvk: KVK,
+      btwId: BTW_ID,
       address: process.env.COMPANY_ADDRESS || null,
       country: process.env.COMPANY_COUNTRY || null,
     },

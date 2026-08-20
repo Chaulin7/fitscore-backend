@@ -53,6 +53,6 @@
 
 ## Review
 
-Owner: operator (Chaulin). Review this policy when the data model, hosting, or
+Owner: operator (Joyaco BV). Review this policy when the data model, hosting, or
 retention features change, and at least every 12 months. Next review:
 **2027-06-12** or on change, whichever is first.
