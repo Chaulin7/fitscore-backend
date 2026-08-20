@@ -1871,6 +1871,8 @@ function onAuthed(d){
   updateAccountChip();
   hideAuthScreen();
   initApp();
+  // No-op unless a validated ?plan= intent came in from the pricing page.
+  resumeCheckoutIntent();
 }
 
 async function doLogin(){
@@ -2448,6 +2450,57 @@ function handleBillingReturn(){
   })();
 }
 
+// ── Checkout intent carried in from the pricing page ────────────────────────
+// The landing page's "Get Pro/Team" buttons send logged-OUT visitors here as
+// /signup?plan=<tier id> rather than dropping the purchase. The id is not
+// trusted from the URL: it has to match a tier in GET /api/plans
+// (src/config/plans.js) that is actually purchasable, and the plan we then send
+// to checkout is that tier's own `upgradePlan`, never the raw query value.
+// Anything unrecognised is ignored — the visitor just signs up normally.
+let _pendingCheckoutPlan = null;
+
+function stripPlanParam(){
+  try {
+    const u = new URL(window.location.href);
+    if (!u.searchParams.has('plan')) return;
+    u.searchParams.delete('plan');
+    history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
+  } catch (_) {}
+}
+
+async function capturePlanIntent(params){
+  const raw = params && params.get('plan');
+  if (!raw) return null;
+  const cfg = await loadPlans();
+  const tier = ((cfg && cfg.tiers) || []).find(function(t){ return t.id === raw && t.upgradePlan; });
+  _pendingCheckoutPlan = tier ? tier.upgradePlan : null;
+  if (!_pendingCheckoutPlan) stripPlanParam(); // nothing to resume — don't leave it lying in the URL
+  return _pendingCheckoutPlan;
+}
+
+// Runs after every successful auth (signup, login, invite accept). A visitor
+// who clicked "Get Pro" and then created an account goes straight into Stripe
+// Checkout instead of landing on the dashboard and having to find the upgrade
+// button again. Reuses startCheckout — the same POST /api/billing/checkout the
+// in-product flow uses.
+async function resumeCheckoutIntent(){
+  const plan = _pendingCheckoutPlan;
+  if (!plan) return;
+  _pendingCheckoutPlan = null;
+  stripPlanParam();
+  const name = plan === 'team' ? 'Team' : 'Pro';
+  // Already subscribed to exactly this plan: no second subscription, stay put.
+  const b = await refreshUsage();
+  if (b && b.plan === plan) { toast('You’re already on the ' + name + ' plan.', 'info'); return; }
+  let me = null;
+  try { me = await api('/api/auth/me'); } catch (_) {}
+  if (!(me && me.user && me.user.role === 'owner')) {
+    toast('Ask your organization owner to upgrade to ' + name + '.', 'info', 6000);
+    return;
+  }
+  startCheckout(plan);
+}
+
 // Keep the usage chip fresh after each completed analysis.
 document.addEventListener('cv:analyze_completed', function(){ refreshUsage(); });
 
@@ -2476,6 +2529,10 @@ async function bootAuth(){
   let params = null;
   try { params = new URLSearchParams(window.location.search); } catch (_) {}
 
+  // 0) A purchase intent handed over by the pricing page (/signup?plan=pro).
+  //    Validated here; consumed by resumeCheckoutIntent once auth succeeds.
+  const planIntent = await capturePlanIntent(params);
+
   // 1) Arriving from a password-reset email link
   const resetToken = params && params.get('reset_token');
   if (resetToken) {
@@ -2502,8 +2559,10 @@ async function bootAuth(){
     }
     return;
   }
-  // 3) Fresh visitor
-  showAuthScreen();
+  // 3) Fresh visitor. Someone sent here by a "Get Pro" button asked to buy, not
+  //    to sign in — open on the signup form so the intent is not lost behind a
+  //    login screen they have no account for.
+  showAuthScreen(planIntent && window.location.pathname === '/signup' ? 'signup' : 'login');
 }
 
 // Single-use download token for browser-opened URLs (report HTML, CSV export)

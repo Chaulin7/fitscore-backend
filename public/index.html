@@ -132,7 +132,22 @@ h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.4vw,36px);l
 .tier ul{list-style:none;font-size:14px;color:var(--ink-soft);flex:1}
 .tier li{padding:7px 0;border-top:1px solid var(--rule)}
 .tier li::before{content:"—";margin-right:10px;color:var(--rule)}
-.tier .btn{margin-top:24px;text-align:center}
+.tier .btn{margin-top:24px;text-align:center;width:100%}
+/* VAT qualifier. The prices are ex-VAT, so a bare "€49" would overstate what
+   the customer gets for their money; this rides alongside every price rather
+   than being crammed into the button label. */
+.price .tax{font-family:var(--body);font-weight:400;font-size:13px;color:var(--ink-soft);letter-spacing:0}
+/* Secondary CTA under a purchase button (Team keeps a route to the demo form). */
+.tier-alt{display:block;text-align:center;margin-top:10px;font-size:13px;color:var(--ink-soft)}
+.tier-alt:hover{color:var(--ink)}
+/* Per-card status line for checkout failures (owner-only, billing off, …). */
+.tier-msg{font-family:var(--mono);font-size:11.5px;line-height:1.6;margin-top:10px;color:#B3242C;display:none}
+.tier-msg a{color:inherit}
+/* Not an error — an entitlement note shown before the visitor clicks anything. */
+.tier-msg.note{color:var(--ink-soft)}
+.tier .btn[disabled]{cursor:default;opacity:.55}
+.tier .btn[disabled]:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.tier .btn.btn-ghost[disabled]:hover{background:transparent;color:var(--ink)}
 .included{margin-top:28px;border:1px solid var(--rule);background:var(--panel);padding:24px 28px}
 .included-head{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--stamp);margin-bottom:12px}
 .included ul{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:0 28px;font-size:14px;color:var(--ink-soft)}
@@ -393,25 +408,47 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   var grid=document.getElementById('pricingTiers');
   var included=document.getElementById('pricingIncluded');
   if(!grid)return;
-  var FALLBACK_CTA={href:'#demo',label:'Book a demo',cls:'btn-ghost'};
-  var CTA={
-    free:{href:'/signup',label:'Start free',cls:'btn-ghost'},
-    pro:{href:'#demo',label:'Book a demo',cls:'btn-primary'},
-    team:{href:'#demo',label:'Book a demo',cls:'btn-ghost'}
-  };
+  // CTA policy. What a button SAYS is never written here: the tier name, price
+  // and period all come out of the payload, so a price change in
+  // src/config/plans.js changes these buttons with no edit to this page. Only
+  // the ROUTING is page-specific:
+  //   no upgradePlan (Free) -> straight to signup
+  //   upgradePlan present   -> self-serve Stripe Checkout, wired through the
+  //                            delegated data-action block further down.
+  //                            `upgradePlan` is the plan id POST
+  //                            /api/billing/checkout expects, published by
+  //                            plans.js itself rather than retyped here.
+  //   SECONDARY_DEMO        -> tiers that also keep a link to the demo form.
+  var DEMO_HREF='#demo';
+  var SECONDARY_DEMO={team:'Or book a demo'};
   var BADGE={pro:'Most agencies'};
   function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+  function ctaHtml(t){
+    if(t.upgradePlan){
+      var plan=esc(t.upgradePlan);
+      return '<button type="button" class="btn btn-primary" data-action="startCheckout" data-plan="'+plan+'">'
+        +'Get '+esc(t.name)+' — '+esc(t.priceLabel)+esc(t.per||'')+'</button>'
+        // No VAT qualifier here: it sits beside the price a few lines up, and
+        // twice on one card reads as clutter rather than as care.
+        +(SECONDARY_DEMO[t.id]
+          ? '<a class="tier-alt" href="'+DEMO_HREF+'">'+esc(SECONDARY_DEMO[t.id])+'</a>' : '')
+        +'<div class="tier-msg" id="tierMsg-'+plan+'" role="status" aria-live="polite"></div>';
+    }
+    if(t.id==='free') return '<a class="btn btn-ghost" href="/signup">Start free</a>';
+    return '<a class="btn btn-ghost" href="'+DEMO_HREF+'">Book a demo</a>';
+  }
+
   function render(cfg){
     grid.innerHTML=(cfg.tiers||[]).map(function(t){
-      var cta=CTA[t.id]||FALLBACK_CTA;
       return '<div class="tier'+(t.featured?' featured':'')+'">'
         +(BADGE[t.id]?'<div class="badge">'+esc(BADGE[t.id])+'</div>':'')
         +'<h3>'+esc(t.name)+'</h3>'
-        +'<div class="price">'+esc(t.priceLabel)+'<small> '+esc(t.per)+'</small></div>'
+        +'<div class="price">'+esc(t.priceLabel)+'<small> '+esc(t.per)
+          +(t.taxNote?' <span class="tax">'+esc(t.taxNote)+'</span>':'')+'</small></div>'
         +(t.tagline?'<div class="meter">'+esc(t.tagline)+'</div>':'')
         +'<ul>'+(t.highlights||[]).map(function(h){return '<li>'+esc(h)+'</li>';}).join('')+'</ul>'
-        +'<a class="btn '+cta.cls+'" href="'+esc(cta.href)+'">'+esc(cta.label)+'</a>'
+        +ctaHtml(t)
         +'</div>';
     }).join('');
     grid.removeAttribute('data-skeleton');
@@ -424,6 +461,11 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
       included.removeAttribute('data-skeleton');
       included.removeAttribute('aria-busy');
     }
+    // The cards now exist but say the same thing to everyone. What a given
+    // visitor is actually entitled to do (owner vs member, current plan) is a
+    // session question, not a plan-table one, so it is answered in the checkout
+    // block below — which owns the session — rather than here.
+    document.dispatchEvent(new CustomEvent('cv:pricing_rendered'));
   }
 
   function fail(){
@@ -439,6 +481,156 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
     .then(function(r){ if(!r.ok)throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(cfg){ if(!cfg||!cfg.tiers)throw new Error('malformed'); render(cfg); })
     .catch(fail);
+})();
+</script>
+<script nonce="__CSP_NONCE__">
+/* Self-serve purchase from the pricing cards.
+   Event delegation (CSP hardening) — same shape as public/app.html and
+   public/compliance.html. Helmet sets script-src-attr 'none', so an onclick
+   here would not merely be poor style, it would be a dead button. The cards are
+   rendered after this script runs, which is exactly why delegation is the right
+   fit: the listener is on document and needs no element to exist yet.
+
+   There is deliberately NO second checkout endpoint for the marketing page.
+   These buttons call the same POST /api/billing/checkout the in-product upgrade
+   flow calls, with the same plan ids (published by src/config/plans.js as
+   `upgradePlan`), so pricing, entitlement and payment can never disagree. */
+(function(){
+  // Written by public/app.html, which the same server serves from this origin.
+  var SESSION_KEY='cvsprings_session_token';
+  // The product itself. NOT /login: this is where someone who is already signed
+  // in belongs, and saying so in the URL is the difference between arriving at
+  // the app and being shown an auth route that happens to redirect.
+  var APP_URL='/dashboard';
+
+  function token(){ try{ return localStorage.getItem(SESSION_KEY)||''; }catch(_){ return ''; } }
+  function dropToken(){ try{ localStorage.removeItem(SESSION_KEY); }catch(_){} }
+  function msgEl(plan){ return document.getElementById('tierMsg-'+plan); }
+  function showMsg(plan,html,note){
+    var el=msgEl(plan); if(!el)return;
+    el.innerHTML=html;
+    el.className='tier-msg'+(note?' note':'');
+    el.style.display='block';
+  }
+  function clearMsg(plan){ var el=msgEl(plan); if(!el)return; el.textContent=''; el.className='tier-msg'; el.style.display='none'; }
+  // The intent rides along in the URL; app.html validates it against /api/plans
+  // and resumes checkout once the account exists.
+  function toAuth(page,plan){ window.location=page+'?plan='+encodeURIComponent(plan); }
+
+  function apiFetch(path,method,body){
+    var headers={Accept:'application/json',Authorization:'Bearer '+token()};
+    if(body)headers['Content-Type']='application/json';
+    return fetch(path,{method:method||'GET',headers:headers,body:body?JSON.stringify(body):undefined})
+      .then(function(r){
+        return r.json().catch(function(){return null;}).then(function(d){
+          if(!r.ok){
+            var e=new Error((d&&d.error)||('HTTP '+r.status));
+            e.status=r.status; e.code=d&&d.code;
+            throw e;
+          }
+          return d;
+        });
+      });
+  }
+
+  function startCheckout(el){
+    var plan=el.getAttribute('data-plan');
+    if(!plan)return;
+    clearMsg(plan);
+    // Logged out: no session to attach a subscription to. Sign them up first.
+    if(!token()){ toAuth('/signup',plan); return; }
+
+    var label=el.textContent;
+    el.disabled=true; el.textContent='Starting checkout…';
+    function restore(){ el.disabled=false; el.textContent=label; }
+
+    // Ask what the org is on BEFORE creating anything: an org already on this
+    // plan must not be sold a second subscription — it gets its dashboard.
+    apiFetch('/api/billing/usage')
+      .then(function(b){
+        if(b&&b.plan===plan){ window.location=APP_URL; return null; }
+        return apiFetch('/api/billing/checkout','POST',{plan:plan});
+      })
+      .then(function(d){
+        if(!d)return; // already-on-this-plan branch, already navigating away
+        if(d.url){ window.location=d.url; return; }
+        restore();
+        showMsg(plan,'Could not start checkout. <a href="#demo">Book a demo</a> and we\'ll set it up with you.');
+      })
+      .catch(function(e){
+        restore();
+        if(e.status===401){ dropToken(); toAuth('/login',plan); return; } // expired session
+        if(e.code==='OWNER_REQUIRED'){
+          showMsg(plan,'Only your organization\'s owner can start a subscription — ask them to upgrade from Settings → Plan &amp; Billing.');
+          return;
+        }
+        // Both are "the server cannot take money right now", which from a
+        // visitor's side is one situation, not two. The owner gets the specific
+        // Stripe Tax text in-app; a stranger on the pricing page does not need
+        // to read about our tax registrations.
+        if(e.code==='BILLING_NOT_CONFIGURED'||e.code==='TAX_NOT_CONFIGURED'){
+          showMsg(plan,'Card payment isn\'t available right now. <a href="#demo">Book a demo</a> and we\'ll set you up.');
+          return;
+        }
+        showMsg(plan,'Could not start checkout. Please try again, or <a href="#demo">book a demo</a>.');
+      });
+  }
+
+  // --- Entitlement, decided BEFORE the visitor clicks -----------------------
+  // A member of an org cannot start a subscription (POST /api/billing/checkout
+  // is owner-only), and an org already on a tier cannot buy it twice. Both were
+  // previously only discoverable by clicking and being told no, which is a
+  // button that lies about what it does. One paired lookup answers both.
+  //
+  // This is presentation only and deliberately fail-open: if either call fails
+  // the cards keep their normal purchase buttons and the click path — which is
+  // the real, server-enforced gate — handles it exactly as before.
+  function ctaButtons(){
+    return Array.prototype.slice.call(
+      document.querySelectorAll('#pricingTiers button[data-action="startCheckout"]'),
+    );
+  }
+
+  function applyEntitlement(me,usage){
+    var isOwner=!!(me&&me.user&&me.user.role==='owner');
+    var currentPlan=(usage&&usage.plan)||'free';
+    ctaButtons().forEach(function(btn){
+      var plan=btn.getAttribute('data-plan');
+      if(plan===currentPlan){
+        btn.disabled=true;
+        btn.textContent='Your current plan';
+        showMsg(plan,'Manage it from your <a href="'+APP_URL+'">dashboard</a>.',true);
+        return;
+      }
+      if(!isOwner){
+        btn.disabled=true;
+        showMsg(plan,'Only your organization’s owner can start a subscription.',true);
+      }
+    });
+  }
+
+  function syncEntitlement(){
+    if(!token())return; // logged out: everyone gets the plain purchase button
+    Promise.all([
+      apiFetch('/api/auth/me'),
+      apiFetch('/api/billing/usage'),
+    ]).then(function(r){ applyEntitlement(r[0],r[1]); })
+      .catch(function(){ /* fail open — the click path still enforces */ });
+  }
+  document.addEventListener('cv:pricing_rendered',syncEntitlement);
+
+  var delegatedHandlers={
+    click:{ startCheckout: startCheckout },
+  };
+  Object.keys(delegatedHandlers).forEach(function(eventType){
+    var map=delegatedHandlers[eventType];
+    document.addEventListener(eventType,function(e){
+      var el=e.target.closest('[data-action]');
+      if(!el)return;
+      var fn=map[el.dataset.action];
+      if(typeof fn==='function')fn(el,e);
+    });
+  });
 })();
 </script>
 <script nonce="__CSP_NONCE__">
