@@ -17,6 +17,7 @@ const { requireSession } = require('../middleware/auth');
 const auth = require('../services/authService');
 const billing = require('../services/billing');
 const { getOrgBilling } = require('../services/db');
+const { baseUrlFor } = require('../config/appUrl');
 
 const router = express.Router();
 
@@ -48,10 +49,9 @@ function atSeatLimit(orgId) {
   return auth.countOrgUsers(orgId) >= TEAM_MAX_MEMBERS;
 }
 
-function appBaseUrl(req) {
-  const fromEnv = (process.env.APP_BASE_URL || '').replace(/\/+$/, '');
-  return fromEnv || `${req.protocol}://${req.get('host')}`;
-}
+// Invite links go in emails, so they must carry the public origin. Resolved by
+// the one shared helper (src/config/appUrl.js).
+const appBaseUrl = baseUrlFor;
 
 async function deliverInviteEmail(email, orgName, inviteUrl) {
   const resendKey = process.env.RESEND_API_KEY;

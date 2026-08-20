@@ -20,7 +20,7 @@ hardcoded — all Stripe identifiers come from here.
 | `STRIPE_PRICE_PRO` | Recurring price ID for the Pro plan | `price_...` |
 | `STRIPE_PRICE_TEAM` | Recurring price ID for the Team plan | `price_...` |
 | `FREE_MONTHLY_LIMIT` | Free analyses per org per month (optional, default 25) | `25` |
-| `APP_BASE_URL` | Base URL for Checkout success/cancel + portal return | `https://cvsprings7.onrender.com` |
+| `PUBLIC_APP_URL` | Public origin for Checkout success/cancel + portal return. `FRONTEND_URL` / `APP_BASE_URL` are deprecated aliases; see `src/config/appUrl.js` | `https://cvsprings.com` |
 
 If `STRIPE_SECRET_KEY` is unset the app still boots; billing endpoints return
 `503 BILLING_NOT_CONFIGURED` and every org stays on Free with the monthly cap.
@@ -38,7 +38,7 @@ If `STRIPE_SECRET_KEY` is unset the app still boots; billing endpoints return
 
 ## Webhook registration
 
-- **Endpoint URL:** `{APP_BASE_URL}/api/billing/webhook`
+- **Endpoint URL:** `{PUBLIC_APP_URL}/api/billing/webhook`
   (e.g. `https://cvsprings7.onrender.com/api/billing/webhook`).
   > This URL changes from the Render URL to the custom domain when the
   > domain-merge step lands — update the endpoint in the Stripe dashboard then;
@@ -102,4 +102,4 @@ In test mode (Stripe Checkout), use any future expiry, any CVC, any postal code:
 2. Set `STRIPE_SECRET_KEY` to the live secret key.
 3. Register a **live-mode** webhook at the production URL and set
    `STRIPE_WEBHOOK_SECRET` to its live signing secret.
-4. Set `APP_BASE_URL` to the production domain.
+4. Set `PUBLIC_APP_URL` to the production domain (it is the only URL variable; `APP_BASE_URL` still works as a deprecated alias).

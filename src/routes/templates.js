@@ -11,9 +11,15 @@ const router = express.Router();
 // the same file): DATABASE_PATH preferred, DB_PATH legacy alias, local fallback.
 const DB_PATH = process.env.DATABASE_PATH || process.env.DB_PATH
   || path.join(__dirname, '..', '..', 'data', 'audit.db');
+// This router is a second door onto the same file, so it needs the same test
+// guard — otherwise a suite blocked from data/audit.db by services/db could
+// still reach it through here.
+const { assertNotTheRealDatabase } = require('../services/db');
+
 let db;
 function getDb() {
   if (!db) {
+    assertNotTheRealDatabase();
     const fs = require('fs');
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

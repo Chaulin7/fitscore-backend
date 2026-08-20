@@ -6,6 +6,7 @@ const { requireSession } = require('../middleware/auth');
 const auth = require('../services/authService');
 const brandingService = require('../services/branding');
 const { getDb } = require('../services/db');
+const { baseUrlFor } = require('../config/appUrl');
 
 const router = express.Router();
 
@@ -247,11 +248,9 @@ router.post('/request-reset', async (req, res) => {
     const rawToken = auth.createPasswordReset(user.id);
     // Reset links must point at the public customer-facing origin, NOT the
     // request host — behind Render that host is the *.onrender.com proxy host,
-    // which produces a broken/incorrect link. PUBLIC_APP_URL is the canonical
-    // origin (set in Render); FRONTEND_URL / APP_BASE_URL are accepted as
-    // legacy aliases. The request origin is used only as a dev fallback when
-    // none of these are set.
-    const base = (process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    // which produces a broken/incorrect link. See src/config/appUrl.js for the
+    // resolution order; the request origin is only a dev fallback.
+    const base = baseUrlFor(req);
     const resetLink = `${base}/?reset_token=${rawToken}`;
     try {
       await deliverResetLink(email, resetLink);

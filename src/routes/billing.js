@@ -23,6 +23,7 @@ const {
   getOrgBilling, getUsageCount, currentPeriodKey,
   setOrgStripeCustomerId, findOrgByStripeCustomerId, setOrgPlan,
 } = require('../services/db');
+const { baseUrlFor } = require('../config/appUrl');
 
 const router = express.Router();
 
@@ -38,11 +39,11 @@ function requireOwner(req, res, next) {
   return next();
 }
 
-function appBaseUrl(req) {
-  const fromEnv = (process.env.APP_BASE_URL || '').replace(/\/+$/, '');
-  if (fromEnv) return fromEnv;
-  return `${req.protocol}://${req.get('host')}`;
-}
+// Stripe success/cancel and portal-return URLs. Resolved by the one shared
+// helper (src/config/appUrl.js) rather than reading APP_BASE_URL directly, so a
+// deployment that sets only PUBLIC_APP_URL no longer sends customers back to the
+// proxy host after paying.
+const appBaseUrl = baseUrlFor;
 
 // GET /api/billing/usage — plan + usage for the current period (any member)
 router.get('/usage', requireSession, (req, res) => {
@@ -62,6 +63,45 @@ router.get('/usage', requireSession, (req, res) => {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
+
+// --- Stripe Tax misconfiguration ------------------------------------------
+// Turning automatic_tax on moves a whole class of failure from "impossible" to
+// "one dashboard setting away": Stripe Tax needs an origin address on the
+// account, at least one active registration, and a tax_behavior on every Price
+// (a Price created with tax_behavior 'unspecified' cannot be used with
+// automatic tax, and that field is immutable, so it needs a NEW Price).
+//
+// All of those surface as a generic Stripe error at session creation, which
+// previously became a 502 STRIPE_ERROR and, on the pricing page, a button that
+// silently did nothing. None of them are the customer's fault or the code's;
+// they are all "go fix the Stripe dashboard". They get their own code so the
+// logs, the owner's toast and the visitor's message all say tax.
+//
+// Matched on Stripe's own error codes first, then on the parameter/message,
+// because the parameter-level failures (automatic_tax[enabled], tax_behavior)
+// arrive without a stable machine code.
+const TAX_ERROR_CODES = new Set([
+  'customer_tax_location_invalid',
+  'tax_id_invalid',
+  'invalid_tax_location',
+]);
+
+function isTaxConfigError(err) {
+  if (!err) return false;
+  if (err.code && TAX_ERROR_CODES.has(err.code)) return true;
+  const haystack = `${err.param || ''} ${err.message || ''}`;
+  return /automatic_tax|tax_id_collection|tax_behavior|tax registration|origin address|stripe tax|tax settings/i
+    .test(haystack);
+}
+
+function taxConfigMessage(err) {
+  // The underlying text is kept: it is the fastest route to the offending
+  // setting, and this endpoint is owner-only, so it is not leaking to the world.
+  const detail = err && err.message ? ` Stripe said: ${err.message}` : '';
+  return 'Checkout could not start because this account\'s Stripe Tax configuration is '
+    + 'incomplete. Stripe Tax needs an origin address, at least one active tax registration, '
+    + `and a tax behavior set on each price.${detail}`;
+}
 
 // POST /api/billing/checkout { plan: 'pro'|'team' } (owner only)
 router.post('/checkout', requireSession, requireOwner, async (req, res) => {
@@ -99,9 +139,28 @@ router.post('/checkout', requireSession, requireOwner, async (req, res) => {
       cancel_url: `${base}/?billing=cancel`,
       metadata: { orgId: req.orgId, plan },
       subscription_data: { metadata: { orgId: req.orgId, plan } },
+
+      // --- Stripe Tax ------------------------------------------------------
+      // Stripe decides the rate. Nothing here encodes a rate, a country or a
+      // threshold: that logic lives in the Stripe dashboard's tax settings and
+      // registrations, which change without a deploy.
+      //
+      // We create the Customer ourselves (above) with no address — the app
+      // holds none — so on a first purchase there is nothing for Stripe Tax to
+      // locate. Checkout collects a billing address when automatic_tax is on,
+      // and customer_update writes it back onto the Customer so the second
+      // purchase, the subscription renewals and the invoices all have it.
+      // Without customer_update, Stripe rejects the session outright for an
+      // existing Customer.
+      automatic_tax: { enabled: true },
+      tax_id_collection: { enabled: true }, // EU B2B: VAT number -> reverse charge
+      customer_update: { address: 'auto', name: 'auto' },
     });
     res.json({ url: session.url });
   } catch (err) {
+    if (isTaxConfigError(err)) {
+      return sendError(res, 503, 'TAX_NOT_CONFIGURED', taxConfigMessage(err));
+    }
     sendError(res, 502, 'STRIPE_ERROR', err.message);
   }
 });

@@ -37,8 +37,44 @@
 const WHITE_LABEL_HIGHLIGHT =
   'White-label reports — replace the CVsprings mark with your own logo';
 
+// Money is stored ONCE per tier, as a number (`priceAmount`), and the display
+// string is derived from it. Before, `priceLabel: '€49'` was the only record of
+// the price, which was fine while the only consumer was a card that prints it —
+// but the search-engine structured data on the pricing page needs a numeric
+// amount and an ISO currency code, and re-deriving those by parsing '€49' would
+// have made a second, quietly divergent source of the price. CURRENCY carries
+// both forms of the currency for the same reason.
+const CURRENCY = { symbol: '€', code: 'EUR' };
+const priceLabelFor = (amount) => `${CURRENCY.symbol}${amount}`;
+
+/**
+ * Whether the amounts above are the total a customer pays.
+ *
+ * They are NOT: the Stripe Prices behind STRIPE_PRICE_PRO / STRIPE_PRICE_TEAM
+ * are `tax_behavior: 'exclusive'`, so Stripe Tax adds VAT on top at checkout — a
+ * Dutch customer is charged 49 x 1.21 = 59.29. Advertising a bare "€49" as the
+ * price is therefore a claim that is not true for most buyers.
+ *
+ * ONE constant drives both expressions of that fact: the human qualifier next to
+ * every rendered price, and `valueAddedTaxIncluded` in the structured data a
+ * crawler reads. If the Stripe Prices are ever recreated as 'inclusive' (the
+ * field is immutable, so that means new Price objects and new env values), flip
+ * `included` here and every price on the site follows.
+ *
+ * `note` is deliberately not rendered on the Free tier: VAT on €0 is €0, and a
+ * qualifier there is noise, not accuracy.
+ */
+const TAX = Object.freeze({
+  included: false,
+  note: 'excl. VAT',
+});
+
+// The qualifier a tier should display, or null where it does not apply.
+const taxNoteFor = (amount) => (TAX.included || !amount ? null : TAX.note);
+
 const PLANS = {
-  currency: '€',
+  currency: CURRENCY.symbol,
+  currencyCode: CURRENCY.code,
 
   // Included on all plans (not gated in code).
   baseline: [
@@ -54,14 +90,16 @@ const PLANS = {
   // Ordered low -> high; `highlights` are the ENFORCED per-tier differentiators.
   tiers: [
     {
-      id: 'free', name: 'Free', priceLabel: '€0', per: '/month',
+      id: 'free', name: 'Free', priceAmount: 0, priceLabel: priceLabelFor(0), per: '/month',
+      taxNote: taxNoteFor(0),
       tagline: 'Try CVsprings on a real role.',
       limits: { analysesPerMonth: 25, seats: 1 },
       capabilities: { customBranding: false },
       highlights: ['25 CV analyses / month', 'Single user'],
     },
     {
-      id: 'pro', name: 'Pro', priceLabel: '€49', per: '/month', featured: true,
+      id: 'pro', name: 'Pro', priceAmount: 49, priceLabel: priceLabelFor(49), per: '/month', featured: true,
+      taxNote: taxNoteFor(49),
       tagline: 'For recruiters screening at volume.',
       limits: { analysesPerMonth: null, seats: 1 },
       capabilities: { customBranding: true },
@@ -69,7 +107,8 @@ const PLANS = {
       upgradePlan: 'pro', // -> POST /api/billing/checkout {plan:'pro'} (existing flow)
     },
     {
-      id: 'team', name: 'Team', priceLabel: '€199', per: '/month',
+      id: 'team', name: 'Team', priceAmount: 199, priceLabel: priceLabelFor(199), per: '/month',
+      taxNote: taxNoteFor(199),
       tagline: 'For agencies with a screening team.',
       limits: { analysesPerMonth: null, seats: 'multiple' },
       capabilities: { customBranding: true },
@@ -119,6 +158,7 @@ function marketingView() {
       name: t.name,
       priceLabel: t.priceLabel,
       per: t.per,
+      taxNote: t.taxNote || null, // null on Free; templates render it only when set
       tagline: t.tagline,
       featured: !!t.featured,
       limits: { ...t.limits },
@@ -129,10 +169,67 @@ function marketingView() {
   };
 }
 
+/**
+ * schema.org Product + Offer structured data for the pricing section.
+ *
+ * The prices on the landing page are rendered by client-side JS from
+ * /api/plans, so until this existed they were invisible to anything that does
+ * not run scripts — crawlers, link unfurlers, price aggregators. This produces
+ * the same three tiers as a server-rendered block, built from the SAME objects
+ * the cards are built from, so the marked-up price cannot drift from the
+ * displayed one.
+ *
+ * One Product with three Offers (rather than three Products) is the accurate
+ * shape here: it is a single service sold at three subscription tiers. Each
+ * Offer carries a UnitPriceSpecification because "€49" alone does not say per
+ * what — `unitCode: 'MON'` (UN/CEFACT for month) plus billingDuration says it.
+ *
+ * @param {string|null} baseUrl absolute site origin; offer URLs are omitted
+ *   when it is unset, since a relative URL in JSON-LD is not resolvable by a
+ *   consumer that fetched the page from somewhere else.
+ */
+function productJsonLd(baseUrl) {
+  const origin = typeof baseUrl === 'string' ? baseUrl.replace(/\/+$/, '') : '';
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: 'CVsprings',
+    description: 'Deterministic, rules-based CV screening for recruitment agencies. '
+      + 'Explainable scores, reproducible results and an EU AI Act-aligned audit trail, '
+      + 'with no language model in the candidate path.',
+    brand: { '@type': 'Brand', name: 'CVsprings' },
+    category: 'Recruitment screening software',
+    offers: PLANS.tiers.map((t) => ({
+      '@type': 'Offer',
+      name: t.name,
+      description: t.tagline,
+      price: String(t.priceAmount),
+      priceCurrency: CURRENCY.code,
+      availability: 'https://schema.org/InStock',
+      ...(origin ? { url: `${origin}/#pricing` } : {}),
+      priceSpecification: {
+        '@type': 'UnitPriceSpecification',
+        price: String(t.priceAmount),
+        priceCurrency: CURRENCY.code,
+        billingDuration: 1,
+        billingIncrement: 1,
+        unitCode: 'MON', // UN/CEFACT: month
+        // The prices above are ex-VAT. Without this, the markup asserts that
+        // €49 is what a buyer pays, which is the same false claim in a form
+        // search engines index and may surface as a price.
+        valueAddedTaxIncluded: TAX.included,
+      },
+    })),
+  };
+}
+
 module.exports = {
   PLANS,
+  CURRENCY,
+  TAX,
   FALLBACK_CAPABILITIES,
   tierById,
   capabilitiesFor,
   marketingView,
+  productJsonLd,
 };

@@ -2146,7 +2146,8 @@ function renderPlanCompare(currentPlan){
       +'style="flex:1;text-align:left;cursor:pointer;font:inherit;border:1px solid '+(cur?'#0f2847':'#e5e7eb')+';border-radius:8px;padding:10px;background:'+(cur?'#f8fafc':'#fff')+'">'
       +'<div style="font-weight:700;font-size:13px;color:#111827">'+escHtml(p.name)
       +(cur?' <span style="font-size:10px;background:#0f2847;color:#fff;border-radius:8px;padding:1px 7px;vertical-align:middle">Current</span>':'')+'</div>'
-      +'<div style="font-size:15px;font-weight:800;color:#0f2847;margin:2px 0 6px">'+escHtml(p.priceLabel)+'<span style="font-size:11px;font-weight:600;color:#6b7280">'+escHtml(p.per||'')+'</span></div>'
+      +'<div style="font-size:15px;font-weight:800;color:#0f2847;margin:2px 0 6px">'+escHtml(p.priceLabel)+'<span style="font-size:11px;font-weight:600;color:#6b7280">'+escHtml(p.per||'')
+        +(p.taxNote?' <span style="font-weight:400">'+escHtml(p.taxNote)+'</span>':'')+'</span></div>'
       +(p.highlights||[]).map(function(l){return '<div style="font-size:11px;color:#6b7280">'+escHtml(l)+'</div>';}).join('')
       +'<div style="font-size:11px;color:#0f2847;font-weight:600;margin-top:6px">View details &rarr;</div>'
       +'</button>';
@@ -2181,7 +2182,8 @@ function showPlanDetail(el){
     '<div class="modal-head"><h3>'+escHtml(tier.name)+(cur?' <span style="font-size:11px;background:#0f2847;color:#fff;border-radius:8px;padding:2px 8px;vertical-align:middle">Your plan</span>':'')+'</h3>'
       +'<button type="button" class="modal-close" aria-label="Close">&times;</button></div>'
     +'<div class="modal-body">'
-      +'<div style="font-size:24px;font-weight:800;color:#0f2847">'+escHtml(tier.priceLabel)+'<span style="font-size:13px;font-weight:600;color:#6b7280">'+escHtml(tier.per||'')+'</span></div>'
+      +'<div style="font-size:24px;font-weight:800;color:#0f2847">'+escHtml(tier.priceLabel)+'<span style="font-size:13px;font-weight:600;color:#6b7280">'+escHtml(tier.per||'')
+        +(tier.taxNote?' <span style="font-weight:400">'+escHtml(tier.taxNote)+'</span>':'')+'</span></div>'
       +(tier.tagline?'<p style="color:#6b7280;font-size:13px;margin:4px 0 12px">'+escHtml(tier.tagline)+'</p>':'')
       +'<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:2px">This tier</div>'
       +'<ul style="list-style:none;margin:0 0 14px;padding:0">'+highlights+'</ul>'
@@ -2238,12 +2240,19 @@ function showQuotaPrompt(errEl, e){
   errEl.innerHTML = '<div class="err-retry-card" style="background:#fffbeb;border-color:#fde68a">'
     + '<span class="err-retry-icon">⚠️</span>'
     + '<span class="err-retry-msg" style="color:#92400e">'+msg+' <span id="quotaUpgradeHint">Upgrade for unlimited analyses.</span></span>'
-    + '<button class="err-retry-btn" id="quotaUpgradeProBtn" style="background:#0f2847;display:none">Upgrade to Pro €49</button>'
-    + '<button class="err-retry-btn" id="quotaUpgradeTeamBtn" style="background:#374151;display:none">Team €199</button></div>';
+    + '<button class="err-retry-btn" id="quotaUpgradeProBtn" style="background:#0f2847;display:none">Upgrade to Pro</button>'
+    + '<button class="err-retry-btn" id="quotaUpgradeTeamBtn" style="background:#374151;display:none">Team</button></div>';
   errEl.style.display='block';
   toast(e&&e.message?e.message:'Monthly analysis limit reached. Upgrade to continue.','error',6000);
   // Owners get plan-choice upgrade buttons; members get an "ask your owner" hint.
-  api('/api/auth/me').then(function(me){
+  // These buttons used to read 'Upgrade to Pro €49' / 'Team €199' with the money
+  // typed straight into the markup — a second source of truth that a price
+  // change in plans.js would have left quietly wrong, and which had no VAT
+  // qualifier. The price now comes from /api/plans like everywhere else, and the
+  // button carries a plain label until it arrives, so a slow or failed fetch
+  // degrades to 'Upgrade to Pro' rather than to a stale number.
+  Promise.all([api('/api/auth/me'), loadPlans()]).then(function(r){
+    const me=r[0], cfg=r[1];
     const isOwner = !!(me&&me.user&&me.user.role==='owner');
     const pro=document.getElementById('quotaUpgradeProBtn');
     const team=document.getElementById('quotaUpgradeTeamBtn');
@@ -2252,8 +2261,13 @@ function showQuotaPrompt(errEl, e){
       if(hint)hint.textContent='Ask your organization’s owner to upgrade.';
       return;
     }
-    if(pro){ pro.style.display='inline-flex'; pro.onclick=function(){ startCheckout('pro'); }; }
-    if(team){ team.style.display='inline-flex'; team.onclick=function(){ startCheckout('team'); }; }
+    const label=function(planId, prefix){
+      const t=((cfg&&cfg.tiers)||[]).find(function(x){return x.id===planId;});
+      if(!t)return prefix;
+      return prefix+' '+t.priceLabel+t.per+(t.taxNote?' '+t.taxNote:'');
+    };
+    if(pro){ pro.textContent=label('pro','Upgrade to Pro'); pro.style.display='inline-flex'; pro.onclick=function(){ startCheckout('pro'); }; }
+    if(team){ team.textContent=label('team','Team'); team.style.display='inline-flex'; team.onclick=function(){ startCheckout('team'); }; }
   }).catch(function(){});
 }
 

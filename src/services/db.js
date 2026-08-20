@@ -9,8 +9,29 @@ const { v4: uuidv4 } = require('uuid');
 // /opt/render/project/data/fitscore.db); DB_PATH is the legacy alias used by
 // existing scripts/docs. The repo-local fallback keeps dev and tests working
 // with no env set. Keep in sync with the same constant in routes/templates.js.
-const DB_PATH = process.env.DATABASE_PATH || process.env.DB_PATH
-  || path.join(__dirname, '..', '..', 'data', 'audit.db');
+const DEFAULT_DB_PATH = path.join(__dirname, '..', '..', 'data', 'audit.db');
+const EXPLICIT_DB_PATH = process.env.DATABASE_PATH || process.env.DB_PATH || null;
+const DB_PATH = EXPLICIT_DB_PATH || DEFAULT_DB_PATH;
+
+// Under the test runner the repo-local fallback is NOT a safe default: it is the
+// developer's own dev database, and a test that reaches it writes rows into,
+// migrates, and leaves WAL sidecars on real data. Every suite here already sets
+// DATABASE_PATH to a throwaway file before requiring this module (see the
+// `process.env.DATABASE_PATH = ...` line at the top of each *.test.js); this
+// turns that convention into an enforced precondition, so the next test that
+// forgets fails loudly instead of silently opening data/audit.db.
+//
+// NODE_TEST_CONTEXT is set by `node --test` in each test child, and inherited by
+// servers those tests spawn, so it covers both.
+function assertNotTheRealDatabase() {
+  if (!process.env.NODE_TEST_CONTEXT) return;
+  if (EXPLICIT_DB_PATH) return;
+  throw new Error(
+    '[db] refusing to open the default database from a test run.\n'
+    + `      Would have opened: ${DEFAULT_DB_PATH}\n`
+    + '      Set process.env.DATABASE_PATH to a throwaway file BEFORE requiring services/db.',
+  );
+}
 
 let db;
 let checkpointTimer = null;
@@ -68,6 +89,7 @@ const FEATURE_REQUEST_RETENTION_DAYS = 365;
 
 function getDb() {
   if (!db) {
+    assertNotTheRealDatabase();
     const fs = require('fs');
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -1539,6 +1561,8 @@ function setOrgPlan(orgId, fields) {
 
 module.exports = {
   getDb,
+  assertNotTheRealDatabase, // shared with routes/templates.js, the other connection
+  DEFAULT_DB_PATH,
   closeDb,
   startWalCheckpointing,
   registerGracefulShutdown,
