@@ -25,8 +25,30 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # Parses every source file without executing any of it.
+      #
+      # This step used to be `node -e "require('./src/index.js')" &`, which had
+      # to be backgrounded because src/index.js calls app.listen() at module
+      # scope — a bare require never returns. The trailing & meant the step
+      # reported success unconditionally, so it never gated anything. Worse, the
+      # require ran the real boot path: no DATABASE_PATH and no NODE_TEST_CONTEXT,
+      # so services/db.assertNotTheRealDatabase() stayed quiet and the app opened
+      # data/audit.db and left a WAL sidecar in the workspace. The next step is
+      # `npm test`, and dbIsolation.test.js asserts precisely that no such
+      # sidecar exists — so the lint step broke the test step, every run.
+      #
+      # `node --check` cannot do any of that: it never evaluates the module, so
+      # there is no listen, no database, and nothing to background. It gates
+      # properly on a non-zero exit.
+      #
+      # Boot-time validation is not lost — "Verify server health endpoint" below
+      # starts the app for real and curls /health, which is a stronger check than
+      # a require that discarded its result.
       - name: Lint (syntax check)
-        run: node -e "require('./src/index.js')" &
+        shell: bash
+        run: |
+          find src -name '*.js' -print0 | xargs -0 -n1 -P4 node --check
+          echo "syntax OK — $(find src -name '*.js' | wc -l | tr -d ' ') files"
 
       - name: Run tests
         run: npm test
