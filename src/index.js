@@ -17,6 +17,8 @@ const teamRouter = require('./routes/team');
 const demoRouter = require('./routes/demo');
 const featureRequestsRouter = require('./routes/featureRequests');
 const plansRouter = require('./routes/plans');
+const { productJsonLd } = require('./config/plans');
+const { configuredBaseUrl, warnDeprecatedAliases } = require('./config/appUrl');
 const { migrateLegacyData } = require('./services/authService');
 const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { startProvenanceSweep } = require('./services/provenanceCache');
@@ -180,9 +182,21 @@ app.get('/eu-ai-act-checklist.pdf', (req, res) => {
 // registered BEFORE express.static, and static gets index:false, so the raw
 // placeholder files are never reachable (neither via / nor /index.html).
 const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html'];
+// Pricing structured data is substituted ONCE at startup, not per request: the
+// tier table is static per deploy (same reasoning as the cached PAYLOAD in
+// routes/plans.js). It is built from src/config/plans.js, so the prices a
+// crawler reads are the prices the cards render — the cards themselves are
+// client-rendered from /api/plans and are therefore invisible without JS.
+// `<` is escaped so no string inside the JSON can close the script element.
+// Offer URLs need an absolute origin and there is no request to derive one
+// from, so an unconfigured deployment publishes offers without `url` (see
+// warnDeprecatedAliases below, which says so at boot).
+const pricingJsonLd = JSON.stringify(productJsonLd(configuredBaseUrl()))
+  .replaceAll('<', '\\u003c');
 const htmlTemplates = {};
 for (const page of HTML_PAGES) {
-  htmlTemplates[page] = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8');
+  htmlTemplates[page] = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8')
+    .replaceAll('__PRICING_JSONLD__', pricingJsonLd);
 }
 function serveNoncedHtml(page) {
   return (req, res) => {
@@ -192,11 +206,21 @@ function serveNoncedHtml(page) {
   };
 }
 // Routing: "/" is the marketing landing page (index.html); the product app
-// (auth screen + tool) lives at /login and /signup (both serve app.html —
-// the app is a SPA that shows its login/signup modes itself).
+// serves app.html at three paths, because the SPA decides its own mode from the
+// session and the URL is only a statement of intent:
+//   /login, /signup  — arriving to authenticate (bootAuth opens the matching
+//                      form; an existing valid session skips straight past it)
+//   /dashboard       — arriving at the product itself
+//
+// /dashboard exists so code that means "send this signed-in user to the app"
+// can say so. It used to have to send them to /login and rely on bootAuth
+// silently swapping the auth screen for the dashboard — correct behaviour
+// reached by a misleading URL, and one that flashes a login route at a user who
+// is already logged in.
 app.get('/', serveNoncedHtml('index.html'));
 app.get('/login', serveNoncedHtml('app.html'));
 app.get('/signup', serveNoncedHtml('app.html'));
+app.get('/dashboard', serveNoncedHtml('app.html'));
 for (const page of HTML_PAGES) {
   app.get('/' + page, serveNoncedHtml(page));
 }
@@ -315,9 +339,18 @@ startWalCheckpointing();
 // candidate data from being deleted by accident. Timer is .unref()'d.
 startProvenanceSweep();
 
+// Say once, at boot, which variable supplied the public origin — or that none
+// did. A wrong origin does not throw: it produces working-looking links that
+// point at the proxy host, and offer URLs that quietly vanish from the pricing
+// structured data. That is only findable if the process says so out loud.
+warnDeprecatedAliases(logger
+  ? { warn: (m) => logger.warn(m) }
+  : console);
+
 const server = app.listen(PORT, () => {
   const log = logger ? logger.info.bind(logger) : console.log;
   log('CVsprings API listening on http://localhost:' + PORT);
+  log(' Public origin: ' + (configuredBaseUrl() || '(unset — links will use the request host)'));
   log(' POST /api/auth/signup        - Create an organization + owner account');
   log(' POST /api/auth/login         - Email + password login (returns session token)');
   log(' POST /api/auth/logout        - Invalidate the current session');
