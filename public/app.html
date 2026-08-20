@@ -689,8 +689,8 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);
   transition:opacity .6s ease, visibility .6s ease}
 #splash.hidden{opacity:0;visibility:hidden;pointer-events:none}
-#splash .splash-brand{font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px}
-#splash .splash-brand em{font-style:normal;color:#7dd3fc}
+#splash .splash-brand,#authScreen .splash-brand{font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px}
+#splash .splash-brand em,#authScreen .splash-brand em{font-style:normal;color:#7dd3fc}
 #splash .splash-status{font-size:13px;color:rgba(255,255,255,0.55);letter-spacing:.04em}
 #splash .splash-dots span{animation:splashDot 1.4s infinite}
 #splash .splash-dots span:nth-child(2){animation-delay:.2s}
@@ -700,7 +700,22 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 /* ── Auth screen ── */
 #authScreen{position:fixed;inset:0;z-index:9500;display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:20px;
   background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);overflow:auto}
-#authScreen .auth-brand-wrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+#authScreen .auth-brand-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;
+  color:inherit;text-decoration:none}
+/* Way out of the auth screen and back to the marketing site. It sits in the
+   normal flow above the card rather than being absolutely positioned, so it
+   cannot overlap the card on a narrow viewport — the row simply shrinks with
+   it. The row carries the card's width so the chevron lines up with the
+   card's left edge; the anchor inside stays content-width so there is no
+   invisible click target stretching across the rest of the row. The negative
+   margin trims the container's 22px gap to ~12px, tying the link visually to
+   the card it belongs to rather than leaving it stranded under the logo. */
+.auth-back-row{display:flex;width:100%;max-width:380px;margin-bottom:-10px}
+.auth-back{display:inline-flex;align-items:center;gap:6px;padding:4px 2px;border-radius:4px;
+  color:rgba(255,255,255,0.55);font:600 12px 'Inter',sans-serif;text-decoration:none;transition:color .15s}
+.auth-back:hover{color:#fff}
+.auth-back:focus-visible{outline:2px solid #7dd3fc;outline-offset:2px;color:#fff}
+.auth-back svg{flex-shrink:0}
 .auth-card{background:#fff;border-radius:14px;padding:28px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.35)}
 .auth-card h2{font-size:18px;font-weight:800;color:#0a1f3d;margin:0 0 4px}
 .auth-card form{display:flex;flex-direction:column;gap:12px}
@@ -988,9 +1003,15 @@ img, video, table { max-width: 100%; }
 </div>
 <!-- Auth screen (login / signup / reset) -->
 <div id="authScreen" role="dialog" aria-modal="true" aria-label="Sign in to CVsprings">
-  <div class="auth-brand-wrap">
+  <a class="auth-brand-wrap" href="/" aria-label="CVsprings home">
     <span class="brandmark" aria-hidden="true"></span>
     <div class="splash-brand">CV<em>springs</em></div>
+  </a>
+  <div class="auth-back-row">
+    <a class="auth-back" href="/">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to home
+    </a>
   </div>
   <div class="auth-card">
     <div class="msg msg-err" id="authError" role="alert" aria-live="polite"></div>
