@@ -1,10 +1,10 @@
 # CVsprings — Records of Processing Activities (GDPR Art. 30(2), processor)
 
-*v1.3.0 — 2026-06-12. Maintained by the operator (Chaulin) as processor.*
+*v1.3.0 — 2026-06-12. Maintained by the operator (Joyaco BV) as processor.*
 
 ## Processor
 
-- **Name / contact:** Chaulin [TODO: full legal name, registered address].
+- **Name / contact:** Joyaco BV (KvK 42135911, BTW NL005523705B04) [TODO: registered address].
 - **Privacy contact:** value of `PRIVACY_CONTACT_EMAIL` [TODO: set in production
   environment and record here].
 - **Representative / DPO:** [TODO: confirm whether either is required and

@@ -19,14 +19,22 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 
+// Read the entity from its source of truth, so a rename cannot leave these
+// tests guarding a name the product no longer uses — the exact way the
+// blocklist in branding.js went stale.
+const { LEGAL_NAME } = require('../config/legal');
+const LEGAL_BARE = LEGAL_NAME.replace(/\s+B\.?\s*V\.?$/i, '').trim();
+
 const {
   resolveBranding,
   publicBranding,
   isEntitledToCustomBranding,
   isCompedOrg,
+  isLegalEntityName,
   platformBrandName,
   PROVENANCE_PLATFORM,
   LEGAL_ENTITY_NAMES,
+  RETIRED_LEGAL_NAMES,
   BRAND_NAME_FALLBACK,
   BRAND_COLOR_FALLBACK,
 } = require('./branding');
@@ -333,16 +341,72 @@ describe('the legal entity can never appear as a brand', () => {
     }
   }
 
+  // ── Retired names ────────────────────────────────────────────────────────
+  //
+  // These deliberately do NOT loop over LEGAL_ENTITY_NAMES. That loop is over
+  // the union, so deleting RETIRED_LEGAL_NAMES would not fail it — it would
+  // simply iterate three fewer names and pass, which is how a guard gets
+  // quietly removed. Naming the retired list directly is what makes pruning it
+  // a test failure.
+  test('the retired list still holds the names it was written for', () => {
+    for (const name of ['Chaulin', 'Chaulin BV', 'Chaulin B.V.']) {
+      assert.ok(
+        RETIRED_LEGAL_NAMES.includes(name),
+        `"${name}" was removed from RETIRED_LEGAL_NAMES. That list is append-only: `
+        + 'a name that was once the operating entity must never head a report, and '
+        + 'stale config naming it outlives the rename by design.',
+      );
+    }
+  });
+
+  for (const retired of RETIRED_LEGAL_NAMES) {
+    test(`a retired entity name ("${retired}") is refused as an org's display name`, () => {
+      // COMPED is entitled to custom branding, so this is the case where a
+      // display name genuinely would render — not one rejected on entitlement.
+      const b = resolveBranding({ ...CUSTOM, brandDisplayName: retired }, COMPED);
+      assert.equal(b.displayName, BRAND_NAME_FALLBACK);
+    });
+
+    test(`a retired entity name ("${retired}") never reaches a rendered report`, () => {
+      // The live failure mode: COMPANY_LEGAL_NAME outlived the rename in Render,
+      // so a deployment pointing BRAND_NAME at the same stale value is not
+      // hypothetical.
+      withEnv({ BRAND_NAME: retired }, () => {
+        const doc = buildReportDoc(AUDIT, resolveBranding(CUSTOM, COMPED));
+        const everywhere = [...textsIn(doc.content), footerTexts(doc), ...textsIn(doc.header(2))].join(' ');
+        assert.ok(
+          !everywhere.toLowerCase().includes(retired.toLowerCase()),
+          `retired entity "${retired}" leaked into the report`,
+        );
+        assert.ok(everywhere.includes('CVsprings'));
+      });
+    });
+  }
+
+  test('matching is case- and whitespace-insensitive, but exact otherwise', () => {
+    // Documents the semantics deliberately: isLegalEntityName() compares whole
+    // strings after trim+lowercase. It is NOT a substring match, so a name that
+    // merely CONTAINS a retired entity is not caught — see the note on
+    // LEGACY_ORG_NAME in services/authService.js.
+    assert.ok(isLegalEntityName('  chaulin bv  '));
+    assert.ok(isLegalEntityName('CHAULIN B.V.'));
+    assert.ok(!isLegalEntityName('Chaulin (legacy)'));
+    assert.ok(!isLegalEntityName('Chaulin Holdings'));
+  });
+
   test('an org cannot white-label itself as the legal entity either', () => {
-    const b = resolveBranding({ ...CUSTOM, brandDisplayName: 'Chaulin BV' }, PRO);
+    const b = resolveBranding({ ...CUSTOM, brandDisplayName: LEGAL_NAME }, PRO);
     assert.equal(b.displayName, BRAND_NAME_FALLBACK);
   });
 
   test('the rendered report never prints the legal entity, under hostile env', () => {
-    withEnv({ BRAND_NAME: 'Chaulin' }, () => {
+    withEnv({ BRAND_NAME: LEGAL_BARE }, () => {
       const doc = buildReportDoc(AUDIT, resolveBranding(NO_BRANDING, FREE));
       const everywhere = [...textsIn(doc.content), footerTexts(doc), ...textsIn(doc.header(2))].join(' ');
-      assert.ok(!/Chaulin/i.test(everywhere), 'legal entity leaked into the report');
+      assert.ok(
+        !everywhere.toLowerCase().includes(LEGAL_BARE.toLowerCase()),
+        'legal entity leaked into the report',
+      );
       assert.ok(everywhere.includes('CVsprings'));
     });
   });

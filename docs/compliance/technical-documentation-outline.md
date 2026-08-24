@@ -8,7 +8,7 @@
 - **Name / version:** CVsprings, v1.3.0 (frontend `CVSPRINGS_VERSION` and backend package version aligned; scoring engine identified as `cvsprings-lexical-scorer@1.3.0` on every analysis).
 - **Intended purpose:** advisory candidate-fit scoring for recruitment (see `instructions-for-use.md` §1).
 - **Risk classification:** high-risk, Annex III point 4 (employment / workers management — CV screening).
-- **Provider:** Chaulin / CVsprings. **TODO:** confirm legal entity details for the declaration.
+- **Provider:** Joyaco BV (KvK 42135911, BTW NL005523705B04) / CVsprings. **TODO:** registered address for the declaration.
 - **Deployment form:** web application (SaaS). Single-page frontend + REST backend.
 
 ## 2. System architecture
