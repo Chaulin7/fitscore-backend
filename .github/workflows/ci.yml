@@ -53,8 +53,15 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Verify PDF extraction determinism
-        run: npm run extraction:verify
+      # Both gates guard determinism, from opposite ends of the pipeline:
+      # extraction proves the PDF reader is stable across file orderings,
+      # narrative proves the report writer is a pure function of the stored
+      # record. One step so a failure in either blocks the same way.
+      - name: Verify determinism (extraction + narrative)
+        shell: bash
+        run: |
+          npm run extraction:verify
+          npm run narrative:verify
 
       - name: Verify server health endpoint
         run: |

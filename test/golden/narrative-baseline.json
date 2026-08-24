@@ -1,0 +1,355 @@
+{
+  "band-limited.json": {
+    "narrativeVersion": "n-1",
+    "bandsVersion": "b-1",
+    "templateVersion": "t-2",
+    "locale": "en",
+    "weightsSource": "weights_json",
+    "band": {
+      "key": "limited",
+      "label": "Limited alignment",
+      "minScore": 40,
+      "maxScore": 59
+    },
+    "assessment": [
+      "The CV documents a limited share of the recorded requirements, scoring 48 of 100.",
+      "The CV contains 1 of the 4 job-description keywords, scoring 50 of 100.",
+      "The CV contains 2 of the 5 skills named in the job description, including Python and AWS.",
+      "The CV documents experience signals below the level recorded for this role, scoring 50 of 100.",
+      "The CV documents a qualification at the level recorded for this role."
+    ],
+    "gaps": [
+      {
+        "text": "The CV does not contain the following job-description terms: grpc, observability and kafka.",
+        "dimension": "keywords",
+        "impact": 20
+      },
+      {
+        "text": "The CV does not document Kubernetes, Terraform and Go.",
+        "dimension": "skills",
+        "impact": 18
+      },
+      {
+        "text": "The CV does not document experience at the level recorded for this role.",
+        "dimension": "experience",
+        "impact": 10
+      }
+    ],
+    "gapsDisclaimer": "Absence of evidence is not evidence of absence. These items indicate what the CV does not document, not what the candidate cannot do.",
+    "interviewQuestions": [
+      "How does your experience relate to grpc as described in this role?",
+      "Could you describe a piece of work where you used Kubernetes?",
+      "Could you walk me through the scope and duration of your most recent role?"
+    ]
+  },
+  "band-minimal.json": {
+    "narrativeVersion": "n-1",
+    "bandsVersion": "b-1",
+    "templateVersion": "t-2",
+    "locale": "en",
+    "weightsSource": "weights_json",
+    "band": {
+      "key": "minimal",
+      "label": "Minimal alignment",
+      "minScore": 0,
+      "maxScore": 39
+    },
+    "assessment": [
+      "The CV documents few of the recorded requirements, scoring 20 of 100.",
+      "The CV contains 1 of the 5 job-description keywords, scoring 25 of 100.",
+      "The CV contains 1 of the 5 skills named in the job description, including AWS.",
+      "The CV documents experience signals below the level recorded for this role, scoring 20 of 100.",
+      "The CV does not document a qualification at the level recorded for this role."
+    ],
+    "gaps": [
+      {
+        "text": "The CV does not contain the following job-description terms: grpc, observability and kafka.",
+        "dimension": "keywords",
+        "impact": 30
+      },
+      {
+        "text": "The CV does not document Python, Kubernetes and Terraform.",
+        "dimension": "skills",
+        "impact": 24
+      },
+      {
+        "text": "The CV does not document experience at the level recorded for this role.",
+        "dimension": "experience",
+        "impact": 16
+      },
+      {
+        "text": "The CV does not document a qualification at the level recorded for this role.",
+        "dimension": "education",
+        "impact": 10
+      }
+    ],
+    "gapsDisclaimer": "Absence of evidence is not evidence of absence. These items indicate what the CV does not document, not what the candidate cannot do.",
+    "interviewQuestions": [
+      "How does your experience relate to grpc as described in this role?",
+      "Could you describe a piece of work where you used Python?",
+      "Could you walk me through the scope and duration of your most recent role?"
+    ]
+  },
+  "band-partial.json": {
+    "narrativeVersion": "n-1",
+    "bandsVersion": "b-1",
+    "templateVersion": "t-2",
+    "locale": "en",
+    "weightsSource": "weights_json",
+    "band": {
+      "key": "partial",
+      "label": "Partial alignment",
+      "minScore": 60,
+      "maxScore": 79
+    },
+    "assessment": [
+      "The CV documents some of the recorded requirements, scoring 74 of 100.",
+      "The CV contains 2 of the 4 job-description keywords, scoring 80 of 100.",
+      "The CV contains 2 of the 6 skills named in the job description, including Python and Go.",
+      "The experience signals in the CV align with the level recorded for this role, scoring 70 of 100.",
+      "The CV documents a qualification at the level recorded for this role."
+    ],
+    "gaps": [
+      {
+        "text": "The CV does not document Kubernetes, Terraform and AWS.",
+        "dimension": "skills",
+        "impact": 12
+      },
+      {
+        "text": "The CV does not contain the following job-description terms: grpc and observability.",
+        "dimension": "keywords",
+        "impact": 8
+      }
+    ],
+    "gapsDisclaimer": "Absence of evidence is not evidence of absence. These items indicate what the CV does not document, not what the candidate cannot do.",
+    "interviewQuestions": [
+      "Could you describe a piece of work where you used Kubernetes?",
+      "How does your experience relate to grpc as described in this role?"
+    ]
+  },
+  "band-strong.json": {
+    "narrativeVersion": "n-1",
+    "bandsVersion": "b-1",
+    "templateVersion": "t-2",
+    "locale": "en",
+    "weightsSource": "weights_json",
+    "band": {
+      "key": "strong",
+      "label": "Strong alignment",
+      "minScore": 80,
+      "maxScore": 100
+    },
+    "assessment": [
+      "The CV documents most of the recorded requirements, scoring 88 of 100.",
+      "The CV contains 3 of the 4 job-description keywords, scoring 90 of 100.",
+      "The CV contains 3 of the 4 skills named in the job description, including Python, Go and Kubernetes.",
+      "The experience signals in the CV align with the level recorded for this role, scoring 90 of 100.",
+      "The CV documents a qualification at the level recorded for this role."
+    ],
+    "gaps": [
+      {
+        "text": "The CV does not document SQL.",
+        "dimension": "skills",
+        "impact": 4.5
+      },
+      {
+        "text": "The CV does not contain the following job-description terms: grpc.",
+        "dimension": "keywords",
+        "impact": 4
+      }
+    ],
+    "gapsDisclaimer": "Absence of evidence is not evidence of absence. These items indicate what the CV does not document, not what the candidate cannot do.",
+    "interviewQuestions": [
+      "Could you describe a piece of work where you used SQL?",
+      "How does your experience relate to grpc as described in this role?"
+    ]
+  },
+  "enumeration-cap.json": {
+    "narrativeVersion": "n-1",
+    "bandsVersion": "b-1",
+    "templateVersion": "t-2",
+    "locale": "en",
+    "weightsSource": "weights_json",
+    "band": {
+      "key": "minimal",
+      "label": "Minimal alignment",
+      "minScore": 0,
+      "maxScore": 39
+    },
+    "assessment": [
+      "The CV documents few of the recorded requirements, scoring 35 of 100.",
+      "The CV contains 1 of the 6 job-description keywords, scoring 40 of 100.",
+      "The CV documents experience signals below the level recorded for this role, scoring 40 of 100.",
+      "The CV contains 2 of the 9 skills named in the job description, including Python and Scala.",
+      "The CV documents a qualification at the level recorded for this role."
+    ],
+    "gaps": [
+      {
+        "text": "The CV does not contain the following job-description terms: grpc, observability and kafka.",
+        "dimension": "keywords",
+        "impact": 24
+      },
+      {
+        "text": "The CV does not document Kubernetes, Terraform and Go.",
+        "dimension": "skills",
+        "impact": 24
+      },
+      {
+        "text": "The CV does not document experience at the level recorded for this role.",
+        "dimension": "experience",
+        "impact": 12
+      }
+    ],
+    "gapsDisclaimer": "Absence of evidence is not evidence of absence. These items indicate what the CV does not document, not what the candidate cannot do.",
+    "interviewQuestions": [
+      "How does your experience relate to grpc as described in this role?",
+      "Could you describe a piece of work where you used Kubernetes?",
+      "Could you walk me through the scope and duration of your most recent role?"
+    ]
+  },
+  "legacy-weights.json": {
+    "narrativeVersion": "n-1",
+    "bandsVersion": "b-1",
+    "templateVersion": "t-2",
+    "locale": "en",
+    "weightsSource": "legacy_weights",
+    "band": {
+      "key": "partial",
+      "label": "Partial alignment",
+      "minScore": 60,
+      "maxScore": 79
+    },
+    "assessment": [
+      "The CV documents some of the recorded requirements, scoring 66 of 100.",
+      "The CV contains 2 of the 3 job-description keywords, scoring 70 of 100.",
+      "The CV contains 2 of the 3 skills named in the job description, including Python and Go.",
+      "The experience signals in the CV align with the level recorded for this role, scoring 65 of 100.",
+      "The CV documents a qualification at the level recorded for this role."
+    ],
+    "gaps": [
+      {
+        "text": "The CV does not contain the following job-description terms: grpc.",
+        "dimension": "keywords",
+        "impact": 12
+      },
+      {
+        "text": "The CV does not document Kubernetes.",
+        "dimension": "skills",
+        "impact": 12
+      }
+    ],
+    "gapsDisclaimer": "Absence of evidence is not evidence of absence. These items indicate what the CV does not document, not what the candidate cannot do.",
+    "interviewQuestions": [
+      "How does your experience relate to grpc as described in this role?",
+      "Could you describe a piece of work where you used Kubernetes?"
+    ]
+  },
+  "perfect-score.json": {
+    "narrativeVersion": "n-1",
+    "bandsVersion": "b-1",
+    "templateVersion": "t-2",
+    "locale": "en",
+    "weightsSource": "weights_json",
+    "band": {
+      "key": "strong",
+      "label": "Strong alignment",
+      "minScore": 80,
+      "maxScore": 100
+    },
+    "assessment": [
+      "The CV documents most of the recorded requirements, scoring 100 of 100.",
+      "The CV contains 3 of the 3 job-description keywords, scoring 100 of 100.",
+      "The CV contains every skill named in the job description (3 in total).",
+      "The experience signals in the CV align with the level recorded for this role, scoring 100 of 100.",
+      "The CV documents a qualification at the level recorded for this role."
+    ],
+    "gaps": [],
+    "gapsDisclaimer": "Absence of evidence is not evidence of absence. These items indicate what the CV does not document, not what the candidate cannot do.",
+    "interviewQuestions": []
+  },
+  "tiebreak-equal-contribution.json": {
+    "narrativeVersion": "n-1",
+    "bandsVersion": "b-1",
+    "templateVersion": "t-2",
+    "locale": "en",
+    "weightsSource": "weights_json",
+    "band": {
+      "key": "partial",
+      "label": "Partial alignment",
+      "minScore": 60,
+      "maxScore": 79
+    },
+    "assessment": [
+      "The CV documents some of the recorded requirements, scoring 70 of 100.",
+      "The CV contains 1 of the 2 job-description keywords, scoring 50 of 100.",
+      "The CV contains every skill named in the job description (2 in total).",
+      "The CV documents a qualification at the level recorded for this role.",
+      "The CV documents experience signals below the level recorded for this role, scoring 50 of 100."
+    ],
+    "gaps": [
+      {
+        "text": "The CV does not contain the following job-description terms: grpc.",
+        "dimension": "keywords",
+        "impact": 20
+      },
+      {
+        "text": "The CV does not document experience at the level recorded for this role.",
+        "dimension": "experience",
+        "impact": 10
+      }
+    ],
+    "gapsDisclaimer": "Absence of evidence is not evidence of absence. These items indicate what the CV does not document, not what the candidate cannot do.",
+    "interviewQuestions": [
+      "How does your experience relate to grpc as described in this role?",
+      "Could you walk me through the scope and duration of your most recent role?"
+    ]
+  },
+  "zero-match.json": {
+    "narrativeVersion": "n-1",
+    "bandsVersion": "b-1",
+    "templateVersion": "t-2",
+    "locale": "en",
+    "weightsSource": "weights_json",
+    "band": {
+      "key": "minimal",
+      "label": "Minimal alignment",
+      "minScore": 0,
+      "maxScore": 39
+    },
+    "assessment": [
+      "The CV documents few of the recorded requirements, scoring 0 of 100.",
+      "The CV contains 0 of the 3 job-description keywords, scoring 0 of 100.",
+      "The CV contains none of the skills named in the job description (3 in total).",
+      "The CV documents experience signals below the level recorded for this role, scoring 0 of 100.",
+      "The CV does not document a qualification at the level recorded for this role."
+    ],
+    "gaps": [
+      {
+        "text": "The CV does not contain the following job-description terms: grpc, observability and kafka.",
+        "dimension": "keywords",
+        "impact": 40
+      },
+      {
+        "text": "The CV does not document Python, Go and Kubernetes.",
+        "dimension": "skills",
+        "impact": 30
+      },
+      {
+        "text": "The CV does not document experience at the level recorded for this role.",
+        "dimension": "experience",
+        "impact": 20
+      },
+      {
+        "text": "The CV does not document a qualification at the level recorded for this role.",
+        "dimension": "education",
+        "impact": 10
+      }
+    ],
+    "gapsDisclaimer": "Absence of evidence is not evidence of absence. These items indicate what the CV does not document, not what the candidate cannot do.",
+    "interviewQuestions": [
+      "How does your experience relate to grpc as described in this role?",
+      "Could you describe a piece of work where you used Python?",
+      "Could you walk me through the scope and duration of your most recent role?"
+    ]
+  }
+}

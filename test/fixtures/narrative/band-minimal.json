@@ -1,0 +1,72 @@
+{
+  "id": "fx-band-minimal",
+  "candidateName": "Fixture Candidate",
+  "anonymized": false,
+  "overall": 20,
+  "role": "Platform Engineer",
+  "scores": {
+    "keywords": 25,
+    "skills": 20,
+    "experience": 20,
+    "education": 0
+  },
+  "appVersion": "1.3.0",
+  "modelId": "cvsprings-matcher",
+  "analysisTimestamp": "2026-08-01T09:00:00.000Z",
+  "weightsJson": {
+    "kw": 40,
+    "sk": 30,
+    "ex": 20,
+    "ed": 10
+  },
+  "weights": null,
+  "analysisDetail": {
+    "found": [
+      "api"
+    ],
+    "missing": [
+      "grpc",
+      "observability",
+      "kafka",
+      "terraform"
+    ],
+    "matches": [
+      {
+        "requirement": "python",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "kubernetes",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "terraform",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "go",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "aws",
+        "matched": true,
+        "evidence": "Evidence for aws",
+        "cvLineRef": null,
+        "weight": null
+      }
+    ],
+    "recommendations": []
+  }
+}

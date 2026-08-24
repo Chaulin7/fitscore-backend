@@ -1,0 +1,48 @@
+{
+  "id": "fx-tiebreak",
+  "candidateName": "Fixture Candidate",
+  "anonymized": false,
+  "overall": 70,
+  "role": "Platform Engineer",
+  "scores": {
+    "keywords": 50,
+    "skills": 100,
+    "experience": 50,
+    "education": 100
+  },
+  "appVersion": "1.3.0",
+  "modelId": "cvsprings-matcher",
+  "analysisTimestamp": "2026-08-01T09:00:00.000Z",
+  "weightsJson": {
+    "kw": 40,
+    "sk": 20,
+    "ex": 20,
+    "ed": 20
+  },
+  "weights": null,
+  "analysisDetail": {
+    "found": [
+      "api"
+    ],
+    "missing": [
+      "grpc"
+    ],
+    "matches": [
+      {
+        "requirement": "python",
+        "matched": true,
+        "evidence": "Evidence for python",
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "go",
+        "matched": true,
+        "evidence": "Evidence for go",
+        "cvLineRef": null,
+        "weight": null
+      }
+    ],
+    "recommendations": []
+  }
+}

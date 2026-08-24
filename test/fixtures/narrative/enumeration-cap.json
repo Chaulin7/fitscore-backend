@@ -1,0 +1,101 @@
+{
+  "id": "fx-enum-cap",
+  "candidateName": "Fixture Candidate",
+  "anonymized": false,
+  "overall": 35,
+  "role": "Platform Engineer",
+  "scores": {
+    "keywords": 40,
+    "skills": 20,
+    "experience": 40,
+    "education": 50
+  },
+  "appVersion": "1.3.0",
+  "modelId": "cvsprings-matcher",
+  "analysisTimestamp": "2026-08-01T09:00:00.000Z",
+  "weightsJson": {
+    "kw": 40,
+    "sk": 30,
+    "ex": 20,
+    "ed": 10
+  },
+  "weights": null,
+  "analysisDetail": {
+    "found": [
+      "api"
+    ],
+    "missing": [
+      "grpc",
+      "observability",
+      "kafka",
+      "redis",
+      "spark"
+    ],
+    "matches": [
+      {
+        "requirement": "python",
+        "matched": true,
+        "evidence": "Evidence for python",
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "kubernetes",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "terraform",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "go",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "aws",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "sql",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "kafka",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "rust",
+        "matched": false,
+        "evidence": null,
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "scala",
+        "matched": true,
+        "evidence": "Evidence for scala",
+        "cvLineRef": null,
+        "weight": null
+      }
+    ],
+    "recommendations": []
+  }
+}
