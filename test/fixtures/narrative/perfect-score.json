@@ -1,0 +1,55 @@
+{
+  "id": "fx-perfect",
+  "candidateName": "Fixture Candidate",
+  "anonymized": false,
+  "overall": 100,
+  "role": "Platform Engineer",
+  "scores": {
+    "keywords": 100,
+    "skills": 100,
+    "experience": 100,
+    "education": 100
+  },
+  "appVersion": "1.3.0",
+  "modelId": "cvsprings-matcher",
+  "analysisTimestamp": "2026-08-01T09:00:00.000Z",
+  "weightsJson": {
+    "kw": 40,
+    "sk": 30,
+    "ex": 20,
+    "ed": 10
+  },
+  "weights": null,
+  "analysisDetail": {
+    "found": [
+      "api",
+      "testing",
+      "ci"
+    ],
+    "missing": [],
+    "matches": [
+      {
+        "requirement": "python",
+        "matched": true,
+        "evidence": "Evidence for python",
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "go",
+        "matched": true,
+        "evidence": "Evidence for go",
+        "cvLineRef": null,
+        "weight": null
+      },
+      {
+        "requirement": "kubernetes",
+        "matched": true,
+        "evidence": "Evidence for kubernetes",
+        "cvLineRef": null,
+        "weight": null
+      }
+    ],
+    "recommendations": []
+  }
+}
