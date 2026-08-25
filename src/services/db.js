@@ -387,6 +387,18 @@ function initSchema() {
   // address is ever hardcoded into an entitlement path — see
   // services/branding.isCompedOrg().
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN comped INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  // Stripe's `cancel_at_period_end`: the subscription is still ACTIVE and still
+  // entitled, but it is set to stop at current_period_end and will not renew.
+  //
+  // This is invisible in subscription_status — such a subscription reads
+  // 'active' right up until the period ends, at which point it flips to
+  // 'canceled' with no warning. Without this column the revenue that is already
+  // on its way out is indistinguishable from revenue that is staying, which is
+  // the difference between noticing churn a month early and noticing it after
+  // the fact. It is deliberately NOT an entitlement input: nothing in
+  // services/billing.js reads it, because a customer who has cancelled has paid
+  // through the end of the period and keeps everything until then.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN cancel_at_period_end INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
 
   // Server-held provenance for a single analysis, claimable by the save that
@@ -574,6 +586,99 @@ function initSchema() {
   `);
   try { getDb().exec('ALTER TABLE templates ADD COLUMN org_id TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_templates_org_id ON templates(org_id)');
+
+  // --- Internal admin metrics -----------------------------------------------
+  // Read-only reporting surface for the operator (GET /admin/metrics). Nothing
+  // here is customer-visible and nothing here is org-scoped: it is deliberately
+  // the ONE place in this codebase that reads across tenants, which is why the
+  // route in front of it is guarded by an owner-email check that 404s.
+
+  // Indexes backing the signup / dormancy / activation windows. audit_log
+  // already has idx_audit_log_created_at; organizations, users and
+  // screening_runs were only ever queried org-first, so a bare created_at scan
+  // had no index to sit on. screening_runs' existing index leads with org_id,
+  // which a cross-tenant date range cannot use.
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_organizations_created_at ON organizations(created_at)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_screening_runs_created_at ON screening_runs(created_at)');
+
+  // One row per calendar day (UTC), keyed by date so the upsert is idempotent:
+  // running the job ten times in a day rewrites the same row rather than
+  // appending ten.
+  //
+  // Two kinds of column live here and they are NOT interchangeable:
+  //
+  //   total_accounts / screenings_run are RECONSTRUCTIBLE — both derive from a
+  //   created_at that is still on disk, so a day the job missed can be filled
+  //   in after the fact and be exactly right.
+  //
+  //   free_count / pro_count / team_count / mrr_eur / active_subs are
+  //   OBSERVATIONS of current state. organizations.plan holds today's plan with
+  //   no history behind it, so what an org was on 2026-06-01 is unknowable now.
+  //   They are NULLABLE precisely so a backfilled row can say "not observed"
+  //   instead of carrying today's plan mix stamped with a past date, which
+  //   would read as data and be fiction.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS metrics_daily (
+      date TEXT PRIMARY KEY,
+      total_accounts INTEGER NOT NULL,
+      free_count INTEGER,
+      pro_count INTEGER,
+      team_count INTEGER,
+      mrr_eur INTEGER,
+      active_subs INTEGER,
+      screenings_run INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Access log for the admin metrics route. Deliberately NOT audit_log: that
+  // table is the EU AI Act Art. 12 record of candidate assessments, it requires
+  // a candidate_name, the bias report aggregates over it and the retention
+  // purge deletes from it. Page views are none of those things and putting them
+  // there would corrupt a regulatory record with operator telemetry.
+  //
+  // Every column is SERVER-ATTESTED, the same rule routes/audit.js applies to a
+  // save: the id and timestamp come from this process, the identity comes from
+  // the resolved session, and the request contributes only `reconcile`, which is
+  // coerced to 0/1 here and can express nothing else. Nothing is read from a
+  // body, and no header or query string is stored verbatim.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS admin_access_log (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      email TEXT,
+      org_id TEXT,
+      route TEXT NOT NULL,
+      auth_method TEXT NOT NULL,
+      reconcile INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  `);
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_admin_access_log_created ON admin_access_log(created_at DESC)');
+
+  // Signups that happened ON this date, STORED rather than derived.
+  //
+  // The chart used to difference total_accounts between consecutive days. That
+  // is correct only while the account count never falls: delete one account
+  // today and yesterday's bar changes, because yesterday's signup figure was
+  // never a recorded fact, it was an artefact of two of today's numbers.
+  // History should not move when the present does. NULLABLE because rows
+  // written before this column existed genuinely have no stored value — the
+  // chart falls back to the delta for exactly those, and for nothing else.
+  try { getDb().exec('ALTER TABLE metrics_daily ADD COLUMN signups_count INTEGER'); } catch (_) {}
+
+  // Passive Stripe drift: how many local/Stripe disagreements the nightly job
+  // found, and when it last managed to look. The admin page reads these and
+  // makes NO API call of its own.
+  //
+  // All three are NULLABLE and written by their own statement, never by the
+  // snapshot upsert, so a boot-time snapshot cannot blank a drift result. On a
+  // failed Stripe call ONLY drift_error is written: a zero would read as "we
+  // checked and everything agrees", which is the one answer a failed check
+  // must never give.
+  try { getDb().exec('ALTER TABLE metrics_daily ADD COLUMN drift_count INTEGER'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE metrics_daily ADD COLUMN drift_checked_at TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE metrics_daily ADD COLUMN drift_error TEXT'); } catch (_) {}
 }
 
 // Insert an audit record (org-scoped). Mints the surrogate candidate identity
@@ -1523,7 +1628,7 @@ function getOrgBilling(orgId) {
     SELECT stripe_customer_id AS stripeCustomerId, plan, subscription_status AS subscriptionStatus,
            current_period_end AS currentPeriodEnd, plan_updated_at AS planUpdatedAt,
            stripe_event_created AS stripeEventCreated, stripe_subscription_id AS stripeSubscriptionId,
-           comped
+           comped, cancel_at_period_end AS cancelAtPeriodEnd
     FROM organizations WHERE id = ?
   `).get(orgId);
   return row || null;
@@ -1554,6 +1659,14 @@ function setOrgPlan(orgId, fields) {
   if ('stripeSubscriptionId' in fields) {
     sets.push('stripe_subscription_id = ?');
     params.push(fields.stripeSubscriptionId || null);
+  }
+  // Same opt-in shape as the two above: written only when the caller names the
+  // key. invoice.payment_failed deliberately does NOT name it — a failed
+  // payment says nothing about whether the customer asked to cancel, and
+  // defaulting it to 0 there would silently clear a pending cancellation.
+  if ('cancelAtPeriodEnd' in fields) {
+    sets.push('cancel_at_period_end = ?');
+    params.push(fields.cancelAtPeriodEnd ? 1 : 0);
   }
   params.push(orgId);
   getDb().prepare(`UPDATE organizations SET ${sets.join(', ')} WHERE id = ?`).run(...params);
