@@ -209,6 +209,12 @@ function applySubscription(orgId, subscription, eventCreated) {
     currentPeriodEnd,
     eventCreated,
     stripeSubscriptionId: subscription.id || null,
+    // Pending cancellation. Read straight off the subscription object rather
+    // than inferred from the status, because a subscription set to stop at the
+    // end of the period reports status 'active' until the moment it does.
+    // Falls to 0 when the plan lands on free, where a pending cancellation on
+    // a subscription that no longer applies would be a stale flag.
+    cancelAtPeriodEnd: plan === 'free' ? 0 : (subscription.cancel_at_period_end ? 1 : 0),
   });
 }
 
@@ -271,6 +277,10 @@ async function handleWebhook(req, res) {
           setOrgPlan(orgId, {
             plan: 'free', subscriptionStatus: 'canceled', currentPeriodEnd: null,
             eventCreated: event.created, stripeSubscriptionId: null, // clear on cancel
+            // The pending cancellation has now happened, so the flag that
+            // predicted it is spent. Left set, this org would sit in the
+            // "churning" figure forever, double-counting a loss already taken.
+            cancelAtPeriodEnd: 0,
           });
         } else if (event.type === 'invoice.payment_failed') {
           // Keep access; surface a warning in the UI. Leave subscription id as-is.

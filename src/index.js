@@ -17,12 +17,14 @@ const teamRouter = require('./routes/team');
 const demoRouter = require('./routes/demo');
 const featureRequestsRouter = require('./routes/featureRequests');
 const plansRouter = require('./routes/plans');
+const adminMetricsRouter = require('./routes/adminMetrics');
 const { productJsonLd } = require('./config/plans');
 const { configuredBaseUrl, warnDeprecatedAliases } = require('./config/appUrl');
 const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE: LEGAL_FOOTER_LINE } = require('./config/legal');
 const { migrateLegacyData } = require('./services/authService');
 const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { startProvenanceSweep } = require('./services/provenanceCache');
+const { startMetricsSnapshotSchedule } = require('./services/metricsSchedule');
 const { mutationLimiter } = require('./middleware/rateLimits');
 
 // Optional pino logger (graceful fallback if not installed yet)
@@ -234,6 +236,14 @@ for (const page of HTML_PAGES) {
 }
 app.use(express.static(PUBLIC_DIR, { index: false }));
 
+// --- Internal admin ---------------------------------------------------------
+// Mounted OUTSIDE /api and before the /api routes because it is not part of the
+// product's API surface: it is a server-rendered operator page that reads across
+// every tenant. Its own owner-email guard runs first and 404s on every failure,
+// so it is deliberately NOT behind requireSession — a 401 here would confirm the
+// path exists. generalLimiter still applies.
+app.use('/admin', generalLimiter, adminMetricsRouter);
+
 // --- Routes ---------------------------------------------------------------
 // Session auth (Authorization: Bearer {sessionToken}) protects every /api/*
 // route except /health and the public /api/auth endpoints (signup, login,
@@ -352,6 +362,14 @@ startWalCheckpointing();
 // candidate data from being deleted by accident. Timer is .unref()'d.
 startProvenanceSweep();
 
+// --- Daily metrics snapshot -------------------------------------------------
+// One metrics_daily row per day, so the admin dashboard's 90-day signup chart
+// has history to draw. Runs once on boot and every 24h after (timer .unref()'d,
+// like the schedules above), which is why Render needs no external cron. The
+// upsert is idempotent and the backfill reconstructs days the process was down
+// for, so restarts neither duplicate nor skip a row.
+startMetricsSnapshotSchedule();
+
 // Say once, at boot, which variable supplied the public origin — or that none
 // did. A wrong origin does not throw: it produces working-looking links that
 // point at the proxy host, and offer URLs that quietly vanish from the pricing
@@ -387,6 +405,7 @@ const server = app.listen(PORT, () => {
   log(' GET  /api/stats/overview     - Dashboard summary metrics (auth required)');
   log(' GET  /api/templates          - Templates CRUD (auth required)');
   log(' POST /api/feature-requests   - Submit a feature request (Pro/Team, auth required)');
+  log(' GET  /admin/metrics          - Internal operator metrics (owner only)');
   log(' GET  /health                 - Health check');
 });
 
