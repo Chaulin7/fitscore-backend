@@ -334,7 +334,13 @@ describe('the signup handover validates the plan against plans.js', () => {
 
 describe('checkout resumes after signup instead of landing on the dashboard', () => {
   test('every successful auth consumes a pending intent', () => {
-    assert.match(APP_HTML, /function onAuthed\(d\)\{[\s\S]{0,400}resumeCheckoutIntent\(\);/);
+    // WAS a proximity regex with a 400-character window, which measured how
+    // much source sat between the two rather than whether the call is in the
+    // function at all — so an unrelated comment could fail it, and a call that
+    // escaped into the NEXT function would pass. Brace-matching the body says
+    // exactly what is meant.
+    const fn = extractFunction(APP_HTML, 'onAuthed');
+    assert.match(fn, /resumeCheckoutIntent\(\);/);
   });
 
   test('resuming goes through the same startCheckout the app uses', () => {

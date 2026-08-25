@@ -1137,6 +1137,16 @@ img, video, table { max-width: 100%; }
       </div>
       <div class="acct-dd-sep" role="separator"></div>
       <button type="button" class="acct-dd-item" role="menuitem" data-action="toggleSettings">Settings</button>
+      <!-- Operator-only. Hidden until /api/auth/me (or login) comes back with
+           user.isPlatformOwner, so it is absent for everyone else AND absent
+           for the operator until the session is confirmed — it fails closed on
+           a slow network rather than flashing. Deliberately NOT in the main
+           nav: /admin/metrics answers 404 to everyone else and should stay
+           unadvertised. Revealing this button grants nothing; the server
+           re-derives ownership from the session on every request. -->
+      <div class="acct-dd-sep" role="separator" id="adminMetricsSep" hidden></div>
+      <button type="button" class="acct-dd-item" role="menuitem" id="adminMetricsItem"
+              data-action="openAdminMetrics" hidden>Metrics</button>
       <div class="acct-dd-sep" role="separator"></div>
       <button type="button" class="acct-dd-item acct-dd-danger" role="menuitem" id="logoutBtn" data-action="doLogout">Log out</button>
     </div>
@@ -1833,11 +1843,26 @@ function toggleAccountMenu(el, e){
   else openAccountMenu(!!e && e.detail === 0);
 }
 
+// Whether the server said this session is the platform operator. Held in
+// memory only, never persisted: it is re-established from /api/auth/me on every
+// load, so a stale localStorage value can never outlive the session it
+// described. Defaults false — the menu item fails closed.
+let _isPlatformOwner = false;
+
 function updateAccountChip(){
   const { menu, btn } = accountMenuEls();
   let email = '', orgName = '';
   try { email = localStorage.getItem(USER_EMAIL_KEY) || ''; orgName = localStorage.getItem(ORG_NAME_KEY) || ''; } catch (_) {}
   const authed = !!(getSessionToken() && email);
+  if (!authed) _isPlatformOwner = false;
+  // hidden rather than display:none so accountMenuItems()' offsetParent filter
+  // skips it in arrow-key navigation too — an unreachable-but-focusable item
+  // is its own bug.
+  const showMetrics = authed && _isPlatformOwner;
+  const metricsItem = document.getElementById('adminMetricsItem');
+  const metricsSep = document.getElementById('adminMetricsSep');
+  if (metricsItem) metricsItem.hidden = !showMetrics;
+  if (metricsSep) metricsSep.hidden = !showMetrics;
   if (menu) menu.classList.toggle('authed', authed);
   if (!authed) closeAccountMenu(false);
   const el = document.getElementById('accountEmail');
@@ -1889,6 +1914,9 @@ function onAuthed(d){
     if (d && d.user && d.user.email) localStorage.setItem(USER_EMAIL_KEY, d.user.email);
     if (d && d.org && d.org.name) localStorage.setItem(ORG_NAME_KEY, d.org.name);
   } catch (_) {}
+  // Server-computed (config/platformOwner) and deliberately not stored. The
+  // owner's address is never sent to a client — only this boolean.
+  _isPlatformOwner = !!(d && d.user && d.user.isPlatformOwner);
   updateAccountChip();
   hideAuthScreen();
   initApp();
@@ -2600,9 +2628,18 @@ async function bootAuth(){
   showAuthScreen(planIntent && window.location.pathname === '/signup' ? 'signup' : 'login');
 }
 
-// Single-use download token for browser-opened URLs (report HTML, CSV export)
-// that cannot carry an Authorization header.
-async function openWithDownloadToken(url){
+// Single-use download token for browser-opened URLs (report HTML, CSV export,
+// the operator metrics page) that cannot carry an Authorization header.
+//
+// The token is held in a local for the length of one navigation: it is never
+// logged, never stored, and reaches the URL only at the moment the window is
+// pointed at it. That matches its server-side lifetime — single-use, 60s.
+//
+// `failMessage` lets a caller name what failed. It exists because "Could not
+// authorize the download" is the wrong sentence for a page that is not a
+// download, and a wrong-but-present message is harder to act on than a right
+// one. Every failure path lands on handleApiError; none of them opens a window.
+async function openWithDownloadToken(url, failMessage){
   // Open the window synchronously to stay inside the user-gesture popup allowance
   let w = null;
   try { w = window.open('about:blank', '_blank'); } catch (_) {}
@@ -2612,12 +2649,23 @@ async function openWithDownloadToken(url){
     if (w && !w.closed) { w.location = full; } else { window.open(full, '_blank'); }
   } catch (e) {
     if (w) { try { w.close(); } catch (_) {} }
-    handleApiError(e, 'Could not authorize the download');
+    handleApiError(e, failMessage || 'Could not authorize the download');
   }
 }
 function openAuditReport(id){
   if (!API) return;
   openWithDownloadToken(API + '/api/audit/report/' + encodeURIComponent(id));
+}
+// Operator metrics. Goes through openWithDownloadToken like every other
+// browser-opened URL — one mint, one navigation, no second copy of the fetch.
+// A missing API base toasts rather than returning quietly: a menu item that
+// does nothing when clicked is indistinguishable from a broken one.
+function openAdminMetrics(){
+  if (!API) { toast('Cannot reach the server.', 'error'); return Promise.resolve(); }
+  // Returns the promise. The delegated click handler ignores it, but a caller
+  // that wants to know when the navigation settled — a test, or any future
+  // sequencing — cannot get that from a function that drops it on the floor.
+  return openWithDownloadToken(API + '/admin/metrics', 'Could not open metrics');
 }
 // === End auth ===============================================================
 function toast(msg, kind, duration) {
@@ -4851,7 +4899,7 @@ const delegatedHandlers = {
   click: {
     toggleMobileNav,
     switchTab: (el) => switchTab(el.dataset.tab, el),
-    focusAuditSearch, doLogout, toggleSettings, toggleAccountMenu,
+    focusAuditSearch, doLogout, toggleSettings, toggleAccountMenu, openAdminMetrics,
     startCheckout: (el) => startCheckout(el.dataset.plan),
     showPlanDetail,
     openBillingPortal, inviteMember, copyInviteLink, saveBranding,
