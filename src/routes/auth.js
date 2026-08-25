@@ -7,6 +7,7 @@ const auth = require('../services/authService');
 const brandingService = require('../services/branding');
 const { getDb } = require('../services/db');
 const { baseUrlFor } = require('../config/appUrl');
+const { isPlatformOwner } = require('../config/platformOwner');
 
 const router = express.Router();
 
@@ -18,10 +19,21 @@ function sendError(res, status, code, message, field) {
 }
 
 // Builds the session payload returned by signup and login (token shown once).
+//
+// isPlatformOwner is a BOOLEAN, deliberately — the operator's address is never
+// published to a client. It tells the SPA whether to render the owner-only
+// "Metrics" item in the account menu, and it is a rendering hint only: the
+// /admin/metrics guard re-derives ownership from the session on every request
+// and 404s regardless of what any client believes about itself.
 function sessionResponse(rawToken, user, org) {
   return {
     sessionToken: rawToken,
-    user: { email: user.email, orgId: user.org_id, role: user.role },
+    user: {
+      email: user.email,
+      orgId: user.org_id,
+      role: user.role,
+      isPlatformOwner: isPlatformOwner(user),
+    },
     org: { name: org ? org.name : null },
   };
 }
@@ -204,7 +216,15 @@ router.get('/me', requireSession, (req, res) => {
   // GET /api/org/branding/logo only when it needs to show it.
   const branding = brandingService.publicBranding(auth.getOrganizationBranding(req.orgId));
   res.json({
-    user: { email: req.user.email, orgId: req.orgId, role: req.user.role },
+    // Same flag as sessionResponse above, so a reloaded tab reaches the same
+    // conclusion as a fresh login instead of losing the menu item until the
+    // next sign-in.
+    user: {
+      email: req.user.email,
+      orgId: req.orgId,
+      role: req.user.role,
+      isPlatformOwner: isPlatformOwner(req.user),
+    },
     org: { name: org ? org.name : null, retentionDays: org ? org.retentionDays : null, branding },
   });
 });

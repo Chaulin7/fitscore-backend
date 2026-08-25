@@ -113,13 +113,25 @@ describe('primary nav holds the five inline destinations', () => {
 });
 
 describe('account dropdown contents', () => {
-  test('it carries Settings and Log out', () => {
+  test('it carries Settings, Metrics and Log out', () => {
     // WAS "the four moved entries". Bias monitoring and Suggest went back to
     // the bar; the plan and connection chips went with them. What remains is
-    // the conventional account-menu payload.
+    // the conventional account-menu payload, plus the operator-only Metrics
+    // entry — which ships `hidden` and is revealed by updateAccountChip only
+    // when the server says the session is the platform owner.
     assert.ok(DROPDOWN, 'account dropdown must exist');
     assert.match(DROPDOWN[1], /data-action="toggleSettings"/);
     assert.match(DROPDOWN[1], /data-action="doLogout"/);
+    assert.match(DROPDOWN[1], /data-action="openAdminMetrics"/);
+  });
+
+  test('the Metrics entry ships hidden — it is never visible by default', () => {
+    // The one that matters: if this attribute is ever dropped, the item shows
+    // for every signed-in customer. It grants them nothing (the route 404s),
+    // but it advertises a page that is meant to stay unadvertised.
+    const item = /<button[^>]*id="adminMetricsItem"[\s\S]*?>/.exec(DROPDOWN[1]);
+    assert.ok(item, 'the Metrics entry must exist');
+    assert.match(item[0], /\shidden\b/);
   });
 
   test('the entries that returned to the bar are not duplicated here', () => {
@@ -128,8 +140,19 @@ describe('account dropdown contents', () => {
   });
 
   test('every actionable entry is a menuitem', () => {
-    const items = DROPDOWN[1].match(/role="menuitem"/g) || [];
-    assert.equal(items.length, 2, 'Settings and Log out');
+    // Asserted structurally rather than as a count. A hardcoded number says
+    // nothing about WHICH entry lost its role, and it fails every time the menu
+    // legitimately grows — which is how it gets "fixed" by bumping the number
+    // without checking. Every actionable row is an .acct-dd-item button; each
+    // one must carry role="menuitem" or it drops out of arrow-key navigation.
+    const buttons = DROPDOWN[1].match(/<button[^>]*class="acct-dd-item[^"]*"[^>]*>/g) || [];
+    assert.ok(buttons.length >= 3, `expected at least Settings, Metrics and Log out, got ${buttons.length}`);
+    for (const b of buttons) {
+      assert.match(b, /role="menuitem"/, `actionable entry is not a menuitem: ${b}`);
+    }
+    // And nothing that is NOT an item claims to be one.
+    const roles = DROPDOWN[1].match(/role="menuitem"/g) || [];
+    assert.equal(roles.length, buttons.length, 'a non-button element claims role="menuitem"');
   });
 
   test('the email header row is NOT a menuitem — it is not actionable', () => {

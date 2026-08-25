@@ -31,29 +31,14 @@ const stripeReconcile = require('../services/stripeReconcile');
 const { getDb } = require('../services/db');
 const { BRANDMARK_SVG } = require('../services/brandmark');
 const { CURRENCY } = require('../config/plans');
+// The owner rule lives in config/platformOwner so this guard and the
+// isPlatformOwner flag on the session payload cannot drift apart. See the
+// header there for why a second copy would fail quietly.
+const { ownerEmail, isPlatformOwner } = require('../config/platformOwner');
 
 const router = express.Router();
 
 const ROUTE_PATH = '/admin/metrics';
-
-/**
- * The single account permitted through this guard.
- *
- * ADMIN_OWNER_EMAIL first so a deployment can move it without a code change,
- * falling back to OWNER_EMAIL (already used by authService.migrateLegacyData to
- * create the owner user at boot) and finally to the operator address this was
- * built for.
- *
- * Note the contrast with services/branding.isCompedOrg(), which goes out of its
- * way NOT to hardcode an address: that is an ENTITLEMENT path, where a hardcoded
- * email would decide what a paying customer receives. This is an internal
- * access gate for one operator, and an env-overridable constant is the honest
- * expression of "there is exactly one of these".
- */
-function ownerEmail() {
-  const configured = process.env.ADMIN_OWNER_EMAIL || process.env.OWNER_EMAIL;
-  return String(configured || 'jasperjoy99@gmail.com').trim().toLowerCase();
-}
 
 function notFound(res) {
   // Byte-identical to the application's catch-all in src/index.js.
@@ -101,27 +86,18 @@ function resolveCaller(req) {
 /**
  * Owner-only guard. 404 on every failure path.
  *
- * Requires BOTH the owner email and role 'owner'. The email alone would be
- * enough today, but role is what every other privileged route in this codebase
- * checks (routes/org.js, routes/team.js, routes/billing.js), and an account
- * that had been demoted while keeping the address should not still hold the
- * one cross-tenant key in the product.
+ * The ownership rule itself is config/platformOwner.isPlatformOwner — email AND
+ * role 'owner', compared timing-safely. This function's job is the 404, not the
+ * rule: routes/auth publishes the same predicate to the SPA so the menu item and
+ * this gate agree by construction rather than by both being kept up to date.
  *
- * The comparison is timing-safe. An email is not a secret and this is close to
- * paranoia, but a plain === on a 404-only endpoint leaves character-by-character
- * timing as the one signal a prober can still read, and the fix costs nothing.
+ * Re-derived from the session on every request. The client's isPlatformOwner
+ * flag is a rendering hint and is never consulted here.
  */
 function isOwner(req, res, next) {
   const caller = resolveCaller(req);
   if (!caller) return notFound(res);
-
-  const actual = String(caller.user.email || '').trim().toLowerCase();
-  const expected = ownerEmail();
-  const a = Buffer.from(actual, 'utf8');
-  const b = Buffer.from(expected, 'utf8');
-  const emailMatches = a.length === b.length && crypto.timingSafeEqual(a, b);
-
-  if (!emailMatches || caller.user.role !== 'owner') return notFound(res);
+  if (!isPlatformOwner(caller.user)) return notFound(res);
 
   req.adminUser = caller.user;
   req.adminAuthMethod = caller.authMethod;
