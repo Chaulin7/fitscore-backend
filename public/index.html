@@ -24,6 +24,15 @@
 </script>
 <title>CVsprings — Deterministic CV screening</title>
 <meta name="description" content="Rules-based CV screening for boutique recruitment agencies. Same input, same output, every time. Built for EU AI Act and GDPR compliance."/>
+<!-- Favicons. Google reads these from the home page specifically and caches the
+     result by URL for a long time, so the paths are fixed: build new artwork
+     with scripts/build-icons.mjs, never rename the files. .ico first with
+     sizes="any" so it wins the legacy slot without competing on pixel size. -->
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/icon-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192">
+<link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <!-- Pricing structured data. Substituted at startup by src/index.js from
      src/config/plans.js — the same table the cards below render from. It is
      server-rendered on purpose: the cards are built by JS from /api/plans, so
