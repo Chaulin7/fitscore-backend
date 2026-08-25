@@ -21,9 +21,10 @@ const { baseUrlFor } = require('../config/appUrl');
 
 const router = express.Router();
 
-const TEAM_MAX_MEMBERS = Number.parseInt(process.env.TEAM_MAX_MEMBERS, 10) >= 0
-  ? Number.parseInt(process.env.TEAM_MAX_MEMBERS, 10)
-  : 0; // 0 = unlimited
+// Seat cap (0 = unlimited). Defined in services/billing.js next to the seat
+// gate itself, so the capacity enforced here is the capacity the plan panel
+// advertises — one number, not two that can drift.
+const { TEAM_MAX_MEMBERS } = billing;
 
 function sendError(res, status, code, message, field) {
   const body = { error: message, code };

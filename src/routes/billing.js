@@ -23,6 +23,7 @@ const {
   getOrgBilling, getUsageCount, currentPeriodKey,
   setOrgStripeCustomerId, findOrgByStripeCustomerId, setOrgPlan,
 } = require('../services/db');
+const { tierById, PLANS, ENTITLEMENT_AXES, phraseForAxis } = require('../config/plans');
 const { baseUrlFor } = require('../config/appUrl');
 
 const router = express.Router();
@@ -58,6 +59,105 @@ router.get('/usage', requireSession, (req, res) => {
       limit: billing.limitFor(b), // null = unlimited
       periodKey,
       billingConfigured: billing.isBillingConfigured(),
+    });
+  } catch (err) {
+    sendError(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// --- Plan summary (the nav plan panel) --------------------------------------
+
+// A comped org is fully entitled with no Stripe subscription behind it. It has
+// no customer id, so the portal would 400, and sending it to checkout would
+// attach a real paid subscription to an account that is deliberately not
+// paying. Both surfaces are therefore suppressed for it rather than offered
+// and then failed.
+function isComped(orgBilling) {
+  return !!orgBilling && (orgBilling.comped === 1 || orgBilling.comped === true);
+}
+
+/**
+ * Why billing cannot be managed, or null when it can.
+ *
+ * These are three genuinely different states and the panel says something
+ * different for each: a member is told who CAN do it, an org with no customer
+ * is told there is nothing to manage yet, and an unconfigured deployment is
+ * told it is the server. Collapsing them into one boolean is what produces an
+ * action area that is simply empty for a member with no explanation.
+ */
+function billingBlockReason({ isOwner, orgBilling, configured }) {
+  if (!isOwner) return 'NOT_OWNER';
+  if (!configured) return 'BILLING_NOT_CONFIGURED';
+  if (isComped(orgBilling)) return 'COMPED';
+  if (!orgBilling || !orgBilling.stripeCustomerId) return 'NO_CUSTOMER';
+  return null;
+}
+
+// GET /api/billing/plan-summary — everything the plan panel renders (any member)
+//
+// Deliberately separate from /usage: that endpoint runs after every analysis
+// and its shape is depended on by the nav chip, so it stays small and hot.
+// This one is fetched only when the panel opens and may be as rich as the
+// panel needs. Nothing here is trusted from the client — plan, price,
+// entitlements, usage and upgrade targets are all read server-side from the
+// session's org.
+router.get('/plan-summary', requireSession, (req, res) => {
+  try {
+    const b = getOrgBilling(req.orgId) || {};
+    const plan = b.plan || 'free';
+    const tier = tierById(plan) || tierById('free');
+    const user = auth.findUserById(req.userId);
+    const isOwner = !!(user && user.org_id === req.orgId && user.role === 'owner');
+    const configured = billing.isBillingConfigured();
+    const comped = isComped(b);
+    const periodKey = currentPeriodKey();
+
+    const blockReason = billingBlockReason({ isOwner, orgBilling: b, configured });
+    const axes = billing.entitlementAxesFor(tier.id);
+
+    // Upgrade targets: strictly higher tiers only, and none at all for a comped
+    // org (see isComped above). Each carries what it GAINS over the current
+    // tier, computed from the enforced axes rather than from tier copy.
+    const upgrades = comped ? [] : PLANS.tiers
+      .filter((t) => billing.isUpgradeFrom(tier.id, t.id) && t.upgradePlan)
+      .map((t) => ({
+        id: t.id,
+        plan: t.upgradePlan,
+        name: t.name,
+        priceLabel: t.priceLabel,
+        per: t.per,
+        taxNote: t.taxNote || null,
+        tagline: t.tagline,
+        gains: billing.gainsBetween(tier.id, t.id),
+      }));
+
+    res.json({
+      plan: tier.id,
+      planName: tier.name,
+      priceLabel: tier.priceLabel,
+      per: tier.per,
+      taxNote: tier.taxNote || null,
+      subscriptionStatus: b.subscriptionStatus || null,
+      currentPeriodEnd: b.currentPeriodEnd || null,
+      cancelAtPeriodEnd: b.cancelAtPeriodEnd === 1 || b.cancelAtPeriodEnd === true,
+      comped,
+      isOwner,
+      billingConfigured: configured,
+      // One positive flag plus the reason it is false, so the panel never has
+      // to infer "why" from a combination of other fields.
+      canManageBilling: blockReason === null,
+      billingBlockReason: blockReason,
+      canUpgrade: isOwner && configured && !comped,
+      usage: {
+        periodKey,
+        analyses: { used: getUsageCount(req.orgId, periodKey), limit: axes.analysesPerMonth },
+        seats: { used: auth.countOrgUsers(req.orgId), limit: axes.seats },
+      },
+      // What this tier grants, phrased from the same axis values the gates read.
+      entitlements: ENTITLEMENT_AXES
+        .map((axis) => ({ axis, value: axes[axis], label: phraseForAxis(axis, axes[axis]) }))
+        .filter((e) => e.label),
+      upgrades,
     });
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -113,6 +213,28 @@ router.post('/checkout', requireSession, requireOwner, async (req, res) => {
     if (plan !== 'pro' && plan !== 'team') {
       return sendError(res, 400, 'VALIDATION_ERROR', "plan must be 'pro' or 'team'.");
     }
+
+    // Refuse anything that is not a strict upgrade from what the org is on.
+    //
+    // The same-tier case is the expensive one: Checkout would happily open a
+    // SECOND subscription against the same customer and bill the org twice for
+    // one plan. A Pro org whose subscription is set to cancel at period end is
+    // refused here too — the fix for that is Resume in the portal, not a
+    // duplicate subscription that outlives the cancellation.
+    //
+    // A comped org is refused for the opposite reason: it is entitled without
+    // paying, and checkout would attach a real subscription it should not have.
+    const currentBilling = getOrgBilling(req.orgId) || {};
+    const currentPlan = currentBilling.plan || 'free';
+    if (isComped(currentBilling)) {
+      return sendError(res, 400, 'PLAN_COMPED',
+        'This account is on a complimentary plan. Contact support to change it.');
+    }
+    if (!billing.isUpgradeFrom(currentPlan, plan)) {
+      return sendError(res, 400, 'PLAN_NOT_AN_UPGRADE',
+        `This organization is already on the ${currentPlan} plan.`);
+    }
+
     const priceId = billing.priceIdForPlan(plan);
     if (!priceId) return sendError(res, 503, 'BILLING_NOT_CONFIGURED', `No price configured for the ${plan} plan.`);
 
