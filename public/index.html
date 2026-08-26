@@ -74,11 +74,17 @@ a{color:inherit}
 /* ---------- nav ---------- */
 nav{border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--paper);z-index:50}
 nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-.wordmark{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.01em;text-decoration:none;display:flex;align-items:center;gap:10px}
+.wordmark{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.01em;text-decoration:none;display:flex;align-items:center;gap:8px}
 .wordmark .wordtext > span{color:var(--stamp)}
 /* Shared brand mark: same /brandmark.svg as the app, via CSS mask so colour
-   comes from currentColor (dark-on-paper here, white-on-navy in the app). */
-.logomark{width:30px;height:30px;flex:none;display:inline-block;color:var(--ink);background-color:currentColor;-webkit-mask:url(/brandmark.svg) center/contain no-repeat;mask:url(/brandmark.svg) center/contain no-repeat}
+   comes from currentColor (navy here, white-on-navy in the app). The mask keeps
+   only the alpha channel, so the file's own #000 fill never renders — the mark
+   is recoloured here and the shared asset stays byte-identical for the app,
+   the legal pages and the generated reports.
+   No optical nudge: measured against Space Grotesk 700/20px, the cap band of
+   the wordmark centres exactly on its line box, so flex centring already lands
+   the mark's midpoint on the cap midpoint. */
+.logomark{width:42px;height:42px;flex:none;display:inline-block;color:var(--stamp);background-color:currentColor;-webkit-mask:url(/brandmark.svg) center/contain no-repeat;mask:url(/brandmark.svg) center/contain no-repeat}
 .navlinks{display:flex;align-items:center;gap:24px;font-size:14px}
 .navlinks a{text-decoration:none;color:var(--ink-soft)}
 .navlinks a:hover{color:var(--ink)}
