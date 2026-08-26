@@ -328,19 +328,40 @@ describe('plan-summary: comped orgs', () => {
     assert.equal(body.billingBlockReason, 'COMPED');
   });
 
-  test('a comped org is offered no upgrades at all', async () => {
+  // The panel offers exactly what POST /checkout will accept. For a comped org
+  // that includes its OWN tier: the grant is not a subscription, so converting
+  // at the same tier is a purchase the server allows.
+  test('a comped Pro org is offered conversion at its own tier and above', async () => {
     setPlan(ORG_A, { plan: 'pro', subscriptionStatus: null, customerId: null, comped: true });
     const { body } = await summary();
-    assert.deepEqual(body.upgrades, [],
-      'checkout would attach a real subscription to an account that should not have one');
-    assert.equal(body.canUpgrade, false);
+    assert.deepEqual(body.upgrades.map((u) => u.id), ['pro', 'team']);
+    assert.equal(body.canUpgrade, true);
+    assert.equal(body.comped, true, 'still comped until a payment actually clears');
   });
 
-  test('a comped FREE org is likewise offered nothing', async () => {
+  test('a comped org still has no billing to manage', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: null, customerId: null, comped: true });
+    const { body } = await summary();
+    assert.equal(body.canManageBilling, false);
+    assert.equal(body.billingBlockReason, 'COMPED',
+      'there is genuinely no subscription behind a comp to manage');
+  });
+
+  test('a comped FREE org is offered both paid tiers', async () => {
     setPlan(ORG_A, { plan: 'free', customerId: null, comped: true });
     const { body } = await summary();
-    assert.deepEqual(body.upgrades, []);
+    assert.deepEqual(body.upgrades.map((u) => u.id), ['pro', 'team']);
+    assert.equal(body.canUpgrade, true);
+  });
+
+  test('a comped org with a subscription already attached is offered nothing', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_a', comped: true });
+    db.getDb().prepare('UPDATE organizations SET stripe_subscription_id = ? WHERE id = ?')
+      .run('sub_existing', ORG_A);
+    const { body } = await summary();
+    assert.deepEqual(body.upgrades, [], 'that one would duplicate a live subscription');
     assert.equal(body.canUpgrade, false);
+    db.getDb().prepare('UPDATE organizations SET stripe_subscription_id = NULL WHERE id = ?').run(ORG_A);
   });
 
   test('clearing the flag restores the upgrade offer (guards a stuck-off test)', async () => {
