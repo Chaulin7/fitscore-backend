@@ -466,12 +466,18 @@ function renderPage(data, reconcile, nonce) {
 
     + '<div class="section"><h2>Subscription status</h2>'
     + '<table><thead><tr><th>Status</th><th class="num">Accounts</th></tr></thead><tbody>'
-    + metrics.KNOWN_STATUSES.map(statusRow).join('')
-    + statusRow('none') + statusRow('other')
+    + metrics.REPORTED_STATUSES.map(statusRow).join('')
     + '</tbody></table>'
     + `<p class="footnote">${data.canceledButInPeriod} canceled subscription`
     + `${data.canceledButInPeriod === 1 ? ' is' : 's are'} still inside a paid period and remain entitled `
-    + 'until current_period_end. <code>none</code> means never subscribed — not the same as canceled.</p></div>'
+    + 'until current_period_end. '
+    + `<code>churned</code> combines <code>canceled</code> (${statuses.raw.canceled || 0}, voluntary) `
+    + `and <code>unpaid</code> (${statuses.raw.unpaid || 0}, dunning exhausted — recoverable by `
+    + 'card-update outreach). <code>none</code> is never subscribed, which includes '
+    + `<code>incomplete_expired</code> (${statuses.raw.incomplete_expired || 0}): a first payment that `
+    + 'never cleared means the account was never a customer, so it is not churn. '
+    + 'NOTE: rows written before this distinction existed rest at NULL and are counted as '
+    + '<code>none</code> — the table mixes pre- and post-fix data until they are backfilled.</p></div>'
 
     + '<div class="section"><h2>Signups per day — last 90 days</h2>'
     + renderChart(data.series) + '</div>'

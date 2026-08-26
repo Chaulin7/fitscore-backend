@@ -57,10 +57,32 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // second one is the true one.
 const KNOWN_PLANS = ['free', 'pro', 'team'];
 
-// The subscription_status values Stripe sends that we report by name. Anything
-// else Stripe invents lands in `other`; a NULL/empty status (never subscribed —
-// every free signup) lands in `none`, which is NOT the same thing as canceled.
-const KNOWN_STATUSES = ['trialing', 'active', 'past_due', 'canceled'];
+// The subscription_status values Stripe sends that we report under their own
+// name. Anything else Stripe invents lands in `other`.
+const KNOWN_STATUSES = ['trialing', 'active', 'past_due'];
+
+/**
+ * Reporting buckets.
+ *
+ * The database now preserves the exact terminal status, so the grouping is done
+ * here — where it can be changed by editing this file rather than by replaying
+ * Stripe. Two deliberate groupings:
+ *
+ *   churned  canceled (voluntary) + unpaid (dunning exhausted, involuntary).
+ *            One top-line churn number, because that is the question the
+ *            dashboard is answering. They stay separable in `raw` below, and in
+ *            the reconcile report, because the recovery motion differs: an
+ *            unpaid account may come back on a card-update email, a canceled
+ *            one will not.
+ *
+ *   none     never subscribed + incomplete_expired. An account whose first
+ *            payment never cleared was never a customer, so counting it as
+ *            churn inflates churn with failed signups.
+ */
+const CHURNED_STATUSES = ['canceled', 'unpaid'];
+const NEVER_SUBSCRIBED_STATUSES = ['incomplete_expired'];
+// Display order for the status table.
+const REPORTED_STATUSES = ['trialing', 'active', 'past_due', 'churned', 'none', 'other'];
 
 function normalisePlan(plan) {
   return KNOWN_PLANS.includes(plan) ? plan : 'unknown';
@@ -68,6 +90,8 @@ function normalisePlan(plan) {
 
 function normaliseStatus(status) {
   if (status == null || status === '') return 'none';
+  if (NEVER_SUBSCRIBED_STATUSES.includes(status)) return 'none';
+  if (CHURNED_STATUSES.includes(status)) return 'churned';
   return KNOWN_STATUSES.includes(status) ? status : 'other';
 }
 
@@ -192,8 +216,12 @@ function planBreakdown() {
 }
 
 /**
- * Accounts per subscription status.
- * `none` = never subscribed (NULL status); distinct from `canceled`.
+ * Accounts per subscription status, bucketed for display.
+ *
+ * `raw` carries the un-bucketed per-status counts alongside, so anything that
+ * needs voluntary churn separated from involuntary (the reconcile report, any
+ * outreach list) can get it without a second query and without the buckets
+ * having to be un-picked.
  */
 function subscriptionStatusBreakdown() {
   const rows = getDb().prepare(`
@@ -201,9 +229,14 @@ function subscriptionStatusBreakdown() {
     FROM organizations GROUP BY subscription_status
   `).all();
 
-  const counts = { trialing: 0, active: 0, past_due: 0, canceled: 0, none: 0, other: 0 };
-  for (const row of rows) counts[normaliseStatus(row.status)] += row.n;
-  return counts;
+  const counts = { trialing: 0, active: 0, past_due: 0, churned: 0, none: 0, other: 0 };
+  const raw = {};
+  for (const row of rows) {
+    const key = row.status == null || row.status === '' ? 'none' : row.status;
+    raw[key] = (raw[key] || 0) + row.n;
+    counts[normaliseStatus(row.status)] += row.n;
+  }
+  return { ...counts, raw };
 }
 
 /**
@@ -686,6 +719,9 @@ function collectMetrics(now = Date.now()) {
 module.exports = {
   KNOWN_PLANS,
   KNOWN_STATUSES,
+  REPORTED_STATUSES,
+  CHURNED_STATUSES,
+  NEVER_SUBSCRIBED_STATUSES,
   SNAPSHOT_BACKFILL_DAYS,
   normalisePlan,
   normaliseStatus,

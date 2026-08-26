@@ -2265,15 +2265,41 @@ function planRenewalLine(sum){
   // The date is still worth showing — it is when this period runs out — so the
   // wording drops the claim rather than the information.
   if(sum.subscriptionStatus==='past_due') return '<div class="pp-sub">Current period ends '+escHtml(when)+'</div>';
+  // An incomplete subscription never started, so there is no period to renew
+  // and no date worth showing — the only useful thing on screen is the action
+  // that completes the payment.
+  if(sum.subscriptionStatus==='incomplete') return '<div class="pp-sub">Payment not completed</div>';
   return '<div class="pp-sub">Renews '+escHtml(when)+'</div>';
 }
 // Why the action area is empty, said out loud. A member seeing nothing where a
 // button should be learns nothing; a member told who can do it can go do it.
+// One string for both surfaces. "organization" is the noun this app uses
+// everywhere else — the server says "Only the organization owner can manage
+// billing" — and the panel had briefly introduced "workspace" as a second word
+// for the same thing.
+const MEMBER_PLAN_NOTE = '<div class="pp-note">Contact your organization owner to change the plan.</div>';
+
+// Renders one server-decided action. The client picks no label, no destination
+// and no prominence: `kind` maps onto the existing button classes and nothing
+// else. data-action keeps it on the delegated path — script-src-attr is 'none',
+// so an inline handler would be a dead control.
+function planActionBtn(a){
+  const cls = a.kind === 'primary' ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+  return '<button type="button" class="'+cls+'" data-action="'+escHtml(a.action)+'"'
+    + (a.plan ? ' data-plan="'+escHtml(a.plan)+'"' : '')
+    + '>'+escHtml(a.label)+'</button>';
+}
+function planActionsAt(sum, anchor){
+  const list = (sum.actions||[]).filter(function(a){ return a.anchor === anchor; });
+  if(!list.length) return '';
+  return '<div class="pp-foot">'+list.map(planActionBtn).join('')+'</div>';
+}
+
 function planBlockNote(sum){
   const r = sum.billingBlockReason;
-  if(r==='NOT_OWNER') return '<div class="pp-note">Contact your workspace owner to manage billing.</div>';
+  if(r==='NOT_OWNER') return MEMBER_PLAN_NOTE;
   if(r==='BILLING_NOT_CONFIGURED') return '<div class="pp-note">Billing is not configured on this deployment.</div>';
-  if(r==='COMPED') return '<div class="pp-note">Your workspace is on a complimentary plan — no billing to manage.</div>';
+  if(r==='COMPED') return '<div class="pp-note">Your organization is on a complimentary plan — no billing to manage.</div>';
   if(r==='NO_CUSTOMER') return '<div class="pp-note">No billing account yet.</div>';
   return '';
 }
@@ -2284,37 +2310,33 @@ function renderPaidPanel(sum){
     ? '<div class="pp-alert"><div class="pp-alert-t">Payment failed</div>'
       +'<div class="pp-alert-b">Your last payment did not go through. Access continues for now — update your payment method to keep it.</div></div>'
     : '';
+  // Placement: this panel lists usage, so an upgrade sits beside the limit it
+  // unlocks — Pro -> Team is a seat gain, so it lands under Members — and the
+  // billing action stays in the footer.
   const usage =
     '<div class="pp-sec"><div class="pp-sec-h">This month</div>'
     +'<div class="pp-row"><span>CV analyses</span><b>'+a.used+(a.limit==null?' <span style="font-weight:400;color:#6b7280">/ unlimited</span>':' / '+a.limit)+'</b></div>'
     + planMeter(a.used, a.limit)
+    + planActionsAt(sum,'analyses')
     +'<div class="pp-row"><span>Members</span><b>'+seats.used+(seats.limit==null?' <span style="font-weight:400;color:#6b7280">/ unlimited</span>':' / '+seats.limit)+'</b></div>'
+    + planActionsAt(sum,'seats')
     +'</div>';
   const ents = (sum.entitlements||[]).length
     ? '<div class="pp-sec"><div class="pp-sec-h">Included</div><ul class="pp-ent">'
       +sum.entitlements.map(function(e){return '<li>'+escHtml(e.label)+'</li>';}).join('')+'</ul></div>'
     : '';
-  // Pro sees Team; Team's upgrades array is empty, so it sees nothing.
-  const up = (sum.upgrades||[]).map(function(t){
-    return '<div class="pp-up"><div class="pp-sec-h">Upgrade to '+escHtml(t.name)+'</div>'
-      +'<div class="pp-tier"><span class="pp-sub">'+escHtml(t.tagline||'')+'</span>'
-      +'<span class="pp-price">'+escHtml(t.priceLabel)+'<small>'+escHtml(t.per||'')+'</small></span></div>'
-      +t.gains.map(function(g){return '<div class="pp-up-gain">'+escHtml(g.label)+'</div>';}).join('')
-      +(sum.canUpgrade
-        ? '<div class="pp-foot"><button type="button" class="btn btn-primary btn-sm" data-action="startPlanCheckout" data-plan="'+escHtml(t.plan)+'">Upgrade to '+escHtml(t.name)+'</button></div>'
-        : '<div class="pp-foot"><div class="pp-note">Contact your workspace owner to upgrade.</div></div>')
-      +'</div>';
-  }).join('');
-  const manage = sum.canManageBilling
-    ? '<button type="button" class="btn btn-ghost btn-sm" data-action="openBillingPortal">Manage billing</button>'
-    : planBlockNote(sum);
+  // A member is told who can act rather than shown an empty area. The server
+  // sends them no actions at all, so this is the whole footer for them.
+  const footer = (sum.actions||[]).length
+    ? planActionsAt(sum,'footer')
+    : '<div class="pp-foot">'+(sum.isOwner ? planBlockNote(sum) : MEMBER_PLAN_NOTE)+'</div>';
 
   return alert
     +'<div class="pp-tier"><span class="pp-name">'+escHtml(sum.planName)+'</span>'
     +'<span class="pp-price">'+escHtml(sum.priceLabel)+'<small>'+escHtml(sum.per||'')
     +(sum.taxNote?' '+escHtml(sum.taxNote):'')+'</small></span></div>'
     + planRenewalLine(sum)
-    + usage + ents + '<div class="pp-foot">'+manage+'</div>' + up;
+    + usage + ents + footer;
 }
 
 // Free tier: a modal, not the dropdown. See the .pf-grid comment in the CSS.
@@ -2332,9 +2354,13 @@ function openFreePlanModal(sum){
       +'<div class="pf-tag">'+escHtml(t.tagline||'')+'</div>'
       +'<div class="pp-sec-h">What you gain</div>'
       +'<ul class="pf-gains">'+t.gains.map(function(g){return '<li>'+escHtml(g.label)+'</li>';}).join('')+'</ul>'
-      +(sum.canUpgrade
-        ? '<button type="button" class="btn btn-primary btn-sm" data-action="startPlanCheckout" data-plan="'+escHtml(t.plan)+'">Upgrade to '+escHtml(t.name)+'</button>'
-        : '')
+      // Prominence comes from the server's `kind`, not from the tier id: Pro is
+      // the primary and Team the ghost, so there is exactly one primary in the
+      // dialog. A member gets no action for either card.
+      +(function(){
+        const act = (sum.actions||[]).find(function(x){ return x.plan === t.plan; });
+        return act ? planActionBtn(act) : '';
+      })()
       +'</div>';
   }).join('');
   box.innerHTML=
@@ -2348,7 +2374,7 @@ function openFreePlanModal(sum){
       +'</div>'
       +'<div class="pp-sec-h" style="margin-top:14px">Upgrade</div>'
       +'<div class="pf-grid">'+cards+'</div>'
-      +(sum.canUpgrade?'':'<div class="pp-note" style="margin-top:10px">Contact your workspace owner to upgrade.</div>')
+      +((sum.actions||[]).length?'':'<div style="margin-top:10px">'+(sum.isOwner?planBlockNote(sum):MEMBER_PLAN_NOTE)+'</div>')
     +'</div><div class="modal-foot"></div>';
   // Same z-index reasoning as showPlanDetail: this can open over the settings
   // panel (9999/9998), which the shared .modal-backdrop 2000 sits under.

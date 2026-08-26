@@ -45,6 +45,7 @@ const express = require('express');
 const db = require('../services/db');
 const auth = require('../services/authService');
 const billingRouter = require('../routes/billing');
+const { planPanelState, planActions } = require('../routes/billing');
 const billingSvc = require('../services/billing');
 const { PLANS } = require('../config/plans');
 
@@ -424,5 +425,165 @@ describe('plan-summary: unauthenticated', () => {
       headers: { Authorization: 'Bearer not-a-real-token' },
     });
     assert.equal(res.status, 401);
+  });
+});
+
+/**
+ * The state -> action mapping, exercised directly.
+ *
+ * This is the whole contract the panel renders from: the client decides no
+ * label, no destination and no prominence. Each state gets its own assertion of
+ * the EXACT action set, because the failure mode is silent — an upsell that
+ * appears while a payment is failing, or a missing recovery button, both render
+ * as a perfectly normal-looking panel.
+ */
+describe('plan panel: state derivation', () => {
+  const owner = { isOwner: true, canCheckout: true, canPortal: true, plan: 'pro' };
+
+  test('every terminal status resolves to free, however the org churned', () => {
+    for (const status of ['canceled', 'unpaid', 'incomplete_expired']) {
+      assert.equal(planPanelState({ plan: 'free', subscriptionStatus: status }), 'free',
+        `${status} should present as free`);
+      // Even if the plan string was left behind, the terminal status wins.
+      assert.equal(planPanelState({ plan: 'pro', subscriptionStatus: status }), 'free');
+    }
+  });
+
+  test('never-subscribed is free too', () => {
+    assert.equal(planPanelState({ plan: 'free', subscriptionStatus: null }), 'free');
+    assert.equal(planPanelState({}), 'free');
+    assert.equal(planPanelState(null), 'free');
+  });
+
+  test('live tiers, payment trouble and a scheduled cancellation are distinguished', () => {
+    assert.equal(planPanelState({ plan: 'pro', subscriptionStatus: 'active' }), 'pro_active');
+    assert.equal(planPanelState({ plan: 'team', subscriptionStatus: 'active' }), 'team_active');
+    assert.equal(planPanelState({ plan: 'pro', subscriptionStatus: 'past_due' }), 'past_due');
+    assert.equal(planPanelState({ plan: 'pro', subscriptionStatus: 'incomplete' }), 'incomplete');
+    assert.equal(
+      planPanelState({ plan: 'pro', subscriptionStatus: 'active', cancelAtPeriodEnd: 1 }),
+      'cancel_scheduled');
+  });
+
+  test('past_due outranks a scheduled cancellation — one is urgent, one is not', () => {
+    assert.equal(
+      planPanelState({ plan: 'pro', subscriptionStatus: 'past_due', cancelAtPeriodEnd: 1 }),
+      'past_due');
+  });
+});
+
+describe('plan panel: the action set for each state', () => {
+  const owner = (plan) => ({ isOwner: true, canCheckout: true, canPortal: true, plan });
+  const ids = (acts) => acts.map((a) => a.id);
+  const primaries = (acts) => acts.filter((a) => a.kind === 'primary');
+
+  test('FREE: Pro is the primary, Team stays reachable as a ghost', () => {
+    const acts = planActions('free', owner('free'));
+    assert.deepEqual(ids(acts), ['upgrade_pro', 'upgrade_team']);
+    assert.equal(acts[0].kind, 'primary');
+    assert.equal(acts[1].kind, 'ghost',
+      'a free org that needs seats must not be forced to buy Pro first');
+    assert.ok(acts.every((a) => a.action === 'startPlanCheckout'));
+    assert.deepEqual(acts.map((a) => a.plan), ['pro', 'team']);
+  });
+
+  test('PRO: Manage billing is the primary, the Team upsell is not', () => {
+    const acts = planActions('pro_active', owner('pro'));
+    assert.deepEqual(ids(acts), ['upgrade_team', 'manage_billing']);
+    const manage = acts.find((a) => a.id === 'manage_billing');
+    assert.equal(manage.kind, 'primary', 'Pro users mostly come here for invoices');
+    assert.equal(manage.action, 'openBillingPortal');
+    const upsell = acts.find((a) => a.id === 'upgrade_team');
+    assert.equal(upsell.kind, 'ghost');
+    assert.equal(upsell.anchor, 'seats', 'beside the limit it unlocks');
+  });
+
+  test('TEAM: billing only — no upgrade CTA on the top tier', () => {
+    const acts = planActions('team_active', owner('team'));
+    assert.deepEqual(ids(acts), ['manage_billing']);
+    assert.ok(!acts.some((a) => a.action === 'startPlanCheckout'));
+  });
+
+  test('PAST_DUE: the portal, named for the job, and no upsell', () => {
+    const acts = planActions('past_due', owner('pro'));
+    assert.deepEqual(ids(acts), ['update_payment']);
+    assert.equal(acts[0].label, 'Update payment method');
+    assert.equal(acts[0].action, 'openBillingPortal');
+    assert.ok(!acts.some((a) => a.action === 'startPlanCheckout'),
+      'never upsell someone whose payment is failing');
+  });
+
+  test('INCOMPLETE: a fresh checkout at the SAME tier, because the portal cannot fix it', () => {
+    // The portal can change a card but cannot complete a subscription whose
+    // first payment never cleared; Stripe expires it within about a day.
+    const acts = planActions('incomplete', owner('pro'));
+    assert.deepEqual(ids(acts), ['complete_payment']);
+    assert.equal(acts[0].action, 'startPlanCheckout');
+    assert.equal(acts[0].plan, 'pro', 'same tier — this is a retry, not an upgrade');
+    assert.equal(acts[0].label, 'Complete payment');
+  });
+
+  test('CANCEL_SCHEDULED: reactivate through the portal, no upsell', () => {
+    const acts = planActions('cancel_scheduled', owner('pro'));
+    assert.deepEqual(ids(acts), ['reactivate']);
+    assert.equal(acts[0].action, 'openBillingPortal');
+    assert.ok(!acts.some((a) => a.action === 'startPlanCheckout'));
+  });
+
+  test('every state offers at most one primary action', () => {
+    for (const state of ['free', 'pro_active', 'team_active', 'past_due', 'incomplete', 'cancel_scheduled']) {
+      assert.ok(primaries(planActions(state, owner('pro'))).length <= 1,
+        `${state} offers more than one primary`);
+    }
+  });
+
+  test('upgrade labels carry the price, from config/plans.js', () => {
+    // A control that spends money says how much, without a block of upsell
+    // copy beside it — and the number is never typed into the frontend.
+    const free = planActions('free', owner('free'));
+    assert.match(free.find((a) => a.plan === 'pro').label, /€49/);
+    assert.match(free.find((a) => a.plan === 'team').label, /€199/);
+  });
+});
+
+describe('plan panel: a member is offered nothing at all', () => {
+  const member = (plan) => ({ isOwner: false, canCheckout: true, canPortal: true, plan });
+
+  test('no state produces an action for a non-owner', () => {
+    for (const state of ['free', 'pro_active', 'team_active', 'past_due', 'incomplete', 'cancel_scheduled']) {
+      assert.deepEqual(planActions(state, member('pro')), [],
+        `${state} handed a member an action they would be 403'd for`);
+    }
+  });
+
+  test('an owner in the same state DOES get actions (guards a vacuous pass)', () => {
+    assert.ok(planActions('pro_active', { isOwner: true, canCheckout: true, canPortal: true, plan: 'pro' }).length > 0);
+  });
+
+  test('checkout and portal availability gate their own actions independently', () => {
+    const noCheckout = planActions('pro_active', { isOwner: true, canCheckout: false, canPortal: true, plan: 'pro' });
+    assert.deepEqual(noCheckout.map((a) => a.id), ['manage_billing']);
+    const noPortal = planActions('pro_active', { isOwner: true, canCheckout: true, canPortal: false, plan: 'pro' });
+    assert.deepEqual(noPortal.map((a) => a.id), ['upgrade_team']);
+  });
+});
+
+describe('plan-summary carries the state and actions end to end', () => {
+  test('an owner on Pro gets pro_active and both actions over HTTP', async () => {
+    actAs('user-a');
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_a', comped: false });
+    const { body } = await summary();
+    assert.equal(body.state, 'pro_active');
+    assert.deepEqual(body.actions.map((a) => a.id), ['upgrade_team', 'manage_billing']);
+  });
+
+  test('a member on the same org gets the state but no actions', async () => {
+    setPlan(ORG_A, { plan: 'team', subscriptionStatus: 'active', customerId: 'cus_a', comped: false });
+    actAs('member-a');
+    const { body } = await summary();
+    assert.equal(body.state, 'team_active');
+    assert.deepEqual(body.actions, [],
+      'the button is not merely hidden — the server offers nothing');
+    assert.equal(body.isOwner, false);
   });
 });

@@ -164,6 +164,24 @@ function planRank(tierId) {
  */
 const LIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'past_due', 'trialing', 'paused']);
 
+/**
+ * Statuses from which a subscription never comes back.
+ *
+ * These are PRESERVED in organizations.subscription_status rather than nulled,
+ * because they are three different outcomes and NULL erases the difference
+ * permanently — you cannot un-collapse them without replaying Stripe:
+ *
+ *   canceled           voluntary churn: the customer chose to stop
+ *   unpaid             involuntary churn: dunning ran out. Recoverable by
+ *                      card-update outreach, which is a different motion
+ *   incomplete_expired the first payment never cleared, so this account was
+ *                      never a customer at all
+ *
+ * NULL keeps a meaning of its own: never subscribed. Reporting decides how to
+ * group these (services/metrics.js) — the write path does not.
+ */
+const TERMINAL_SUBSCRIPTION_STATUSES = new Set(['canceled', 'unpaid', 'incomplete_expired']);
+
 function hasLiveSubscription(orgBilling) {
   return !!orgBilling && LIVE_SUBSCRIPTION_STATUSES.has(orgBilling.subscriptionStatus);
 }
@@ -207,6 +225,7 @@ module.exports = {
   planRank,
   isUpgradeFrom,
   LIVE_SUBSCRIPTION_STATUSES,
+  TERMINAL_SUBSCRIPTION_STATUSES,
   hasLiveSubscription,
   effectiveTierFor,
   getStripe,
