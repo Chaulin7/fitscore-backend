@@ -487,15 +487,29 @@ describe('plan panel: the action set for each state', () => {
     assert.deepEqual(acts.map((a) => a.plan), ['pro', 'team']);
   });
 
-  test('PRO: Manage billing is the primary, the Team upsell is not', () => {
+  test('PRO: billing only — the Team upgrade is gated off', () => {
+    // Checkout opens a NEW subscription and the de-duplication is same-tier by
+    // design, so this button left a Pro org paying 49 + 199 concurrently.
+    // Gated until the tier change goes through subscriptions.update instead.
     const acts = planActions('pro_active', owner('pro'));
-    assert.deepEqual(ids(acts), ['upgrade_team', 'manage_billing']);
+    assert.deepEqual(ids(acts), ['manage_billing']);
     const manage = acts.find((a) => a.id === 'manage_billing');
-    assert.equal(manage.kind, 'primary', 'Pro users mostly come here for invoices');
+    assert.equal(manage.kind, 'primary');
     assert.equal(manage.action, 'openBillingPortal');
-    const upsell = acts.find((a) => a.id === 'upgrade_team');
-    assert.equal(upsell.kind, 'ghost');
-    assert.equal(upsell.anchor, 'seats', 'beside the limit it unlocks');
+  });
+
+  test('PRO offers no checkout at all while the gate is in place', () => {
+    const acts = planActions('pro_active', owner('pro'));
+    assert.ok(!acts.some((a) => a.action === 'startPlanCheckout'),
+      'a second Checkout Session against a live Pro subscription double-bills the org');
+  });
+
+  test('free -> Team is untouched: there is no subscription to duplicate', () => {
+    // The bug needs an EXISTING live subscription. A free org has none, so
+    // Checkout is still the correct path for it and must keep working.
+    const acts = planActions('free', owner('free'));
+    assert.deepEqual(ids(acts), ['upgrade_pro', 'upgrade_team']);
+    assert.ok(acts.every((a) => a.action === 'startPlanCheckout'));
   });
 
   test('TEAM: billing only — no upgrade CTA on the top tier', () => {
@@ -561,20 +575,23 @@ describe('plan panel: a member is offered nothing at all', () => {
   });
 
   test('checkout and portal availability gate their own actions independently', () => {
-    const noCheckout = planActions('pro_active', { isOwner: true, canCheckout: false, canPortal: true, plan: 'pro' });
-    assert.deepEqual(noCheckout.map((a) => a.id), ['manage_billing']);
+    // Asserted on `free`, which still offers both kinds — pro_active is now
+    // portal-only while the Team upgrade is gated.
+    const noCheckout = planActions('free', { isOwner: true, canCheckout: false, canPortal: true, plan: 'free' });
+    assert.deepEqual(noCheckout.map((a) => a.id), []);
     const noPortal = planActions('pro_active', { isOwner: true, canCheckout: true, canPortal: false, plan: 'pro' });
-    assert.deepEqual(noPortal.map((a) => a.id), ['upgrade_team']);
+    assert.deepEqual(noPortal.map((a) => a.id), []);
   });
 });
 
 describe('plan-summary carries the state and actions end to end', () => {
-  test('an owner on Pro gets pro_active and both actions over HTTP', async () => {
+  test('an owner on Pro gets pro_active and billing only, over HTTP', async () => {
     actAs('user-a');
     setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_a', comped: false });
     const { body } = await summary();
     assert.equal(body.state, 'pro_active');
-    assert.deepEqual(body.actions.map((a) => a.id), ['upgrade_team', 'manage_billing']);
+    assert.deepEqual(body.actions.map((a) => a.id), ['manage_billing'],
+      'the double-billing upgrade path must not be reachable from the panel');
   });
 
   test('a member on the same org gets the state but no actions', async () => {

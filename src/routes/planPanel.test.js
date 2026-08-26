@@ -226,13 +226,12 @@ describe('paid panel: what a Pro tenant sees', () => {
     assert.match(html, /Manage billing/);
   });
 
-  test('on Pro, Manage billing is the primary and the upsell is not', () => {
-    // Pro customers mostly open this for invoices, so billing outranks the
-    // upsell — and there is exactly one primary in the panel.
+  test('on Pro, billing is the only action while the upgrade is gated', () => {
     const html = paidPanel(withRealActions(summaryFor(),
       { plan: 'pro', subscriptionStatus: 'active' }));
     assert.match(html, /class="btn btn-primary btn-sm" data-action="openBillingPortal"/);
-    assert.match(html, /class="btn btn-ghost btn-sm" data-action="startPlanCheckout"/);
+    assert.doesNotMatch(html, /startPlanCheckout/,
+      'the Team upgrade opened a second concurrent subscription');
     assert.equal(primaryCount(html), 1, 'one primary action maximum');
   });
 });
@@ -244,15 +243,24 @@ describe('paid panel: upgrade section', () => {
     gains: [{ axis: 'seats', from: 1, to: null, label: 'Multiple team members' }],
   };
 
-  test('Pro sees a Team upgrade carrying its price, beside the seat limit', () => {
+  test('Pro sees NO Team upgrade — gated until the tier change is prorated', () => {
     const html = paidPanel(withRealActions(summaryFor({ upgrades: [teamUpgrade] }),
       { plan: 'pro', subscriptionStatus: 'active' }));
-    assert.match(html, /Upgrade to Team/);
-    assert.match(html, /€199/, 'a control that spends money must say how much');
-    assert.match(html, /data-action="startPlanCheckout"[^>]*data-plan="team"/);
-    // Anchored to the limit it unlocks: the button follows the Members row.
-    assert.ok(html.indexOf('Members') < html.indexOf('data-plan="team"'),
-      'the seat upgrade belongs next to the seat limit, not in the footer');
+    assert.doesNotMatch(html, /data-plan="team"/);
+    assert.doesNotMatch(html, /Upgrade to Team/);
+    // The upgrades[] payload is untouched; only the ACTION is withheld, so
+    // restoring the button is a change in one place.
+    assert.match(html, /Manage billing/);
+  });
+
+  test('the anchored-placement machinery still works, on the free path', () => {
+    // Guards against the gate quietly removing anchor support along with the
+    // one action that used it.
+    const html = paidPanel(withRealActions(summaryFor(),
+      { plan: 'free', subscriptionStatus: null }));
+    assert.match(html, /data-plan="pro"/);
+    assert.ok(html.indexOf('CV analyses') < html.indexOf('data-plan="pro"'),
+      'the analyses upgrade still anchors to the analyses row');
   });
 
   test('no secondary upsell copy survives beside the action', () => {
