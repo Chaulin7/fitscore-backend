@@ -167,13 +167,29 @@ function planActions(state, { isOwner, canCheckout, canPortal, plan }) {
         ...checkout('upgrade_team', upgradeLabel('team'), 'ghost', 'team', 'footer'),
       ];
     case 'pro_active':
-      // Manage billing is the primary: Pro customers mostly come here for
-      // invoices, not to spend more. The Team upsell is a ghost beside the
-      // seat limit it unlocks.
-      return [
-        ...checkout('upgrade_team', upgradeLabel('team'), 'ghost', 'team', 'seats'),
-        ...portal('manage_billing', 'Manage billing', 'primary'),
-      ];
+      // NO UPGRADE ACTION HERE — deliberately, and temporarily.
+      //
+      // POST /checkout always opens a NEW Checkout Session, and the webhook
+      // de-duplication is scoped to the same tier on purpose, so it does not
+      // touch a Pro subscription when a Team one appears. A Pro org that
+      // upgraded through this button therefore ended up with BOTH
+      // subscriptions live: 49 + 199 = 248 EUR a month, recurring, with
+      // nothing in the product showing the second one.
+      //
+      // The fix is a tier change on the existing subscription
+      // (subscriptions.update with proration) rather than a second session.
+      // Until that lands, the safe move is to not offer the button: an owner
+      // who wants Team can be moved by hand, and nobody is silently
+      // double-charged in the meantime.
+      //
+      // TO RESTORE: put the checkout(...) line back once the proration path
+      // exists, and point it at that path rather than at Checkout.
+      //
+      // Side effect worth knowing: a comped Pro org also loses this button.
+      // Checkout would actually be safe for them (they hold no subscription to
+      // duplicate), but the gate is kept total rather than conditional so
+      // there is one rule to reason about while the real fix is built.
+      return portal('manage_billing', 'Manage billing', 'primary');
     case 'team_active':
       return portal('manage_billing', 'Manage billing', 'primary');
     case 'past_due':
