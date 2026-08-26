@@ -798,6 +798,71 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .plan-chip.clickable{cursor:pointer}
 .plan-chip.clickable:hover{background:rgba(255,255,255,0.16)}
 @media(max-width:640px){.plan-chip{padding:4px 9px}}
+.plan-chip{font-family:'Inter',sans-serif}
+.plan-chip:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+
+/* ── Plan panel (paid tiers; the Free state opens a modal instead) ──
+   Anchored to the chip and right-aligned, because the chip sits near the right
+   edge of the bar and a left-aligned panel would run off-screen. Colours are
+   the dashboard card set, not the dark topbar set: the panel is a surface you
+   read, not part of the bar. */
+.plan-menu{position:relative;display:inline-flex}
+.plan-panel{position:absolute;top:calc(100% + 8px);right:0;z-index:1200;width:320px;
+  background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+  box-shadow:0 12px 32px rgba(15,40,71,0.18);padding:14px;text-align:left;
+  font-family:'Inter',sans-serif;color:#111827}
+.plan-panel[hidden]{display:none}
+@media(max-width:560px){.plan-panel{width:min(320px,calc(100vw - 24px));right:-8px}}
+.pp-tier{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.pp-name{font-size:15px;font-weight:700;color:#0f2847}
+.pp-price{font-size:15px;font-weight:800;color:#0f2847}
+.pp-price small{font-size:11px;font-weight:600;color:#6b7280}
+.pp-sub{font-size:11px;color:#6b7280;margin-top:2px}
+.pp-sec{margin-top:12px}
+.pp-sec-h{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:5px}
+.pp-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#374151;padding:3px 0}
+.pp-row b{font-weight:600;color:#111827}
+.pp-meter{height:5px;border-radius:3px;background:#eef2f7;overflow:hidden;margin-top:4px}
+.pp-meter span{display:block;height:100%;background:#0f2847;border-radius:3px}
+.pp-meter.warn span{background:#d97706}
+.pp-ent{list-style:none;margin:0;padding:0}
+.pp-ent li{font-size:12px;color:#374151;padding:3px 0 3px 16px;position:relative}
+.pp-ent li::before{content:"✓";position:absolute;left:0;color:#16a34a;font-weight:700}
+.pp-foot{margin-top:13px;display:flex;flex-direction:column;gap:7px}
+.pp-foot .btn{width:100%;justify-content:center}
+/* Payment failure. Deliberately the loudest thing in the panel: removing the
+   chip's old direct-to-portal click added a step to the one path where the
+   user is actively losing access, so the panel has to make the next action
+   unmissable rather than merely present. */
+.pp-alert{background:#fef3c7;border:1px solid #fcd34d;border-radius:7px;padding:9px 10px;margin-bottom:11px}
+.pp-alert-t{font-size:12px;font-weight:700;color:#92400e}
+.pp-alert-b{font-size:11px;color:#a16207;margin-top:2px;line-height:1.45}
+.pp-note{font-size:11px;color:#6b7280;line-height:1.5}
+/* Upgrade teaser inside the paid panel (Pro -> Team). Team gets no upgrades
+   from the server, so this block is simply never rendered for it. */
+.pp-up{border-top:1px solid #f1f4f9;margin-top:12px;padding-top:11px}
+.pp-up-gain{font-size:11px;color:#374151;padding:2px 0 2px 15px;position:relative}
+.pp-up-gain::before{content:"+";position:absolute;left:0;color:#0f2847;font-weight:800}
+
+/* ── Free-plan modal ──
+   The free state is a purchase decision showing two tiers side by side, which
+   needs ~500px; the chip sits near the right edge of a topbar, so a dropdown
+   that wide would need edge-clamping and would read as a modal anyway. It
+   reuses .modal-backdrop/.modal-box, including the z-index note in
+   showPlanDetail — this opens from the bar, not from inside settings. */
+.pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+@media(max-width:600px){.pf-grid{grid-template-columns:1fr}}
+.pf-card{border:1px solid #e5e7eb;border-radius:9px;padding:13px;display:flex;flex-direction:column;background:#fff}
+.pf-card.featured{border-color:#0f2847;box-shadow:0 0 0 1px #0f2847 inset}
+.pf-name{font-size:13px;font-weight:700;color:#0f2847}
+.pf-price{font-size:20px;font-weight:800;color:#0f2847;margin:2px 0 1px}
+.pf-price small{font-size:11px;font-weight:600;color:#6b7280}
+.pf-tag{font-size:11px;color:#6b7280;margin-bottom:8px;line-height:1.4}
+.pf-gains{list-style:none;margin:0 0 11px;padding:0;flex:1}
+.pf-gains li{font-size:11.5px;color:#374151;padding:3px 0 3px 15px;position:relative;line-height:1.4}
+.pf-gains li::before{content:"+";position:absolute;left:0;color:#0f2847;font-weight:800}
+.pf-card .btn{width:100%;justify-content:center}
+.pf-now{border:1px solid #e5e7eb;border-radius:9px;padding:11px 13px;background:#f8fafc}
 /* Both chips are back in the bar at full size, with their original colour
    semantics — green dot for connected, amber for a plan warning.
    Below 640px the row carries brand, hamburger, Connected, search, Pro and the
@@ -1120,8 +1185,19 @@ img, video, table { max-width: 100%; }
   <button type="button" class="nav-search-btn" id="navSearchBtn" data-action="focusAuditSearch" title="Search audit log" aria-label="Search audit log">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
   </button>
-  <!-- Immediately left of the avatar, where it sat relative to the email chip. -->
-  <span class="plan-chip" id="planChip" title="Your plan"><span class="plan-dot"></span><span id="planChipLabel"></span></span>
+  <!-- Immediately left of the avatar, where it sat relative to the email chip.
+       A real <button> on EVERY tier, Free included: the panel behind it is
+       where a free org sees what it has and what upgrading buys, where a paid
+       org reaches the portal, and where a past_due org is told it is locked
+       out. aria-haspopup is "dialog" rather than "menu" — the panel is a
+       status-and-actions surface, not a list of role="menuitem"s, so menu
+       arrow-key semantics would be a promise the content does not keep. -->
+  <div class="plan-menu" id="planMenu">
+    <button type="button" class="plan-chip" id="planChip" data-action="togglePlanPanel"
+            aria-haspopup="dialog" aria-expanded="false" aria-controls="planPanel"
+            title="Your plan"><span class="plan-dot" aria-hidden="true"></span><span id="planChipLabel"></span></button>
+    <div class="plan-panel" id="planPanel" role="dialog" aria-label="Plan and billing" hidden></div>
+  </div>
   <!-- Account menu. The trigger is an avatar rather than the email address: the
        email was the widest variable-width element in the bar, so it drove the
        overflow it now sits inside. -->
@@ -1828,6 +1904,10 @@ function accountMenuItems(){
 function openAccountMenu(focusFirst){
   const { btn, dd } = accountMenuEls();
   if (!btn || !dd) return;
+  // Only one popup in the bar at a time; the plan panel does the same to this
+  // one. Declared later in the file — classic scripts hoist, and both live on
+  // the global object, which is how the delegated map reaches either.
+  if (typeof closePlanPanel === 'function') closePlanPanel(false);
   dd.hidden = false;
   btn.setAttribute('aria-expanded', 'true');
   if (focusFirst) { const items = accountMenuItems(); if (items.length) items[0].focus(); }
@@ -1875,8 +1955,14 @@ function updateAccountChip(){
   if (letter) letter.textContent = accountInitial(email);
   // The avatar shows one character, so the accessible name carries the address.
   if (btn) btn.setAttribute('aria-label', email ? ('Account menu for ' + email) : 'Account menu');
-  // Hide the plan chip whenever we're not authenticated.
-  if (!authed) { const pc = document.getElementById('planChip'); if (pc) pc.style.display = 'none'; }
+  // Hide the plan chip whenever we're not authenticated — and close the panel
+  // with it, so logging out cannot leave a plan surface hanging over the login
+  // screen with the previous tenant's figures on it.
+  if (!authed) {
+    const pc = document.getElementById('planChip');
+    if (pc) pc.style.display = 'none';
+    if (typeof closePlanPanel === 'function') closePlanPanel(false);
+  }
 }
 
 // Dismissal + in-menu keyboard handling. Registered once, at document level, in
@@ -2104,13 +2190,16 @@ function renderPlanChip(b){
   const chip=document.getElementById('planChip');
   const label=document.getElementById('planChipLabel');
   if(!chip||!label||!b){ if(chip)chip.style.display='none'; return; }
-  chip.classList.remove('warn','clickable');
-  chip.onclick=null;
+  // Always clickable now: the chip is a button on every tier and the panel
+  // behind it is the plan surface. The old chip.onclick=openBillingPortal
+  // shortcut is gone — it was mouse-only, invisible to assistive tech, and
+  // existed only for past_due, which the panel now handles far more loudly.
+  chip.classList.remove('warn');
+  chip.classList.add('clickable');
   if(b.subscriptionStatus==='past_due'){
     label.textContent='Payment issue';
-    chip.classList.add('warn','clickable');
-    chip.title='Payment failed — click to manage billing';
-    chip.onclick=openBillingPortal;
+    chip.classList.add('warn');
+    chip.title='Payment failed — open plan and billing';
   }else if(b.plan==='pro'||b.plan==='team'){
     label.textContent=b.plan==='team'?'Team':'Pro';
     chip.title='Active subscription';
@@ -2122,6 +2211,248 @@ function renderPlanChip(b){
   }
   chip.style.display='inline-flex';
 }
+
+// === Nav plan panel ========================================================
+// Opens from the topbar chip. Paid tiers render into the anchored dropdown;
+// Free opens a modal instead (two tiers side by side need the width). Every
+// value shown is read from GET /api/billing/plan-summary on open — the client
+// holds no opinion about tier, price, entitlements, usage or renewal date.
+
+let _planSummary = null;
+
+function planPanelEls(){
+  return {
+    btn: document.getElementById('planChip'),
+    panel: document.getElementById('planPanel'),
+    menu: document.getElementById('planMenu'),
+  };
+}
+function isPlanPanelOpen(){
+  const { panel } = planPanelEls();
+  return !!panel && !panel.hidden;
+}
+function closePlanPanel(restoreFocus){
+  const { btn, panel } = planPanelEls();
+  if(!btn || !panel || panel.hidden) return;
+  panel.hidden = true;
+  btn.setAttribute('aria-expanded','false');
+  if(restoreFocus) btn.focus();
+}
+function openPlanPanel(focusFirst){
+  const { btn, panel } = planPanelEls();
+  if(!btn || !panel) return;
+  panel.hidden = false;
+  btn.setAttribute('aria-expanded','true');
+  if(focusFirst){
+    const f = panel.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if(f) f.focus();
+  }
+}
+
+function planMeter(used, limit){
+  if(limit==null) return '';
+  const pct = Math.max(0, Math.min(100, Math.round((used/limit)*100)));
+  return '<div class="pp-meter'+(pct>=80?' warn':'')+'"><span style="width:'+pct+'%"></span></div>';
+}
+function planRenewalLine(sum){
+  if(!sum.currentPeriodEnd) return '';
+  let when='';
+  try{ when = new Date(sum.currentPeriodEnd).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}); }
+  catch(_){ return ''; }
+  if(sum.cancelAtPeriodEnd) return '<div class="pp-sub">Ends '+escHtml(when)+' — cancellation scheduled</div>';
+  // "Renews" is a promise, and while an invoice is failing it is one we cannot
+  // make: Stripe is retrying and the subscription lapses if it never clears.
+  // The date is still worth showing — it is when this period runs out — so the
+  // wording drops the claim rather than the information.
+  if(sum.subscriptionStatus==='past_due') return '<div class="pp-sub">Current period ends '+escHtml(when)+'</div>';
+  return '<div class="pp-sub">Renews '+escHtml(when)+'</div>';
+}
+// Why the action area is empty, said out loud. A member seeing nothing where a
+// button should be learns nothing; a member told who can do it can go do it.
+function planBlockNote(sum){
+  const r = sum.billingBlockReason;
+  if(r==='NOT_OWNER') return '<div class="pp-note">Contact your workspace owner to manage billing.</div>';
+  if(r==='BILLING_NOT_CONFIGURED') return '<div class="pp-note">Billing is not configured on this deployment.</div>';
+  if(r==='COMPED') return '<div class="pp-note">Your workspace is on a complimentary plan — no billing to manage.</div>';
+  if(r==='NO_CUSTOMER') return '<div class="pp-note">No billing account yet.</div>';
+  return '';
+}
+
+function renderPaidPanel(sum){
+  const a = sum.usage.analyses, seats = sum.usage.seats;
+  const alert = sum.subscriptionStatus==='past_due'
+    ? '<div class="pp-alert"><div class="pp-alert-t">Payment failed</div>'
+      +'<div class="pp-alert-b">Your last payment did not go through. Access continues for now — update your payment method to keep it.</div></div>'
+    : '';
+  const usage =
+    '<div class="pp-sec"><div class="pp-sec-h">This month</div>'
+    +'<div class="pp-row"><span>CV analyses</span><b>'+a.used+(a.limit==null?' <span style="font-weight:400;color:#6b7280">/ unlimited</span>':' / '+a.limit)+'</b></div>'
+    + planMeter(a.used, a.limit)
+    +'<div class="pp-row"><span>Members</span><b>'+seats.used+(seats.limit==null?' <span style="font-weight:400;color:#6b7280">/ unlimited</span>':' / '+seats.limit)+'</b></div>'
+    +'</div>';
+  const ents = (sum.entitlements||[]).length
+    ? '<div class="pp-sec"><div class="pp-sec-h">Included</div><ul class="pp-ent">'
+      +sum.entitlements.map(function(e){return '<li>'+escHtml(e.label)+'</li>';}).join('')+'</ul></div>'
+    : '';
+  // Pro sees Team; Team's upgrades array is empty, so it sees nothing.
+  const up = (sum.upgrades||[]).map(function(t){
+    return '<div class="pp-up"><div class="pp-sec-h">Upgrade to '+escHtml(t.name)+'</div>'
+      +'<div class="pp-tier"><span class="pp-sub">'+escHtml(t.tagline||'')+'</span>'
+      +'<span class="pp-price">'+escHtml(t.priceLabel)+'<small>'+escHtml(t.per||'')+'</small></span></div>'
+      +t.gains.map(function(g){return '<div class="pp-up-gain">'+escHtml(g.label)+'</div>';}).join('')
+      +(sum.canUpgrade
+        ? '<div class="pp-foot"><button type="button" class="btn btn-primary btn-sm" data-action="startPlanCheckout" data-plan="'+escHtml(t.plan)+'">Upgrade to '+escHtml(t.name)+'</button></div>'
+        : '<div class="pp-foot"><div class="pp-note">Contact your workspace owner to upgrade.</div></div>')
+      +'</div>';
+  }).join('');
+  const manage = sum.canManageBilling
+    ? '<button type="button" class="btn btn-ghost btn-sm" data-action="openBillingPortal">Manage billing</button>'
+    : planBlockNote(sum);
+
+  return alert
+    +'<div class="pp-tier"><span class="pp-name">'+escHtml(sum.planName)+'</span>'
+    +'<span class="pp-price">'+escHtml(sum.priceLabel)+'<small>'+escHtml(sum.per||'')
+    +(sum.taxNote?' '+escHtml(sum.taxNote):'')+'</small></span></div>'
+    + planRenewalLine(sum)
+    + usage + ents + '<div class="pp-foot">'+manage+'</div>' + up;
+}
+
+// Free tier: a modal, not the dropdown. See the .pf-grid comment in the CSS.
+function openFreePlanModal(sum){
+  const a = sum.usage.analyses;
+  const backdrop=document.createElement('div');
+  backdrop.className='modal-backdrop'; backdrop.setAttribute('role','dialog'); backdrop.setAttribute('aria-modal','true');
+  backdrop.setAttribute('aria-label','Your plan');
+  const box=document.createElement('div'); box.className='modal-box'; box.style.maxWidth='560px';
+  const ents=(sum.entitlements||[]).map(function(e){return '<li>'+escHtml(e.label)+'</li>';}).join('');
+  const cards=(sum.upgrades||[]).map(function(t){
+    return '<div class="pf-card'+(t.id==='pro'?' featured':'')+'">'
+      +'<div class="pf-name">'+escHtml(t.name)+'</div>'
+      +'<div class="pf-price">'+escHtml(t.priceLabel)+'<small>'+escHtml(t.per||'')+(t.taxNote?' '+escHtml(t.taxNote):'')+'</small></div>'
+      +'<div class="pf-tag">'+escHtml(t.tagline||'')+'</div>'
+      +'<div class="pp-sec-h">What you gain</div>'
+      +'<ul class="pf-gains">'+t.gains.map(function(g){return '<li>'+escHtml(g.label)+'</li>';}).join('')+'</ul>'
+      +(sum.canUpgrade
+        ? '<button type="button" class="btn btn-primary btn-sm" data-action="startPlanCheckout" data-plan="'+escHtml(t.plan)+'">Upgrade to '+escHtml(t.name)+'</button>'
+        : '')
+      +'</div>';
+  }).join('');
+  box.innerHTML=
+    '<div class="modal-head"><h3>Your plan</h3><button type="button" class="modal-close" aria-label="Close">&times;</button></div>'
+    +'<div class="modal-body">'
+      +'<div class="pf-now"><div class="pp-tier"><span class="pp-name">'+escHtml(sum.planName)+'</span>'
+        +'<span class="pp-price">'+escHtml(sum.priceLabel)+'<small>'+escHtml(sum.per||'')+'</small></span></div>'
+        +'<div class="pp-row" style="margin-top:6px"><span>CV analyses this month</span><b>'+a.used+' / '+(a.limit==null?'unlimited':a.limit)+'</b></div>'
+        + planMeter(a.used,a.limit)
+        +(ents?'<div class="pp-sec-h" style="margin-top:9px">Includes</div><ul class="pp-ent">'+ents+'</ul>':'')
+      +'</div>'
+      +'<div class="pp-sec-h" style="margin-top:14px">Upgrade</div>'
+      +'<div class="pf-grid">'+cards+'</div>'
+      +(sum.canUpgrade?'':'<div class="pp-note" style="margin-top:10px">Contact your workspace owner to upgrade.</div>')
+    +'</div><div class="modal-foot"></div>';
+  // Same z-index reasoning as showPlanDetail: this can open over the settings
+  // panel (9999/9998), which the shared .modal-backdrop 2000 sits under.
+  backdrop.style.zIndex='10000';
+  function cleanup(){ backdrop.classList.remove('open'); setTimeout(function(){try{backdrop.remove();}catch(_){}} ,200); document.removeEventListener('keydown',onKey,true); const b=document.getElementById('planChip'); if(b) b.focus(); }
+  function onKey(e){ if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cleanup();} }
+  const closeBtn=document.createElement('button'); closeBtn.type='button'; closeBtn.className='btn btn-ghost'; closeBtn.textContent='Close';
+  closeBtn.addEventListener('click', cleanup);
+  box.querySelector('.modal-foot').appendChild(closeBtn);
+  box.querySelector('.modal-close').addEventListener('click', cleanup);
+  backdrop.addEventListener('click', function(e){ if(e.target===backdrop) cleanup(); });
+  // The upgrade buttons inside are delegated (data-action), so activating one
+  // must also dismiss this dialog — otherwise it hangs over the redirect.
+  box.addEventListener('click', function(e){ if(e.target.closest('[data-action="startPlanCheckout"]')) cleanup(); });
+  document.addEventListener('keydown', onKey, true);
+  backdrop.appendChild(box); document.body.appendChild(backdrop);
+  requestAnimationFrame(function(){ backdrop.classList.add('open'); });
+}
+
+// A short message and a way out, never an indefinite spinner. The panel is
+// opened by a deliberate click, so a request that fails or never answers has to
+// end in something the user can act on rather than in a control that looks
+// stuck. The timeout is here because a hung request produces no rejection at
+// all — without it the panel would sit empty for as long as the socket lives.
+const PLAN_SUMMARY_TIMEOUT_MS = 8000;
+
+function renderPlanPanelError(){
+  return '<div class="pp-sec-h">Plan</div>'
+    +'<div class="pp-note">Could not load your plan just now.</div>'
+    +'<div class="pp-foot"><button type="button" class="btn btn-ghost btn-sm" data-action="retryPlanPanel">Retry</button></div>';
+}
+
+async function fetchPlanSummary(){
+  let timer;
+  try{
+    return await Promise.race([
+      api('/api/billing/plan-summary'),
+      new Promise(function(_, reject){
+        timer = setTimeout(function(){ reject(new Error('timeout')); }, PLAN_SUMMARY_TIMEOUT_MS);
+      }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
+
+// Loads the summary and renders whichever surface the tier calls for. Shared by
+// the first open and by Retry, so the error path cannot drift from the happy one.
+async function loadPlanPanel(focusFirst){
+  const { panel } = planPanelEls();
+  if(!panel) return;
+  let sum=null;
+  try{ sum = await fetchPlanSummary(); }
+  catch(_){
+    panel.innerHTML = renderPlanPanelError();
+    openPlanPanel(false);
+    return;
+  }
+  _planSummary = sum;
+  if(sum.plan==='free'){ closePlanPanel(false); openFreePlanModal(sum); return; }
+  panel.innerHTML = renderPaidPanel(sum);
+  openPlanPanel(focusFirst);
+}
+
+async function togglePlanPanel(el, e){
+  const { panel } = planPanelEls();
+  if(!panel) return;
+  if(isPlanPanelOpen()){ closePlanPanel(true); return; }
+  closeAccountMenu(false); // only one popup open at a time
+  await loadPlanPanel(!!e && e.detail === 0);
+}
+
+// Retry re-runs the same load in place; the panel is already open, so focus
+// stays where the user put it rather than jumping back to the trigger.
+async function retryPlanPanel(){
+  const { panel } = planPanelEls();
+  if(panel) panel.innerHTML = '<div class="pp-note">Loading…</div>';
+  await loadPlanPanel(false);
+}
+
+// Upgrade from the panel/modal. Distinct from startCheckout(), which drives the
+// Settings buttons by id; here there is no such button to disable.
+async function startPlanCheckout(el){
+  const plan = el && el.dataset ? el.dataset.plan : null;
+  if(!plan) return;
+  closePlanPanel(false);
+  if(el) el.disabled = true;
+  try{
+    const d = await api('/api/billing/checkout',{method:'POST',body:JSON.stringify({plan})});
+    if(d && d.url){ window.location = d.url; return; }
+    toast('Could not start checkout.','error');
+  }catch(err){
+    toast((err && err.message) || 'Could not start checkout.','error');
+  }finally{ if(el) el.disabled = false; }
+}
+
+// Dismissal, mirroring the account menu: outside click closes without moving
+// focus, Escape closes and returns focus to the trigger.
+document.addEventListener('click', function(e){
+  const { menu } = planPanelEls();
+  if(isPlanPanelOpen() && menu && !menu.contains(e.target)) closePlanPanel(false);
+});
+document.addEventListener('keydown', function(e){
+  if(!isPlanPanelOpen()) return;
+  if(e.key==='Escape'){ e.preventDefault(); closePlanPanel(true); }
+});
 
 async function populatePlanBilling(){
   const line=document.getElementById('planStatusLine');
@@ -4905,6 +5236,9 @@ const delegatedHandlers = {
     switchTab: (el) => switchTab(el.dataset.tab, el),
     focusAuditSearch, doLogout, toggleSettings, toggleAccountMenu, openAdminMetrics,
     startCheckout: (el) => startCheckout(el.dataset.plan),
+    togglePlanPanel,
+    retryPlanPanel,
+    startPlanCheckout,
     showPlanDetail,
     openBillingPortal, inviteMember, copyInviteLink, saveBranding,
     saveSettings, changePassword, saveRetention, setRetentionPreset, exportOrgData, deleteAllOrgData,

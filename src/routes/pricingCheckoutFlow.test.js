@@ -453,11 +453,30 @@ describe('Stripe Tax is switched on in the session we send', () => {
 });
 
 describe('a misconfigured tax account is reported as such', () => {
+  // Its own free-tier owner rather than the shared journey's, which is on Pro
+  // by this point: checkout now refuses a same-tier repurchase before it ever
+  // reaches Stripe (PLAN_NOT_AN_UPGRADE), so a Pro account could not get far
+  // enough to exercise the tax branch. These tests are about how a Stripe
+  // failure is REPORTED, so they need a request that legitimately reaches
+  // Stripe in order to fail there.
+  let taxOwner;
+
+  before(async () => {
+    clearFault();
+    const created = await post('/api/auth/signup', {
+      email: 'taxfail-' + Date.now() + '@example.com',
+      password: 'correct-horse-battery',
+      orgName: 'Tax Fail Co',
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    taxOwner = created.body;
+  });
+
   after(() => clearFault());
 
   test('a tax rejection becomes 503 TAX_NOT_CONFIGURED, not a generic failure', async () => {
     injectFault('tax');
-    const res = await post('/api/billing/checkout', { plan: 'pro' }, owner.sessionToken);
+    const res = await post('/api/billing/checkout', { plan: 'pro' }, taxOwner.sessionToken);
     clearFault();
 
     assert.equal(res.status, 503);
@@ -471,7 +490,7 @@ describe('a misconfigured tax account is reported as such', () => {
 
   test('an unrelated Stripe failure still reports as a generic Stripe error', async () => {
     injectFault('generic');
-    const res = await post('/api/billing/checkout', { plan: 'pro' }, owner.sessionToken);
+    const res = await post('/api/billing/checkout', { plan: 'pro' }, taxOwner.sessionToken);
     clearFault();
 
     assert.equal(res.status, 502);

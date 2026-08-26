@@ -37,6 +37,61 @@
 const WHITE_LABEL_HIGHLIGHT =
   'White-label reports — replace the CVsprings mark with your own logo';
 
+/**
+ * The Free tier's monthly analysis cap.
+ *
+ * Read from the environment HERE rather than in services/billing.js, which used
+ * to own it, so the number this file publishes as a tier limit and the number
+ * the quota check enforces cannot be two different numbers. billing.js now
+ * imports it and re-exports it, so every existing caller is unaffected.
+ */
+const FREE_MONTHLY_LIMIT = Number.parseInt(process.env.FREE_MONTHLY_LIMIT, 10) > 0
+  ? Number.parseInt(process.env.FREE_MONTHLY_LIMIT, 10)
+  : 25;
+
+/**
+ * The ENFORCED entitlement axes, and the only vocabulary used to describe them.
+ *
+ * `highlights` below is marketing prose. It is the right thing to *show* a
+ * customer and the wrong thing to *compute* with: rewording one string, or
+ * reordering a list, would silently change any answer derived by comparing
+ * those strings between tiers. The upgrade surface asks exactly such a question
+ * — "what does Team give me that Pro does not?" — so it is computed from the
+ * three axes the server actually gates on (see entitlementAxesFor in
+ * services/billing.js) and only *phrased* from here.
+ *
+ * PHRASE is the single set of strings. `highlights` is built from it and
+ * phraseForAxis() reads from it, so a wording change moves both together and
+ * moves neither out of step with the gate. What a tier grants is decided by the
+ * axis VALUES; what we call it is decided here.
+ */
+const PHRASE = Object.freeze({
+  analysesCapped: (n) => `${n} CV analyses / month`,
+  analysesUnlimited: 'Unlimited CV analyses',
+  seatsSingle: 'Single user',
+  seatsMulti: 'Multiple team members',
+  whiteLabel: WHITE_LABEL_HIGHLIGHT,
+});
+
+// Order is the order a gains list reads in: volume, then people, then branding.
+const ENTITLEMENT_AXES = Object.freeze(['analysesPerMonth', 'seats', 'customBranding']);
+
+/**
+ * How to say what an axis value grants. Derived from the VALUE, never matched
+ * against a highlight string — that is the coupling this exists to avoid.
+ * Returns null where the value grants nothing worth naming (e.g. branding off).
+ * @param {string} axis one of ENTITLEMENT_AXES
+ * @param {number|null|boolean} value the enforced value on the tier in question
+ */
+function phraseForAxis(axis, value) {
+  if (axis === 'analysesPerMonth') {
+    return value == null ? PHRASE.analysesUnlimited : PHRASE.analysesCapped(value);
+  }
+  if (axis === 'seats') return value === 1 ? PHRASE.seatsSingle : PHRASE.seatsMulti;
+  if (axis === 'customBranding') return value ? PHRASE.whiteLabel : null;
+  return null;
+}
+
 // Money is stored ONCE per tier, as a number (`priceAmount`), and the display
 // string is derived from it. Before, `priceLabel: '€49'` was the only record of
 // the price, which was fine while the only consumer was a card that prints it —
@@ -93,9 +148,9 @@ const PLANS = {
       id: 'free', name: 'Free', priceAmount: 0, priceLabel: priceLabelFor(0), per: '/month',
       taxNote: taxNoteFor(0),
       tagline: 'Try CVsprings on a real role.',
-      limits: { analysesPerMonth: 25, seats: 1 },
+      limits: { analysesPerMonth: FREE_MONTHLY_LIMIT, seats: 1 },
       capabilities: { customBranding: false },
-      highlights: ['25 CV analyses / month', 'Single user'],
+      highlights: [PHRASE.analysesCapped(FREE_MONTHLY_LIMIT), PHRASE.seatsSingle],
     },
     {
       id: 'pro', name: 'Pro', priceAmount: 49, priceLabel: priceLabelFor(49), per: '/month', featured: true,
@@ -103,7 +158,7 @@ const PLANS = {
       tagline: 'For recruiters screening at volume.',
       limits: { analysesPerMonth: null, seats: 1 },
       capabilities: { customBranding: true },
-      highlights: ['Unlimited CV analyses', 'Single user', WHITE_LABEL_HIGHLIGHT],
+      highlights: [PHRASE.analysesUnlimited, PHRASE.seatsSingle, PHRASE.whiteLabel],
       upgradePlan: 'pro', // -> POST /api/billing/checkout {plan:'pro'} (existing flow)
     },
     {
@@ -112,7 +167,7 @@ const PLANS = {
       tagline: 'For agencies with a screening team.',
       limits: { analysesPerMonth: null, seats: 'multiple' },
       capabilities: { customBranding: true },
-      highlights: ['Unlimited CV analyses', 'Multiple team members', WHITE_LABEL_HIGHLIGHT],
+      highlights: [PHRASE.analysesUnlimited, PHRASE.seatsMulti, PHRASE.whiteLabel],
       upgradePlan: 'team',
     },
   ],
@@ -228,6 +283,10 @@ module.exports = {
   CURRENCY,
   TAX,
   FALLBACK_CAPABILITIES,
+  FREE_MONTHLY_LIMIT,
+  PHRASE,
+  ENTITLEMENT_AXES,
+  phraseForAxis,
   tierById,
   capabilitiesFor,
   marketingView,
