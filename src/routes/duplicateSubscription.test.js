@@ -278,3 +278,46 @@ describe('the cleanup is narrow enough to be safe', () => {
     assert.deepEqual(cancelled, ['sub_A'], 'without the fault, the same flow does cancel');
   });
 });
+
+/**
+ * The resting subscription_status after each terminal path.
+ *
+ * These used to disagree: subscription.deleted wrote 'canceled' while
+ * applySubscription's terminal branch wrote NULL, so the same real-world
+ * outcome landed in two different buckets depending on which webhook Stripe
+ * happened to send — and NULL already meant "never subscribed" to
+ * services/metrics.js. Collapsing them at write time would have destroyed the
+ * voluntary/involuntary distinction permanently, so the exact status is kept
+ * here and the grouping happens in reporting.
+ */
+describe('a terminated subscription keeps the status that ended it', () => {
+  for (const status of ['canceled', 'unpaid', 'incomplete_expired']) {
+    test(`${status} is preserved, not nulled`, async () => {
+      SUBS.set('sub_T', subObj('sub_T', CUS, 'active', 'price_stub_pro', ORG));
+      await webhook('customer.subscription.created', SUBS.get('sub_T'));
+      SUBS.get('sub_T').status = status;
+      await webhook('customer.subscription.updated', SUBS.get('sub_T'));
+
+      const row = orgRow();
+      assert.equal(row.plan, 'free', 'entitlement still ends');
+      assert.equal(row.status, status,
+        'NULL here would report a churned account as never having subscribed');
+    });
+  }
+
+  test('never-subscribed stays NULL — the meaning NULL still carries', () => {
+    db.setOrgPlan(ORG, { plan: 'free', subscriptionStatus: null, currentPeriodEnd: null });
+    assert.equal(orgRow().status, null);
+  });
+
+  test('a non-terminal status on a free plan is still nulled', async () => {
+    // planForPriceId returns null for a price we do not know, so the plan
+    // lands on free with a live status. That is not a terminal outcome and
+    // must not be recorded as one.
+    SUBS.set('sub_U', subObj('sub_U', CUS, 'active', 'price_unknown_to_us', ORG));
+    await webhook('customer.subscription.created', SUBS.get('sub_U'));
+    const row = orgRow();
+    assert.equal(row.plan, 'free');
+    assert.equal(row.status, null);
+  });
+});

@@ -105,13 +105,31 @@ describe('plan and status normalisation', () => {
     for (const p of ['free', 'pro', 'team']) assert.equal(metrics.normalisePlan(p), p);
   });
 
-  test('a null subscription status is `none`, not `canceled`', () => {
-    // Every free signup has a NULL status. Bucketing those as canceled would
-    // report the entire free tier as churn.
+  test('a null subscription status is `none`, not churn', () => {
+    // Every free signup has a NULL status. Bucketing those as churn would
+    // report the entire free tier as lost customers.
     assert.equal(metrics.normaliseStatus(null), 'none');
     assert.equal(metrics.normaliseStatus(''), 'none');
-    assert.equal(metrics.normaliseStatus('incomplete_expired'), 'other');
     assert.equal(metrics.normaliseStatus('active'), 'active');
+  });
+
+  test('churn is voluntary AND involuntary, under one bucket', () => {
+    // canceled = the customer chose to stop. unpaid = dunning ran out. Both
+    // are lost revenue and belong in the same top-line number; they stay
+    // separable in `raw` because the recovery motion is different.
+    assert.equal(metrics.normaliseStatus('canceled'), 'churned');
+    assert.equal(metrics.normaliseStatus('unpaid'), 'churned');
+  });
+
+  test('a first payment that never cleared is not churn', () => {
+    // incomplete_expired means the account was never a customer. Counting it
+    // as churn would inflate churn with failed signups.
+    assert.equal(metrics.normaliseStatus('incomplete_expired'), 'none');
+  });
+
+  test('an unrecognised status still lands in `other`, not silently in churn', () => {
+    assert.equal(metrics.normaliseStatus('some_future_stripe_status'), 'other');
+    assert.equal(metrics.normaliseStatus('paused'), 'other');
   });
 
   test('prices come from config/plans.js, and an unknown plan is worth nothing', () => {
@@ -167,7 +185,7 @@ describe('zero accounts', () => {
 
   test('subscriptionStatusBreakdown returns all buckets at zero', () => {
     assert.deepEqual(metrics.subscriptionStatusBreakdown(), {
-      trialing: 0, active: 0, past_due: 0, canceled: 0, none: 0, other: 0,
+      trialing: 0, active: 0, past_due: 0, churned: 0, none: 0, other: 0, raw: {},
     });
   });
 
@@ -304,13 +322,28 @@ describe('seeded platform', () => {
     assert.equal(p.mrrByPlan.unknown, 0);
   });
 
-  test('subscriptionStatusBreakdown separates never-subscribed from canceled', () => {
+  test('subscriptionStatusBreakdown separates never-subscribed from churn', () => {
     const s = metrics.subscriptionStatusBreakdown();
-    assert.deepEqual(s, {
-      trialing: 1, active: 3, past_due: 1, canceled: 2,
+    const { raw, ...counts } = s;
+    assert.deepEqual(counts, {
+      trialing: 1, active: 3, past_due: 1, churned: 2,
       none: 3, other: 0,
     });
-    assert.equal(Object.values(s).reduce((a, b) => a + b, 0), metrics.totalAccounts());
+    assert.equal(Object.values(counts).reduce((a, b) => a + b, 0), metrics.totalAccounts());
+  });
+
+  test('raw keeps the exact statuses the buckets were built from', () => {
+    // The bucket is for the dashboard; `raw` is what an outreach list needs.
+    const { raw } = metrics.subscriptionStatusBreakdown();
+    assert.equal(raw.canceled, 2, 'this fixture has two canceled orgs');
+    assert.equal(raw.none, 3, 'NULL statuses are keyed as none in raw too');
+    // Every raw count must be accounted for by exactly one bucket.
+    const { raw: _r, ...counts } = metrics.subscriptionStatusBreakdown();
+    assert.equal(
+      Object.values(raw).reduce((a, b) => a + b, 0),
+      Object.values(counts).reduce((a, b) => a + b, 0),
+      'raw and bucketed totals must agree',
+    );
   });
 
   test('canceled-but-still-in-period is counted, and an expired one is not', () => {

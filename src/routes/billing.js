@@ -437,7 +437,8 @@ async function applySubscription(orgId, subscription, eventCreated) {
   // Terminal states fall back to free — but only when the event is about the
   // subscription this org is actually on. A canceled duplicate must not
   // downgrade an org whose real subscription is healthy.
-  if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired') {
+  const terminal = billing.TERMINAL_SUBSCRIPTION_STATUSES.has(status);
+  if (terminal) {
     if (!concernsCurrentSubscription(orgId, subscription.id)) {
       console.warn('[billing] ignoring terminal event for a superseded subscription', {
         orgId, subscriptionId: subscription.id, status,
@@ -454,7 +455,11 @@ async function applySubscription(orgId, subscription, eventCreated) {
 
   setOrgPlan(orgId, {
     plan,
-    subscriptionStatus: plan === 'free' ? null : status,
+    // A terminal status is kept verbatim. It used to be nulled here, which
+    // dropped a churned org into the same bucket as one that never subscribed
+    // — the exact distinction services/metrics.js documents. NULL still means
+    // never subscribed; it is no longer overloaded to also mean "churned".
+    subscriptionStatus: terminal ? status : (plan === 'free' ? null : status),
     currentPeriodEnd,
     eventCreated,
     stripeSubscriptionId: subscription.id || null,
