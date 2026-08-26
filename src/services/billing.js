@@ -151,6 +151,45 @@ function planRank(tierId) {
   return PLANS.tiers.findIndex((t) => t.id === tierId);
 }
 
+/**
+ * Subscription statuses in which a SECOND checkout for the same tier would
+ * duplicate a subscription the org already holds.
+ *
+ * Deliberately not the same set as the entitlement predicates above. A trialing
+ * or paused subscription grants nothing right now, but it is live: it will bill
+ * when the trial converts or collection resumes, so selling the same tier again
+ * produces two subscriptions. `incomplete` is the opposite case — the initial
+ * payment never succeeded, the subscription bills nothing and Stripe expires it
+ * within about a day — so there is nothing there to duplicate.
+ */
+const LIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'past_due', 'trialing', 'paused']);
+
+function hasLiveSubscription(orgBilling) {
+  return !!orgBilling && LIVE_SUBSCRIPTION_STATUSES.has(orgBilling.subscriptionStatus);
+}
+
+/**
+ * The tier the checkout guard ranks against.
+ *
+ * The stored `plan` string alone is the wrong input. The webhook resets plan to
+ * 'free' on the terminal states (canceled, unpaid, incomplete_expired and the
+ * subscription.deleted branch), so those recover on their own — but `incomplete`
+ * is not in that list, which leaves an org sitting at plan='pro' with a dead
+ * subscription, no entitlement, and a guard that refuses to let it buy Pro. The
+ * owner is trying to give us money and cannot.
+ *
+ * So a paid plan only counts as held while a subscription is actually live at
+ * it. A comped org keeps its tier — it is entitled with no subscription by
+ * design, and checkout refuses it earlier and for its own reason.
+ */
+function effectiveTierFor(orgBilling) {
+  if (!orgBilling) return 'free';
+  const plan = orgBilling.plan || 'free';
+  if (plan === 'free') return 'free';
+  if (orgBilling.comped === 1 || orgBilling.comped === true) return plan;
+  return hasLiveSubscription(orgBilling) ? plan : 'free';
+}
+
 // Whether `target` is a genuine upgrade from `current`. Used by the checkout
 // guard to refuse a same-tier repurchase (which would attach a SECOND Stripe
 // subscription to the org, i.e. bill twice) and any downgrade.
@@ -167,6 +206,9 @@ module.exports = {
   gainsBetween,
   planRank,
   isUpgradeFrom,
+  LIVE_SUBSCRIPTION_STATUSES,
+  hasLiveSubscription,
+  effectiveTierFor,
   getStripe,
   isBillingConfigured,
   priceIdForPlan,

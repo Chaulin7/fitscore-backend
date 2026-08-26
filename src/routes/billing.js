@@ -225,7 +225,11 @@ router.post('/checkout', requireSession, requireOwner, async (req, res) => {
     // A comped org is refused for the opposite reason: it is entitled without
     // paying, and checkout would attach a real subscription it should not have.
     const currentBilling = getOrgBilling(req.orgId) || {};
-    const currentPlan = currentBilling.plan || 'free';
+    // Ranked against the tier the org EFFECTIVELY holds, not the stored plan
+    // string: an org whose subscription died without reaching a terminal status
+    // (notably 'incomplete') still reads as plan='pro' and would otherwise be
+    // permanently refused the very purchase it is trying to make.
+    const currentPlan = billing.effectiveTierFor(currentBilling);
     if (isComped(currentBilling)) {
       return sendError(res, 400, 'PLAN_COMPED',
         'This account is on a complimentary plan. Contact support to change it.');

@@ -32,6 +32,7 @@ process.env.DATABASE_PATH = path.join(TMP_DIR, 'test.db');
 process.env.STRIPE_SECRET_KEY = 'sk_test_stub_guard';
 process.env.STRIPE_PRICE_PRO = 'price_stub_pro';
 process.env.STRIPE_PRICE_TEAM = 'price_stub_team';
+process.env.STRIPE_WEBHOOK_SECRET = 'whsec_stub';
 
 // --- Stripe, stubbed in-process -------------------------------------------
 // The shared helper is built for a spawned server (it logs to a file via
@@ -62,6 +63,12 @@ const fakeStripe = () => ({
       },
     },
   },
+  subscriptions: {
+    retrieve: async (id) => ({ id, status: 'active', items: { data: [] } }),
+  },
+  // Signature verification is Stripe's own code; what these tests need behind
+  // it is our handler, so this just parses the body.
+  webhooks: { constructEvent: (buf) => JSON.parse(buf.toString('utf8')) },
 });
 const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
@@ -99,6 +106,9 @@ before(async () => {
   token = TOKENS['g-owner-a'];
 
   const app = express();
+  // Raw body first, exactly as index.js mounts it — the handler verifies a
+  // signature over the raw bytes, so express.json() must not see it first.
+  app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), billingRouter.handleWebhook);
   app.use(express.json());
   app.use('/api/billing', billingRouter);
   server = app.listen(0);
@@ -132,6 +142,28 @@ function setPlan(orgId, fields) {
   db.setOrgStripeCustomerId(orgId, fields.customerId || null);
   db.getDb().prepare('UPDATE organizations SET comped = ? WHERE id = ?')
     .run(fields.comped ? 1 : 0, orgId);
+}
+
+// Drives the REAL webhook handler, so what these tests pin is the shipped
+// transition rather than a direct database write standing in for it.
+async function webhook(type, object, created) {
+  const res = await fetch(base + '/api/billing/webhook', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'stripe-signature': 'stub' },
+    body: JSON.stringify({
+      id: 'evt_' + Math.random().toString(36).slice(2),
+      type,
+      created: created || Math.floor(Date.now() / 1000),
+      data: { object },
+    }),
+  });
+  return res.status;
+}
+
+function planOf(orgId) {
+  return db.getDb()
+    .prepare('SELECT plan, subscription_status AS s FROM organizations WHERE id = ?')
+    .get(orgId);
 }
 
 function stripeCalls() { return calls.slice(); }
@@ -336,5 +368,115 @@ describe('the stub is actually wired (guards against vacuous "nothing was sent")
   test('a successful call does appear in the log', () => {
     assert.ok(stripeCalls().some((c) => c.call === 'checkout.sessions.create'));
     assert.ok(stripeCalls().some((c) => c.call === 'billingPortal.sessions.create'));
+  });
+});
+
+/**
+ * The guard ranks on the tier an org EFFECTIVELY holds, and that now depends on
+ * the webhook resetting plan to 'free' when a subscription terminates. That
+ * dependency is invisible from the guard's own source, so it is pinned here: if
+ * a future edit stops resetting the plan, these fail rather than the product
+ * quietly refusing a paying customer's money.
+ */
+describe('termination resets the stored plan, so the guard cannot trap an owner', () => {
+  before(() => actAs('g-owner-a'));
+
+  test("customer.subscription.deleted puts the org back on free", async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_term', comped: false });
+    const status = await webhook('customer.subscription.deleted', {
+      id: 'sub_1', customer: 'cus_term', metadata: { orgId: ORG_A },
+    });
+    assert.equal(status, 200);
+    assert.equal(planOf(ORG_A).plan, 'free', 'src/routes/billing.js sets plan: free on this event');
+  });
+
+  test('a fully terminated org can buy the SAME tier again', async () => {
+    // The scenario the guard could plausibly have broken: churned customer
+    // comes back for the tier they used to be on.
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_term', comped: false });
+    await webhook('customer.subscription.deleted', { id: 'sub_1', customer: 'cus_term', metadata: { orgId: ORG_A } });
+    const n = calls.length;
+    const res = await post('/api/billing/checkout', { plan: 'pro' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const sent = callsSince(n).find((c) => c.call === 'checkout.sessions.create');
+    assert.ok(sent, 'a returning customer must be able to pay');
+    assert.equal(sent.price, 'price_stub_pro');
+  });
+
+  test('dunning exhaustion to unpaid also resets the plan and unblocks rebuying', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'past_due', customerId: 'cus_term', comped: false });
+    await webhook('customer.subscription.updated', {
+      id: 'sub_1', customer: 'cus_term', status: 'unpaid', metadata: { orgId: ORG_A },
+      items: { data: [{ price: { id: 'price_stub_pro' } }] },
+    });
+    assert.equal(planOf(ORG_A).plan, 'free');
+    const res = await post('/api/billing/checkout', { plan: 'pro' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+  });
+
+  test('incomplete_expired resets the plan too', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'incomplete', customerId: 'cus_term', comped: false });
+    await webhook('customer.subscription.updated', {
+      id: 'sub_1', customer: 'cus_term', status: 'incomplete_expired', metadata: { orgId: ORG_A },
+      items: { data: [{ price: { id: 'price_stub_pro' } }] },
+    });
+    assert.equal(planOf(ORG_A).plan, 'free');
+  });
+
+  test('an active subscription is NOT reset by these paths (guards a vacuous pass)', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_term', comped: false });
+    await webhook('customer.subscription.updated', {
+      id: 'sub_1', customer: 'cus_term', status: 'active', metadata: { orgId: ORG_A },
+      items: { data: [{ price: { id: 'price_stub_pro' } }] },
+    });
+    assert.equal(planOf(ORG_A).plan, 'pro');
+  });
+});
+
+/**
+ * `incomplete` is the gap the terminal-state list does not cover: the initial
+ * payment failed, so the subscription bills nothing and Stripe expires it in
+ * about a day, but plan is still 'pro'. Ranking on the stored string alone
+ * refused this owner the exact purchase they were retrying.
+ */
+describe('a dead-but-not-terminal subscription does not block the retry', () => {
+  before(() => actAs('g-owner-a'));
+
+  test('an org stuck at incomplete may check out for the same tier', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'incomplete', customerId: 'cus_inc', comped: false });
+    assert.equal(planOf(ORG_A).plan, 'pro', 'precondition: the stored plan still says pro');
+    const n = calls.length;
+    const res = await post('/api/billing/checkout', { plan: 'pro' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.ok(callsSince(n).some((c) => c.call === 'checkout.sessions.create'));
+  });
+
+  test('a paid plan with no subscription status at all is likewise not trapped', async () => {
+    // The drift state stripeReconcile.js reports: paid plan, nothing behind it.
+    setPlan(ORG_A, { plan: 'team', subscriptionStatus: null, customerId: null, comped: false });
+    const res = await post('/api/billing/checkout', { plan: 'team' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+  });
+
+  test('a LIVE subscription still blocks a duplicate, whatever its entitlement', async () => {
+    // trialing and paused grant nothing right now, but they will bill. Selling
+    // the same tier again here is the double-billing this guard exists to stop,
+    // so "not entitled" must NOT be the test for "may buy again".
+    for (const status of ['active', 'past_due', 'trialing', 'paused']) {
+      setPlan(ORG_A, { plan: 'pro', subscriptionStatus: status, customerId: 'cus_live', comped: false });
+      const n = calls.length;
+      const res = await post('/api/billing/checkout', { plan: 'pro' });
+      assert.equal(res.status, 400, `status=${status} must not permit a second Pro subscription`);
+      assert.equal(res.body.code, 'PLAN_NOT_AN_UPGRADE');
+      assert.deepEqual(callsSince(n), [], `status=${status} reached Stripe`);
+    }
+  });
+
+  test('those same live states still allow a genuine upgrade to Team', async () => {
+    for (const status of ['active', 'past_due', 'trialing', 'paused']) {
+      setPlan(ORG_A, { plan: 'pro', subscriptionStatus: status, customerId: 'cus_live', comped: false });
+      const res = await post('/api/billing/checkout', { plan: 'team' });
+      assert.equal(res.status, 200, `status=${status}: upgrading tier must stay possible`);
+    }
   });
 });
