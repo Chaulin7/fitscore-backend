@@ -2273,7 +2273,7 @@ function planBlockNote(sum){
   const r = sum.billingBlockReason;
   if(r==='NOT_OWNER') return '<div class="pp-note">Contact your workspace owner to manage billing.</div>';
   if(r==='BILLING_NOT_CONFIGURED') return '<div class="pp-note">Billing is not configured on this deployment.</div>';
-  if(r==='COMPED') return '<div class="pp-note">This workspace is on a complimentary plan — there is no subscription to manage.</div>';
+  if(r==='COMPED') return '<div class="pp-note">Your workspace is on a complimentary plan — no billing to manage.</div>';
   if(r==='NO_CUSTOMER') return '<div class="pp-note">No billing account yet.</div>';
   return '';
 }
@@ -2368,23 +2368,63 @@ function openFreePlanModal(sum){
   requestAnimationFrame(function(){ backdrop.classList.add('open'); });
 }
 
-async function togglePlanPanel(el, e){
+// A short message and a way out, never an indefinite spinner. The panel is
+// opened by a deliberate click, so a request that fails or never answers has to
+// end in something the user can act on rather than in a control that looks
+// stuck. The timeout is here because a hung request produces no rejection at
+// all — without it the panel would sit empty for as long as the socket lives.
+const PLAN_SUMMARY_TIMEOUT_MS = 8000;
+
+function renderPlanPanelError(){
+  return '<div class="pp-sec-h">Plan</div>'
+    +'<div class="pp-note">Could not load your plan just now.</div>'
+    +'<div class="pp-foot"><button type="button" class="btn btn-ghost btn-sm" data-action="retryPlanPanel">Retry</button></div>';
+}
+
+async function fetchPlanSummary(){
+  let timer;
+  try{
+    return await Promise.race([
+      api('/api/billing/plan-summary'),
+      new Promise(function(_, reject){
+        timer = setTimeout(function(){ reject(new Error('timeout')); }, PLAN_SUMMARY_TIMEOUT_MS);
+      }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
+
+// Loads the summary and renders whichever surface the tier calls for. Shared by
+// the first open and by Retry, so the error path cannot drift from the happy one.
+async function loadPlanPanel(focusFirst){
   const { panel } = planPanelEls();
   if(!panel) return;
-  if(isPlanPanelOpen()){ closePlanPanel(true); return; }
-  closeAccountMenu(false); // only one popup open at a time
-  const keyboard = !!e && e.detail === 0;
   let sum=null;
-  try{ sum = await api('/api/billing/plan-summary'); }
+  try{ sum = await fetchPlanSummary(); }
   catch(_){
-    panel.innerHTML='<div class="pp-note">Could not load your plan. Try again in a moment.</div>';
+    panel.innerHTML = renderPlanPanelError();
     openPlanPanel(false);
     return;
   }
   _planSummary = sum;
   if(sum.plan==='free'){ closePlanPanel(false); openFreePlanModal(sum); return; }
   panel.innerHTML = renderPaidPanel(sum);
-  openPlanPanel(keyboard);
+  openPlanPanel(focusFirst);
+}
+
+async function togglePlanPanel(el, e){
+  const { panel } = planPanelEls();
+  if(!panel) return;
+  if(isPlanPanelOpen()){ closePlanPanel(true); return; }
+  closeAccountMenu(false); // only one popup open at a time
+  await loadPlanPanel(!!e && e.detail === 0);
+}
+
+// Retry re-runs the same load in place; the panel is already open, so focus
+// stays where the user put it rather than jumping back to the trigger.
+async function retryPlanPanel(){
+  const { panel } = planPanelEls();
+  if(panel) panel.innerHTML = '<div class="pp-note">Loading…</div>';
+  await loadPlanPanel(false);
 }
 
 // Upgrade from the panel/modal. Distinct from startCheckout(), which drives the
@@ -5197,6 +5237,7 @@ const delegatedHandlers = {
     focusAuditSearch, doLogout, toggleSettings, toggleAccountMenu, openAdminMetrics,
     startCheckout: (el) => startCheckout(el.dataset.plan),
     togglePlanPanel,
+    retryPlanPanel,
     startPlanCheckout,
     showPlanDetail,
     openBillingPortal, inviteMember, copyInviteLink, saveBranding,

@@ -132,11 +132,12 @@ describe('the chip is a real button with the popup contract', () => {
     assert.match(sample.replace(/^[ \t]*\/\/.*$/gm, ''), /chip\.onclick\s*=/);
   });
 
-  test('both panel actions are registered in the delegated map', () => {
+  test('every panel action is registered in the delegated map', () => {
     const map = /const delegatedHandlers = \{[\s\S]*?\n\};/.exec(APP_HTML);
     assert.ok(map, 'delegated handler map not found');
     assert.match(map[0], /\btogglePlanPanel\b/);
     assert.match(map[0], /\bstartPlanCheckout\b/);
+    assert.match(map[0], /\bretryPlanPanel\b/, 'the retry button would be inert without this');
   });
 });
 
@@ -239,7 +240,10 @@ describe('paid panel: why an action is unavailable is always stated', () => {
       comped: true, canManageBilling: false, billingBlockReason: 'COMPED', canUpgrade: false,
     }));
     assert.doesNotMatch(html, /data-action="openBillingPortal"/);
-    assert.match(html, /complimentary plan/);
+    assert.match(html, /Your workspace is on a complimentary plan — no billing to manage\./,
+      'a comped design partner should read this as an explanation of their state, not a refusal');
+    assert.doesNotMatch(html, /cannot|not allowed|unavailable|denied/i,
+      'nothing here is being withheld from them');
   });
 
   test('an unconfigured deployment blames the server, not the user', () => {
@@ -299,11 +303,13 @@ describe('past_due: the recovery path stays short and loud', () => {
 });
 
 describe('the free state is a modal, and never offers billing management', () => {
-  test('openFreePlanModal exists and the toggle routes free tenants to it', () => {
+  test('openFreePlanModal exists and the loader routes free tenants to it', () => {
     assert.ok(/function openFreePlanModal\s*\(/.test(APP_HTML));
-    const toggle = extractFunction(APP_HTML, 'togglePlanPanel');
-    assert.match(toggle, /plan\s*===\s*'free'/, 'the free branch must be driven by the server tier');
-    assert.match(toggle, /openFreePlanModal/);
+    // The branch lives in loadPlanPanel, which both the first open and Retry
+    // go through — putting it in togglePlanPanel would skip it on retry.
+    const load = extractFunction(APP_HTML, 'loadPlanPanel');
+    assert.match(load, /plan\s*===\s*'free'/, 'the free branch must be driven by the server tier');
+    assert.match(load, /openFreePlanModal/);
   });
 
   test('the free modal never renders a portal button', () => {
@@ -347,5 +353,45 @@ describe('the panel closes the way the account menu does', () => {
   test('aria-expanded tracks the open state on both paths', () => {
     assert.match(extractFunction(APP_HTML, 'openPlanPanel'), /aria-expanded['"],\s*['"]true/);
     assert.match(extractFunction(APP_HTML, 'closePlanPanel'), /aria-expanded['"],\s*['"]false/);
+  });
+});
+
+describe('the panel fails visibly, not silently', () => {
+  const errCtx = vm.createContext({});
+  vm.runInContext(extractFunction(APP_HTML, 'renderPlanPanelError'), errCtx);
+  const errorHtml = vm.runInContext('renderPlanPanelError()', errCtx);
+
+  test('the error state says something short and offers a retry', () => {
+    assert.match(errorHtml, /Could not load your plan/);
+    assert.match(errorHtml, /data-action="retryPlanPanel"/,
+      'an error with no way forward is a dead end');
+    assert.match(errorHtml, /Retry/);
+  });
+
+  test('the retry is a real button, wired through delegation', () => {
+    assert.match(errorHtml, /<button[^>]*type="button"/);
+    assert.doesNotMatch(errorHtml, /\son[a-z]+=/i, "script-src-attr 'none' blocks inline handlers");
+  });
+
+  test('a failed load renders the error state rather than leaving the panel empty', () => {
+    const src = extractFunction(APP_HTML, 'loadPlanPanel');
+    assert.match(src, /catch/, 'the fetch must be guarded');
+    assert.match(src, /renderPlanPanelError/);
+    assert.match(src, /openPlanPanel/, 'the panel must still open so the user sees the failure');
+  });
+
+  test('a hung request is bounded, so the panel cannot spin forever', () => {
+    const src = extractFunction(APP_HTML, 'fetchPlanSummary');
+    assert.match(src, /Promise\.race/, 'a request that never settles produces no rejection to catch');
+    assert.match(src, /setTimeout/);
+    assert.match(APP_HTML, /PLAN_SUMMARY_TIMEOUT_MS\s*=\s*\d+/);
+    assert.match(src, /clearTimeout/, 'the timer must not outlive a successful load');
+  });
+
+  test('retry reuses the same loader, so the paths cannot drift apart', () => {
+    const retry = extractFunction(APP_HTML, 'retryPlanPanel');
+    assert.match(retry, /loadPlanPanel/);
+    const toggle = extractFunction(APP_HTML, 'togglePlanPanel');
+    assert.match(toggle, /loadPlanPanel/);
   });
 });

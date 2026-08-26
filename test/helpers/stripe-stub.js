@@ -102,6 +102,19 @@ function fakeStripe() {
     },
     subscriptions: {
       retrieve: async (id) => ({ id, status: 'active', items: { data: [] } }),
+      // The de-duplication path in routes/billing.js reaches for these. An
+      // empty list is the honest default here: this stub does not model
+      // Stripe's subscription lifecycle, so it has no second subscription to
+      // report. duplicateSubscription.test.js drives that case with its own
+      // stub, which does.
+      list: async (p) => {
+        log({ call: 'subscriptions.list', customer: p.customer, status: p.status });
+        return { data: [] };
+      },
+      cancel: async (id) => {
+        log({ call: 'subscriptions.cancel', id });
+        return { id, status: 'canceled' };
+      },
     },
     webhooks: {
       constructEvent: (buf) => JSON.parse(buf.toString('utf8')),

@@ -313,14 +313,105 @@ router.post('/portal', requireSession, requireOwner, async (req, res) => {
 // Applies a Stripe Subscription object to our org plan state. Idempotent:
 // always sets state from the event, never blindly toggles. `eventCreated`
 // (unix seconds) advances the ordering guard so later stale events are skipped.
-function applySubscription(orgId, subscription, eventCreated) {
+// The price on a subscription object, or null. Stripe nests this four deep and
+// every level is optional on a malformed or partially expanded object.
+function priceIdOf(subscription) {
+  return (subscription && subscription.items && subscription.items.data
+    && subscription.items.data[0] && subscription.items.data[0].price
+    && subscription.items.data[0].price.id) || null;
+}
+
+// Statuses in which a subscription still exists as far as billing is concerned.
+// Deliberately wider than billing.LIVE_SUBSCRIPTION_STATUSES: 'incomplete' is
+// included here precisely because it is the one that needs cancelling.
+const NON_TERMINAL_SUBSCRIPTION_STATUSES = new Set([
+  'active', 'past_due', 'trialing', 'paused', 'incomplete',
+]);
+
+/**
+ * Cancel any OTHER subscription on the same customer for the same tier.
+ *
+ * Checkout is mode:'subscription' with no reference to an existing
+ * subscription, so every session creates a new one — Stripe does not reuse or
+ * supersede the old object. Combined with the ~23h window in which an
+ * 'incomplete' subscription can still be completed by a late 3DS confirmation,
+ * a customer can finish with two live subscriptions at the same tier: the org
+ * row holds one stripe_subscription_id, and the other bills forever with
+ * nothing in the product referring to it.
+ *
+ * Scoped to the SAME tier on purpose. A different tier on the same customer is
+ * the Pro -> Team upgrade path, which also leaves two subscriptions today but
+ * is a separate problem with a different correct answer (proration on the
+ * existing subscription, not a second checkout), and silently cancelling
+ * someone's other tier here would be worse than the bug.
+ *
+ * Best-effort: a failure to reach Stripe must not fail the webhook, because the
+ * org's own plan state has already been written correctly by the caller and
+ * services/stripeReconcile.js reports the duplicate either way.
+ */
+async function cancelSupersededSubscriptions(subscription, plan) {
+  const stripe = billing.getStripe();
+  if (!stripe || !subscription || !subscription.id || !subscription.customer) return;
+  if (!plan || plan === 'free') return;
+  // Only a subscription that is actually billing supersedes another. An
+  // 'incomplete' one arriving must never cancel the active subscription.
+  if (!billing.LIVE_SUBSCRIPTION_STATUSES.has(subscription.status)) return;
+
+  let list;
+  try {
+    list = await stripe.subscriptions.list({ customer: subscription.customer, status: 'all', limit: 100 });
+  } catch (err) {
+    console.warn('[billing] could not list subscriptions to de-duplicate', { error: err.message });
+    return;
+  }
+  for (const other of (list && list.data) || []) {
+    if (!other || other.id === subscription.id) continue;
+    if (!NON_TERMINAL_SUBSCRIPTION_STATUSES.has(other.status)) continue;
+    if (billing.planForPriceId(priceIdOf(other)) !== plan) continue;
+    try {
+      await stripe.subscriptions.cancel(other.id);
+      console.warn('[billing] cancelled a superseded duplicate subscription', {
+        kept: subscription.id, cancelled: other.id, customer: subscription.customer, plan,
+      });
+    } catch (err) {
+      console.warn('[billing] could not cancel superseded subscription', {
+        subscriptionId: other.id, error: err.message,
+      });
+    }
+  }
+}
+
+/**
+ * Whether a plan-REMOVING event actually concerns the subscription this org is
+ * on. Cancelling a superseded duplicate makes Stripe emit a deleted/canceled
+ * event for it, and without this that event would land on the org and downgrade
+ * the customer who just paid — the ordering guard cannot help, because the
+ * cancellation is genuinely the newer event.
+ *
+ * A null stored id means we are not tracking one yet, so the event is accepted.
+ */
+function concernsCurrentSubscription(orgId, subscriptionId) {
+  const stored = getOrgBilling(orgId);
+  const current = stored && stored.stripeSubscriptionId;
+  if (!current || !subscriptionId) return true;
+  return current === subscriptionId;
+}
+
+async function applySubscription(orgId, subscription, eventCreated) {
   const status = subscription.status; // active, past_due, canceled, ...
-  const priceId = subscription.items && subscription.items.data && subscription.items.data[0]
-    && subscription.items.data[0].price && subscription.items.data[0].price.id;
+  const priceId = priceIdOf(subscription);
   let plan = billing.planForPriceId(priceId);
 
-  // Terminal states fall back to free.
+  // Terminal states fall back to free — but only when the event is about the
+  // subscription this org is actually on. A canceled duplicate must not
+  // downgrade an org whose real subscription is healthy.
   if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired') {
+    if (!concernsCurrentSubscription(orgId, subscription.id)) {
+      console.warn('[billing] ignoring terminal event for a superseded subscription', {
+        orgId, subscriptionId: subscription.id, status,
+      });
+      return;
+    }
     plan = 'free';
   }
   if (!plan) plan = 'free';
@@ -342,6 +433,11 @@ function applySubscription(orgId, subscription, eventCreated) {
     // a subscription that no longer applies would be a stale flag.
     cancelAtPeriodEnd: plan === 'free' ? 0 : (subscription.cancel_at_period_end ? 1 : 0),
   });
+
+  // After our own state is correct, not before: if this call fails the org is
+  // still on the right plan and the duplicate is merely un-cleaned, which
+  // stripeReconcile reports.
+  await cancelSupersededSubscriptions(subscription, plan);
 }
 
 function orgIdFromCustomer(customerId) {
@@ -397,9 +493,15 @@ async function handleWebhook(req, res) {
           if (obj.customer) setOrgStripeCustomerId(orgId, obj.customer);
           if (obj.subscription) {
             const sub = await stripe.subscriptions.retrieve(obj.subscription);
-            applySubscription(orgId, sub, event.created); // writes subscription id too
+            await applySubscription(orgId, sub, event.created); // writes subscription id too
           }
         } else if (event.type === 'customer.subscription.deleted') {
+          if (!concernsCurrentSubscription(orgId, obj.id)) {
+            console.warn('[billing] ignoring deletion of a superseded subscription', {
+              orgId, subscriptionId: obj.id,
+            });
+            return res.json({ received: true });
+          }
           setOrgPlan(orgId, {
             plan: 'free', subscriptionStatus: 'canceled', currentPeriodEnd: null,
             eventCreated: event.created, stripeSubscriptionId: null, // clear on cancel
@@ -419,7 +521,7 @@ async function handleWebhook(req, res) {
           });
         } else {
           // customer.subscription.created / customer.subscription.updated
-          applySubscription(orgId, obj, event.created);
+          await applySubscription(orgId, obj, event.created);
         }
       }
     }
