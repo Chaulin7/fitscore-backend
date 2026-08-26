@@ -321,3 +321,47 @@ describe('a terminated subscription keeps the status that ended it', () => {
     assert.equal(row.status, null);
   });
 });
+
+/**
+ * The panel's "Complete payment" action, end to end.
+ *
+ * INCOMPLETE offers a fresh checkout at the same tier rather than the portal,
+ * because the portal cannot finish a subscription whose first payment never
+ * cleared. That is a second checkout against a customer who already has a
+ * subscription object — precisely what the de-duplication guard exists for — so
+ * this pins that the action relies on the guard rather than routing around it.
+ */
+describe('the "Complete payment" retry goes through the de-duplication guard', () => {
+  test('the retry is permitted, and the abandoned attempt is cancelled when it clears', async () => {
+    // The state the panel would be showing: first payment never cleared.
+    SUBS.set('sub_first', subObj('sub_first', CUS, 'incomplete', 'price_stub_pro', ORG));
+    await webhook('customer.subscription.created', SUBS.get('sub_first'));
+    assert.equal(orgRow().status, 'incomplete', 'precondition: the panel state is INCOMPLETE');
+
+    // "Complete payment" opens a NEW session at the same tier; that one clears.
+    SUBS.set('sub_retry', subObj('sub_retry', CUS, 'active', 'price_stub_pro', ORG));
+    await webhook('customer.subscription.created', SUBS.get('sub_retry'));
+
+    assert.deepEqual(liveSubs(), ['sub_retry'],
+      'the customer must not be left billing twice for one retry');
+    assert.deepEqual(cancelled, ['sub_first']);
+    assert.equal(orgRow().plan, 'pro');
+    assert.equal(orgRow().subId, 'sub_retry');
+  });
+
+  test('and if the ORIGINAL clears late instead, the retry is the one cancelled', async () => {
+    SUBS.set('sub_first', subObj('sub_first', CUS, 'incomplete', 'price_stub_pro', ORG));
+    await webhook('customer.subscription.created', SUBS.get('sub_first'));
+    SUBS.set('sub_retry', subObj('sub_retry', CUS, 'active', 'price_stub_pro', ORG));
+    await webhook('customer.subscription.created', SUBS.get('sub_retry'));
+
+    // Late 3DS confirmation on the original, inside its ~23h window.
+    SUBS.get('sub_first').status = 'active';
+    cancelled.length = 0;
+    await webhook('customer.subscription.updated', SUBS.get('sub_first'));
+
+    assert.equal(liveSubs().length, 1, 'exactly one survives, whichever order they land in');
+    assert.deepEqual(cancelled, ['sub_retry']);
+    assert.equal(orgRow().plan, 'pro');
+  });
+});

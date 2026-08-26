@@ -108,6 +108,90 @@ function billingBlockReason({ isOwner, orgBilling, configured }) {
   return null;
 }
 
+/**
+ * The panel's state, derived from the authoritative subscription record.
+ *
+ * Keyed on the TERMINAL SET rather than on individual statuses, so a churned
+ * org resolves to 'free' however it churned — canceled, unpaid or
+ * incomplete_expired all mean the same thing to a customer looking at the
+ * panel: they are on Free and the way forward is to buy.
+ */
+function planPanelState(orgBilling) {
+  const b = orgBilling || {};
+  const plan = b.plan || 'free';
+  const status = b.subscriptionStatus || null;
+
+  if (plan === 'free' || billing.TERMINAL_SUBSCRIPTION_STATUSES.has(status)) return 'free';
+  // Ordered by urgency. past_due outranks a scheduled cancellation because the
+  // customer is actively losing access; a scheduled cancellation is not urgent
+  // until it happens.
+  if (status === 'past_due') return 'past_due';
+  if (status === 'incomplete') return 'incomplete';
+  if (b.cancelAtPeriodEnd === 1 || b.cancelAtPeriodEnd === true) return 'cancel_scheduled';
+  return plan === 'team' ? 'team_active' : 'pro_active';
+}
+
+/**
+ * The actions the panel may offer, for this state and this member.
+ *
+ * The whole mapping lives here so the client renders a list rather than
+ * re-deciding from a status string it was handed. At most ONE action is
+ * `primary`; `anchor` says where it belongs — next to the limit it unlocks, or
+ * in the footer.
+ *
+ * Non-owners get an empty list. The buttons are not merely hidden: POST
+ * /checkout and POST /portal are both behind requireOwner and answer 403, so
+ * an empty list here and a refusal there are the same rule stated twice.
+ */
+function planActions(state, { isOwner, canCheckout, canPortal, plan }) {
+  if (!isOwner) return [];
+
+  // The price rides on the button rather than in a block of copy beside it:
+  // constraint is no secondary upsell copy, but a control that spends money
+  // has to say how much. Composed from config/plans.js, never typed here.
+  const upgradeLabel = (targetPlan) => {
+    const t = tierById(targetPlan);
+    return t ? `Upgrade to ${t.name} — ${t.priceLabel}${t.per || ''}` : 'Upgrade';
+  };
+  const checkout = (id, label, kind, targetPlan, anchorTo) => (canCheckout
+    ? [{ id, label, kind, action: 'startPlanCheckout', plan: targetPlan, anchor: anchorTo }] : []);
+  const portal = (id, label, kind) => (canPortal
+    ? [{ id, label, kind, action: 'openBillingPortal', anchor: 'footer' }] : []);
+
+  switch (state) {
+    case 'free':
+      // Pro is the primary; Team stays reachable as a ghost so a free agency
+      // that needs seats is not forced to buy Pro first. Still one primary.
+      return [
+        ...checkout('upgrade_pro', upgradeLabel('pro'), 'primary', 'pro', 'analyses'),
+        ...checkout('upgrade_team', upgradeLabel('team'), 'ghost', 'team', 'footer'),
+      ];
+    case 'pro_active':
+      // Manage billing is the primary: Pro customers mostly come here for
+      // invoices, not to spend more. The Team upsell is a ghost beside the
+      // seat limit it unlocks.
+      return [
+        ...checkout('upgrade_team', upgradeLabel('team'), 'ghost', 'team', 'seats'),
+        ...portal('manage_billing', 'Manage billing', 'primary'),
+      ];
+    case 'team_active':
+      return portal('manage_billing', 'Manage billing', 'primary');
+    case 'past_due':
+      // No upsell while a payment is failing.
+      return portal('update_payment', 'Update payment method', 'primary');
+    case 'incomplete':
+      // The portal cannot finish a subscription whose first payment never
+      // cleared — Stripe expires it within about a day. A fresh checkout at the
+      // SAME tier is the recovery, and the webhook de-duplication cancels
+      // whichever attempt loses, so this does not route around that guard.
+      return checkout('complete_payment', 'Complete payment', 'primary', plan, 'footer');
+    case 'cancel_scheduled':
+      return portal('reactivate', 'Reactivate plan', 'primary');
+    default:
+      return [];
+  }
+}
+
 // GET /api/billing/plan-summary — everything the plan panel renders (any member)
 //
 // Deliberately separate from /usage: that endpoint runs after every analysis
@@ -154,7 +238,17 @@ router.get('/plan-summary', requireSession, (req, res) => {
         gains: billing.gainsBetween(rankFrom, t.id),
       }));
 
+    const state = planPanelState(b);
+    const actions = planActions(state, {
+      isOwner,
+      canCheckout: configured && !upgradeBlocked,
+      canPortal: blockReason === null,
+      plan: tier.id,
+    });
+
     res.json({
+      state,
+      actions,
       plan: tier.id,
       planName: tier.name,
       priceLabel: tier.priceLabel,
@@ -581,3 +675,7 @@ async function handleWebhook(req, res) {
 
 module.exports = router;
 module.exports.handleWebhook = handleWebhook;
+// Exported so the tests drive the real state->action mapping rather than a
+// transcription of it, and so the panel tests render real action sets.
+module.exports.planPanelState = planPanelState;
+module.exports.planActions = planActions;

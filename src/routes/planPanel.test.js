@@ -49,14 +49,36 @@ const MARKUP = stripComments(APP_HTML);
 const SOURCE = stripComments(APP_HTML).replace(/^[ \t]*\/\/.*$/gm, '');
 
 // --- the shipped renderers, in a sandbox ------------------------------------
+const { extractLine } = require('../../test/helpers/pageSandbox');
+const { planPanelState, planActions } = require('../routes/billing');
+
 const sandbox = vm.createContext({});
 vm.runInContext([
   extractFunction(APP_HTML, 'escHtml'),
+  extractLine(APP_HTML, 'const MEMBER_PLAN_NOTE ='),
+  extractFunction(APP_HTML, 'planActionBtn'),
+  extractFunction(APP_HTML, 'planActionsAt'),
   extractFunction(APP_HTML, 'planMeter'),
   extractFunction(APP_HTML, 'planRenewalLine'),
   extractFunction(APP_HTML, 'planBlockNote'),
   extractFunction(APP_HTML, 'renderPaidPanel'),
 ].join('\n'), sandbox);
+
+// Builds the actions the SERVER would send for this org, so the panel tests
+// render the real mapping instead of a fixture that can drift from it.
+function withRealActions(summary, orgBilling, opts) {
+  const o = Object.assign({ isOwner: true, canCheckout: true, canPortal: true }, opts || {});
+  const state = planPanelState(orgBilling);
+  return Object.assign({}, summary, {
+    state,
+    actions: planActions(state, { ...o, plan: orgBilling.plan || 'free' }),
+    isOwner: o.isOwner,
+  });
+}
+
+function primaryCount(html) {
+  return (html.match(/class="btn btn-primary/g) || []).length;
+}
 
 function paidPanel(summary) {
   sandbox.__s = summary;
@@ -155,6 +177,16 @@ describe('paid panel: what a Pro tenant sees', () => {
     assert.match(html, /Renews/);
   });
 
+  test('an incomplete subscription does not claim it will renew', () => {
+    // Its first payment never cleared, so there is no period and nothing to
+    // renew. Same class of claim as "Renews" beside "Payment failed".
+    const html = paidPanel(withRealActions(summaryFor({ subscriptionStatus: 'incomplete' }),
+      { plan: 'pro', subscriptionStatus: 'incomplete' }));
+    assert.doesNotMatch(html, /Renews/);
+    assert.match(html, /Payment not completed/);
+    assert.match(html, /Complete payment/, 'the only useful control is the one that fixes it');
+  });
+
   test('a scheduled cancellation says "Ends", not "Renews"', () => {
     const html = paidPanel(summaryFor({ cancelAtPeriodEnd: true }));
     assert.match(html, /Ends/);
@@ -188,9 +220,20 @@ describe('paid panel: what a Pro tenant sees', () => {
   });
 
   test('Manage billing appears for an owner who can use it', () => {
-    const html = paidPanel(summaryFor());
+    const html = paidPanel(withRealActions(summaryFor(),
+      { plan: 'pro', subscriptionStatus: 'active' }));
     assert.match(html, /data-action="openBillingPortal"/);
     assert.match(html, /Manage billing/);
+  });
+
+  test('on Pro, Manage billing is the primary and the upsell is not', () => {
+    // Pro customers mostly open this for invoices, so billing outranks the
+    // upsell — and there is exactly one primary in the panel.
+    const html = paidPanel(withRealActions(summaryFor(),
+      { plan: 'pro', subscriptionStatus: 'active' }));
+    assert.match(html, /class="btn btn-primary btn-sm" data-action="openBillingPortal"/);
+    assert.match(html, /class="btn btn-ghost btn-sm" data-action="startPlanCheckout"/);
+    assert.equal(primaryCount(html), 1, 'one primary action maximum');
   });
 });
 
@@ -201,13 +244,22 @@ describe('paid panel: upgrade section', () => {
     gains: [{ axis: 'seats', from: 1, to: null, label: 'Multiple team members' }],
   };
 
-  test('Pro sees a Team upgrade with its price and what it gains', () => {
-    const html = paidPanel(summaryFor({ upgrades: [teamUpgrade] }));
+  test('Pro sees a Team upgrade carrying its price, beside the seat limit', () => {
+    const html = paidPanel(withRealActions(summaryFor({ upgrades: [teamUpgrade] }),
+      { plan: 'pro', subscriptionStatus: 'active' }));
     assert.match(html, /Upgrade to Team/);
-    assert.match(html, /€199/);
-    assert.match(html, /\/month/);
-    assert.match(html, /Multiple team members/);
+    assert.match(html, /€199/, 'a control that spends money must say how much');
     assert.match(html, /data-action="startPlanCheckout"[^>]*data-plan="team"/);
+    // Anchored to the limit it unlocks: the button follows the Members row.
+    assert.ok(html.indexOf('Members') < html.indexOf('data-plan="team"'),
+      'the seat upgrade belongs next to the seat limit, not in the footer');
+  });
+
+  test('no secondary upsell copy survives beside the action', () => {
+    const html = paidPanel(withRealActions(summaryFor({ upgrades: [teamUpgrade] }),
+      { plan: 'pro', subscriptionStatus: 'active' }));
+    assert.doesNotMatch(html, /class="pp-up"/, 'the upsell block is gone');
+    assert.doesNotMatch(html, /For agencies with a screening team/, 'no tagline copy');
   });
 
   test('Team sees no upgrade section at all — the empty list is what hides it', () => {
@@ -222,7 +274,7 @@ describe('paid panel: upgrade section', () => {
       billingBlockReason: 'NOT_OWNER', upgrades: [teamUpgrade],
     }));
     assert.doesNotMatch(html, /startPlanCheckout/, 'no upgrade button for a non-owner');
-    assert.match(html, /Contact your workspace owner to upgrade/);
+    assert.match(html, /Contact your organization owner to change the plan/);
   });
 });
 
@@ -232,7 +284,7 @@ describe('paid panel: why an action is unavailable is always stated', () => {
       isOwner: false, canManageBilling: false, billingBlockReason: 'NOT_OWNER',
     }));
     assert.doesNotMatch(html, /data-action="openBillingPortal"/);
-    assert.match(html, /Contact your workspace owner to manage billing/);
+    assert.match(html, /Contact your organization owner to change the plan/);
   });
 
   test('a comped org is told there is no subscription to manage', () => {
@@ -240,7 +292,7 @@ describe('paid panel: why an action is unavailable is always stated', () => {
       comped: true, canManageBilling: false, billingBlockReason: 'COMPED', canUpgrade: false,
     }));
     assert.doesNotMatch(html, /data-action="openBillingPortal"/);
-    assert.match(html, /Your workspace is on a complimentary plan — no billing to manage\./,
+    assert.match(html, /Your organization is on a complimentary plan — no billing to manage\./,
       'a comped design partner should read this as an explanation of their state, not a refusal');
     assert.doesNotMatch(html, /cannot|not allowed|unavailable|denied/i,
       'nothing here is being withheld from them');
@@ -282,10 +334,14 @@ describe('past_due: the recovery path stays short and loud', () => {
     assert.match(html, /Current period ends/, 'the date itself is still useful');
   });
 
-  test('the portal is still reachable — chip, panel, Manage billing', () => {
-    const html = paidPanel(pastDue);
+  test('the portal is still reachable, and the label names the fix', () => {
+    const html = paidPanel(withRealActions(pastDue,
+      { plan: 'pro', subscriptionStatus: 'past_due' }));
     assert.match(html, /data-action="openBillingPortal"/,
       'removing the chip shortcut must not remove the recovery path');
+    assert.match(html, /Update payment method/, '"Manage billing" understates it here');
+    assert.doesNotMatch(html, /startPlanCheckout/, 'no upsell while a payment is failing');
+    assert.equal(primaryCount(html), 1);
   });
 
   test('a healthy subscription shows no alert (guards a vacuous pass)', () => {
@@ -298,7 +354,7 @@ describe('past_due: the recovery path stays short and loud', () => {
       canManageBilling: false, billingBlockReason: 'NOT_OWNER',
     }));
     assert.match(html, /Payment failed/);
-    assert.match(html, /Contact your workspace owner/);
+    assert.match(html, /Contact your organization owner to change the plan/);
   });
 });
 
