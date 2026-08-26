@@ -1668,6 +1668,14 @@ function setOrgPlan(orgId, fields) {
     sets.push('cancel_at_period_end = ?');
     params.push(fields.cancelAtPeriodEnd ? 1 : 0);
   }
+  // Same opt-in shape again. A comp is a grant standing in for a subscription,
+  // so it is spent once a real one bills — but only the webhook knows that, and
+  // only when the subscription actually goes live. Every other caller omits the
+  // key and the flag is left exactly as an operator set it.
+  if ('comped' in fields) {
+    sets.push('comped = ?');
+    params.push(fields.comped ? 1 : 0);
+  }
   params.push(orgId);
   getDb().prepare(`UPDATE organizations SET ${sets.join(', ')} WHERE id = ?`).run(...params);
 }

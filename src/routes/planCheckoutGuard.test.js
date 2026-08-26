@@ -133,11 +133,17 @@ async function post(p, body) {
   return { status: res.status, body: await res.json() };
 }
 
+// Writes stripe_subscription_id explicitly (null unless named), because plan-
+// removing events are only honoured when they concern the subscription the org
+// is actually on. A test that terminates a subscription therefore has to say
+// which one the org holds — leaving it over from a previous test would make
+// these pass or fail on declaration order.
 function setPlan(orgId, fields) {
   db.setOrgPlan(orgId, {
     plan: fields.plan,
     subscriptionStatus: fields.subscriptionStatus || null,
     currentPeriodEnd: null,
+    stripeSubscriptionId: fields.subId || null,
   });
   db.setOrgStripeCustomerId(orgId, fields.customerId || null);
   db.getDb().prepare('UPDATE organizations SET comped = ? WHERE id = ?')
@@ -245,27 +251,87 @@ describe('checkout: only a genuine upgrade reaches Stripe', () => {
   });
 });
 
-describe('checkout: comped orgs are never sold anything', () => {
+/**
+ * A comp is a grant with no subscription behind it, so a checkout has nothing
+ * to duplicate and a design partner choosing to start paying is a conversion,
+ * not an error. The blanket refusal that used to live here meant a customer who
+ * wanted to pay us could not, at any tier, ever.
+ *
+ * The narrow hazard survives: a comped org that somehow already carries a
+ * subscription id IS duplicable, and is still refused.
+ */
+describe('checkout: a comped org may convert to paying', () => {
   before(() => actAs('g-owner-a'));
   after(() => setPlan(ORG_A, { plan: 'free', customerId: null, comped: false }));
 
-  test('a comped org is refused with PLAN_COMPED and reaches no Stripe call', async () => {
+  test('a comped Pro org may buy its OWN tier — the grant does not block it', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: null, customerId: null, comped: true });
+    const n = calls.length;
+    const res = await post('/api/billing/checkout', { plan: 'pro' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const sent = callsSince(n).find((c) => c.call === 'checkout.sessions.create');
+    assert.ok(sent, 'converting at the same tier is the whole point of the fix');
+    assert.equal(sent.price, 'price_stub_pro');
+    assert.equal(sent.metadata.orgId, ORG_A);
+  });
+
+  test('a comped Pro org may also buy a higher tier', async () => {
     setPlan(ORG_A, { plan: 'pro', subscriptionStatus: null, customerId: null, comped: true });
     const n = calls.length;
     const res = await post('/api/billing/checkout', { plan: 'team' });
-    assert.equal(res.status, 400);
-    assert.equal(res.body.code, 'PLAN_COMPED');
-    assert.deepEqual(callsSince(n), [],
-      'a real subscription must not be attached to an account that is entitled without paying');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(callsSince(n).find((c) => c.call === 'checkout.sessions.create').price, 'price_stub_team');
   });
 
-  test('a comped FREE org is refused as well', async () => {
+  test('a comped FREE org may buy too', async () => {
     setPlan(ORG_A, { plan: 'free', customerId: null, comped: true });
+    const res = await post('/api/billing/checkout', { plan: 'pro' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+  });
+
+  test('a comped org that ALREADY has a subscription is still refused', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_a', comped: true });
+    db.getDb().prepare('UPDATE organizations SET stripe_subscription_id = ? WHERE id = ?')
+      .run('sub_existing', ORG_A);
     const n = calls.length;
     const res = await post('/api/billing/checkout', { plan: 'pro' });
     assert.equal(res.status, 400);
     assert.equal(res.body.code, 'PLAN_COMPED');
-    assert.deepEqual(callsSince(n), []);
+    assert.deepEqual(callsSince(n), [], 'that one really would duplicate a live subscription');
+    db.getDb().prepare('UPDATE organizations SET stripe_subscription_id = NULL WHERE id = ?').run(ORG_A);
+  });
+
+  test('the comp is spent once the subscription goes live', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: null, customerId: 'cus_conv', comped: true });
+    await webhook('customer.subscription.updated', {
+      id: 'sub_conv', customer: 'cus_conv', status: 'active', metadata: { orgId: ORG_A },
+      items: { data: [{ price: { id: 'price_stub_pro' } }] },
+    });
+    const row = db.getDb()
+      .prepare('SELECT plan, comped, subscription_status AS s FROM organizations WHERE id = ?').get(ORG_A);
+    assert.equal(row.comped, 0, 'a paying customer reported as comped is EUR 0 MRR forever');
+    assert.equal(row.plan, 'pro');
+    assert.equal(row.s, 'active');
+  });
+
+  test('a failed conversion attempt does NOT revoke the comp', async () => {
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: null, customerId: 'cus_inc2', comped: true });
+    await webhook('customer.subscription.updated', {
+      id: 'sub_inc2', customer: 'cus_inc2', status: 'incomplete', metadata: { orgId: ORG_A },
+      items: { data: [{ price: { id: 'price_stub_pro' } }] },
+    });
+    const row = db.getDb().prepare('SELECT comped FROM organizations WHERE id = ?').get(ORG_A);
+    assert.equal(row.comped, 1, 'the customer still depends on the grant until a payment clears');
+  });
+
+  test('converting keeps white-label branding — through the paid path, not the comp', () => {
+    const branding = require('../services/branding');
+    assert.equal(branding.isEntitledToCustomBranding(
+      { plan: 'pro', subscriptionStatus: null, comped: 1 }), true, 'before: via the comp');
+    assert.equal(branding.isEntitledToCustomBranding(
+      { plan: 'pro', subscriptionStatus: 'active', comped: 0 }), true, 'after Pro: via capabilitiesFor');
+    assert.equal(branding.isEntitledToCustomBranding(
+      { plan: 'team', subscriptionStatus: 'active', comped: 0 }), true, 'after Team: via capabilitiesFor');
   });
 });
 
@@ -382,7 +448,7 @@ describe('termination resets the stored plan, so the guard cannot trap an owner'
   before(() => actAs('g-owner-a'));
 
   test("customer.subscription.deleted puts the org back on free", async () => {
-    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_term', comped: false });
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_term', comped: false, subId: 'sub_1' });
     const status = await webhook('customer.subscription.deleted', {
       id: 'sub_1', customer: 'cus_term', metadata: { orgId: ORG_A },
     });
@@ -393,7 +459,7 @@ describe('termination resets the stored plan, so the guard cannot trap an owner'
   test('a fully terminated org can buy the SAME tier again', async () => {
     // The scenario the guard could plausibly have broken: churned customer
     // comes back for the tier they used to be on.
-    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_term', comped: false });
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_term', comped: false, subId: 'sub_1' });
     await webhook('customer.subscription.deleted', { id: 'sub_1', customer: 'cus_term', metadata: { orgId: ORG_A } });
     const n = calls.length;
     const res = await post('/api/billing/checkout', { plan: 'pro' });
@@ -404,7 +470,7 @@ describe('termination resets the stored plan, so the guard cannot trap an owner'
   });
 
   test('dunning exhaustion to unpaid also resets the plan and unblocks rebuying', async () => {
-    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'past_due', customerId: 'cus_term', comped: false });
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'past_due', customerId: 'cus_term', comped: false, subId: 'sub_1' });
     await webhook('customer.subscription.updated', {
       id: 'sub_1', customer: 'cus_term', status: 'unpaid', metadata: { orgId: ORG_A },
       items: { data: [{ price: { id: 'price_stub_pro' } }] },
@@ -415,7 +481,7 @@ describe('termination resets the stored plan, so the guard cannot trap an owner'
   });
 
   test('incomplete_expired resets the plan too', async () => {
-    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'incomplete', customerId: 'cus_term', comped: false });
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'incomplete', customerId: 'cus_term', comped: false, subId: 'sub_1' });
     await webhook('customer.subscription.updated', {
       id: 'sub_1', customer: 'cus_term', status: 'incomplete_expired', metadata: { orgId: ORG_A },
       items: { data: [{ price: { id: 'price_stub_pro' } }] },
@@ -424,7 +490,7 @@ describe('termination resets the stored plan, so the guard cannot trap an owner'
   });
 
   test('an active subscription is NOT reset by these paths (guards a vacuous pass)', async () => {
-    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_term', comped: false });
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'active', customerId: 'cus_term', comped: false, subId: 'sub_1' });
     await webhook('customer.subscription.updated', {
       id: 'sub_1', customer: 'cus_term', status: 'active', metadata: { orgId: ORG_A },
       items: { data: [{ price: { id: 'price_stub_pro' } }] },

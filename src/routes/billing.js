@@ -77,6 +77,21 @@ function isComped(orgBilling) {
 }
 
 /**
+ * Whether a comp should stop this org opening Checkout.
+ *
+ * Being comped is NOT itself a reason to refuse. A comp is a grant with no
+ * subscription behind it, so there is nothing a new checkout could duplicate,
+ * and a design partner deciding to start paying is a conversion rather than an
+ * error — refusing it meant a customer who wanted to pay us could not.
+ *
+ * The narrow case that IS a hazard: a comped org that somehow already carries a
+ * subscription id. That one is duplicable, so it keeps the refusal.
+ */
+function compedBlocksCheckout(orgBilling) {
+  return isComped(orgBilling) && !!(orgBilling && orgBilling.stripeSubscriptionId);
+}
+
+/**
  * Why billing cannot be managed, or null when it can.
  *
  * These are three genuinely different states and the panel says something
@@ -118,8 +133,14 @@ router.get('/plan-summary', requireSession, (req, res) => {
     // Upgrade targets: strictly higher tiers only, and none at all for a comped
     // org (see isComped above). Each carries what it GAINS over the current
     // tier, computed from the enforced axes rather than from tier copy.
-    const upgrades = comped ? [] : PLANS.tiers
-      .filter((t) => billing.isUpgradeFrom(tier.id, t.id) && t.upgradePlan)
+    // Ranked from the same baseline POST /checkout uses, so the panel never
+    // offers a purchase the server would refuse, nor hides one it would accept.
+    // For a comped org that baseline is 'free' — the grant is not a
+    // subscription — which is what lets it convert at its own tier.
+    const upgradeBlocked = compedBlocksCheckout(b);
+    const rankFrom = comped ? 'free' : tier.id;
+    const upgrades = upgradeBlocked ? [] : PLANS.tiers
+      .filter((t) => billing.isUpgradeFrom(rankFrom, t.id) && t.upgradePlan)
       .map((t) => ({
         id: t.id,
         plan: t.upgradePlan,
@@ -128,7 +149,9 @@ router.get('/plan-summary', requireSession, (req, res) => {
         per: t.per,
         taxNote: t.taxNote || null,
         tagline: t.tagline,
-        gains: billing.gainsBetween(tier.id, t.id),
+        // Gains from the same baseline, so a card cannot advertise a gain the
+        // ranking did not consider.
+        gains: billing.gainsBetween(rankFrom, t.id),
       }));
 
     res.json({
@@ -147,7 +170,7 @@ router.get('/plan-summary', requireSession, (req, res) => {
       // to infer "why" from a combination of other fields.
       canManageBilling: blockReason === null,
       billingBlockReason: blockReason,
-      canUpgrade: isOwner && configured && !comped,
+      canUpgrade: isOwner && configured && !upgradeBlocked,
       usage: {
         periodKey,
         analyses: { used: getUsageCount(req.orgId, periodKey), limit: axes.analysesPerMonth },
@@ -230,13 +253,22 @@ router.post('/checkout', requireSession, requireOwner, async (req, res) => {
     // (notably 'incomplete') still reads as plan='pro' and would otherwise be
     // permanently refused the very purchase it is trying to make.
     const currentPlan = billing.effectiveTierFor(currentBilling);
-    if (isComped(currentBilling)) {
+    if (compedBlocksCheckout(currentBilling)) {
       return sendError(res, 400, 'PLAN_COMPED',
-        'This account is on a complimentary plan. Contact support to change it.');
+        'This account is on a complimentary plan with a subscription already attached. '
+        + 'Contact support to change it.');
     }
-    if (!billing.isUpgradeFrom(currentPlan, plan)) {
+    // Rank against what a second checkout could DUPLICATE, which is a live
+    // subscription — not what the org is entitled to. A comp confers a tier
+    // with nothing behind it, so it must not block conversion to paying.
+    // Deliberately computed here rather than inside effectiveTierFor(): that
+    // function answers "what tier does this org hold", and teaching it to
+    // answer 'free' for a comped org would be a trap for any future caller
+    // that reached for it to gate a feature.
+    const rankAgainst = isComped(currentBilling) ? 'free' : currentPlan;
+    if (!billing.isUpgradeFrom(rankAgainst, plan)) {
       return sendError(res, 400, 'PLAN_NOT_AN_UPGRADE',
-        `This organization is already on the ${currentPlan} plan.`);
+        `This organization is already on the ${rankAgainst} plan.`);
     }
 
     const priceId = billing.priceIdForPlan(plan);
@@ -432,6 +464,15 @@ async function applySubscription(orgId, subscription, eventCreated) {
     // Falls to 0 when the plan lands on free, where a pending cancellation on
     // a subscription that no longer applies would be a stale flag.
     cancelAtPeriodEnd: plan === 'free' ? 0 : (subscription.cancel_at_period_end ? 1 : 0),
+    // The comp is spent once a real subscription is billing. Left set, metrics
+    // would report a paying customer as EUR 0 MRR forever (services/metrics.js
+    // returns zero for any comped org) and stripeReconcile would keep filing
+    // them under "comped, no customer, expected" while they have both.
+    // Cleared ONLY on a live status: an incomplete attempt must not revoke a
+    // grant the customer still depends on. Branding survives either way —
+    // capabilitiesFor grants it on pro and team, so a converted org keeps it
+    // through the paid path instead of the comp short-circuit.
+    ...(billing.LIVE_SUBSCRIPTION_STATUSES.has(status) ? { comped: 0 } : {}),
   });
 
   // After our own state is correct, not before: if this call fails the org is
