@@ -332,9 +332,11 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   <div class="wrap">
     <div class="section-eyebrow">A deliberate choice</div>
     <h2>Why we don't use AI to read CVs.</h2>
-    <p>Every screening tool on the market added a language model between your candidates and your shortlist. It reads the CV, forms an impression, and gives you a score it cannot explain and will not repeat.</p>
-    <p>Under the EU AI Act, CV screening is a <strong>high-risk application</strong>. High-risk means you must be able to show your work — to candidates, to clients, to regulators. An impression is not work you can show.</p>
-    <p>So we made the unfashionable choice: <strong>a rules engine you configure, that does exactly what it says, every single time.</strong> Less magical. Entirely defensible.</p>
+    <p>Most screening tools put a language model between your candidates and your shortlist. It reads the CV, forms an impression, and returns a score it cannot explain and will not repeat. Run the same CV twice and you can get two different answers.</p>
+    <p>Under the EU AI Act, screening candidates is <strong>high-risk</strong> — when it's done by an AI system. The obligations that follow are not light: risk management, data governance, technical documentation, logging, human oversight, conformity assessment. And a good part of that lands on you, the agency deploying the tool, not only on the vendor who built it.</p>
+    <p>So we made the unfashionable choice: <strong>a rules engine you configure.</strong> The thresholds, the weights, the knockouts are yours, written down in advance, applied the same way to every candidate. No model reads the CV. Nothing infers, because there is nothing to infer from — the rules are the rules, and they run exactly as written.</p>
+    <p>Which is the point. Every score comes with the rule that produced it. The audit trail is attested by the server, not supplied by the browser. And a determinism check runs before every release: same CV, same rules, same score, or the build doesn't ship.</p>
+    <p>Less magical. Entirely defensible.</p>
     <div class="sig">— CVsprings, engineering principle nº 1</div>
   </div>
 </section>
