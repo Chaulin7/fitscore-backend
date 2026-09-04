@@ -1,0 +1,146 @@
+/*
+ * Copied verbatim (selectors + declarations, unmodified) from the shipping
+ * product CSS: fitscore-backend/public/app.html and public/bias-report.html.
+ * Only rules unused by the video's scenes are omitted (auth screen, settings
+ * panel, mobile breakpoints, modal fixes). Do not "clean up" values here —
+ * fidelity to the real app is the point.
+ */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px}
+
+/* ==================== Topbar ==================== */
+.topbar{
+  background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);
+  padding:0 32px;height:60px;display:flex;align-items:center;gap:20px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.25);position:relative;z-index:100
+}
+.topbar-brand{display:flex;align-items:center;gap:5px;text-decoration:none}
+.brand-name{font-size:18px;font-weight:800;color:#ffffff;letter-spacing:-.4px;text-shadow:0 0 18px rgba(255,255,255,0.35)}
+.brand-name em{font-style:normal;color:#7dd3fc}
+.topbar-nav{display:flex;gap:2px}
+.nav-btn{
+  background:none;border:none;color:rgba(255,255,255,0.65);font:600 13px 'Inter',sans-serif;
+  padding:7px 15px;border-radius:6px;letter-spacing:.03em;position:relative;
+  text-decoration:none;line-height:normal;box-sizing:border-box;white-space:nowrap
+}
+.nav-btn.active{color:#fff;background:rgba(255,255,255,0.14)}
+.nav-btn.active::after{
+  content:'';position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);
+  width:24px;height:2px;background:#7dd3fc;border-radius:1px
+}
+.nav-status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,0.08);color:#cbd5e1;font-size:12px;line-height:1;margin:0 6px 0 auto}
+.nav-status-pill .dot{width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block}
+.nav-status-pill .dot.ok{background:#22c55e}
+
+/* ==================== Buttons / Inputs ==================== */
+.btn{height:36px;padding:0 18px;border-radius:7px;font:600 13px 'Inter',sans-serif;border:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,#0f2847,#1a3d6e);color:#fff;box-shadow:0 2px 8px rgba(15,40,71,0.35)}
+.btn-ghost{background:#fff;color:#374151;border:1px solid #d1d5db;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.btn-sm{height:30px;padding:0 12px;font-size:12px}
+.text-input{height:36px;background:#fff;border:1.5px solid #e5e7eb;border-radius:7px;padding:0 12px;font:500 13px 'Inter',sans-serif;color:#111827}
+
+/* ==================== Cards ==================== */
+.main{padding:28px 32px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:18px;box-shadow:0 1px 6px rgba(0,0,0,0.05)}
+.card-head{padding:14px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#0a1f3d}
+.card-body{padding:20px}
+
+/* ==================== Drop zone ==================== */
+.dropzone{border:2px dashed #e5e7eb;border-radius:9px;padding:36px 20px;text-align:center;position:relative;background:#fafafa}
+.dropzone.drag{border-color:#0f2847;background:#f0f4ff;box-shadow:0 0 0 4px rgba(15,40,71,0.06)}
+.dz-icon{width:50px;height:50px;border-radius:12px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.dz-label{font-size:15px;font-weight:700;color:#111827;margin-bottom:4px}
+.dz-sub{font-size:12px;color:#9ca3af}
+.file-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.file-chip{background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;color:#1d4ed8;display:flex;align-items:center;gap:6px}
+
+/* ==================== How-it-works banner ==================== */
+.how-banner{display:flex;gap:0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-bottom:22px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.how-step{flex:1;display:flex;align-items:flex-start;gap:12px;padding:16px 18px;position:relative}
+.how-step:not(:last-child)::after{content:'';position:absolute;right:0;top:20%;height:60%;width:1px;background:#e5e7eb}
+.how-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#0a1f3d,#0f2847);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.how-text strong{display:block;font-size:13px;font-weight:700;color:#0f2847;margin-bottom:2px}
+.how-text span{font-size:12px;color:#6b7280;line-height:1.4}
+
+/* ==================== Weights ==================== */
+.weights-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.w-card{background:#fafafa;border:1.5px solid #e5e7eb;border-radius:8px;padding:14px}
+.w-card.focus{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.07)}
+.w-name{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px}
+.w-desc{font-size:11px;color:#9ca3af;margin-bottom:8px}
+.w-input{width:100%;height:42px;background:#fff;border:1.5px solid #e5e7eb;border-radius:7px;text-align:center;font:800 22px 'Inter',sans-serif;color:#0f2847}
+.w-slider{width:100%;margin-top:8px;accent-color:#0f2847;cursor:pointer;height:4px}
+.w-sum{font-size:12px;font-weight:600;color:#9ca3af}
+.w-sum.ok{color:#059669}
+
+/* ==================== Score boxes ==================== */
+.score-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+.score-box{background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:16px 12px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.05);position:relative;overflow:hidden}
+.score-box.overall{background:linear-gradient(135deg,#0a1f3d,#0f2847);border-color:transparent;box-shadow:0 4px 16px rgba(15,40,71,0.35)}
+.s-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px}
+.score-box.overall .s-label{color:rgba(255,255,255,0.55)}
+.ring-svg{overflow:visible}
+.ring-bg{fill:none;stroke:#f3f4f6;stroke-width:5}
+.score-box.overall .ring-bg{stroke:rgba(255,255,255,0.1)}
+.ring-fill{fill:none;stroke-linecap:round;stroke-width:5}
+
+/* ==================== Score pill / chips / badges ==================== */
+.score-pill{display:inline-block;padding:3px 11px;border-radius:12px;font-size:12px;font-weight:700;letter-spacing:.02em}
+.pill-hi{background:#dcfce7;color:#15803d}
+.pill-med{background:#fef9c3;color:#a16207}
+.pill-lo{background:#fee2e2;color:#b91c1c}
+.section-sub{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:9px}
+.chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+.chip{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.chip-found{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.chip-miss{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-green{background:#dcfce7;color:#15803d}
+.badge-red{background:#fee2e2;color:#b91c1c}
+
+/* ==================== Tables / Leaderboard ==================== */
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6}
+.data-table td{padding:10px 14px;border-bottom:1px solid #f9fafb;color:#374151;vertical-align:middle}
+.lb{width:100%;border-collapse:collapse;font-size:13px}
+.lb th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6}
+.lb td{padding:10px 14px;border-bottom:1px solid #f9fafb;vertical-align:middle}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-size:11px;font-weight:700}
+.r1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,0.4)}
+.r2{background:linear-gradient(135deg,#9ca3af,#6b7280);color:#fff}
+.r3{background:linear-gradient(135deg,#d97706,#92400e);color:#fff}
+.rn{background:#f3f4f6;color:#6b7280;font-size:12px}
+
+/* ==================== Batch summary / why box ==================== */
+.batch-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.bs-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;text-align:center}
+.bs-val{font-size:26px;font-weight:800;color:#0a1f3d;line-height:1}
+.bs-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-top:4px}
+.bs-sub{font-size:11px;color:#6b7280;margin-top:2px}
+.why-box{background:#f8faff;border:1px solid #dde4f7;border-radius:8px;padding:12px 14px;margin-top:10px;font-size:12px;line-height:1.65;color:#374151}
+.why-row{padding:2px 0}
+
+/* ==================== Audit toolbar ==================== */
+.audit-tb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.legacy-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.03em;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:4px;padding:1px 5px;margin-left:6px}
+.bias-gen{background:#f7f9fc;border:1px solid #dbe3f0;border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.bias-gen-scope{font-size:12.5px;color:#334155;margin-top:9px;line-height:1.5}
+.bias-gen-scope strong{color:#0f2847;font-weight:700}
+
+/* ==================== Footer ==================== */
+.site-footer{background:#0a1f3d;color:rgba(255,255,255,.7);font-size:12px;line-height:1.7;padding:32px}
+
+/* ==================== Bias report page (public/bias-report.html) ==================== */
+.br-hero{background:linear-gradient(135deg,#0a1f3d,#153360);color:#fff;border-radius:14px;padding:34px 36px;margin-bottom:26px}
+.br-hero h1{font-size:24px;font-weight:800;letter-spacing:-.3px;margin-bottom:10px}
+.br-hero p{font-size:14px;line-height:1.65;color:rgba(255,255,255,.82);max-width:660px}
+.br-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:22px;box-shadow:0 1px 6px rgba(0,0,0,0.05);overflow:hidden}
+.br-card-head{padding:16px 24px;border-bottom:1px solid #f3f4f6}
+.br-card-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#0a1f3d}
+.br-card-body{padding:22px 24px;line-height:1.7;color:#374151}
+.br-mon-note{background:#f3f4f6;border-radius:8px;padding:12px 14px;font-size:12.5px;color:#6b7280;line-height:1.6;margin-bottom:16px}
+.br-role-block{border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;margin-bottom:14px}
+.br-role-name{font-size:14px;font-weight:700;color:#0f2847;margin-bottom:2px}
+.br-role-stats{font-size:12px;color:#6b7280;margin-bottom:12px}
+.br-chart-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;margin:10px 0 6px}
