@@ -27,7 +27,7 @@ const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 // nonce-substituting template routes.
 const SERVED_PAGES = [
   'index.html', 'app.html', 'compliance.html', 'integrations.html',
-  'terms.html', 'privacy.html', 'bias-report.html',
+  'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html',
 ];
 
 // Strip <script>…</script> and <!-- … --> before scanning, so JS assignments
