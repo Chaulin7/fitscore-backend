@@ -20,7 +20,7 @@ const featureRequestsRouter = require('./routes/featureRequests');
 const plansRouter = require('./routes/plans');
 const adminMetricsRouter = require('./routes/adminMetrics');
 const { productJsonLd } = require('./config/plans');
-const { MEDIA_PLACEHOLDERS, URL_PREFIX: MEDIA_URL_PREFIX, assetUrl, logMediaAssets } = require('./config/mediaAssets');
+const { MEDIA_PLACEHOLDERS, URL_PREFIX: MEDIA_URL_PREFIX, assetUrl, logMediaAssets, DEMO_VIDEO_UPLOAD_DATE } = require('./config/mediaAssets');
 const { configuredBaseUrl, warnDeprecatedAliases } = require('./config/appUrl');
 const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE: LEGAL_FOOTER_LINE } = require('./config/legal');
 const { migrateLegacyData } = require('./services/authService');
@@ -225,7 +225,9 @@ const pricingJsonLd = JSON.stringify(productJsonLd(configuredBaseUrl()))
 // thumbnailUrl is the JPEG, not the WebP the page itself uses for the poster:
 // this field is read by crawlers, and JPEG is the format they all accept.
 const DEMO_VIDEO_DURATION = 'PT1M13S'; // 73 seconds
-const DEMO_VIDEO_UPLOAD_DATE = '2026-09-04';
+// uploadDate is NOT here: it lives in config/mediaAssets.js beside the four
+// file entries, so re-recording the demo touches the files and the date they
+// are dated in one place.
 const DEMO_VIDEO_NAME = 'CVsprings — a deterministic screening run, end to end';
 const DEMO_VIDEO_DESCRIPTION = 'A single pass through the CVsprings rules engine on synthetic candidate data: '
   + 'a role defined explicitly, a candidate scored with every point traced to the line that earned it, '

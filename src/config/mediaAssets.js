@@ -57,6 +57,22 @@ const MANAGED = {
 };
 
 /**
+ * Publication date of the recording, as schema.org VideoObject.uploadDate.
+ *
+ * It lives here, beside the files it describes, rather than next to the
+ * JSON-LD that consumes it: everything else about these assets updates itself
+ * when the bytes change, because it is derived from the bytes. This one field
+ * cannot be — a re-encode of the same recording is not a new upload, and a
+ * file mtime is reset by any fresh checkout, so it would lie on every deploy.
+ *
+ * MUST BE BUMPED WHEN THE DEMO IS RE-RECORDED. Re-encoding the existing cut
+ * (a new resolution, a smaller file) does not change it; recording new footage
+ * does. Getting it wrong misdates the video in search results and nowhere
+ * else, so nothing will fail to tell you.
+ */
+const DEMO_VIDEO_UPLOAD_DATE = '2026-09-04';
+
+/**
  * First 10 hex chars of the file's SHA-256, or null if it cannot be read.
  *
  * 10 hex chars is 40 bits. These are cache-busting tokens, not integrity
@@ -141,6 +157,7 @@ function logMediaAssets(log) {
 module.exports = {
   MANAGED,
   URL_PREFIX,
+  DEMO_VIDEO_UPLOAD_DATE,
   MEDIA_PLACEHOLDERS,
   assetUrl,
   currentVersion,
