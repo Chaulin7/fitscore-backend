@@ -40,6 +40,12 @@
      scripts. Data block, not executable code; the nonce is carried anyway so
      the tag is unambiguous under script-src. -->
 <script type="application/ld+json" nonce="__CSP_NONCE__">__PRICING_JSONLD__</script>
+<!-- VideoObject for the demo recording (§ FIG. 01). Substituted whole — tag and
+     all — by src/index.js at startup, because contentUrl and thumbnailUrl carry
+     the content hash of the files on disk. Omitted entirely, as an HTML comment,
+     when no public origin is configured: schema.org URLs must be absolute, and a
+     VideoObject pointing at a relative path is worse than none. -->
+__VIDEO_JSONLD__
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -104,7 +110,8 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:6
 @media(max-width:900px){.hero .wrap{grid-template-columns:1fr;gap:40px}}
 .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--stamp);margin-bottom:20px}
 h1{font-family:var(--display);font-weight:700;font-size:clamp(34px,4.6vw,52px);line-height:1.08;letter-spacing:-.02em;margin-bottom:20px}
-.hero p.lede{font-size:18px;color:var(--ink-soft);max-width:44ch;margin-bottom:32px}
+.lede{font-size:18px;color:var(--ink-soft);margin-bottom:32px}
+.hero p.lede{max-width:44ch}
 .hero-ctas{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
 .hero-note{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:16px}
 
@@ -136,6 +143,40 @@ h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.4vw,36px);l
 .clause .cl{font-family:var(--mono);font-size:11px;color:var(--stamp);letter-spacing:.06em;margin-bottom:14px}
 .clause h3{font-family:var(--display);font-weight:500;font-size:19px;margin-bottom:10px}
 .clause p{font-size:14.5px;color:var(--ink-soft);max-width:46ch}
+
+/* ---------- recorded session (fig. 01) ---------- */
+/* Uses .section-eyebrow, not .eyebrow: every other section label on this page
+   is .section-eyebrow (ink-soft), and .eyebrow (stamp blue) appears exactly
+   once, in the hero. Blue marginalia here would read as a different kind of
+   thing than the four section labels around it. */
+.recording{padding:72px 0;border-bottom:1px solid var(--rule)}
+.marginalia{display:flex;justify-content:space-between;align-items:baseline;gap:16px 32px;flex-wrap:wrap}
+.recording h2{margin-bottom:18px}
+
+/* One border around frame + ledger, so the ledger's top rule IS the frame's
+   bottom rule rather than sitting 1px below it. Square corners, no shadow. */
+.rec-shell{border:1px solid var(--rule);background:var(--panel)}
+.rec-frame{position:relative;aspect-ratio:16/9;background:var(--dark);overflow:hidden}
+.rec-frame video{display:block;width:100%;height:100%;object-fit:contain;background:var(--dark)}
+
+/* Play facade. Covers the native controls until first play, so it is REMOVED
+   from the DOM rather than hidden — a hidden overlay would keep swallowing
+   clicks on the scrub bar underneath it. */
+.rec-play{position:absolute;inset:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(20,22,27,.42);border:0;cursor:pointer;font-family:var(--mono);color:#fff;transition:background .15s}
+.rec-play:hover{background:rgba(20,22,27,.26)}
+/* Inset, unlike the global :focus-visible, so the ring stays inside the frame
+   instead of being drawn over the section rule below it. */
+.rec-play:focus-visible{outline:2px solid var(--stamp);outline-offset:-4px}
+.rec-play-control{border:1px solid #fff;background:rgba(20,22,27,.55);padding:12px 24px;font-size:13px;letter-spacing:.09em;transition:background .15s,border-color .15s}
+.rec-play:hover .rec-play-control{background:var(--stamp);border-color:var(--stamp)}
+.rec-play-spec{font-size:11px;letter-spacing:.07em;color:rgba(255,255,255,.74)}
+@media (prefers-reduced-motion:reduce){.rec-play,.rec-play-control{transition:none}}
+
+.rec-ledger{border-top:1px solid var(--rule);font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;color:var(--ink-soft);padding:12px 16px}
+.rec-figure{margin:0}
+.rec-figure figcaption{font-size:14px;line-height:1.65;color:var(--ink-soft);max-width:70ch;margin-top:16px}
+.rec-figure figcaption .fig{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--ink);text-transform:uppercase}
+@media(max-width:560px){.rec-play-control{padding:10px 18px;font-size:12px}.rec-play-spec{font-size:10px;text-align:center;padding:0 12px}}
 
 /* ---------- dark statement ---------- */
 .statement{background:var(--dark);color:var(--dark-ink);padding:88px 0;border-bottom:1px solid var(--rule)}
@@ -325,6 +366,48 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
         <p>No candidate data is sent to third-party AI providers — because there are none in the pipeline. Processing is GDPR-scoped by design, with per-candidate deletion on request.</p>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- FIG. 01 — the recorded session. Sits between the four clauses and the
+     statement on purpose: the clauses assert what the engine does, this shows
+     it doing it, and only then does the statement argue for why.
+     id="recording", not "demo" — #demo belongs to the booking form below and
+     has seven inbound links pointing at it. -->
+<section class="recording" id="recording">
+  <div class="wrap">
+    <div class="marginalia">
+      <div class="section-eyebrow">FIG. 01 — Recorded session</div>
+      <div class="section-eyebrow">Runtime 00:01:13 · No audio · Captions embedded</div>
+    </div>
+    <h2>The four clauses, running.</h2>
+    <p class="lede">One pass through the engine: a role defined explicitly, a candidate scored with every point traced to the line that earned it, the audit log, and the bias report. Nothing is edited between steps.</p>
+
+    <figure class="rec-figure">
+      <div class="rec-shell">
+        <div class="rec-frame">
+          <!-- preload="none" is deliberate: nothing is fetched until a visitor
+               asks for it, so a 3.9 MB file costs a passing reader nothing.
+               That is also why there are no <source> children — the resolution
+               is chosen in JS at click time (see playDemo below), which a
+               <source media> attribute cannot do: it is evaluated at parse
+               time and cannot see Save-Data at all.
+               The poster is the WebP (49 KB vs 94 KB for the JPEG); the JPEG is
+               what the VideoObject advertises to crawlers. -->
+          <video preload="none" playsinline controls
+                 poster="__DEMO_POSTER_WEBP__"
+                 data-src1080="__DEMO_VIDEO_1080__"
+                 data-src720="__DEMO_VIDEO_720__"></video>
+          <button type="button" class="rec-play" data-action="playDemo"
+                  aria-label="Play the recorded screening session — 1 minute 13 seconds, silent, with captions on screen">
+            <span class="rec-play-control">PLAY 00:01:13</span>
+            <span class="rec-play-spec">SILENT · CAPTIONED ON SCREEN</span>
+          </button>
+        </div>
+        <div class="rec-ledger">SOURCE cvsprings engine v1 · DATA synthetic candidates · EDITS none</div>
+      </div>
+      <figcaption><span class="fig">Fig. 01</span> — Screening walkthrough on synthetic candidate data. For a run against your own CVs, <a href="#demo">book the 15-minute demo</a> — we do it live, twice. <a href="/demo-transcript">Text version</a>.</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -650,8 +733,33 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   }
   document.addEventListener('cv:pricing_rendered',syncEntitlement);
 
+  // FIG. 01 play control. The <video> carries no src until this runs, so the
+  // page costs a passing reader nothing; preload="none" is load-bearing, not
+  // decoration.
+  function playDemo(el){
+    var frame=el.closest('.rec-frame');
+    var video=frame&&frame.querySelector('video');
+    if(!video)return;
+    // Resolution is decided HERE, at click time, rather than by <source media>.
+    // A media attribute is evaluated when the markup is parsed, against the
+    // viewport as it was then, and it cannot consult Save-Data at all.
+    var narrow=window.matchMedia?window.matchMedia('(max-width:900px)').matches:false;
+    var conn=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+    var saveData=!!(conn&&conn.saveData);
+    video.src=(narrow||saveData)?video.dataset.src720:video.dataset.src1080;
+    // Removed, not hidden. The facade covers the native controls, so leaving it
+    // in the DOM would leave the scrub bar unclickable for the whole video.
+    if(el.parentNode)el.parentNode.removeChild(el);
+    video.focus&&video.focus();
+    var started=video.play();
+    // Some browsers reject play() even for a muted, user-initiated start. The
+    // native controls are visible by now, so the visitor can simply press play;
+    // an unhandled rejection here would be a console error and nothing else.
+    if(started&&typeof started.catch==='function')started.catch(function(){});
+  }
+
   var delegatedHandlers={
-    click:{ startCheckout: startCheckout },
+    click:{ startCheckout: startCheckout, playDemo: playDemo },
   };
   Object.keys(delegatedHandlers).forEach(function(eventType){
     var map=delegatedHandlers[eventType];

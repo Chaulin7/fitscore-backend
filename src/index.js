@@ -15,10 +15,12 @@ const orgRouter = require('./routes/org');
 const billingRouter = require('./routes/billing');
 const teamRouter = require('./routes/team');
 const demoRouter = require('./routes/demo');
+const mediaAssetsRouter = require('./routes/mediaAssets');
 const featureRequestsRouter = require('./routes/featureRequests');
 const plansRouter = require('./routes/plans');
 const adminMetricsRouter = require('./routes/adminMetrics');
 const { productJsonLd } = require('./config/plans');
+const { MEDIA_PLACEHOLDERS, URL_PREFIX: MEDIA_URL_PREFIX, assetUrl, logMediaAssets, DEMO_VIDEO_UPLOAD_DATE } = require('./config/mediaAssets');
 const { configuredBaseUrl, warnDeprecatedAliases } = require('./config/appUrl');
 const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE: LEGAL_FOOTER_LINE } = require('./config/legal');
 const { migrateLegacyData } = require('./services/authService');
@@ -84,6 +86,12 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:'],
+      // Pinned independently of default-src, not as documentation of it. The
+      // demo video would load anyway by falling back to default-src 'self';
+      // stating media-src here means a future origin added to default-src (a
+      // CDN, an image host) cannot silently widen where video may be loaded
+      // from as a side effect.
+      mediaSrc: ["'self'"],
       // XHR/fetch targets: same-origin, the API host, and Plausible.
       connectSrc: ["'self'", 'https://plausible.io', 'https://cvsprings7.onrender.com'],
       frameSrc: ['https://js.stripe.com', 'https://hooks.stripe.com'],
@@ -184,7 +192,7 @@ app.get('/eu-ai-act-checklist.pdf', (req, res) => {
 // nonce that no longer matches the fresh CSP header. These routes are
 // registered BEFORE express.static, and static gets index:false, so the raw
 // placeholder files are never reachable (neither via / nor /index.html).
-const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html'];
+const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html'];
 // Pricing structured data is substituted ONCE at startup, not per request: the
 // tier table is static per deploy (same reasoning as the cached PAYLOAD in
 // routes/plans.js). It is built from src/config/plans.js, so the prices a
@@ -201,12 +209,64 @@ const pricingJsonLd = JSON.stringify(productJsonLd(configuredBaseUrl()))
 // the server sends rather than fetched afterwards, so a visitor without JS
 // still sees them. Every page in HTML_PAGES carries both placeholders in its
 // footer — src/config/legal.test.js fails the build if one stops doing so.
+// VideoObject structured data for the demo recording, built in this same
+// startup pass and for the same reason as the pricing block above: contentUrl
+// and thumbnailUrl have to carry the content hash that config/mediaAssets.js
+// computes at boot. Hand-written URLs in the HTML would go stale the moment
+// the video is re-encoded and would then advertise a URL whose bytes no longer
+// match what the page plays.
+//
+// The URLs must be absolute — a crawler reading schema.org fields has no page
+// context to resolve a relative path against. So with no public origin
+// configured there is nothing correct to emit, and the tag is replaced by a
+// comment rather than by a VideoObject that points nowhere. warnDeprecatedAliases()
+// already says at boot that no origin was configured.
+//
+// thumbnailUrl is the JPEG, not the WebP the page itself uses for the poster:
+// this field is read by crawlers, and JPEG is the format they all accept.
+const DEMO_VIDEO_DURATION = 'PT1M13S'; // 73 seconds
+// uploadDate is NOT here: it lives in config/mediaAssets.js beside the four
+// file entries, so re-recording the demo touches the files and the date they
+// are dated in one place.
+const DEMO_VIDEO_NAME = 'CVsprings — a deterministic screening run, end to end';
+const DEMO_VIDEO_DESCRIPTION = 'A single pass through the CVsprings rules engine on synthetic candidate data: '
+  + 'a role defined explicitly, a candidate scored with every point traced to the line that earned it, '
+  + 'the audit log, and the bias report. Silent, with captions on screen. Nothing is edited between steps.';
+
+function buildVideoJsonLd() {
+  const origin = configuredBaseUrl();
+  if (!origin) return '<!-- VideoObject omitted: no public origin configured (set PUBLIC_APP_URL) -->';
+  const absolute = (u) => new URL(u, origin).toString();
+  const payload = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    name: DEMO_VIDEO_NAME,
+    description: DEMO_VIDEO_DESCRIPTION,
+    thumbnailUrl: absolute(assetUrl('cvsprings-demo-poster.jpg')),
+    uploadDate: DEMO_VIDEO_UPLOAD_DATE,
+    duration: DEMO_VIDEO_DURATION,
+    contentUrl: absolute(assetUrl('cvsprings-demo-1080.mp4')),
+  }).replaceAll('<', '\\u003c');
+  // The nonce placeholder is substituted per request, after this pass.
+  return '<script type="application/ld+json" nonce="__CSP_NONCE__">' + payload + '</script>';
+}
+const videoJsonLd = buildVideoJsonLd();
+
 const htmlTemplates = {};
 for (const page of HTML_PAGES) {
-  htmlTemplates[page] = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8')
+  let html = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8')
     .replaceAll('__PRICING_JSONLD__', pricingJsonLd)
     .replaceAll('__LEGAL_FOOTER__', LEGAL_FOOTER_LINE)
-    .replaceAll('__LEGAL_NAME__', LEGAL_NAME);
+    .replaceAll('__LEGAL_NAME__', LEGAL_NAME)
+    .replaceAll('__VIDEO_JSONLD__', videoJsonLd);
+  // Content-hashed URLs for the demo video and poster (src/config/mediaAssets.js).
+  // Substituted here, at startup, for the same reason as the two above: the
+  // files cannot change while the process is up, so the hash is a per-deploy
+  // constant and not a per-request one.
+  for (const [placeholder, url] of Object.entries(MEDIA_PLACEHOLDERS)) {
+    html = html.replaceAll(placeholder, url);
+  }
+  htmlTemplates[page] = html;
 }
 function serveNoncedHtml(page) {
   return (req, res) => {
@@ -231,9 +291,17 @@ app.get('/', serveNoncedHtml('index.html'));
 app.get('/login', serveNoncedHtml('app.html'));
 app.get('/signup', serveNoncedHtml('app.html'));
 app.get('/dashboard', serveNoncedHtml('app.html'));
+// Plain-text walkthrough of the product demo video, linked from its figcaption
+// on the landing page. Clean URL because it is a page a visitor may be sent
+// directly to; /demo-transcript.html keeps working via the HTML_PAGES loop.
+app.get('/demo-transcript', serveNoncedHtml('demo-transcript.html'));
 for (const page of HTML_PAGES) {
   app.get('/' + page, serveNoncedHtml(page));
 }
+// Demo video + poster, content-hashed and cached for a year. MUST be mounted
+// before express.static: static would answer these paths first and stamp
+// Cache-Control: public, max-age=0 on a 3.9 MB file for every page view.
+app.use(MEDIA_URL_PREFIX, mediaAssetsRouter);
 app.use(express.static(PUBLIC_DIR, { index: false }));
 
 // --- Internal admin ---------------------------------------------------------
@@ -374,6 +442,8 @@ startMetricsSnapshotSchedule();
 // did. A wrong origin does not throw: it produces working-looking links that
 // point at the proxy host, and offer URLs that quietly vanish from the pricing
 // structured data. That is only findable if the process says so out loud.
+logMediaAssets(logger ? logger : console);
+
 warnDeprecatedAliases(logger
   ? { warn: (m) => logger.warn(m) }
   : console);

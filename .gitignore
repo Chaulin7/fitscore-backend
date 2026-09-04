@@ -21,3 +21,17 @@ test/golden/extraction-baseline.*.json
 # a wholly-excluded directory.
 .vscode/*
 !.vscode/extensions.json
+
+# Video masters and the Remotion project that renders them. The encoded
+# outputs that the site actually serves ARE committed, in
+# public/assets/video/ — this rule is only about the sources.
+#
+# Do not "helpfully" commit the master: it is ~8 MB, it is a build input that
+# nothing at runtime reads, and every re-render would add another full 8 MB
+# blob to history (mp4 does not delta-compress). The 1080p encode in
+# public/assets/video/ is derived from it and is the only copy the page needs.
+# Keep masters in cloud storage, not in git.
+#
+# marketing/demo-video/node_modules/ is already covered by the node_modules/
+# rule above, which is unanchored and so matches at any depth.
+marketing/

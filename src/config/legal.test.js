@@ -33,7 +33,7 @@ const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 // resolves rather than shipping to the visitor as literal text.
 const SERVED_PAGES = [
   'index.html', 'app.html', 'compliance.html', 'integrations.html',
-  'terms.html', 'privacy.html', 'bias-report.html',
+  'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html',
 ];
 
 const FOOTER_TOKEN = '__LEGAL_FOOTER__';

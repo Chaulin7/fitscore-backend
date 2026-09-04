@@ -272,7 +272,12 @@ describe('the buttons reuse the in-product checkout route', () => {
   test('the buttons are wired by delegation, not inline handlers', () => {
     // Helmet sets script-src-attr 'none' — an onclick here would be a dead
     // button. (cspInlineHandlers.test.js scans for the attribute itself.)
-    assert.match(INDEX_HTML, /click:\{ startCheckout: startCheckout \}/);
+    //
+    // Matched inside the click map rather than as the whole map: the page has
+    // more than one delegated action now (playDemo, for the FIG. 01 recording),
+    // and what this test is about is that checkout is delegated at all — not
+    // that it is the only thing that is.
+    assert.match(INDEX_HTML, /click:\{[^}]*\bstartCheckout: startCheckout\b[^}]*\}/);
     assert.match(INDEX_HTML, /closest\('\[data-action\]'\)/);
   });
 });
