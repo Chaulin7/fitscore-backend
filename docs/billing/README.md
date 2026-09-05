@@ -19,7 +19,7 @@ hardcoded — all Stripe identifiers come from here.
 | `STRIPE_WEBHOOK_SECRET` | Verifies the webhook signature | `whsec_...` |
 | `STRIPE_PRICE_PRO` | Recurring price ID for the Pro plan | `price_...` |
 | `STRIPE_PRICE_TEAM` | Recurring price ID for the Team plan | `price_...` |
-| `FREE_MONTHLY_LIMIT` | Free analyses per org per month (optional, default 25) | `25` |
+| `FREE_MONTHLY_LIMIT` | Free analyses per org per month (optional, default 10) | `10` |
 | `PUBLIC_APP_URL` | Public origin for Checkout success/cancel + portal return. `FRONTEND_URL` / `APP_BASE_URL` are deprecated aliases; see `src/config/appUrl.js` | `https://cvsprings.com` |
 
 If `STRIPE_SECRET_KEY` is unset the app still boots; billing endpoints return
