@@ -178,9 +178,9 @@ completes (most useful for large batches).
   `429 { "code": "RATE_LIMITED", "retryAfter": <seconds> }` with a `Retry-After`
   header.
 - **Plan quota:** API calls count toward the org's plan **exactly like the UI**.
-  Free orgs get a monthly analysis allowance (default 25/month); Pro/Team are
+  Free orgs get a monthly analysis allowance (default 10/month); Pro/Team are
   unlimited. Exceeding it →
-  `402 { "code": "QUOTA_EXCEEDED", "limit": 25, "used": 25, "plan": "free" }`.
+  `402 { "code": "QUOTA_EXCEEDED", "limit": 10, "used": 10, "plan": "free" }`.
 - **Common error codes:** `AUTH_REQUIRED` (401), `VALIDATION_ERROR` (400, with
   `field`), `INVALID_FILE` (400), `QUOTA_EXCEEDED` (402), `RATE_LIMITED` (429),
   `NOT_FOUND` (404), `INTERNAL_ERROR` (500, generic message — no internals

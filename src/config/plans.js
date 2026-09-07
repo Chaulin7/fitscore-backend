@@ -10,7 +10,7 @@
  * the code that actually enforces the tiers.
  *
  * LIMITS below are what the backend actually ENFORCES today:
- *   - monthly analysis quota — Free = 25/month (FREE_MONTHLY_LIMIT), Pro/Team
+ *   - monthly analysis quota — Free = 10/month (FREE_MONTHLY_LIMIT), Pro/Team
  *     unlimited (src/services/billing.js)
  *   - seats — Team = multi-user, Free/Pro = single user (same file)
  *   - customBranding — whether the report header may carry the org's own mark
@@ -47,7 +47,7 @@ const WHITE_LABEL_HIGHLIGHT =
  */
 const FREE_MONTHLY_LIMIT = Number.parseInt(process.env.FREE_MONTHLY_LIMIT, 10) > 0
   ? Number.parseInt(process.env.FREE_MONTHLY_LIMIT, 10)
-  : 25;
+  : 10;
 
 /**
  * The ENFORCED entitlement axes, and the only vocabulary used to describe them.
