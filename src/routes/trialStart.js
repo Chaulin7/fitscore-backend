@@ -74,6 +74,33 @@ function alreadyCustomer(req, res, detail) {
 }
 
 /**
+ * Where a re-invited prospect whose trial PAUSED goes.
+ *
+ * The login form, and — critically — no new organization. Their data is on the
+ * paused org and creating a second one would hide it from them permanently.
+ *
+ * TODO(resume): this only guarantees no duplicate is created; it does not yet
+ * get them running again. The resume path still has to be built, and it needs
+ * to do what routes/billing.js already does on payment_method.attached:
+ *
+ *   1. take a payment method (billing portal, or a checkout in setup mode) —
+ *      the account is paused precisely because there is none;
+ *   2. set it as the customer's default if they have none, or the resumed
+ *      subscription fails its next invoice straight into past_due;
+ *   3. clear pause_collection on the subscription (send it as an empty string —
+ *      Stripe does not resume on card attach by itself);
+ *   4. full access then restores on its own: the subscription.updated event
+ *      writes status 'active' and services/entitlements.js does the rest.
+ *
+ * Until that exists, the honest thing is to land them on login with their
+ * account intact rather than to sell them a second trial.
+ */
+function resumePausedTrial(req, res, detail) {
+  console.warn('[trial] /start: the invited address has a paused trial — no new org created', detail || {});
+  return res.redirect(302, `${baseUrlFor(req)}/login?trial=resume`);
+}
+
+/**
  * The plan a trial opens at. Pro unless ?plan=team, exactly as specified —
  * anything else (a typo, a probe, 'free') falls to Pro rather than erroring,
  * because a mistyped query parameter should not cost us the prospect.
@@ -94,15 +121,30 @@ function planFromQuery(query) {
 const ALREADY_CUSTOMER_STATUSES = new Set(['trialing', 'active', 'past_due']);
 
 /**
- * Whether the invited address already belongs to a paying or trialing account.
+ * The status of an account whose trial lapsed without a card.
+ *
+ * Handled separately from the three above, and NOT by falling through to
+ * ordinary org creation, which is what it used to do. A re-invited prospect
+ * whose first trial paused would have been given a brand new empty
+ * organization: their analyses, audit log and templates would still exist on
+ * the paused org, and they would be looking at an empty product with no way to
+ * reach any of it. That is precisely the duplicate-account failure this whole
+ * bridge exists to prevent, arrived at from the other direction.
+ */
+const PAUSED_STATUS = 'paused';
+
+/**
+ * What the invited address already resolves to, if anything.
  *
  * Checked BEFORE any organization is created, which is the whole point: the
  * previous ordering resolved (and could create) an org and only then asked
  * whether it had a live subscription, so an invite sent to an existing customer
  * whose address happened not to resolve left an empty org behind on every
  * click.
+ *
+ * @returns {{outcome: 'none'|'customer'|'paused', orgId: string|null, status: string|null}}
  */
-function invitedAddressIsCustomer(invite) {
+function invitedAddressResolvesTo(invite) {
   // The org the token already points at, then the one its address resolves to.
   const candidates = [];
   if (invite.orgId) candidates.push(invite.orgId);
@@ -111,11 +153,15 @@ function invitedAddressIsCustomer(invite) {
 
   for (const orgId of candidates) {
     const b = getOrgBilling(orgId);
-    if (b && ALREADY_CUSTOMER_STATUSES.has(b.subscriptionStatus)) {
-      return { blocked: true, orgId, status: b.subscriptionStatus };
+    if (!b) continue;
+    if (ALREADY_CUSTOMER_STATUSES.has(b.subscriptionStatus)) {
+      return { outcome: 'customer', orgId, status: b.subscriptionStatus };
+    }
+    if (b.subscriptionStatus === PAUSED_STATUS) {
+      return { outcome: 'paused', orgId, status: b.subscriptionStatus };
     }
   }
-  return { blocked: false, orgId: null, status: null };
+  return { outcome: 'none', orgId: null, status: null };
 }
 
 /**
@@ -175,13 +221,22 @@ router.get('/', async (req, res) => {
     const priceId = billing.priceIdForPlan(plan);
     if (!priceId) return softFail(req, res, 'NO_PRICE_CONFIGURED', { plan });
 
-    // Before anything is created: is this address already a customer? Sending
-    // them to login is both the honest answer and the thing that stops a
-    // duplicate trialing subscription being opened next to their real one.
-    const customer = invitedAddressIsCustomer(invite);
-    if (customer.blocked) {
+    // Before anything is created: what does this address already resolve to?
+    // Both branches below exist to stop a SECOND organization being made — one
+    // for an account that is paying, one for an account whose trial lapsed.
+    const resolved = invitedAddressResolvesTo(invite);
+    if (resolved.outcome === 'customer') {
       return alreadyCustomer(req, res, {
-        token: invite.token, orgId: customer.orgId, status: customer.status,
+        token: invite.token, orgId: resolved.orgId, status: resolved.status,
+      });
+    }
+    if (resolved.outcome === 'paused') {
+      // Recorded on the invite so the operator can see this token landed on an
+      // existing paused account rather than opening a trial — and so the resume
+      // path, when it exists, can find which invite sent them.
+      trialInvites.setTrialInviteTarget(invite.token, { orgId: resolved.orgId });
+      return resumePausedTrial(req, res, {
+        token: invite.token, orgId: resolved.orgId, status: resolved.status,
       });
     }
 

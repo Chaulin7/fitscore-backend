@@ -410,10 +410,7 @@ describe('GET /start — an unusable token', () => {
     assert.equal(lastSession(), undefined, 'Checkout would have created a SECOND subscription');
   });
 
-  test('a PAUSED org is still refused, but as an ordinary soft failure', async () => {
-    // Paused is a lapsed trial, not a customer: it is deliberately outside
-    // ALREADY_CUSTOMER_STATUSES so an operator may re-invite it. The remaining
-    // live-subscription guard still stops a second subscription being opened.
+  test('a PAUSED org is sent to the resume path, not sold a second trial', async () => {
     const body = await (await mint({ invites: [{ email: 'paused@lambda.test', company_name: 'Lambda' }] })).json();
     const [inv] = body.invites;
     await startRaw(`?t=${inv.token}`);
@@ -425,7 +422,7 @@ describe('GET /start — an unusable token', () => {
     calls.length = 0;
     const res = await startRaw(`?t=${inv.token}`);
     assert.equal(res.status, 302);
-    assert.match(res.headers.get('location'), /trial=unavailable/);
+    assert.equal(res.headers.get('location'), 'https://cvsprings.test/login?trial=resume');
     assert.equal(lastSession(), undefined);
   });
 });

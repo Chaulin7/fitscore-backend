@@ -408,6 +408,25 @@ function initSchema() {
   // trial_converted_at doubles as the idempotency key for that branch — Stripe
   // will redeliver invoice.paid, and "already converted" is a null check rather
   // than an event-id ledger.
+  // --- Provisional organizations ---------------------------------------------
+  // An expiry instant, not a boolean, and it is doing two jobs at once.
+  //
+  // Signup creates an organization before it knows whether the account will
+  // adopt a trial org instead (routes/auth.js). If it does, the one just
+  // created is a throwaway that has to be removed, or every trial signup leaves
+  // an empty org inflating the org and signup counts on /admin/metrics.
+  //
+  // deleteOrganizationIfEmpty will ONLY touch a row whose provisional_until is
+  // set and still in the future. That makes this simultaneously the marker
+  // ("this row was made moments ago by a request that may discard it") and the
+  // age bound ("and only for the next few seconds"). One column, so the two
+  // cannot get out of step, and it self-expires: a request that dies midway
+  // leaves an org that becomes permanently undeletable by that path rather than
+  // one that stays deletable forever.
+  //
+  // NULL — the value for every organization that has ever mattered — is out of
+  // reach of that delete entirely.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN provisional_until TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_campaign TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_converted_at TEXT'); } catch (_) {}
   // Email the trial invite was addressed to, when the org was created by a
@@ -1892,41 +1911,109 @@ function isEmailVerified(userId) {
 }
 
 /**
- * Delete an organization only if nothing whatsoever hangs off it.
+ * Every table that scopes rows to an organization, derived from the schema.
  *
- * The throwaway created by a signup that then adopted a trial org. Leaving it
- * would litter the database with empty orgs and, worse, inflate the signup and
- * org counts on /admin/metrics with accounts that never existed.
+ * NOT a hand-maintained list, and the difference is not academic: the list this
+ * replaced named eight tables and the schema has fifteen. An organization
+ * holding usage_counters, purge_runs, analysis_provenance, run_nonces,
+ * audit_changes, trial_emails or admin_access_log rows passed the emptiness
+ * check and was deleted.
  *
- * EVERY child table is checked, not just users. This runs a DELETE against the
- * one table the whole product is scoped by, so it refuses on any sign of life
- * rather than trusting the caller's claim that the org is seconds old. A
- * stranded empty org is a blemish; a deleted populated one is unrecoverable.
+ * Derivation is by COLUMN NAME rather than by PRAGMA foreign_key_list, because
+ * this schema declares no REFERENCES clauses at all — foreign_key_list returns
+ * nothing for every table here, so an FK-based derivation would silently
+ * enumerate the empty set and make the check pass unconditionally. `org_id` is
+ * the actual convention, enforced by every query in this file.
+ *
+ * Read once per process and cached: the schema cannot change while the process
+ * is up (initSchema runs at boot, before any request), and this is on the
+ * signup path.
  */
-function deleteOrganizationIfEmpty(orgId) {
-  if (!orgId) return false;
+let _orgScopedTables = null;
+function orgScopedTables() {
+  if (_orgScopedTables) return _orgScopedTables;
   const db = getDb();
-  const occupied = [
-    'SELECT 1 FROM users WHERE org_id = ? LIMIT 1',
-    'SELECT 1 FROM audit_log WHERE org_id = ? LIMIT 1',
-    'SELECT 1 FROM screening_runs WHERE org_id = ? LIMIT 1',
-    'SELECT 1 FROM candidates WHERE org_id = ? LIMIT 1',
-    'SELECT 1 FROM templates WHERE org_id = ? LIMIT 1',
-    'SELECT 1 FROM invites WHERE org_id = ? LIMIT 1',
-    'SELECT 1 FROM feature_requests WHERE org_id = ? LIMIT 1',
-    'SELECT 1 FROM trial_invites WHERE org_id = ? LIMIT 1',
-  ];
-  for (const sql of occupied) {
-    try { if (db.prepare(sql).get(orgId)) return false; } catch (_) { return false; }
-  }
-  // Nor may it have anything to do with money.
-  const billing = db.prepare(
-    'SELECT stripe_customer_id AS c, stripe_subscription_id AS s FROM organizations WHERE id = ?',
-  ).get(orgId);
-  if (!billing || billing.c || billing.s) return false;
+  const tables = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+  ).all().map((r) => r.name);
 
-  const info = db.prepare('DELETE FROM organizations WHERE id = ?').run(orgId);
+  _orgScopedTables = tables.filter((t) => {
+    if (t === 'organizations') return false; // the parent, not a child
+    return db.prepare(`PRAGMA table_info(${t})`).all().some((c) => c.name === 'org_id');
+  });
+  return _orgScopedTables;
+}
+
+/** How long a provisional organization stays eligible for cleanup. */
+const PROVISIONAL_ORG_TTL_MS = 60 * 1000;
+
+/**
+ * Delete a PROVISIONAL organization, and only if nothing hangs off it.
+ *
+ * This runs a DELETE against the table the entire product is scoped by, on a
+ * path that fires for every signup, so it is written to be unable to reach a
+ * real organization even if the emptiness check below is wrong.
+ *
+ * THREE INDEPENDENT GUARDS, each sufficient on its own:
+ *
+ *   1. provisional_until must be set AND in the future. Every organization that
+ *      has ever been used has NULL there and is unreachable by this function
+ *      whatever else happens. The window is PROVISIONAL_ORG_TTL_MS.
+ *   2. created_at must match the value the caller was handed at creation, so
+ *      the row deleted is provably the row that request just made and not
+ *      another org that happens to be provisional at the same moment.
+ *   3. every org-scoped table must be empty, enumerated from the schema rather
+ *      than from a list somebody has to remember to update.
+ *
+ * All three are in the DELETE's own WHERE clause where they can be, rather than
+ * checked and then acted on, so nothing can change between the check and the
+ * write.
+ *
+ * A stranded empty org is a blemish. A deleted populated one is unrecoverable.
+ * Everything here is arranged around that asymmetry.
+ *
+ * @param {string} orgId
+ * @param {{createdAt: string}} expect the createdAt returned by createOrganization
+ * @returns {boolean} whether a row was deleted
+ */
+function deleteOrganizationIfEmpty(orgId, { createdAt } = {}) {
+  if (!orgId || !createdAt) return false;
+  const db = getDb();
+
+  // Guard 1 + 2, read first so a refusal can say which one refused.
+  const row = db.prepare(`
+    SELECT provisional_until AS provisionalUntil, created_at AS createdAt,
+           stripe_customer_id AS customerId, stripe_subscription_id AS subscriptionId
+      FROM organizations WHERE id = ?
+  `).get(orgId);
+  if (!row) return false;
+  if (row.createdAt !== createdAt) return false;
+  if (!row.provisionalUntil || Date.parse(row.provisionalUntil) <= Date.now()) return false;
+  // Nor may it have anything to do with money.
+  if (row.customerId || row.subscriptionId) return false;
+
+  // Guard 3. A table that cannot be read counts as occupied: an error here must
+  // not be mistaken for emptiness.
+  for (const table of orgScopedTables()) {
+    try {
+      if (db.prepare(`SELECT 1 FROM ${table} WHERE org_id = ? LIMIT 1`).get(orgId)) return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  const info = db.prepare(`
+    DELETE FROM organizations
+     WHERE id = ? AND created_at = ?
+       AND provisional_until IS NOT NULL AND provisional_until > ?
+       AND stripe_customer_id IS NULL AND stripe_subscription_id IS NULL
+  `).run(orgId, createdAt, nowIso());
   return info.changes === 1;
+}
+
+/** Mark a provisional organization permanent — it is being kept. */
+function clearProvisional(orgId) {
+  getDb().prepare('UPDATE organizations SET provisional_until = NULL WHERE id = ?').run(orgId);
 }
 
 /** Move a user onto another organization. Used only by trial adoption. */
@@ -2066,6 +2153,9 @@ module.exports = {
   isEmailVerified,
   setUserOrg,
   deleteOrganizationIfEmpty,
+  clearProvisional,
+  orgScopedTables,
+  PROVISIONAL_ORG_TTL_MS,
   setTrialInviteTarget,
   findTrialInviteByOrg,
   createTrialOrganization,

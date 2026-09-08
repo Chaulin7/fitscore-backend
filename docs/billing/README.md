@@ -142,12 +142,25 @@ Stripe Tax and VAT-ID collection stay on, with
 never appears, because Stripe normally infers the country from the payment
 method and this session collects none.
 
-`/start` refuses an address that is **already a customer** (subscription
-`trialing`, `active` or `past_due`) and redirects to `/login?trial=existing_account`
-instead — otherwise re-inviting an existing customer would open a second
-trialing subscription beside the one they are already paying for. A `paused`
-org is deliberately *not* refused: that is a lapsed trial an operator may
-legitimately re-invite.
+`/start` never creates a second organization for an address that already has
+one. Two cases, two destinations, both decided **before** anything is created:
+
+| The address resolves to | `/start` does |
+|---|---|
+| `trialing`, `active`, `past_due` | redirect to `/login?trial=existing_account` |
+| `paused` (a lapsed trial) | redirect to `/login?trial=resume`, and record the resolved org on the invite |
+
+Re-inviting an existing customer would otherwise open a second subscription
+beside the one they pay for. Re-inviting a *lapsed* one is worse in a quieter
+way: their analyses, audit log and templates are on the paused org, so a fresh
+org would leave them looking at an empty product with no route back to any of
+it. Neither invite is consumed and neither starts a trial.
+
+> **The resume path itself is not built yet.** A paused account is landed on
+> login with everything intact; getting them running again still needs a
+> payment method taken, set as the customer default, and `pause_collection`
+> cleared — the same sequence the `payment_method.attached` webhook already
+> performs. See the TODO at `resumePausedTrial` in `src/routes/trialStart.js`.
 
 ### Claiming the account
 

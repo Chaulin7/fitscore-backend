@@ -399,6 +399,81 @@ describe('an address that already has an account', () => {
   });
 });
 
+// --- 7 ----------------------------------------------------------------------
+
+describe('/start on an address whose trial PAUSED', () => {
+  /**
+   * A prospect whose first trial ran out without a card, re-invited on a later
+   * campaign. Their analyses, audit log and templates are all on the paused
+   * org. Creating a second org for them would leave them staring at an empty
+   * product with no route back to any of it — the duplicate-account failure
+   * this bridge exists to prevent, reached from the other direction.
+   */
+  let pausedOrgId;
+  let orgCountBefore;
+
+  before(async () => {
+    const first = await runCheckout('lapsed@eta.test', 'Eta Recruitment');
+    pausedOrgId = first.orgId;
+
+    // The account is claimed and in use — this is a real customer's data.
+    const res = await signup({ email: 'lapsed@eta.test', password: PW, trialToken: first.invite.token });
+    assert.equal(res.status, 201);
+    assert.equal((await res.json()).trialAdopted, true);
+
+    // Day 30 arrives with no payment method.
+    db.setOrgPlan(pausedOrgId, {
+      plan: 'pro', subscriptionStatus: 'paused', currentPeriodEnd: null, stripeSubscriptionId: 'sub_eta',
+    });
+
+    orgCountBefore = db.getDb().prepare('SELECT COUNT(*) AS n FROM organizations').get().n;
+  });
+
+  test('a fresh invite redirects to the resume path', async () => {
+    const invite = await mintToken('lapsed@eta.test', 'Eta Recruitment', 'q3-winback');
+    const res = await fetch(`${base}/start?t=${invite.token}`, { redirect: 'manual' });
+
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), 'https://cvsprings.test/login?trial=resume');
+  });
+
+  test('NO new organization was created', () => {
+    const after = db.getDb().prepare('SELECT COUNT(*) AS n FROM organizations').get().n;
+    assert.equal(after, orgCountBefore, 'a second org would have hidden their data from them');
+
+    const named = db.getDb().prepare('SELECT COUNT(*) AS n FROM organizations WHERE name = ?').get('Eta Recruitment');
+    assert.equal(named.n, 1);
+  });
+
+  test('the invite is not consumed, and records the org it resolved to', () => {
+    const row = db.getDb().prepare(
+      'SELECT token, org_id AS orgId, consumed_at AS consumedAt, redeemed_at AS redeemedAt '
+      + 'FROM trial_invites WHERE campaign = ? ORDER BY created_at DESC LIMIT 1',
+    ).get('q3-winback');
+
+    assert.equal(row.orgId, pausedOrgId, 'it resolved to the existing paused org');
+    assert.equal(row.consumedAt, null, 'nothing was claimed — there is nothing new to claim');
+    assert.equal(row.redeemedAt, null, 'and no trial was started');
+  });
+
+  test('nothing was sent to Stripe', async () => {
+    const before = sessionParams.length;
+    const invite = await mintToken('lapsed@eta.test', 'Eta Recruitment', 'q3-winback-2');
+    await fetch(`${base}/start?t=${invite.token}`, { redirect: 'manual' });
+    assert.equal(sessionParams.length, before, 'no second subscription was opened');
+  });
+
+  test('their data and their account are untouched', () => {
+    const owner = auth.listOrgUsers(pausedOrgId).find((u) => u.role === 'owner');
+    assert.ok(owner, 'they still own the paused org');
+    assert.equal(owner.email, 'lapsed@eta.test');
+    const billing = db.getOrgBilling(pausedOrgId);
+    assert.equal(billing.plan, 'pro', 'the plan is retained');
+    assert.equal(billing.subscriptionStatus, 'paused');
+    assert.equal(billing.stripeSubscriptionId, 'sub_eta', 'the subscription the resume path will un-pause');
+  });
+});
+
 // --- 6 ----------------------------------------------------------------------
 
 describe('/start refuses an invite whose address is already a paying customer', () => {

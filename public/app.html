@@ -3011,9 +3011,15 @@ async function bootAuth(){
     // server does. No error is shown: they may simply be signing up normally.
   }
 
-  // 0c) Sent here by GET /start because they are already a customer.
-  if (params && params.get('trial') === 'existing_account') {
+  // 0c) Sent here by GET /start because the invited address already has an
+  //     account. Two reasons, two messages — a customer who is fine, and a
+  //     lapsed trial that needs a card before it works again.
+  const trialState = params && params.get('trial');
+  if (trialState === 'existing_account') {
     showAuthNotice('You already have a CVsprings account, and this trial is on it. Sign in to continue.');
+  } else if (trialState === 'resume') {
+    showAuthNotice('Your CVsprings account is here and your data is intact — your trial ended without a '
+      + 'payment method, so it is paused. Sign in, then add a card in Billing to pick up where you left off.');
   }
 
   // 1) Arriving from a password-reset email link

@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 const { requireSession } = require('../middleware/auth');
 const auth = require('../services/authService');
 const trialAdoption = require('../services/trialAdoption');
-const { deleteOrganizationIfEmpty } = require('../services/db');
+const { deleteOrganizationIfEmpty, clearProvisional } = require('../services/db');
 const brandingService = require('../services/branding');
 const { getDb } = require('../services/db');
 const { baseUrlFor } = require('../config/appUrl');
@@ -164,7 +164,11 @@ router.post('/signup', signupLimiter, async (req, res) => {
     // the trial org directly would mean an invalid link either blocks the
     // signup or silently drops them somewhere they should not be; this way the
     // failure mode of every unusable link is an ordinary new account.
-    const ownOrg = auth.createOrganization(orgName || 'My Organization');
+    // Provisional: this org may be discarded moments from now if the trial link
+    // below turns out to be good. The flag is what makes it eligible for
+    // cleanup, and it is the ONLY thing that does — see
+    // db.deleteOrganizationIfEmpty.
+    const ownOrg = auth.createOrganization(orgName || 'My Organization', { provisional: true });
     let user;
     try {
       user = auth.createUser({ email: normEmail, passwordHash, orgId: ownOrg.id, role: 'owner' });
@@ -186,9 +190,17 @@ router.post('/signup', signupLimiter, async (req, res) => {
     const adoption = trialAdoption.adoptByToken(trialToken, user.id);
     let org = ownOrg;
     if (adoption.adopted) {
-      deleteOrganizationIfEmpty(ownOrg.id);
+      // The user has moved to the trial org, so the one created above is a
+      // throwaway. createdAt is passed so the delete can prove it is removing
+      // the row THIS request made and not another org that happens to be
+      // provisional at the same instant.
+      deleteOrganizationIfEmpty(ownOrg.id, { createdAt: ownOrg.createdAt });
       user = auth.findUserById(user.id); // re-read: org_id moved
       org = auth.getOrganizationById(adoption.orgId) || ownOrg;
+    } else {
+      // Kept. Clearing the marker puts it permanently out of reach of the
+      // cleanup path rather than leaving it eligible for the next minute.
+      clearProvisional(ownOrg.id);
     }
 
     auth.recordLoginSuccess(user);
