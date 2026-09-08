@@ -393,7 +393,7 @@ describe('GET /start — an unusable token', () => {
     }
   });
 
-  test('an org that already has a live subscription is not sold a second one', async () => {
+  test('an already-paying org is sent to LOGIN, not sold a second subscription', async () => {
     const body = await (await mint({ invites: [{ email: 'live@kappa.test', company_name: 'Kappa' }] })).json();
     const [inv] = body.invites;
     await startRaw(`?t=${inv.token}`);
@@ -405,8 +405,28 @@ describe('GET /start — an unusable token', () => {
     calls.length = 0;
     const res = await startRaw(`?t=${inv.token}`);
     assert.equal(res.status, 302);
-    assert.match(res.headers.get('location'), /trial=unavailable/);
+    assert.equal(res.headers.get('location'), 'https://cvsprings.test/login?trial=existing_account',
+      'they do not need selling — they need signing in');
     assert.equal(lastSession(), undefined, 'Checkout would have created a SECOND subscription');
+  });
+
+  test('a PAUSED org is still refused, but as an ordinary soft failure', async () => {
+    // Paused is a lapsed trial, not a customer: it is deliberately outside
+    // ALREADY_CUSTOMER_STATUSES so an operator may re-invite it. The remaining
+    // live-subscription guard still stops a second subscription being opened.
+    const body = await (await mint({ invites: [{ email: 'paused@lambda.test', company_name: 'Lambda' }] })).json();
+    const [inv] = body.invites;
+    await startRaw(`?t=${inv.token}`);
+    const target = db.findTrialInviteByToken(inv.token);
+    db.setOrgPlan(target.orgId, {
+      plan: 'pro', subscriptionStatus: 'paused', currentPeriodEnd: null, stripeSubscriptionId: 'sub_paused',
+    });
+
+    calls.length = 0;
+    const res = await startRaw(`?t=${inv.token}`);
+    assert.equal(res.status, 302);
+    assert.match(res.headers.get('location'), /trial=unavailable/);
+    assert.equal(lastSession(), undefined);
   });
 });
 

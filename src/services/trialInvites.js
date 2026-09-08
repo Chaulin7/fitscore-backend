@@ -26,6 +26,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const {
   createTrialInvite, findTrialInviteByToken, markTrialInviteRedeemed, setTrialInviteTarget,
+  markTrialInviteConsumed,
 } = require('./db');
 
 /**
@@ -42,6 +43,19 @@ const TRIAL_PERIOD_DAYS = 30;
 /** How long a minted token stays redeemable, unless the caller overrides it. */
 const DEFAULT_INVITE_TTL_DAYS = TRIAL_PERIOD_DAYS;
 
+/**
+ * How long the /signup?t= link works after the trial is redeemed.
+ *
+ * A SECOND, shorter deadline than the invite's own expiry, and the difference
+ * matters. expires_at governs whether a trial may be STARTED; after redemption
+ * the organization exists and Stripe is billing it, so the link that claims it
+ * is a live credential over a real account sitting in somebody's inbox. Two
+ * weeks is long enough for a prospect who closed the tab and came back after a
+ * holiday, and short enough that a forwarded confirmation email is not a
+ * standing invitation to take the account.
+ */
+const SIGNUP_LINK_TTL_DAYS = 14;
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** Why a token was refused. Server-side vocabulary; never sent to a visitor. */
@@ -50,6 +64,13 @@ const REASON = Object.freeze({
   UNKNOWN: 'UNKNOWN',
   EXPIRED: 'EXPIRED',
   ALREADY_REDEEMED: 'ALREADY_REDEEMED',
+  // Signup-link outcomes. NOT_REDEEMED is the mirror image of ALREADY_REDEEMED:
+  // a link is only good for claiming an account once the trial behind it has
+  // actually started.
+  NOT_REDEEMED: 'NOT_REDEEMED',
+  ALREADY_CONSUMED: 'ALREADY_CONSUMED',
+  SIGNUP_LINK_EXPIRED: 'SIGNUP_LINK_EXPIRED',
+  NO_ORG: 'NO_ORG',
 });
 
 // A v4 uuid, which is the only shape mint() produces. Checked before the
@@ -101,6 +122,52 @@ function validateInvite(invite, now = Date.now()) {
 function validateToken(token, now = Date.now()) {
   if (!isWellFormedToken(token)) return { ok: false, reason: REASON.MALFORMED, invite: null };
   return validateInvite(findTrialInviteByToken(token.trim()), now);
+}
+
+/**
+ * Validate an invite row for use as a SIGNUP link, against a clock.
+ *
+ * Different question from validateInvite(), and deliberately a different
+ * function rather than a flag on that one. That asks "may this token start a
+ * trial"; this asks "may this token claim the account of a trial that has
+ * already started". The two have opposite expectations of redeemed_at, and a
+ * shared implementation with a boolean would be a coin flip on which meaning a
+ * caller got.
+ *
+ * @returns {{ok: boolean, reason: string|null, invite: object|null}}
+ */
+function validateSignupInvite(invite, now = Date.now()) {
+  if (!invite) return { ok: false, reason: REASON.UNKNOWN, invite: null };
+  // The trial must have actually started. A token that only ever reached
+  // Checkout has no organization to attach anyone to.
+  if (!invite.redeemedAt) return { ok: false, reason: REASON.NOT_REDEEMED, invite };
+  if (invite.consumedAt) return { ok: false, reason: REASON.ALREADY_CONSUMED, invite };
+  if (!invite.orgId) return { ok: false, reason: REASON.NO_ORG, invite };
+
+  // A missing deadline is treated as expired rather than as unlimited. Rows
+  // redeemed before this column existed have none, and failing open there would
+  // make every one of them a permanent claim on its organization.
+  const deadlineMs = Date.parse(invite.signupExpiresAt);
+  if (!Number.isFinite(deadlineMs)) return { ok: false, reason: REASON.SIGNUP_LINK_EXPIRED, invite };
+  if (now >= deadlineMs) return { ok: false, reason: REASON.SIGNUP_LINK_EXPIRED, invite };
+
+  return { ok: true, reason: null, invite };
+}
+
+/** Look a signup token up and validate it. */
+function validateSignupToken(token, now = Date.now()) {
+  if (!isWellFormedToken(token)) return { ok: false, reason: REASON.MALFORMED, invite: null };
+  return validateSignupInvite(findTrialInviteByToken(token.trim()), now);
+}
+
+/** When the signup link for a trial redeemed at `now` stops working. */
+function signupExpiryFrom(now = Date.now()) {
+  return expiryFrom(now, SIGNUP_LINK_TTL_DAYS);
+}
+
+/** The link a redeemed prospect follows to claim their account. */
+function signupUrl(baseUrl, token) {
+  return `${String(baseUrl || '').replace(/\/+$/, '')}/signup?t=${encodeURIComponent(token)}`;
 }
 
 const trim = (v) => (typeof v === 'string' ? v.trim() : '');
@@ -208,10 +275,16 @@ function mintInvites(entries, { expiresAt, expiresInDays, baseUrl } = {}, now = 
 module.exports = {
   TRIAL_PERIOD_DAYS,
   DEFAULT_INVITE_TTL_DAYS,
+  SIGNUP_LINK_TTL_DAYS,
   REASON,
   isWellFormedToken,
   validateInvite,
   validateToken,
+  validateSignupInvite,
+  validateSignupToken,
+  signupExpiryFrom,
+  signupUrl,
+  markTrialInviteConsumed,
   normalizeInviteInput,
   resolveExpiry,
   inviteUrl,

@@ -142,16 +142,55 @@ Stripe Tax and VAT-ID collection stay on, with
 never appears, because Stripe normally infers the country from the payment
 method and this session collects none.
 
+`/start` refuses an address that is **already a customer** (subscription
+`trialing`, `active` or `past_due`) and redirects to `/login?trial=existing_account`
+instead — otherwise re-inviting an existing customer would open a second
+trialing subscription beside the one they are already paying for. A `paused`
+org is deliberately *not* refused: that is a lapsed trial an operator may
+legitimately re-invite.
+
+### Claiming the account
+
 Redeeming reserves an organization for the prospect (named from
-`company_name`). Signing up later with the invited address adopts that org
-rather than creating a second one, so the trial belongs to the account that uses
-it.
+`company_name`) with no user on it. They claim it by following
+`/signup?t=<token>` — the token rides the Checkout success URL, and the welcome
+email carries a second copy for anyone who closes the tab.
+
+**Possession of the token is the proof of claim.** It is not an email match:
+prospects routinely pay from one address and sign up with another, and an
+address on a fresh signup is unproved, so adopting on it let anyone who knew a
+prospect's email claim that company's organization. The link works for
+`TRIAL_INVITE_SIGNUP_TTL` — 14 days from redemption — and consumes on first use
+(`trial_invites.consumed_at`, guarded in SQL so two concurrent signups cannot
+both adopt).
+
+An unusable link — expired, already consumed, unknown — **falls through to an
+ordinary signup**. It never blocks account creation; somebody whose link expired
+still wants an account, and the operator can extend `signup_expires_at` for that
+one prospect.
+
+If the invited address already has an account, `/start` puts the trial on
+**their** organization and signing up again answers `409 TRIAL_ALREADY_YOURS`
+telling them to log in — never a duplicate account.
+
+### The email fallback is not live
+
+`services/trialAdoption.adoptByVerifiedEmail()` exists for the prospect who lost
+their link, and refuses unless `users.email_verified_at` is set. **Nothing sets
+it: this codebase has no email-verification step.** The fallback is therefore
+unreachable today, by design — it fails closed rather than adopting on an
+unproved address.
+
+Whoever builds email verification: call it from the success branch of the
+verify-email handler, immediately after marking the address verified. Never from
+signup, never from login, never on a timer. `trialAdoption.test.js` asserts that
+signup performs no adoption, so wiring it in at the wrong place fails loudly.
 
 ### Lifecycle
 
 | Day | Stripe event | What happens |
 |---|---|---|
-| 0 | `checkout.session.completed` | plan set, status `trialing`, token spent |
+| 0 | `checkout.session.completed` | plan set, status `trialing`, token redeemed, 14-day signup link stamped, welcome email with the claim link sent to both the Checkout address and the invited one |
 | 27 | `customer.subscription.trial_will_end` | Resend reminder + portal link; one row in `trial_emails` (sent at most once per subscription) |
 | 30, no card | `customer.subscription.updated` → `paused` | account goes **read-only**. Nothing is deleted, nothing is invoiced |
 | 30, card on file | `customer.subscription.updated` → `active`, `invoice.paid` | first invoice is €49 + VAT; org marked converted with its campaign |

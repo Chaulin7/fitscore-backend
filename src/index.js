@@ -292,7 +292,21 @@ function serveNoncedHtml(page) {
 // is already logged in.
 app.get('/', serveNoncedHtml('index.html'));
 app.get('/login', serveNoncedHtml('app.html'));
-app.get('/signup', serveNoncedHtml('app.html'));
+// /signup carries the trial claim link (/signup?t=<token>). The token is
+// validated here so an unusable one is logged with its reason at the moment the
+// prospect hits it, rather than surfacing later as "adoption silently did
+// nothing" — but the page is served either way. An invalid link falls through
+// to an ordinary signup, which is the whole point: somebody whose link expired
+// still wants an account. The authoritative check is POST /api/auth/signup,
+// which re-validates and consumes the token in one guarded write.
+app.get('/signup', (req, res, next) => {
+  const token = req.query && req.query.t;
+  if (token) {
+    const check = require('./services/trialInvites').validateSignupToken(token);
+    if (!check.ok) console.warn('[trial] signup link not usable', { reason: check.reason });
+  }
+  return serveNoncedHtml('app.html')(req, res, next);
+});
 app.get('/dashboard', serveNoncedHtml('app.html'));
 // Plain-text walkthrough of the product demo video, linked from its figcaption
 // on the landing page. Clean URL because it is a page a visitor may be sent

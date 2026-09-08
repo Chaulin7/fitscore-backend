@@ -4,7 +4,8 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { requireSession } = require('../middleware/auth');
 const auth = require('../services/authService');
-const { findReservedTrialOrgForEmail } = require('../services/db');
+const trialAdoption = require('../services/trialAdoption');
+const { deleteOrganizationIfEmpty } = require('../services/db');
 const brandingService = require('../services/branding');
 const { getDb } = require('../services/db');
 const { baseUrlFor } = require('../config/appUrl');
@@ -107,6 +108,23 @@ async function deliverResetLink(email, resetLink) {
 
 // --- POST /api/auth/signup ------------------------------------------------------
 
+/**
+ * GET /api/auth/trial-invite?t=<token> — what a signup link refers to.
+ *
+ * Public, because the person holding the link has no account yet. It publishes
+ * only the company name and the invited address, so the signup form can say
+ * "completing setup for Acme BV" and prefill; the org id, the Stripe customer
+ * and the campaign stay server-side.
+ *
+ * ALWAYS 200. An unusable token answers { valid: false } rather than 4xx: the
+ * page's correct response is to render an ordinary signup form, and an error
+ * status would also make this a cheap oracle for probing which tokens are live.
+ */
+router.get('/trial-invite', (req, res) => {
+  const token = req.query ? req.query.t : null;
+  return res.json(trialAdoption.describeSignupToken(token));
+});
+
 router.post('/signup', signupLimiter, async (req, res) => {
   try {
     const { email, password, orgName } = req.body || {};
@@ -117,28 +135,39 @@ router.post('/signup', signupLimiter, async (req, res) => {
     const pwError = auth.validatePassword(password);
     if (pwError) return sendError(res, 400, 'VALIDATION_ERROR', pwError, 'password');
 
+    // The trial signup link, if this signup came from /signup?t=<token>.
+    // Accepted from the body OR the query string: the SPA posts it, and a
+    // scripted signup naturally keeps it on the URL it was given.
+    const trialToken = (req.body && req.body.trialToken)
+      || (req.query && req.query.t) || null;
+
     if (auth.findUserByEmail(normEmail)) {
+      // Somebody who already has an account followed a trial link. GET /start
+      // put the trial on THEIR organization rather than reserving a new one
+      // (resolveOrgForInvite), so there is nothing to create and nothing to
+      // adopt — the trial is already waiting behind the login form. Saying only
+      // "email taken" would leave them hunting for an account they think they
+      // failed to make.
+      if (trialToken) {
+        const owner = trialAdoption.existingOwnerForToken(trialToken);
+        if (owner && owner.email === normEmail) {
+          return sendError(res, 409, 'TRIAL_ALREADY_YOURS',
+            'You already have an account, and this trial is on it. Log in to continue.');
+        }
+      }
       return sendError(res, 409, 'EMAIL_TAKEN', 'An account with this email already exists');
     }
 
     const passwordHash = await auth.hashPassword(password);
-    // Adopt the organization a no-card trial redemption already reserved for
-    // this address, if there is one.
-    //
-    // GET /start has to create the org before the account exists — the Stripe
-    // customer must hang off something the trial webhooks can resolve. Without
-    // this, the prospect's signup would create a SECOND org and the trial they
-    // just started would sit on the first one: paid for, subscribed, and
-    // invisible to the person using the product. findReservedTrialOrgForEmail
-    // matches only an org with no users at all, so this can never join somebody
-    // to a live account.
-    const reserved = findReservedTrialOrgForEmail(normEmail);
-    const org = reserved
-      ? { id: reserved.id, name: reserved.name }
-      : auth.createOrganization(orgName || 'My Organization');
+    // The account is created on its OWN organization first, always. Adoption
+    // then moves it, and only if the link proves it may. Creating the user on
+    // the trial org directly would mean an invalid link either blocks the
+    // signup or silently drops them somewhere they should not be; this way the
+    // failure mode of every unusable link is an ordinary new account.
+    const ownOrg = auth.createOrganization(orgName || 'My Organization');
     let user;
     try {
-      user = auth.createUser({ email: normEmail, passwordHash, orgId: org.id, role: 'owner' });
+      user = auth.createUser({ email: normEmail, passwordHash, orgId: ownOrg.id, role: 'owner' });
     } catch (err) {
       // UNIQUE constraint race: another signup with the same email won
       if (/UNIQUE/i.test(err.message)) {
@@ -146,9 +175,28 @@ router.post('/signup', signupLimiter, async (req, res) => {
       }
       throw err;
     }
+
+    // Adopt the trial organization, if the link says we may.
+    //
+    // NOTE the fallback that is NOT here: adoption by email match. The address
+    // on a fresh signup is unproved by definition, and adopting on it is the
+    // org-takeover this design replaced. services/trialAdoption
+    // .adoptByVerifiedEmail exists for the prospect who lost their link, and it
+    // must be called from a verification step — never from here.
+    const adoption = trialAdoption.adoptByToken(trialToken, user.id);
+    let org = ownOrg;
+    if (adoption.adopted) {
+      deleteOrganizationIfEmpty(ownOrg.id);
+      user = auth.findUserById(user.id); // re-read: org_id moved
+      org = auth.getOrganizationById(adoption.orgId) || ownOrg;
+    }
+
     auth.recordLoginSuccess(user);
     const { rawToken } = auth.createSession(user.id);
-    return res.status(201).json(sessionResponse(rawToken, user, org));
+    return res.status(201).json({
+      ...sessionResponse(rawToken, user, org),
+      trialAdopted: adoption.adopted,
+    });
   } catch (err) {
     return sendError(res, 500, 'INTERNAL_ERROR', 'Could not create the account.');
   }

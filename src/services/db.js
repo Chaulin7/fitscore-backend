@@ -411,9 +411,13 @@ function initSchema() {
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_campaign TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_converted_at TEXT'); } catch (_) {}
   // Email the trial invite was addressed to, when the org was created by a
-  // redemption and has no user yet. This is what the signup route matches on to
-  // adopt the reserved org instead of creating a second one for the same
-  // company — see findReservedTrialOrgForEmail below.
+  // redemption and has no user yet.
+  //
+  // It is NOT an adoption key. Matching on it is what the token-carried bridge
+  // replaced: an unproved address let anyone who knew a prospect's email claim
+  // that company's organization. It survives as the fallback RECIPIENT for the
+  // trial emails (trialRecipientFor in routes/billing.js), where knowing where
+  // to write is all it is being trusted with.
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_invite_email TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_trial_invite_email ON organizations(trial_invite_email)');
@@ -566,6 +570,15 @@ function initSchema() {
       created_at TEXT NOT NULL
     )
   `);
+  // Whether this address has been proved to belong to the person using it.
+  //
+  // NULL means unverified, and today that is EVERY row: this codebase has no
+  // email-verification step yet. The column exists because the trial's
+  // email-match fallback must never adopt an organization on an unproved
+  // address — signing up as someone@theircompany.com would otherwise hand the
+  // attacker that company's trial. See adoptTrialOrgOnVerification in
+  // services/trialAdoption.js, which is the only intended writer's counterpart.
+  try { getDb().exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id)');
 
@@ -622,6 +635,29 @@ function initSchema() {
   // Mirrors organizations.trial_converted_at, so campaign reporting can be
   // answered from this table alone without joining every org.
   try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN converted_at TEXT'); } catch (_) {}
+  // --- The signup link ---------------------------------------------------
+  // Redemption is not the end of the token's life. The prospect finishes
+  // Checkout and is sent to /signup?t=<token>, and THAT is what attaches them
+  // to the organization the trial is already running on.
+  //
+  // consumed_at is the single-use guard for that second step, separate from
+  // redeemed_at on purpose: redeemed_at means "the trial started", consumed_at
+  // means "an account was attached to it". Collapsing them would either let one
+  // link create accounts forever or stop the prospect signing up at all.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN consumed_at TEXT'); } catch (_) {}
+  // The user the token was consumed by. Storage only — the operator's answer to
+  // "who ended up on this trial", which org_id alone does not give once an org
+  // can have members.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN consumed_by_user_id TEXT'); } catch (_) {}
+  // When the signup link stops working, set at redemption to 14 days out.
+  //
+  // A separate deadline from expires_at, which governs whether the trial may be
+  // STARTED. Once it has started the org exists and is billing, so the link
+  // that claims it is a live credential over a real account and cannot be
+  // allowed to sit in an inbox indefinitely. Stored rather than derived from
+  // redeemed_at + 14d so an operator can extend one link for one prospect
+  // without a code change.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN signup_expires_at TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_email ON trial_invites(email)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_campaign ON trial_invites(campaign)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_org ON trial_invites(org_id)');
@@ -1777,7 +1813,9 @@ function findTrialInviteByToken(token) {
   return getDb().prepare(`
     SELECT token, email, company_name AS companyName, campaign, created_at AS createdAt,
            redeemed_at AS redeemedAt, expires_at AS expiresAt, org_id AS orgId,
-           stripe_customer_id AS stripeCustomerId, plan, converted_at AS convertedAt
+           stripe_customer_id AS stripeCustomerId, plan, converted_at AS convertedAt,
+           consumed_at AS consumedAt, consumed_by_user_id AS consumedByUserId,
+           signup_expires_at AS signupExpiresAt
     FROM trial_invites WHERE token = ?
   `).get(token) || null;
 }
@@ -1789,14 +1827,111 @@ function findTrialInviteByToken(token) {
  * two concurrent /start requests carrying the same token cannot both redeem it.
  * Returns whether THIS call was the one that did it.
  */
-function markTrialInviteRedeemed(token, { redeemedAt, orgId, stripeCustomerId, plan } = {}) {
+function markTrialInviteRedeemed(token, { redeemedAt, orgId, stripeCustomerId, plan, signupExpiresAt } = {}) {
   const info = getDb().prepare(`
     UPDATE trial_invites
        SET redeemed_at = ?, org_id = COALESCE(?, org_id),
-           stripe_customer_id = COALESCE(?, stripe_customer_id), plan = COALESCE(?, plan)
+           stripe_customer_id = COALESCE(?, stripe_customer_id), plan = COALESCE(?, plan),
+           signup_expires_at = COALESCE(signup_expires_at, ?)
      WHERE token = ? AND redeemed_at IS NULL
-  `).run(redeemedAt || nowIso(), orgId || null, stripeCustomerId || null, plan || null, token);
+  `).run(redeemedAt || nowIso(), orgId || null, stripeCustomerId || null, plan || null,
+    signupExpiresAt || null, token);
   return info.changes === 1;
+}
+
+/**
+ * Spend the SIGNUP half of the token: an account has now been attached.
+ *
+ * Guarded by `consumed_at IS NULL` in SQL, like redemption, so two concurrent
+ * signups carrying the same link cannot both adopt the organization. Returns
+ * whether THIS call was the one that consumed it — the caller uses that to
+ * decide whether to adopt or to fall through to an ordinary signup.
+ */
+function markTrialInviteConsumed(token, { consumedAt, userId } = {}) {
+  const info = getDb().prepare(`
+    UPDATE trial_invites
+       SET consumed_at = ?, consumed_by_user_id = COALESCE(?, consumed_by_user_id)
+     WHERE token = ? AND consumed_at IS NULL
+  `).run(consumedAt || nowIso(), userId || null, token);
+  return info.changes === 1;
+}
+
+/**
+ * A redeemed, unconsumed, unexpired invite for this address.
+ *
+ * The email-match FALLBACK's lookup, for the case where the prospect lost the
+ * link. It is only ever safe to act on when the caller has proved the address
+ * belongs to whoever is asking — see services/trialAdoption.js, which is the
+ * only caller and which refuses on an unverified address.
+ */
+function findAdoptableInviteByEmail(email, nowIsoString) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return null;
+  return getDb().prepare(`
+    SELECT token, email, company_name AS companyName, campaign, org_id AS orgId,
+           redeemed_at AS redeemedAt, consumed_at AS consumedAt,
+           signup_expires_at AS signupExpiresAt
+      FROM trial_invites
+     WHERE email = ? AND redeemed_at IS NOT NULL AND consumed_at IS NULL
+       AND org_id IS NOT NULL
+       AND (signup_expires_at IS NULL OR signup_expires_at > ?)
+     ORDER BY redeemed_at DESC LIMIT 1
+  `).get(normalized, nowIsoString || nowIso()) || null;
+}
+
+/** Mark an address proved. The counterpart a real verification step would call. */
+function markEmailVerified(userId, verifiedAt) {
+  getDb().prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?')
+    .run(verifiedAt || nowIso(), userId);
+}
+
+/** Whether this user's address has been proved. */
+function isEmailVerified(userId) {
+  const row = getDb().prepare('SELECT email_verified_at AS at FROM users WHERE id = ?').get(userId);
+  return !!(row && row.at);
+}
+
+/**
+ * Delete an organization only if nothing whatsoever hangs off it.
+ *
+ * The throwaway created by a signup that then adopted a trial org. Leaving it
+ * would litter the database with empty orgs and, worse, inflate the signup and
+ * org counts on /admin/metrics with accounts that never existed.
+ *
+ * EVERY child table is checked, not just users. This runs a DELETE against the
+ * one table the whole product is scoped by, so it refuses on any sign of life
+ * rather than trusting the caller's claim that the org is seconds old. A
+ * stranded empty org is a blemish; a deleted populated one is unrecoverable.
+ */
+function deleteOrganizationIfEmpty(orgId) {
+  if (!orgId) return false;
+  const db = getDb();
+  const occupied = [
+    'SELECT 1 FROM users WHERE org_id = ? LIMIT 1',
+    'SELECT 1 FROM audit_log WHERE org_id = ? LIMIT 1',
+    'SELECT 1 FROM screening_runs WHERE org_id = ? LIMIT 1',
+    'SELECT 1 FROM candidates WHERE org_id = ? LIMIT 1',
+    'SELECT 1 FROM templates WHERE org_id = ? LIMIT 1',
+    'SELECT 1 FROM invites WHERE org_id = ? LIMIT 1',
+    'SELECT 1 FROM feature_requests WHERE org_id = ? LIMIT 1',
+    'SELECT 1 FROM trial_invites WHERE org_id = ? LIMIT 1',
+  ];
+  for (const sql of occupied) {
+    try { if (db.prepare(sql).get(orgId)) return false; } catch (_) { return false; }
+  }
+  // Nor may it have anything to do with money.
+  const billing = db.prepare(
+    'SELECT stripe_customer_id AS c, stripe_subscription_id AS s FROM organizations WHERE id = ?',
+  ).get(orgId);
+  if (!billing || billing.c || billing.s) return false;
+
+  const info = db.prepare('DELETE FROM organizations WHERE id = ?').run(orgId);
+  return info.changes === 1;
+}
+
+/** Move a user onto another organization. Used only by trial adoption. */
+function setUserOrg(userId, orgId) {
+  getDb().prepare('UPDATE users SET org_id = ? WHERE id = ?').run(orgId, userId);
 }
 
 /**
@@ -1822,30 +1957,6 @@ function findTrialInviteByOrg(orgId) {
            org_id AS orgId, plan, converted_at AS convertedAt
     FROM trial_invites WHERE org_id = ? ORDER BY created_at DESC LIMIT 1
   `).get(orgId) || null;
-}
-
-/**
- * The org a trial redemption reserved for this email and that nobody has signed
- * into yet.
- *
- * A redemption creates the organization before the account exists — it has to,
- * because the Stripe customer must hang off something the webhooks can resolve.
- * Without this the prospect's later signup would create a SECOND org and their
- * paid-for trial would sit on the first one, invisible.
- *
- * Deliberately narrow: it matches only an org that still has zero users, so it
- * can never hand an attacker who guesses an email their way into a live
- * account. Once somebody owns the org this returns null forever.
- */
-function findReservedTrialOrgForEmail(email) {
-  const normalized = String(email || '').trim().toLowerCase();
-  if (!normalized) return null;
-  return getDb().prepare(`
-    SELECT o.id, o.name FROM organizations o
-     WHERE o.trial_invite_email = ?
-       AND NOT EXISTS (SELECT 1 FROM users u WHERE u.org_id = o.id)
-     ORDER BY o.created_at DESC LIMIT 1
-  `).get(normalized) || null;
 }
 
 /** Create the organization a trial redemption hangs off, before any user exists. */
@@ -1949,9 +2060,14 @@ module.exports = {
   createTrialInvite,
   findTrialInviteByToken,
   markTrialInviteRedeemed,
+  markTrialInviteConsumed,
+  findAdoptableInviteByEmail,
+  markEmailVerified,
+  isEmailVerified,
+  setUserOrg,
+  deleteOrganizationIfEmpty,
   setTrialInviteTarget,
   findTrialInviteByOrg,
-  findReservedTrialOrgForEmail,
   createTrialOrganization,
   getOrgTrial,
   setOrgTrialCampaign,

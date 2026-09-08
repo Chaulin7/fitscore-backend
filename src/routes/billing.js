@@ -26,6 +26,7 @@ const {
   getOrgTrial, setOrgTrialCampaign, markOrgConverted,
 } = require('../services/db');
 const trialEmail = require('../services/trialEmail');
+const trialInvites = require('../services/trialInvites');
 const { tierById, PLANS, ENTITLEMENT_AXES, phraseForAxis } = require('../config/plans');
 const { baseUrlFor } = require('../config/appUrl');
 
@@ -795,22 +796,74 @@ function handleInvoicePaid(invoice, orgId) {
  */
 function redeemTrialToken(session, orgId) {
   const token = session && session.metadata && session.metadata.trial_token;
-  if (!token) return;
+  if (!token) return null;
   const invite = findTrialInviteByToken(token);
   if (!invite) {
     console.warn('[trial] checkout completed with an unknown trial_token', { token, orgId });
-    return;
+    return null;
   }
   const spent = markTrialInviteRedeemed(token, {
     redeemedAt: new Date().toISOString(),
     orgId: orgId || invite.orgId,
     stripeCustomerId: session.customer || invite.stripeCustomerId,
     plan: (session.metadata && session.metadata.plan) || invite.plan,
+    // The signup link's own, shorter deadline starts now — the trial is running
+    // from this moment, so the link that claims it is live from this moment.
+    signupExpiresAt: trialInvites.signupExpiryFrom(Date.now()),
   });
   if (orgId) setOrgTrialCampaign(orgId, invite.campaign);
   console.log('[trial] token redeemed', {
     token, orgId, campaign: invite.campaign || null, firstRedemption: spent,
   });
+  return findTrialInviteByToken(token);
+}
+
+/**
+ * The address to welcome, preferring the one the customer actually typed.
+ *
+ * Checkout collects its own email and it is frequently NOT the invited one —
+ * the invite goes to a founder, the card is entered by whoever handles billing.
+ * Both get the link: the person who paid needs it because they are holding the
+ * tab, and the invited address needs it because they are the one we expect to
+ * use the product. Deduplicated when they are the same, which is the common case.
+ */
+function welcomeRecipients(session, invite) {
+  const checkoutEmail = (session && session.customer_details && session.customer_details.email)
+    || (session && session.customer_email) || null;
+  const addresses = [checkoutEmail, invite ? invite.email : null]
+    .map((e) => (typeof e === 'string' ? e.trim().toLowerCase() : null))
+    .filter(Boolean);
+  return [...new Set(addresses)];
+}
+
+/**
+ * Send the trial welcome, carrying the /signup?t= link.
+ *
+ * Covers the closed-tab case: Stripe returns the prospect to the signup form,
+ * and if they close it the email is the only other copy of their claim link.
+ * Best-effort — a mail failure must not fail the webhook, because the trial
+ * itself is already correctly set up by the time this runs.
+ */
+async function sendTrialWelcomeFor(req, session, invite, orgId) {
+  if (!invite || !invite.orgId) return;
+  const base = appBaseUrl(req);
+  const signupUrl = trialInvites.signupUrl(base, invite.token);
+  const tier = tierById(invite.plan || 'pro');
+  const org = orgId ? auth.getOrganizationById(orgId) : null;
+
+  for (const toEmail of welcomeRecipients(session, invite)) {
+    await trialEmail.sendTrialWelcome({
+      orgId,
+      // Keyed per address so the send-once guard does not silence the second
+      // recipient, while still stopping a redelivery re-mailing either.
+      subscriptionId: `${session.subscription || invite.token}:${toEmail}`,
+      toEmail,
+      companyName: invite.companyName || (org ? org.name : null),
+      planName: tier ? tier.name : 'Pro',
+      signupUrl,
+      trialEndsAt: null,
+    });
+  }
 }
 
 function orgIdFromCustomer(customerId) {
@@ -893,7 +946,10 @@ async function handleWebhook(req, res) {
           // Spend the trial token, if this session came from GET /start. After
           // the subscription is applied, so a failure here cannot cost the
           // customer the trial they just started.
-          redeemTrialToken(obj, orgId);
+          const redeemed = redeemTrialToken(obj, orgId);
+          // Then the welcome, carrying the /signup?t= link that attaches an
+          // account to the trial now running.
+          await sendTrialWelcomeFor(req, obj, redeemed, orgId);
         } else if (event.type === 'customer.subscription.deleted') {
           if (!concernsCurrentSubscription(orgId, obj.id)) {
             console.warn('[billing] ignoring deletion of a superseded subscription', {

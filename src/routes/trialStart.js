@@ -18,10 +18,12 @@
  * an account, and the only handle Stripe carries is the customer id. The
  * existing resolver is customer -> organizations.stripe_customer_id, so a trial
  * has to hang off an organization from the first minute or every one of those
- * events lands nowhere. The org is created with no user; the prospect adopts it
- * by signing up with the invited address (see db.findReservedTrialOrgForEmail
- * and the signup route). Creating it here rather than at signup is what makes
- * the subscription the prospect just started actually belong to them.
+ * events lands nowhere.
+ *
+ * The org is created with no user, and the prospect claims it by following the
+ * /signup?t=<token> link this route puts on the Checkout success URL — see
+ * services/trialAdoption.js. Possession of the token is the proof of claim;
+ * matching on the email address is not, and used to be.
  */
 
 const express = require('express');
@@ -57,12 +59,63 @@ function softFail(req, res, reason, detail) {
 }
 
 /**
+ * Where an invite sent to somebody who is ALREADY a customer goes.
+ *
+ * The login form, not the pricing page. This person does not need to be sold
+ * anything — they have a live subscription — and the failure this prevents is
+ * expensive: without it, an operator who put an existing customer on a campaign
+ * list would give them a second organization with a second trialing
+ * subscription, and the account they actually use would be untouched while a
+ * duplicate billed alongside it.
+ */
+function alreadyCustomer(req, res, detail) {
+  console.warn('[trial] /start refused: the invited address is already a customer', detail || {});
+  return res.redirect(302, `${baseUrlFor(req)}/login?trial=existing_account`);
+}
+
+/**
  * The plan a trial opens at. Pro unless ?plan=team, exactly as specified —
  * anything else (a typo, a probe, 'free') falls to Pro rather than erroring,
  * because a mistyped query parameter should not cost us the prospect.
  */
 function planFromQuery(query) {
   return (query && String(query.plan || '').trim().toLowerCase() === 'team') ? 'team' : 'pro';
+}
+
+/**
+ * Subscription states in which the invited address is already a customer.
+ *
+ * Deliberately NOT billing.LIVE_SUBSCRIPTION_STATUSES, which also contains
+ * 'paused'. A paused org is a lapsed trial that never converted — exactly the
+ * account an operator might legitimately re-invite — and refusing it would
+ * leave them with no way back in. These three are the states where a second
+ * trial would sit alongside something already running or already billing.
+ */
+const ALREADY_CUSTOMER_STATUSES = new Set(['trialing', 'active', 'past_due']);
+
+/**
+ * Whether the invited address already belongs to a paying or trialing account.
+ *
+ * Checked BEFORE any organization is created, which is the whole point: the
+ * previous ordering resolved (and could create) an org and only then asked
+ * whether it had a live subscription, so an invite sent to an existing customer
+ * whose address happened not to resolve left an empty org behind on every
+ * click.
+ */
+function invitedAddressIsCustomer(invite) {
+  // The org the token already points at, then the one its address resolves to.
+  const candidates = [];
+  if (invite.orgId) candidates.push(invite.orgId);
+  const existingUser = auth.findUserByEmail(invite.email);
+  if (existingUser && existingUser.org_id) candidates.push(existingUser.org_id);
+
+  for (const orgId of candidates) {
+    const b = getOrgBilling(orgId);
+    if (b && ALREADY_CUSTOMER_STATUSES.has(b.subscriptionStatus)) {
+      return { blocked: true, orgId, status: b.subscriptionStatus };
+    }
+  }
+  return { blocked: false, orgId: null, status: null };
 }
 
 /**
@@ -122,13 +175,22 @@ router.get('/', async (req, res) => {
     const priceId = billing.priceIdForPlan(plan);
     if (!priceId) return softFail(req, res, 'NO_PRICE_CONFIGURED', { plan });
 
+    // Before anything is created: is this address already a customer? Sending
+    // them to login is both the honest answer and the thing that stops a
+    // duplicate trialing subscription being opened next to their real one.
+    const customer = invitedAddressIsCustomer(invite);
+    if (customer.blocked) {
+      return alreadyCustomer(req, res, {
+        token: invite.token, orgId: customer.orgId, status: customer.status,
+      });
+    }
+
     const { orgId } = resolveOrgForInvite(invite);
 
-    // Never sell a second subscription to an account that already has a live
-    // one. The same rule POST /api/billing/checkout enforces, for the same
-    // reason — Checkout creates a NEW subscription every time and would bill
-    // this customer twice — reached here through the same predicate rather than
-    // through a second copy of the status list.
+    // The remaining live states — 'paused', and anything the set above does not
+    // name — still must not be sold a second subscription, because Checkout
+    // creates a NEW one every time. Same predicate POST /api/billing/checkout
+    // uses, rather than a second copy of the status list.
     if (billing.hasLiveSubscription(getOrgBilling(orgId))) {
       return softFail(req, res, 'ALREADY_SUBSCRIBED', { orgId, token: invite.token });
     }
@@ -156,7 +218,12 @@ router.get('/', async (req, res) => {
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${base}/?billing=success&trial=started`,
+      // The token rides the success URL, so the prospect lands on a signup form
+      // that knows which trial they just started. This is what replaced
+      // adoption by email match: possession of the token is the proof, and it
+      // survives the prospect paying from one address and signing up with
+      // another — which they routinely do.
+      success_url: trialInvites.signupUrl(base, invite.token),
       cancel_url: `${base}/?billing=cancel`,
       metadata,
 

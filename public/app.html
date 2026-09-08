@@ -1083,6 +1083,11 @@ img, video, table { max-width: 100%; }
     </a>
   </div>
   <div class="auth-card">
+    <!-- Soft, non-error notices on the auth screen: the trial claim link's
+         "completing setup for X", and the "you already have an account"
+         redirect GET /start sends an existing customer to. Separate element
+         from #authError so a notice is never styled as a failure. -->
+    <div class="msg msg-ok" id="authNotice" role="status" aria-live="polite"></div>
     <div class="msg msg-err" id="authError" role="alert" aria-live="polite"></div>
     <form id="authLoginForm" autocomplete="on">
       <h2>Sign in</h2>
@@ -2051,7 +2056,13 @@ async function doSignup(){
   clearAuthError();
   setAuthBusy('suCreateBtn', true);
   try {
-    const d = await api('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, orgName: orgName || undefined }) });
+    const d = await api('/api/auth/signup', { method: 'POST', body: JSON.stringify({
+      email, password, orgName: orgName || undefined,
+      // The trial claim link, when this signup came from /signup?t=. The server
+      // re-validates and consumes it; nothing here is trusted.
+      trialToken: _pendingTrialToken || undefined,
+    }) });
+    _pendingTrialToken = null;
     try { localStorage.setItem(SESSION_KEY, d.sessionToken); } catch (_) {}
     document.getElementById('suPassword').value = '';
     onAuthed(d);
@@ -2928,6 +2939,27 @@ async function resumeCheckoutIntent(){
 // Keep the usage chip fresh after each completed analysis.
 document.addEventListener('cv:analyze_completed', function(){ refreshUsage(); });
 
+let _pendingTrialToken = null;
+
+/** Show a soft, non-error notice on the auth screen. */
+function showAuthNotice(text){
+  const el = document.getElementById('authNotice');
+  if (!el) return;
+  el.textContent = text;
+  el.style.display = 'block';
+}
+
+/**
+ * What a trial claim link refers to, for the "finishing setup for X" line.
+ * Never throws and never blocks the form: a failure here just means an
+ * ordinary signup, which is the correct fallback for an unusable link.
+ */
+async function describeTrialToken(token){
+  try {
+    return await api('/api/auth/trial-invite?t=' + encodeURIComponent(token));
+  } catch (_) { return null; }
+}
+
 async function bootAuth(){
   const wire = function(formId, fn){
     const f = document.getElementById(formId);
@@ -2956,6 +2988,33 @@ async function bootAuth(){
   // 0) A purchase intent handed over by the pricing page (/signup?plan=pro).
   //    Validated here; consumed by resumeCheckoutIntent once auth succeeds.
   const planIntent = await capturePlanIntent(params);
+
+  // 0b) Arriving from a no-card trial: /signup?t=<token>.
+  //     The token is the claim on an organization whose trial is already
+  //     running, so this takes precedence over an existing session the same way
+  //     a team invite does — somebody finishing a trial signup on a shared
+  //     browser must not have it silently attached to whoever is logged in.
+  const trialToken = params && params.get('t');
+  if (trialToken) {
+    const described = await describeTrialToken(trialToken);
+    if (described && described.valid) {
+      _pendingTrialToken = trialToken;
+      showAuthScreen('signup');
+      showAuthNotice(described.companyName
+        ? `Finishing setup for ${described.companyName}. Your trial is already running — create a login to open it.`
+        : 'Your trial is already running — create a login to open it.');
+      const emailField = document.getElementById('suEmail');
+      if (emailField && described.email && !emailField.value) emailField.value = described.email;
+      return;
+    }
+    // An unusable link falls through to an ordinary signup, exactly as the
+    // server does. No error is shown: they may simply be signing up normally.
+  }
+
+  // 0c) Sent here by GET /start because they are already a customer.
+  if (params && params.get('trial') === 'existing_account') {
+    showAuthNotice('You already have a CVsprings account, and this trial is on it. Sign in to continue.');
+  }
 
   // 1) Arriving from a password-reset email link
   const resetToken = params && params.get('reset_token');
