@@ -14,6 +14,11 @@
 
 const express = require('express');
 const { requireSession } = require('../middleware/auth');
+// The read-only gate, per route for the same reason as routes/org.js: this
+// router authenticates inside its handlers, not at the mount. POST /accept is
+// deliberately NOT gated — it is public (like signup), carries no session to
+// derive an org from, and the seat gate in middleware/auth answers it.
+const { requireWriteAccess } = require('../middleware/requireWriteAccess');
 const auth = require('../services/authService');
 const billing = require('../services/billing');
 const { getOrgBilling } = require('../services/db');
@@ -81,7 +86,7 @@ function sessionResponse(rawToken, user, org) {
 }
 
 // --- POST /api/team/invite (owner) ------------------------------------------
-router.post('/invite', requireSession, requireOwner, async (req, res) => {
+router.post('/invite', requireSession, requireWriteAccess, requireOwner, async (req, res) => {
   try {
     if (!orgHasTeamPlan(req.orgId)) {
       return sendError(res, 403, 'TEAM_PLAN_REQUIRED', 'Inviting members requires an active Team plan.');
@@ -121,7 +126,7 @@ router.get('/invites', requireSession, requireOwner, (req, res) => {
 });
 
 // --- DELETE /api/team/invite/:id (owner) ------------------------------------
-router.delete('/invite/:id', requireSession, requireOwner, (req, res) => {
+router.delete('/invite/:id', requireSession, requireWriteAccess, requireOwner, (req, res) => {
   try {
     const ok = auth.revokeInvite(req.orgId, req.params.id);
     if (!ok) return sendError(res, 404, 'NOT_FOUND', 'Invite not found or already used.');
@@ -179,7 +184,7 @@ router.get('/members', requireSession, (req, res) => {
 });
 
 // --- DELETE /api/team/member/:userId (owner) --------------------------------
-router.delete('/member/:userId', requireSession, requireOwner, (req, res) => {
+router.delete('/member/:userId', requireSession, requireWriteAccess, requireOwner, (req, res) => {
   try {
     const target = auth.findUserById(req.params.userId);
     if (!target || target.org_id !== req.orgId) return sendError(res, 404, 'NOT_FOUND', 'Member not found.');
@@ -197,7 +202,7 @@ router.delete('/member/:userId', requireSession, requireOwner, (req, res) => {
 });
 
 // --- PATCH /api/team/member/:userId { role } (owner) ------------------------
-router.patch('/member/:userId', requireSession, requireOwner, (req, res) => {
+router.patch('/member/:userId', requireSession, requireWriteAccess, requireOwner, (req, res) => {
   try {
     const role = (req.body || {}).role;
     if (role !== 'owner' && role !== 'member') {

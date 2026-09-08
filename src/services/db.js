@@ -399,7 +399,24 @@ function initSchema() {
   // services/billing.js reads it, because a customer who has cancelled has paid
   // through the end of the period and keeps everything until then.
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN cancel_at_period_end INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  // --- No-card trial attribution ---------------------------------------------
+  // Which campaign brought this org in, and whether the trial ever turned into
+  // money. Both are set once and never cleared: trial_campaign at redemption
+  // (routes/trialStart.js), trial_converted_at when the first non-zero invoice
+  // is paid (the invoice.paid branch in routes/billing.js).
+  //
+  // trial_converted_at doubles as the idempotency key for that branch — Stripe
+  // will redeliver invoice.paid, and "already converted" is a null check rather
+  // than an event-id ledger.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_campaign TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_converted_at TEXT'); } catch (_) {}
+  // Email the trial invite was addressed to, when the org was created by a
+  // redemption and has no user yet. This is what the signup route matches on to
+  // adopt the reserved org instead of creating a second one for the same
+  // company — see findReservedTrialOrgForEmail below.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_invite_email TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_trial_invite_email ON organizations(trial_invite_email)');
 
   // Server-held provenance for a single analysis, claimable by the save that
   // follows it. Previously an in-memory Map, so every deploy and every idle
@@ -569,6 +586,66 @@ function initSchema() {
   `);
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_invites_org_id ON invites(org_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_invites_token_hash ON invites(token_hash)');
+
+  // --- No-card trial invites --------------------------------------------------
+  // One row per prospect we hand a 30-day trial link to. The token is the URL
+  // credential for GET /start, so it is a v4 uuid and the PRIMARY KEY: unique by
+  // construction, and a lookup is the index.
+  //
+  // Stored in the CLEAR, unlike invites.token_hash above, and the difference is
+  // deliberate. A team invite grants membership of an existing organization —
+  // its token is a credential over somebody else's data, so the server keeps
+  // only a hash. A trial token grants nothing but the right to open a Checkout
+  // Session that bills EUR 0 for 30 days; the operator hands these out by name
+  // in a campaign and needs to answer "which token did we send this company"
+  // from the table, which a hash cannot do.
+  //
+  // org_id / stripe_customer_id are written at redemption (routes/trialStart.js)
+  // and are what lets every trial webhook resolve an account through the
+  // existing customer -> org path rather than inventing a second one.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS trial_invites (
+      token TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      company_name TEXT,
+      campaign TEXT,
+      created_at TEXT NOT NULL,
+      redeemed_at TEXT,
+      expires_at TEXT NOT NULL
+    )
+  `);
+  // Written when the token is redeemed; null until then.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN org_id TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN stripe_customer_id TEXT'); } catch (_) {}
+  // The plan the trial was opened at ('pro' by default, 'team' via ?plan=team).
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN plan TEXT'); } catch (_) {}
+  // Mirrors organizations.trial_converted_at, so campaign reporting can be
+  // answered from this table alone without joining every org.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN converted_at TEXT'); } catch (_) {}
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_email ON trial_invites(email)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_campaign ON trial_invites(campaign)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_org ON trial_invites(org_id)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_customer ON trial_invites(stripe_customer_id)');
+
+  // One row per trial lifecycle email actually attempted. `Log the send` needs
+  // to survive the process that sent it: the trial_will_end reminder is the one
+  // message standing between a paused account and a converted one, so "did it
+  // go out, when, and did the provider take it" has to be answerable later —
+  // from an operator's SQL prompt, not from a log line that scrolled away.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS trial_emails (
+      id TEXT PRIMARY KEY,
+      org_id TEXT,
+      subscription_id TEXT,
+      kind TEXT NOT NULL,
+      to_email TEXT NOT NULL,
+      sent_at TEXT NOT NULL,
+      provider_id TEXT,
+      error TEXT
+    )
+  `);
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_emails_org ON trial_emails(org_id, sent_at DESC)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_emails_sub_kind ON trial_emails(subscription_id, kind)');
 
   // templates is also created by routes/templates.js; ensure it exists here so
   // the org_id migration can run regardless of module load order.
@@ -1680,6 +1757,171 @@ function setOrgPlan(orgId, fields) {
   getDb().prepare(`UPDATE organizations SET ${sets.join(', ')} WHERE id = ?`).run(...params);
 }
 
+// --- No-card trial invites --------------------------------------------------
+
+/**
+ * Insert one trial invite. The caller supplies the token so the URL it hands
+ * back and the row it wrote cannot be two different strings.
+ */
+function createTrialInvite({ token, email, companyName, campaign, expiresAt, createdAt }) {
+  const created = createdAt || nowIso();
+  getDb().prepare(`
+    INSERT INTO trial_invites (token, email, company_name, campaign, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(token, email, companyName || null, campaign || null, created, expiresAt);
+  return { token, email, companyName: companyName || null, campaign: campaign || null, createdAt: created, expiresAt };
+}
+
+function findTrialInviteByToken(token) {
+  if (typeof token !== 'string' || !token) return null;
+  return getDb().prepare(`
+    SELECT token, email, company_name AS companyName, campaign, created_at AS createdAt,
+           redeemed_at AS redeemedAt, expires_at AS expiresAt, org_id AS orgId,
+           stripe_customer_id AS stripeCustomerId, plan, converted_at AS convertedAt
+    FROM trial_invites WHERE token = ?
+  `).get(token) || null;
+}
+
+/**
+ * Mark a token spent, and record what it was spent on.
+ *
+ * Guarded by `redeemed_at IS NULL` in SQL rather than by a read-then-write, so
+ * two concurrent /start requests carrying the same token cannot both redeem it.
+ * Returns whether THIS call was the one that did it.
+ */
+function markTrialInviteRedeemed(token, { redeemedAt, orgId, stripeCustomerId, plan } = {}) {
+  const info = getDb().prepare(`
+    UPDATE trial_invites
+       SET redeemed_at = ?, org_id = COALESCE(?, org_id),
+           stripe_customer_id = COALESCE(?, stripe_customer_id), plan = COALESCE(?, plan)
+     WHERE token = ? AND redeemed_at IS NULL
+  `).run(redeemedAt || nowIso(), orgId || null, stripeCustomerId || null, plan || null, token);
+  return info.changes === 1;
+}
+
+/**
+ * Attach the org and customer a token is being redeemed against, without
+ * spending it. GET /start writes these BEFORE Checkout opens, so a session the
+ * customer abandons still leaves the org linked and the next attempt reuses it
+ * instead of creating a second Stripe customer. redeemed_at stays null until
+ * checkout.session.completed says the customer actually finished.
+ */
+function setTrialInviteTarget(token, { orgId, stripeCustomerId, plan } = {}) {
+  getDb().prepare(`
+    UPDATE trial_invites
+       SET org_id = COALESCE(?, org_id), stripe_customer_id = COALESCE(?, stripe_customer_id),
+           plan = COALESCE(?, plan)
+     WHERE token = ?
+  `).run(orgId || null, stripeCustomerId || null, plan || null, token);
+}
+
+function findTrialInviteByOrg(orgId) {
+  if (!orgId) return null;
+  return getDb().prepare(`
+    SELECT token, email, company_name AS companyName, campaign, redeemed_at AS redeemedAt,
+           org_id AS orgId, plan, converted_at AS convertedAt
+    FROM trial_invites WHERE org_id = ? ORDER BY created_at DESC LIMIT 1
+  `).get(orgId) || null;
+}
+
+/**
+ * The org a trial redemption reserved for this email and that nobody has signed
+ * into yet.
+ *
+ * A redemption creates the organization before the account exists — it has to,
+ * because the Stripe customer must hang off something the webhooks can resolve.
+ * Without this the prospect's later signup would create a SECOND org and their
+ * paid-for trial would sit on the first one, invisible.
+ *
+ * Deliberately narrow: it matches only an org that still has zero users, so it
+ * can never hand an attacker who guesses an email their way into a live
+ * account. Once somebody owns the org this returns null forever.
+ */
+function findReservedTrialOrgForEmail(email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return null;
+  return getDb().prepare(`
+    SELECT o.id, o.name FROM organizations o
+     WHERE o.trial_invite_email = ?
+       AND NOT EXISTS (SELECT 1 FROM users u WHERE u.org_id = o.id)
+     ORDER BY o.created_at DESC LIMIT 1
+  `).get(normalized) || null;
+}
+
+/** Create the organization a trial redemption hangs off, before any user exists. */
+function createTrialOrganization({ name, email, retentionDays }) {
+  const id = uuidv4();
+  const createdAt = nowIso();
+  getDb().prepare(`
+    INSERT INTO organizations (id, name, created_at, retention_days, trial_invite_email)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, String(name || '').trim() || 'Trial organization', createdAt,
+    retentionDays || RETENTION_DEFAULT_DAYS, String(email || '').trim().toLowerCase() || null);
+  return { id, createdAt };
+}
+
+/** The campaign a trial org came from, and whether it has already converted. */
+function getOrgTrial(orgId) {
+  return getDb().prepare(`
+    SELECT trial_campaign AS campaign, trial_converted_at AS convertedAt,
+           trial_invite_email AS inviteEmail
+    FROM organizations WHERE id = ?
+  `).get(orgId) || null;
+}
+
+function setOrgTrialCampaign(orgId, campaign) {
+  getDb().prepare('UPDATE organizations SET trial_campaign = COALESCE(?, trial_campaign) WHERE id = ?')
+    .run(campaign || null, orgId);
+}
+
+/**
+ * Record the conversion, once.
+ *
+ * `trial_converted_at IS NULL` in the WHERE clause is the idempotency: Stripe
+ * redelivers invoice.paid, and a redelivery must not move the conversion date
+ * forward or double-count the campaign. Returns whether this call converted it.
+ */
+function markOrgConverted(orgId, { convertedAt, campaign } = {}) {
+  const at = convertedAt || nowIso();
+  const info = getDb().prepare(`
+    UPDATE organizations
+       SET trial_converted_at = ?, trial_campaign = COALESCE(trial_campaign, ?)
+     WHERE id = ? AND trial_converted_at IS NULL
+  `).run(at, campaign || null, orgId);
+  if (info.changes === 1) {
+    getDb().prepare('UPDATE trial_invites SET converted_at = ? WHERE org_id = ? AND converted_at IS NULL')
+      .run(at, orgId);
+  }
+  return info.changes === 1;
+}
+
+/** Append one trial-email attempt. Returns the row id. */
+function logTrialEmail({ orgId, subscriptionId, kind, toEmail, providerId, error, sentAt }) {
+  const id = uuidv4();
+  getDb().prepare(`
+    INSERT INTO trial_emails (id, org_id, subscription_id, kind, to_email, sent_at, provider_id, error)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, orgId || null, subscriptionId || null, kind, toEmail, sentAt || nowIso(),
+    providerId || null, error || null);
+  return id;
+}
+
+/** Trial emails of one kind already logged for a subscription (send-once checks). */
+function countTrialEmails(subscriptionId, kind) {
+  const row = getDb().prepare(
+    'SELECT COUNT(*) AS n FROM trial_emails WHERE subscription_id = ? AND kind = ? AND error IS NULL',
+  ).get(subscriptionId, kind);
+  return row ? row.n : 0;
+}
+
+function listTrialEmails(orgId) {
+  return getDb().prepare(`
+    SELECT id, org_id AS orgId, subscription_id AS subscriptionId, kind, to_email AS toEmail,
+           sent_at AS sentAt, provider_id AS providerId, error
+    FROM trial_emails WHERE org_id = ? ORDER BY sent_at DESC
+  `).all(orgId);
+}
+
 module.exports = {
   getDb,
   assertNotTheRealDatabase, // shared with routes/templates.js, the other connection
@@ -1704,6 +1946,19 @@ module.exports = {
   setOrgStripeCustomerId,
   findOrgByStripeCustomerId,
   setOrgPlan,
+  createTrialInvite,
+  findTrialInviteByToken,
+  markTrialInviteRedeemed,
+  setTrialInviteTarget,
+  findTrialInviteByOrg,
+  findReservedTrialOrgForEmail,
+  createTrialOrganization,
+  getOrgTrial,
+  setOrgTrialCampaign,
+  markOrgConverted,
+  logTrialEmail,
+  countTrialEmails,
+  listTrialEmails,
   runRetentionPurge,
   startRetentionSchedule,
   validateRetentionDays,

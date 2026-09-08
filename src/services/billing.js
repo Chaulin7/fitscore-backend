@@ -19,6 +19,11 @@ try { Stripe = require('stripe'); } catch (_) { /* SDK optional until configured
 const {
   PLANS, FREE_MONTHLY_LIMIT, ENTITLEMENT_AXES, capabilitiesFor, phraseForAxis,
 } = require('../config/plans');
+// The ONE status -> entitlement mapping. The three predicates below used to
+// each carry their own copy of "which statuses are healthy", and every copy
+// omitted 'trialing' — see the header of services/entitlements.js for why that
+// stopped being harmless the moment a no-card trial existed.
+const { entitlementForStatus, canWrite, canRead } = require('./entitlements');
 
 // Seat cap for an org allowed multiple members (0 = unlimited). Lives here,
 // next to hasActiveTeamPlan, because the two together ARE the seat gate;
@@ -53,12 +58,21 @@ function planForPriceId(priceId) {
   return null;
 }
 
-// Unlimited when on a paid plan with an active (or past_due — grace) subscription.
+// Unlimited when on a paid plan whose subscription currently grants full access.
+//
+// "Currently grants full access" is entitlements.js, not a status list repeated
+// here: active and past_due (grace) as before, and now trialing, because a
+// 30-day trial of Pro that silently enforced the FREE cap would be a trial of
+// nothing. A paused subscription is read-only and therefore NOT unlimited —
+// which is moot for the quota gate, since the write gate refuses it first.
 function isUnlimited(billing) {
   if (!billing) return false;
   const paid = billing.plan === 'pro' || billing.plan === 'team';
-  const ok = billing.subscriptionStatus === 'active' || billing.subscriptionStatus === 'past_due';
-  return paid && ok;
+  // entitlementForStatus, not entitlementForOrg: the question here is what the
+  // SUBSCRIPTION grants, and entitlementForOrg deliberately answers FULL for an
+  // org that has fallen back to the free tier — which is the right answer for
+  // "may they write" and the wrong one for "are they uncapped".
+  return paid && canWrite(entitlementForStatus(billing.subscriptionStatus));
 }
 
 // Effective monthly limit (null = unlimited).
@@ -66,12 +80,22 @@ function limitFor(billing) {
   return isUnlimited(billing) ? null : FREE_MONTHLY_LIMIT;
 }
 
-// Whether an org may have more than one active user (Team plan, active or in
-// the past_due grace window). Free/Pro orgs stay owner-only.
+// Whether an org may have more than one active user. Free/Pro orgs stay
+// owner-only.
+//
+// Seats follow the same entitlement as everything else, so a Team org on a
+// no-card trial seats its members from day one, and a Team org whose trial
+// paused keeps them signed in — READ_ONLY, enforced per write by
+// middleware/requireWriteAccess, rather than 403'd off the product entirely.
+// Losing a plan has never deleted data here; it should not evict people either.
 function hasActiveTeamPlan(billing) {
   if (!billing) return false;
-  const ok = billing.subscriptionStatus === 'active' || billing.subscriptionStatus === 'past_due';
-  return billing.plan === 'team' && ok;
+  if (billing.plan !== 'team') return false;
+  // Read the SUBSCRIPTION's entitlement, so a Team plan whose subscription died
+  // stops seating members exactly as it did before this helper existed. Only
+  // two statuses change answer: 'trialing' (was false, now seats members from
+  // day one) and 'paused' (was false, now keeps them signed in read-only).
+  return canRead(entitlementForStatus(billing.subscriptionStatus));
 }
 
 // Decide whether an org may run `requested` more analyses this period.

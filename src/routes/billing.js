@@ -22,7 +22,10 @@ const billing = require('../services/billing');
 const {
   getOrgBilling, getUsageCount, currentPeriodKey,
   setOrgStripeCustomerId, findOrgByStripeCustomerId, setOrgPlan,
+  markTrialInviteRedeemed, findTrialInviteByToken, findTrialInviteByOrg,
+  getOrgTrial, setOrgTrialCampaign, markOrgConverted,
 } = require('../services/db');
+const trialEmail = require('../services/trialEmail');
 const { tierById, PLANS, ENTITLEMENT_AXES, phraseForAxis } = require('../config/plans');
 const { baseUrlFor } = require('../config/appUrl');
 
@@ -596,6 +599,220 @@ async function applySubscription(orgId, subscription, eventCreated) {
   await cancelSupersededSubscriptions(subscription, plan);
 }
 
+// --- No-card trial webhook branches -----------------------------------------
+//
+// Four events the paid path never sees, because the paid path takes a card up
+// front. Each is handled in its own function so the dispatcher below stays a
+// dispatcher, and so the one that MUST be idempotent can say why in its own
+// header rather than in a comment three levels deep.
+
+/**
+ * Who the trial reminder goes to.
+ *
+ * The invited address first: it is the person we chose to give the trial to and
+ * the only address we know is real at the point the org may still have no user.
+ * Then the org's owner, for a trial started from an existing account. The Stripe
+ * customer's email is the last resort — it is the same address in almost every
+ * case, but it is the one we did not write ourselves.
+ */
+function trialRecipientFor(orgId, subscription) {
+  const invite = orgId ? findTrialInviteByOrg(orgId) : null;
+  if (invite && invite.email) return { email: invite.email, companyName: invite.companyName || null };
+
+  const trial = orgId ? getOrgTrial(orgId) : null;
+  if (trial && trial.inviteEmail) return { email: trial.inviteEmail, companyName: null };
+
+  if (orgId) {
+    const owner = auth.listOrgUsers(orgId).find((u) => u.role === 'owner');
+    if (owner && owner.email) {
+      const org = auth.getOrganizationById(orgId);
+      return { email: owner.email, companyName: org ? org.name : null };
+    }
+  }
+
+  const fromStripe = subscription && subscription.customer_email;
+  return fromStripe ? { email: fromStripe, companyName: null } : { email: null, companyName: null };
+}
+
+/**
+ * A billing-portal link for the reminder email.
+ *
+ * Best-effort: if Stripe will not mint one, the email still goes out saying so,
+ * because a reminder without a link is worth far more than no reminder.
+ */
+async function billingPortalUrlFor(stripe, customerId, returnUrl) {
+  if (!stripe || !customerId) return null;
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId, return_url: returnUrl,
+    });
+    return session.url || null;
+  } catch (err) {
+    console.warn('[trial] could not create a portal link for the reminder', { customerId, error: err.message });
+    return null;
+  }
+}
+
+/**
+ * customer.subscription.trial_will_end — three days out, ask for a card.
+ *
+ * Never throws: services/trialEmail.sendTrialWillEnd swallows delivery failures
+ * into a trial_emails row. A mail provider outage must not make this webhook
+ * 500, because that asks Stripe to redeliver the whole lifecycle event.
+ */
+async function handleTrialWillEnd(req, stripe, subscription, orgId) {
+  const { email, companyName } = trialRecipientFor(orgId, subscription);
+  const plan = billing.planForPriceId(priceIdOf(subscription))
+    || (subscription.metadata && subscription.metadata.plan) || 'pro';
+  const tier = tierById(plan);
+  const portalUrl = await billingPortalUrlFor(stripe, subscription.customer, `${appBaseUrl(req)}/`);
+
+  const result = await trialEmail.sendTrialWillEnd({
+    orgId,
+    subscriptionId: subscription.id,
+    toEmail: email,
+    companyName,
+    planName: tier ? tier.name : 'Pro',
+    trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+    portalUrl,
+  });
+  console.log('[trial] trial_will_end handled', {
+    orgId, subscriptionId: subscription.id, sent: result.sent, skipped: result.skipped,
+  });
+}
+
+/**
+ * payment_method.attached — the card arrived, so un-pause.
+ *
+ * THIS IS REQUIRED, and it is the single least obvious thing in the feature.
+ * Attaching a payment method does NOT resume a paused subscription: Stripe
+ * leaves pause_collection set until something explicitly clears it. Without
+ * this handler a customer adds their card, sees the portal confirm it, and
+ * stays locked in read-only forever with no error anywhere to explain why.
+ *
+ * IDEMPOTENT by construction, which matters because Stripe redelivers and
+ * because a customer may attach several cards:
+ *   - a subscription with no pause_collection is skipped, so a second delivery
+ *     does nothing;
+ *   - the default payment method is only set when the customer has none, so a
+ *     later card never silently replaces the one they chose;
+ *   - clearing pause_collection is itself absolute, not a toggle.
+ *
+ * The subscription.updated event Stripe emits in response flows through the
+ * ordinary path above and writes status 'active' — which restores full access
+ * through the entitlement helper, with nothing here needing to know that.
+ */
+async function handlePaymentMethodAttached(stripe, paymentMethod) {
+  const customerId = paymentMethod && paymentMethod.customer;
+  if (!stripe || !customerId) return;
+
+  let list;
+  try {
+    list = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
+  } catch (err) {
+    console.warn('[trial] could not list subscriptions to resume', { customerId, error: err.message });
+    return;
+  }
+
+  const paused = ((list && list.data) || []).filter((sub) => sub && sub.pause_collection);
+  if (paused.length === 0) return; // nothing paused: a normal card update
+
+  // Give the customer a default payment method if they have none. A resumed
+  // subscription with nothing to charge just fails its next invoice and lands
+  // in past_due, which looks to the customer exactly like the pause they just
+  // paid to escape. Only when unset — never overwriting a deliberate choice.
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    const hasDefault = customer && customer.invoice_settings
+      && customer.invoice_settings.default_payment_method;
+    if (!hasDefault) {
+      await stripe.customers.update(customerId, {
+        invoice_settings: { default_payment_method: paymentMethod.id },
+      });
+    }
+  } catch (err) {
+    console.warn('[trial] could not set the default payment method', { customerId, error: err.message });
+  }
+
+  for (const sub of paused) {
+    try {
+      // Stripe unsets pause_collection when it is sent as an empty string.
+      await stripe.subscriptions.update(sub.id, { pause_collection: '' });
+      console.log('[trial] resumed a paused subscription after a card was added', {
+        customerId, subscriptionId: sub.id,
+      });
+    } catch (err) {
+      console.error('[trial] could not resume a paused subscription', {
+        customerId, subscriptionId: sub.id, error: err.message,
+      });
+    }
+  }
+}
+
+/**
+ * invoice.paid — the trial turned into money.
+ *
+ * "The first post-trial invoice" is identified as the first PAID invoice with a
+ * non-zero amount on an account that came in through a trial. The trial's own
+ * opening invoice is EUR 0, so the amount test excludes it without needing to
+ * trust billing_reason, which differs between a trial that converted on
+ * schedule and one resumed by hand after a pause.
+ *
+ * db.markOrgConverted carries the idempotency: it writes only where
+ * trial_converted_at IS NULL, so Stripe's redeliveries cannot move the
+ * conversion date or double-count the campaign.
+ */
+function handleInvoicePaid(invoice, orgId) {
+  if (!orgId) return;
+  const amountPaid = Number(invoice && invoice.amount_paid) || 0;
+  if (amountPaid <= 0) return; // the EUR 0 trial invoice
+
+  const trial = getOrgTrial(orgId);
+  const invite = findTrialInviteByOrg(orgId);
+  // Only trial-originated accounts convert. An ordinary paid customer's monthly
+  // invoice is not a trial conversion and must not be counted as one.
+  if (!trial || (!trial.campaign && !invite)) return;
+  if (trial.convertedAt) return; // already converted; nothing to say
+
+  const campaign = trial.campaign || (invite && invite.campaign) || null;
+  const converted = markOrgConverted(orgId, {
+    convertedAt: new Date().toISOString(),
+    campaign,
+  });
+  if (converted) {
+    console.log('[trial] converted', {
+      orgId, campaign, invoiceId: invoice.id, amountPaid, currency: invoice.currency,
+    });
+  }
+}
+
+/**
+ * Spend the trial token, keyed off the metadata the session carried.
+ *
+ * Best-effort and last: the subscription state is already written by the time
+ * this runs, so a token that fails to flip leaves a customer with a working
+ * trial and a reusable link, which is the right way round to fail.
+ */
+function redeemTrialToken(session, orgId) {
+  const token = session && session.metadata && session.metadata.trial_token;
+  if (!token) return;
+  const invite = findTrialInviteByToken(token);
+  if (!invite) {
+    console.warn('[trial] checkout completed with an unknown trial_token', { token, orgId });
+    return;
+  }
+  const spent = markTrialInviteRedeemed(token, {
+    redeemedAt: new Date().toISOString(),
+    orgId: orgId || invite.orgId,
+    stripeCustomerId: session.customer || invite.stripeCustomerId,
+    plan: (session.metadata && session.metadata.plan) || invite.plan,
+  });
+  if (orgId) setOrgTrialCampaign(orgId, invite.campaign);
+  console.log('[trial] token redeemed', {
+    token, orgId, campaign: invite.campaign || null, firstRedemption: spent,
+  });
+}
+
 function orgIdFromCustomer(customerId) {
   if (!customerId) return null;
   const org = findOrgByStripeCustomerId(customerId);
@@ -627,6 +844,28 @@ async function handleWebhook(req, res) {
     'invoice.payment_failed',
   ]);
 
+  // The no-card trial's own events. Deliberately a SEPARATE set, not four more
+  // entries above, because none of them writes plan state and none of them
+  // belongs behind the ordering guard:
+  //
+  //   trial_will_end       sends an email. Skipping it as "stale" would drop
+  //                        the one message the conversion depends on.
+  //   payment_method.attached  clears pause_collection at Stripe. It carries no
+  //                        org state to be out of order with, and the
+  //                        subscription.updated it provokes goes through the
+  //                        guarded path above and is what actually writes
+  //                        'active'.
+  //   invoice.paid         records a conversion, guarded by its own
+  //                        write-once column rather than by event ordering.
+  //
+  // Running them through the ordering guard would mean a redelivery arriving
+  // after an unrelated newer event silently does nothing at all.
+  const TRIAL_EVENTS = new Set([
+    'customer.subscription.trial_will_end',
+    'payment_method.attached',
+    'invoice.paid',
+  ]);
+
   try {
     const obj = event.data.object;
 
@@ -651,6 +890,10 @@ async function handleWebhook(req, res) {
             const sub = await stripe.subscriptions.retrieve(obj.subscription);
             await applySubscription(orgId, sub, event.created); // writes subscription id too
           }
+          // Spend the trial token, if this session came from GET /start. After
+          // the subscription is applied, so a failure here cannot cost the
+          // customer the trial they just started.
+          redeemTrialToken(obj, orgId);
         } else if (event.type === 'customer.subscription.deleted') {
           if (!concernsCurrentSubscription(orgId, obj.id)) {
             console.warn('[billing] ignoring deletion of a superseded subscription', {
@@ -677,7 +920,33 @@ async function handleWebhook(req, res) {
           });
         } else {
           // customer.subscription.created / customer.subscription.updated
+          //
+          // The 'paused' status arrives here, from a trial that ended with no
+          // payment method. It needs no branch of its own: applySubscription
+          // writes the status verbatim, the org KEEPS its paid plan and every
+          // row it owns, and services/entitlements.js turns 'paused' into
+          // read-only wherever access is decided. Nothing is deleted, here or
+          // anywhere downstream — the whole reason 'pause' was chosen over
+          // 'cancel' as the trial end behaviour.
           await applySubscription(orgId, obj, event.created);
+          if (obj.status === 'paused') {
+            console.log('[trial] subscription paused — account is read-only, data retained', {
+              orgId, subscriptionId: obj.id,
+            });
+          }
+        }
+      }
+    } else if (TRIAL_EVENTS.has(event.type)) {
+      if (event.type === 'payment_method.attached') {
+        // No org lookup: this one acts on Stripe, not on our database, and it
+        // must work even for a customer whose org row is not linked yet.
+        await handlePaymentMethodAttached(stripe, obj);
+      } else {
+        const orgId = (obj.metadata && obj.metadata.orgId) || orgIdFromCustomer(obj.customer);
+        if (event.type === 'customer.subscription.trial_will_end') {
+          await handleTrialWillEnd(req, stripe, obj, orgId);
+        } else if (event.type === 'invoice.paid') {
+          handleInvoicePaid(obj, orgId);
         }
       }
     }
@@ -694,4 +963,8 @@ module.exports.handleWebhook = handleWebhook;
 // Exported so the tests drive the real state->action mapping rather than a
 // transcription of it, and so the panel tests render real action sets.
 module.exports.planPanelState = planPanelState;
+// Exported for the trial tests, which drive the real branches rather than a
+// re-implementation of them.
+module.exports.handlePaymentMethodAttached = handlePaymentMethodAttached;
+module.exports.handleInvoicePaid = handleInvoicePaid;
 module.exports.planActions = planActions;

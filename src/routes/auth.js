@@ -4,6 +4,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { requireSession } = require('../middleware/auth');
 const auth = require('../services/authService');
+const { findReservedTrialOrgForEmail } = require('../services/db');
 const brandingService = require('../services/branding');
 const { getDb } = require('../services/db');
 const { baseUrlFor } = require('../config/appUrl');
@@ -121,7 +122,20 @@ router.post('/signup', signupLimiter, async (req, res) => {
     }
 
     const passwordHash = await auth.hashPassword(password);
-    const org = auth.createOrganization(orgName || 'My Organization');
+    // Adopt the organization a no-card trial redemption already reserved for
+    // this address, if there is one.
+    //
+    // GET /start has to create the org before the account exists — the Stripe
+    // customer must hang off something the trial webhooks can resolve. Without
+    // this, the prospect's signup would create a SECOND org and the trial they
+    // just started would sit on the first one: paid for, subscribed, and
+    // invisible to the person using the product. findReservedTrialOrgForEmail
+    // matches only an org with no users at all, so this can never join somebody
+    // to a live account.
+    const reserved = findReservedTrialOrgForEmail(normEmail);
+    const org = reserved
+      ? { id: reserved.id, name: reserved.name }
+      : auth.createOrganization(orgName || 'My Organization');
     let user;
     try {
       user = auth.createUser({ email: normEmail, passwordHash, orgId: org.id, role: 'owner' });

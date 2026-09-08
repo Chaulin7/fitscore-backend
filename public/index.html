@@ -189,6 +189,7 @@ h2{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.4vw,36px);l
 
 /* ---------- pricing ---------- */
 .pricing{padding:72px 0;border-bottom:1px solid var(--rule)}
+.trial-notice{margin:0 0 20px;padding:12px 16px;border:1px solid var(--rule);border-radius:8px;font-size:.95rem;line-height:1.5;max-width:56ch}
 .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}
 @media(max-width:820px){.tiers{grid-template-columns:1fr}}
 .tier{background:var(--panel);padding:32px 28px;display:flex;flex-direction:column}
@@ -428,6 +429,17 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   <div class="wrap">
     <div class="section-eyebrow">Pricing</div>
     <h2>Simple, transparent pricing.</h2>
+    <!-- Soft notice for a trial link that could not be used (expired, already
+         redeemed, or unrecognised). GET /start sends every one of those cases
+         here with ?trial=unavailable and one wording, because distinguishing
+         them to an anonymous caller would confirm which tokens exist. Hidden
+         until the script below finds the parameter; there is no path where a
+         visitor arriving normally sees it. -->
+    <p class="trial-notice" id="trialNotice" hidden>
+      That trial link can’t be used any more — it may have expired or already been
+      started. You can still start on any plan below, or
+      <a href="#demo">book a demo</a> and we’ll set one up for you.
+    </p>
     <!-- Both filled from GET /api/plans at the bottom of this page — see the
          note there. The three cards below are a SKELETON: real markup at the
          real dimensions so the section holds its height and the page does not
@@ -508,6 +520,17 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 </footer>
 
 <script nonce="__CSP_NONCE__">
+(function(){
+  // A trial link that could not be used. GET /start redirects here with
+  // ?trial=unavailable; anything else in that parameter is ignored, so the
+  // notice cannot be summoned with arbitrary text from a crafted URL.
+  try{
+    if(new URLSearchParams(location.search).get('trial')==='unavailable'){
+      var n=document.getElementById('trialNotice');
+      if(n) n.hidden=false;
+    }
+  }catch(_){/* no notice on very old browsers */}
+})();
 (function(){
   // Pricing cards render from GET /api/plans — served from src/config/plans.js,
   // the same table the server gates on and the same one Settings reads, so

@@ -20,6 +20,7 @@ hardcoded — all Stripe identifiers come from here.
 | `STRIPE_PRICE_PRO` | Recurring price ID for the Pro plan | `price_...` |
 | `STRIPE_PRICE_TEAM` | Recurring price ID for the Team plan | `price_...` |
 | `FREE_MONTHLY_LIMIT` | Free analyses per org per month (optional, default 10) | `10` |
+| `TRIAL_FROM_EMAIL` | From: address for the trial-ending reminder (falls back to `EMAIL_FROM`) | `billing@cvsprings.com` |
 | `PUBLIC_APP_URL` | Public origin for Checkout success/cancel + portal return. `FRONTEND_URL` / `APP_BASE_URL` are deprecated aliases; see `src/config/appUrl.js` | `https://cvsprings.com` |
 
 If `STRIPE_SECRET_KEY` is unset the app still boots; billing endpoints return
@@ -49,6 +50,16 @@ If `STRIPE_SECRET_KEY` is unset the app still boots; billing endpoints return
   - `customer.subscription.updated`
   - `customer.subscription.deleted`
   - `invoice.payment_failed`
+  - `customer.subscription.trial_will_end` — no-card trial (see below)
+  - `payment_method.attached` — no-card trial (**required**, see below)
+  - `invoice.paid` — no-card trial (see below)
+
+  > The last three are needed by the 30-day no-card trial. If they are not
+  > enabled on the endpoint, trials still start and still pause — but the
+  > reminder email never goes out and, worse, **a customer who adds a card
+  > stays paused forever**, because nothing clears `pause_collection`. There is
+  > no error anywhere when this is misconfigured; the symptom is a paying
+  > customer with no access.
 - The route receives the **raw body** and verifies the `Stripe-Signature`
   header against `STRIPE_WEBHOOK_SECRET`. It is exempt from session auth.
   Handlers are **idempotent** — state is always set from the event, so repeated
@@ -94,6 +105,84 @@ In test mode (Stripe Checkout), use any future expiry, any CVC, any postal code:
   the UI; the org is not cut off immediately.
 - **Canceled/deleted subscription:** the org returns to Free and the cap
   resumes.
+
+## 30-day no-card trial
+
+An invite-only flow, separate from the checkout path above and sharing none of
+its code. Prospects get a link; nobody types a card to start.
+
+### Minting invites
+
+`POST /admin/trial-invites`, platform-operator only (same guard as
+`/admin/metrics` — every other caller gets a 404, not a 403).
+
+```bash
+curl -sX POST https://cvsprings.com/admin/trial-invites \
+  -H "Authorization: Bearer $SESSION_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"invites":[{"email":"lead@agency.nl","company_name":"Agency BV","campaign":"q1-agencies"}]}'
+```
+
+Returns a token and a full `/start?t=…` URL per prospect. Tokens expire 30 days
+out by default; override per request with `expiresInDays` or an explicit
+`expiresAt`. One bad address rejects the whole batch — nothing is half-written.
+
+### Redeeming
+
+`GET /start?t=<token>` (public — the prospect has no account yet). Valid tokens
+redirect into Checkout; **anything else redirects to `/?trial=unavailable#pricing`
+with one soft message**, identical for expired, spent and unknown tokens, so the
+endpoint is not an oracle for guessing live tokens. The precise reason is in the
+server log. Add `?plan=team` for a Team trial; the default is Pro.
+
+The session sets `trial_period_days: 30`, `payment_method_collection:
+'if_required'` (no card asked for) and
+`subscription_data.trial_settings.end_behavior.missing_payment_method: 'pause'`.
+Stripe Tax and VAT-ID collection stay on, with
+`billing_address_collection: 'required'` — without that last one the VAT field
+never appears, because Stripe normally infers the country from the payment
+method and this session collects none.
+
+Redeeming reserves an organization for the prospect (named from
+`company_name`). Signing up later with the invited address adopts that org
+rather than creating a second one, so the trial belongs to the account that uses
+it.
+
+### Lifecycle
+
+| Day | Stripe event | What happens |
+|---|---|---|
+| 0 | `checkout.session.completed` | plan set, status `trialing`, token spent |
+| 27 | `customer.subscription.trial_will_end` | Resend reminder + portal link; one row in `trial_emails` (sent at most once per subscription) |
+| 30, no card | `customer.subscription.updated` → `paused` | account goes **read-only**. Nothing is deleted, nothing is invoiced |
+| 30, card on file | `customer.subscription.updated` → `active`, `invoice.paid` | first invoice is €49 + VAT; org marked converted with its campaign |
+| any day | `payment_method.attached` | clears `pause_collection` and restores full access |
+
+**Adding a card does not resume a paused subscription by itself.** Stripe leaves
+`pause_collection` set until something clears it; that something is the
+`payment_method.attached` branch in `src/routes/billing.js`. It is idempotent,
+and it also sets the customer's default payment method when they have none —
+otherwise the resumed subscription's first invoice fails and they land in
+`past_due`, which looks to them exactly like the pause they just escaped.
+
+### Access levels
+
+One mapping, in `src/services/entitlements.js`, used everywhere:
+
+| Subscription status | Access |
+|---|---|
+| `trialing`, `active`, `past_due` | full |
+| `paused` | read-only — every GET works, every write returns `402 SUBSCRIPTION_PAUSED` |
+| `canceled`, `unpaid`, `incomplete*` | no paid entitlement; the org falls back to the Free tier and its cap |
+
+`/api/billing` is deliberately **not** behind the read-only gate: the way out of
+a pause is the billing portal.
+
+### Reporting
+
+`organizations.trial_campaign` and `trial_converted_at` carry attribution;
+`trial_invites` holds the same per token, plus `redeemed_at`. Conversions are
+recorded once — a redelivered `invoice.paid` cannot move the date or
+double-count a campaign.
 
 ## Going live (later, with paid hosting)
 
