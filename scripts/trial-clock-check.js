@@ -450,6 +450,46 @@ async function runScenarios() {
       check(`a decline reason was recorded (${err ? JSON.stringify(err.message) : 'none'})`, !!err, results);
       check('exactly one live subscription', (await liveSubsFor(ctx.clock.id)).length === 1, results);
     }
+
+    // --- 5. Recovery after a decline ---------------------------------------
+    hr('SCENARIO 5 — declined, then a WORKING card');
+    {
+      const ctx = await buildPausedOrg('recover');
+      clocks.push(ctx.clock.id);
+
+      // First attempt: a card that attaches but fails at charge time.
+      await appCall(ctx.token, 'POST', '/api/billing/resume', { plan: 'pro' });
+      await stripe.paymentMethods.attach('pm_card_chargeCustomerFail', { customer: ctx.customer.id });
+      await sleep(12000);
+      const declined = await stripe.subscriptions.retrieve(ctx.sub.id);
+      console.log(`   [after decline] stripe=${declined.status}`);
+      check(`the failed attempt leaves it past_due (${declined.status})`, declined.status === 'past_due', results);
+
+      // Second attempt: the customer comes back with a card that works.
+      await appCall(ctx.token, 'POST', '/api/billing/resume', { plan: 'pro' });
+      await stripe.paymentMethods.attach('pm_card_visa', { customer: ctx.customer.id });
+      await sleep(14000);
+
+      const sub = await stripe.subscriptions.retrieve(ctx.sub.id);
+      const b = db.getOrgBilling(ctx.orgId) || {};
+      const ent = require('../src/services/entitlements').entitlementForOrg(b);
+      const invs = await stripe.invoices.list({ customer: ctx.customer.id, limit: 10 });
+      console.log(`   [after good card] stripe=${sub.status}  app=${b.subscriptionStatus}  entitlement=${ent}`);
+      for (const i of invs.data) console.log(`   [invoice] ${i.id} ${i.status} total=${i.total} paid=${i.amount_paid} reason=${i.billing_reason}`);
+
+      check(`subscription is active (${sub.status})`, sub.status === 'active', results);
+      check(`app records active (${b.subscriptionStatus})`, b.subscriptionStatus === 'active', results);
+      check(`entitlement is full (${ent})`, ent === 'full', results);
+
+      const paid = invs.data.filter((i) => i.amount_paid > 0);
+      check(`exactly ONE paid invoice (found ${paid.length})`, paid.length === 1, results);
+      check('that invoice is EUR 49 + VAT',
+        paid.length === 1 && paid[0].subtotal === 4900 && paid[0].amount_paid === 5929, results);
+      const totalCharged = invs.data.reduce((n, i) => n + i.amount_paid, 0);
+      check(`nothing was charged twice (total ${totalCharged})`, totalCharged === 5929, results);
+      check('the decline reason was cleared', !db.getResumeError(ctx.orgId), results);
+      check('exactly one live subscription', (await liveSubsFor(ctx.clock.id)).length === 1, results);
+    }
   } finally {
     hr('CLEANUP');
     for (const id of clocks) {

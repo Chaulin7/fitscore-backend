@@ -84,9 +84,19 @@ const fakeStripe = () => ({
   },
   invoices: {
     retrieve: async (id) => ({ ...INVOICES.get(id) }),
-    pay: async (id) => {
-      calls.push({ call: 'invoices.pay', id });
-      if (payThrows) { const e = new Error(payThrows.message); e.code = payThrows.code; e.type = 'StripeCardError'; throw e; }
+    pay: async (id, p) => {
+      calls.push({ call: 'invoices.pay', id, p });
+      if (payThrows) {
+        // What real Stripe does with a declined resumption invoice: the
+        // subscription moves to past_due — NOT back to paused — and the
+        // invoice stays OPEN, waiting for somebody to settle it. Captured from
+        // a live test-clock run; assuming it stayed paused is what hid the
+        // recovery gap this stub now covers.
+        const inv0 = INVOICES.get(id);
+        const s0 = SUBS.get(inv0.subscription);
+        if (s0) s0.status = 'past_due';
+        const e = new Error(payThrows.message); e.code = payThrows.code; e.type = 'StripeCardError'; throw e;
+      }
       const inv = INVOICES.get(id);
       inv.status = 'paid'; inv.amount_paid = inv.total;
       const s = SUBS.get(inv.subscription);
@@ -160,6 +170,10 @@ function setPaused(subId = 'sub_paused') {
   db.setOrgPlan(orgId, {
     plan: 'pro', subscriptionStatus: 'paused', currentPeriodEnd: null, stripeSubscriptionId: subId,
   });
+  // Trial-originated, as GET /start would have left it. Without this the
+  // past_due entitlement rule cannot apply and a declined trial would be
+  // handed the dunning grace.
+  db.setOrgTrialCampaign(orgId, 'q1');
   db.setResumeError(orgId, null);
   return subId;
 }
@@ -337,12 +351,15 @@ describe('a declined card at resume', () => {
     payThrows = { code: 'card_declined', message: 'Your card was declined.' };
   });
 
-  test('the subscription stays paused and the org is NEVER shown as active', async () => {
+  test('the org is NEVER shown as active, and keeps no access it did not pay for', async () => {
     await call('POST', '/api/billing/resume', { plan: 'pro' });
     await webhook('payment_method.attached', { id: 'pm_bad', object: 'payment_method', customer: CUS });
 
-    assert.equal(SUBS.get('sub_paused').status, 'paused', 'still paused at Stripe');
-    assert.equal(db.getOrgBilling(orgId).subscriptionStatus, 'paused', 'and in our own record');
+    // Stripe moves a declined resumption to past_due rather than back to
+    // paused. past_due normally grants the dunning grace; a trial that has
+    // never converted does not get it.
+    assert.equal(SUBS.get('sub_paused').status, 'past_due');
+    assert.notEqual(SUBS.get('sub_paused').status, 'active');
     assert.equal(entitlementForOrg(db.getOrgBilling(orgId)), ENTITLEMENT.READ_ONLY);
   });
 
@@ -376,6 +393,94 @@ describe('a declined card at resume', () => {
 
     assert.equal(SUBS.get('sub_paused').status, 'active');
     assert.equal(db.getResumeError(orgId), null);
+  });
+});
+
+describe('recovery from past_due — the same path, a second entry state', () => {
+  /**
+   * After a decline the subscription is past_due with its resumption invoice
+   * still OPEN. Nothing else in the system pays that invoice, so before this
+   * branch existed a customer who came back with a working card stayed
+   * read-only forever, holding an unpayable EUR 59.29 bill. Verified live
+   * before it was fixed, not assumed.
+   */
+  beforeEach(async () => {
+    setPaused();
+    payThrows = { code: 'card_declined', message: 'Your card was declined.' };
+    await call('POST', '/api/billing/resume', { plan: 'pro' });
+    await webhook('payment_method.attached', { id: 'pm_bad', object: 'payment_method', customer: CUS });
+    // Stripe emits the paused -> past_due transition after the decline; the
+    // ordinary guarded path is what writes it, so deliver it here too or the
+    // org's record would disagree with Stripe for the rest of the test.
+    await webhook('customer.subscription.updated', { ...SUBS.get('sub_paused'), customer: CUS });
+    payThrows = null;
+    calls.length = 0;
+  });
+
+  test('the precondition: past_due, with one open invoice', () => {
+    assert.equal(SUBS.get('sub_paused').status, 'past_due');
+    const open = [...INVOICES.values()].filter((i) => i.status === 'open');
+    assert.equal(open.length, 1);
+  });
+
+  test('a working card pays THAT invoice and makes the subscription active', async () => {
+    await webhook('payment_method.attached', { id: 'pm_good', object: 'payment_method', customer: CUS });
+
+    assert.equal(SUBS.get('sub_paused').status, 'active');
+    const paid = [...INVOICES.values()].filter((i) => i.status === 'paid');
+    assert.equal(paid.length, 1, 'the SAME invoice was settled, not a second one raised');
+    assert.equal(paid[0].amount_paid, 5929);
+  });
+
+  test('access is restored by customer.subscription.updated, not by the handler', async () => {
+    await webhook('payment_method.attached', { id: 'pm_good', object: 'payment_method', customer: CUS });
+    // Deliberately asserted BEFORE the follow-up event: the handler settles the
+    // money at Stripe and writes no plan state of its own, exactly as the
+    // resume path does. Our record is still past_due at this instant.
+    assert.equal(db.getOrgBilling(orgId).subscriptionStatus, 'past_due');
+    assert.equal(entitlementForOrg(db.getOrgBilling(orgId)), ENTITLEMENT.READ_ONLY);
+
+    // Stripe then emits the transition, which is the only thing that writes it.
+    await webhook('customer.subscription.updated', { ...SUBS.get('sub_paused'), customer: CUS });
+    assert.equal(db.getOrgBilling(orgId).subscriptionStatus, 'active');
+    assert.equal(entitlementForOrg(db.getOrgBilling(orgId)), ENTITLEMENT.FULL);
+  });
+
+  test('it does NOT resume — the subscription is already out of the pause', async () => {
+    await webhook('payment_method.attached', { id: 'pm_good', object: 'payment_method', customer: CUS });
+    assert.equal(calls.filter((c) => c.call === 'subscriptions.resume').length, 0,
+      'resuming a past_due subscription would be wrong, and Stripe refuses it');
+    assert.ok(calls.find((c) => c.call === 'invoices.pay'), 'it pays the open invoice instead');
+  });
+
+  test('the new card REPLACES the one that just failed', async () => {
+    await webhook('payment_method.attached', { id: 'pm_good', object: 'payment_method', customer: CUS });
+    const update = calls.find((c) => c.call === 'customers.update');
+    assert.ok(update, 'the customer default was rewritten');
+    assert.equal(update.p.invoice_settings.default_payment_method, 'pm_good',
+      'leaving the declined card as the default would just decline again');
+    const pay = calls.find((c) => c.call === 'invoices.pay');
+    assert.equal(pay.p.payment_method, 'pm_good', 'and the invoice is paid with it explicitly');
+  });
+
+  test('nothing is charged twice', async () => {
+    await webhook('payment_method.attached', { id: 'pm_good', object: 'payment_method', customer: CUS });
+    const n = calls.filter((c) => c.call === 'invoices.pay').length;
+    await webhook('payment_method.attached', { id: 'pm_good', object: 'payment_method', customer: CUS });
+    assert.equal(calls.filter((c) => c.call === 'invoices.pay').length, n,
+      'a redelivery finds the invoice already paid and does nothing');
+    const paid = [...INVOICES.values()].filter((i) => i.status === 'paid');
+    assert.equal(paid.reduce((t, i) => t + i.amount_paid, 0), 5929);
+  });
+
+  test('an ordinary past_due customer is left to Stripe dunning', async () => {
+    // No trial origin: their retry schedule is Stripe's business, and charging
+    // them the instant they touch a card would jump ahead of it.
+    db.getDb().prepare('UPDATE organizations SET trial_origin_at = NULL WHERE id = ?').run(orgId);
+    calls.length = 0;
+    await webhook('payment_method.attached', { id: 'pm_good', object: 'payment_method', customer: CUS });
+    assert.equal(calls.filter((c) => c.call === 'invoices.pay').length, 0);
+    assert.equal(SUBS.get('sub_paused').status, 'past_due');
   });
 });
 

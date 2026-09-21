@@ -994,18 +994,49 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
     return;
   }
 
-  const paused = ((list && list.data) || []).filter((sub) => sub && sub.status === 'paused');
-  if (paused.length === 0) return; // nothing paused: a normal card update
+  const orgId = orgIdFromCustomer(customerId);
+  const orgBilling = orgId ? getOrgBilling(orgId) : null;
+  // Only a trial-originated account takes the past_due branch below. An
+  // ordinary customer in dunning has Stripe's own retry schedule working on
+  // their behalf, and charging them the instant they touch a card would jump
+  // ahead of it.
+  const trialOrigin = !!(orgBilling && orgBilling.trialOriginAt);
 
-  // Give the customer a default payment method if they have none. A resumed
-  // subscription with nothing to charge just fails its invoice and stays
-  // paused, which looks to the customer exactly like the pause they just paid
-  // to escape. Only when unset — never overwriting a deliberate choice.
+  /**
+   * Subscriptions a newly-added card can rescue. TWO entry states, one path.
+   *
+   *   paused    the trial ended with no payment method. Needs resume() and then
+   *             payment of the invoice that raises.
+   *   past_due  the resumption invoice was DECLINED. Stripe does not put the
+   *             subscription back to paused — it moves it to past_due and
+   *             leaves that invoice open. Nothing else in the system pays it,
+   *             so before this branch existed a customer who came back with a
+   *             working card stayed read-only forever with an open EUR 59.29
+   *             invoice and no way to settle it. Verified live, not assumed.
+   *
+   * They differ by one step — whether a resume is needed — so this is one loop
+   * with that step conditional, rather than a second handler that would drift.
+   */
+  const recoverable = ((list && list.data) || []).filter((sub) => {
+    if (!sub) return false;
+    if (sub.status === 'paused') return true;
+    return sub.status === 'past_due' && trialOrigin && !!sub.latest_invoice;
+  });
+  if (recoverable.length === 0) return; // nothing to rescue: a normal card update
+
+  // Whether the card we are replacing is known to be bad.
+  //
+  // A past_due trial subscription is past_due BECAUSE its default payment
+  // method was just declined. Leaving that card as the default and paying with
+  // it would decline again, so the new card takes over. In the paused case
+  // nothing has failed and the rule stays the conservative one: set a default
+  // only when there is none, never overwrite a deliberate choice.
+  const replacingFailedCard = recoverable.some((sub) => sub.status === 'past_due');
   try {
     const customer = await stripe.customers.retrieve(customerId);
     const hasDefault = customer && customer.invoice_settings
       && customer.invoice_settings.default_payment_method;
-    if (!hasDefault) {
+    if (!hasDefault || replacingFailedCard) {
       await stripe.customers.update(customerId, {
         invoice_settings: { default_payment_method: paymentMethod.id },
       });
@@ -1014,8 +1045,7 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
     console.warn('[trial] could not set the default payment method', { customerId, error: err.message });
   }
 
-  for (const sub of paused) {
-    const orgId = orgIdFromCustomer(customerId);
+  for (const sub of recoverable) {
     try {
       // --- apply a pending tier change, before the money moves -------------
       // POST /resume records { pending_plan } on the subscription when the
@@ -1030,7 +1060,9 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
       // sell a new Team subscription — has a window in which both exist, loses
       // the trial's lineage and metadata, and puts the customer through a
       // second checkout for something they already told us they wanted.
-      const pendingPlan = sub.metadata && sub.metadata.pending_plan;
+      // Only while paused. Switching the price of a subscription mid-dunning
+      // would change what the already-open invoice was supposed to collect.
+      const pendingPlan = sub.status === 'paused' && sub.metadata && sub.metadata.pending_plan;
       const targetPrice = pendingPlan ? billing.priceIdForPlan(pendingPlan) : null;
       const currentPrice = priceIdOf(sub);
       if (targetPrice && currentPrice && targetPrice !== currentPrice) {
@@ -1063,10 +1095,16 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
       // the customer's invoice_settings.default_payment_method was correctly
       // set — so the customer-level default alone is not what Stripe charges a
       // resumption against. Only set when the subscription has none of its own.
-      if (!sub.default_payment_method) {
+      if (!sub.default_payment_method || replacingFailedCard) {
         await stripe.subscriptions.update(sub.id, { default_payment_method: paymentMethod.id });
       }
-      const resumed = await stripe.subscriptions.resume(sub.id, { billing_cycle_anchor: 'now' });
+
+      // The one step the two entry states do not share. A past_due subscription
+      // is already out of the pause — its invoice exists and is waiting — so
+      // resuming it again would be wrong and Stripe refuses it anyway.
+      const resumed = sub.status === 'paused'
+        ? await stripe.subscriptions.resume(sub.id, { billing_cycle_anchor: 'now' })
+        : await stripe.subscriptions.retrieve(sub.id);
 
       // PAY THE RESUMPTION INVOICE. resume() raises and finalizes it but does
       // NOT collect it: a live run showed the invoice sitting `open` with
@@ -1080,7 +1118,12 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
       // pays nothing twice.
       let finalStatus = resumed && resumed.status;
       const invoiceId = resumed && resumed.latest_invoice;
-      if (finalStatus === 'paused' && invoiceId) {
+      // Keyed on the INVOICE being open rather than on the subscription's
+      // status, so both entry states settle through the same line: a resumed
+      // subscription is 'paused' with a fresh invoice, a declined one is
+      // 'past_due' with the old one. Either way there is exactly one open
+      // invoice and paying it is what makes the subscription active.
+      if ((finalStatus === 'paused' || finalStatus === 'past_due') && invoiceId) {
         const invoice = await stripe.invoices.retrieve(invoiceId);
         if (invoice && invoice.status === 'open') {
           // A DECLINE LANDS HERE, as a thrown Stripe error. It must not be
@@ -1088,7 +1131,9 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
           // and leaves the subscription paused, so a customer whose card was
           // refused would otherwise see the same locked screen with no reason
           // and try the same card again.
-          const paid = await stripe.invoices.pay(invoiceId);
+          // Named explicitly rather than relying on the default resolving in
+          // time — the customer added THIS card to settle THIS invoice.
+          const paid = await stripe.invoices.pay(invoiceId, { payment_method: paymentMethod.id });
           console.log('[trial] paid the resumption invoice', {
             subscriptionId: sub.id, invoiceId, status: paid && paid.status, amountPaid: paid && paid.amount_paid,
           });
@@ -1097,15 +1142,15 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
         }
       }
       if (finalStatus === 'active' && orgId) setResumeError(orgId, null);
-      console.log('[trial] resumed a paused subscription after a card was added', {
-        customerId, subscriptionId: sub.id, status: finalStatus,
+      console.log('[trial] recovered a subscription after a card was added', {
+        customerId, subscriptionId: sub.id, from: sub.status, status: finalStatus,
       });
     } catch (err) {
       // The org stays PAUSED and therefore read-only — never shown as active —
       // and the reason is recorded for the panel to render.
       const declineMessage = declineReason(err);
-      console.error('[trial] could not resume a paused subscription', {
-        customerId, subscriptionId: sub.id, orgId, error: err.message,
+      console.error('[trial] could not recover a subscription', {
+        customerId, subscriptionId: sub.id, from: sub.status, orgId, error: err.message,
       });
       if (orgId) setResumeError(orgId, declineMessage);
     }

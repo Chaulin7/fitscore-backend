@@ -257,6 +257,16 @@ from a trial that has never converted (`trial_origin_at` set,
 `trial_converted_at` null), or declining the card would be a way to keep using
 the product. The reason is stored in `resume_error` and rendered on the screen.
 
+**Recovering after a decline.** The declined resumption invoice stays **open**
+on the `past_due` subscription, and nothing else in the system settles it. So
+`payment_method.attached` also rescues a `past_due` trial-origin subscription
+that has an open invoice: it makes the new card the default — replacing the one
+that just failed — and pays that same invoice. No second invoice is raised and
+nothing is charged twice. It is the same handler and the same loop as the
+paused case; only the resume step is conditional, because a `past_due`
+subscription is already out of the pause. An ordinary customer in dunning is
+left alone: Stripe's own retry schedule is working on their behalf.
+
 `customer.subscription.paused` is handled as a **side-effect hook only**: it
 sends one "your trial has ended, your data is safe" email and writes no state.
 A live run showed `customer.subscription.resumed` arriving with a stale payload
