@@ -1,7 +1,13 @@
 node_modules/
 uploads/
 audit.db
+# Secrets. The bare `.env` line alone matched ONLY a file called exactly .env,
+# so every sibling — .env.local, .env.live-backup, .env.production — was
+# committable. A backup of a live-key file is the same secret as the file.
+# .env.example is the committed template and is negated back in.
 .env
+.env.*
+!.env.example
 *.log
 .DS_Store
 dist/
