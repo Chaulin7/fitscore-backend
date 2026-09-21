@@ -84,6 +84,50 @@ describe('entitlementForOrg — what an account may actually do', () => {
   });
 });
 
+describe('dunning grace is for customers who have paid', () => {
+  // Stripe reports a paused trial whose resumption invoice was DECLINED as
+  // past_due, not paused. past_due normally grants full access on purpose —
+  // the documented grace window. Extending that to an account that arrived on
+  // a free trial and has never paid anything would make "decline the card" a
+  // way to keep using the product indefinitely.
+
+  test('a trial that never converted loses the grace', () => {
+    assert.equal(entitlementForOrg({
+      plan: 'pro', subscriptionStatus: 'past_due',
+      trialOriginAt: '2026-01-01T00:00:00Z', trialConvertedAt: null,
+    }), ENTITLEMENT.READ_ONLY);
+  });
+
+  test('it keys on trial ORIGIN, not on the campaign, which is nullable', () => {
+    // An invite minted without a campaign is legitimate. Keying the rule on
+    // trial_campaign would silently hand those orgs the grace.
+    assert.equal(entitlementForOrg({
+      plan: 'pro', subscriptionStatus: 'past_due',
+      trialOriginAt: '2026-01-01T00:00:00Z', trialCampaign: null, trialConvertedAt: null,
+    }), ENTITLEMENT.READ_ONLY);
+  });
+
+  test('a converted trial customer KEEPS the grace on a later failed renewal', () => {
+    assert.equal(entitlementForOrg({
+      plan: 'pro', subscriptionStatus: 'past_due',
+      trialOriginAt: '2026-01-01T00:00:00Z', trialConvertedAt: '2026-02-01T00:00:00Z',
+    }), ENTITLEMENT.FULL);
+  });
+
+  test('an ordinary customer who never trialed is untouched', () => {
+    assert.equal(entitlementForOrg({ plan: 'pro', subscriptionStatus: 'past_due' }), ENTITLEMENT.FULL);
+    assert.equal(entitlementForOrg({ plan: 'team', subscriptionStatus: 'past_due' }), ENTITLEMENT.FULL);
+  });
+
+  test('the rule touches no other status', () => {
+    for (const status of ['active', 'trialing', 'paused', 'canceled']) {
+      const trial = { plan: 'pro', subscriptionStatus: status, trialOriginAt: '2026-01-01T00:00:00Z', trialConvertedAt: null };
+      const plain = { plan: 'pro', subscriptionStatus: status };
+      assert.equal(entitlementForOrg(trial), entitlementForOrg(plain), `status ${status}`);
+    }
+  });
+});
+
 describe('writeAccessFor — what a blocked write is told', () => {
   test('a paused org is refused with a code that names the cause', () => {
     const access = writeAccessFor({ plan: 'pro', subscriptionStatus: 'paused' });

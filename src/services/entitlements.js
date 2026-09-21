@@ -100,9 +100,41 @@ function entitlementForStatus(status) {
  * @param {object|null} orgBilling a row from db.getOrgBilling()
  * @returns {'full'|'read_only'|'none'}
  */
+/**
+ * A trial whose FIRST charge failed, which Stripe reports as past_due.
+ *
+ * When the resumption invoice for a paused trial is declined, Stripe does not
+ * put the subscription back to `paused` — it moves it to `past_due`. That
+ * status normally grants full access, deliberately: it is the dunning grace
+ * documented in docs/billing/README.md, and cutting off an established customer
+ * over one failed renewal would be worse than carrying them for a few days.
+ *
+ * But grace is something you extend to somebody who has paid you before. An
+ * account that arrived on a free trial, never converted, and has just had its
+ * very first charge declined has paid nothing — handing it full access would
+ * make "decline the card" a way to keep using the product. So for that one
+ * combination the grace does not apply and the account stays read-only, which
+ * is where the pause had it.
+ *
+ * Narrow on purpose: it requires BOTH a trial origin and no conversion. An
+ * ordinary paying customer in past_due is untouched, and so is a trial customer
+ * who converted months ago and later had a renewal fail.
+ */
+function isFailedTrialFirstCharge(orgBilling) {
+  return !!orgBilling
+    && orgBilling.subscriptionStatus === 'past_due'
+    // trial_origin_at, NOT trial_campaign: the campaign is optional on an
+    // invite, so an org invited without one would have skipped this check
+    // entirely and been handed the grace it is not entitled to.
+    && !!orgBilling.trialOriginAt
+    && !orgBilling.trialConvertedAt;
+}
+
 function entitlementForOrg(orgBilling) {
   if (!orgBilling) return ENTITLEMENT.FULL; // unknown org -> free tier, quota-capped
   if (orgBilling.comped === 1 || orgBilling.comped === true) return ENTITLEMENT.FULL;
+  // A trial that has never paid does not get the dunning grace — see above.
+  if (isFailedTrialFirstCharge(orgBilling)) return ENTITLEMENT.READ_ONLY;
 
   const plan = orgBilling.plan || 'free';
   const status = orgBilling.subscriptionStatus || null;
@@ -167,6 +199,7 @@ function writeAccessFor(orgBilling) {
 
 module.exports = {
   ENTITLEMENT,
+  isFailedTrialFirstCharge,
   ORDER,
   entitlementForStatus,
   entitlementForOrg,

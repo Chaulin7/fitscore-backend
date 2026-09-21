@@ -2443,6 +2443,7 @@ async function loadPlanPanel(focusFirst){
     return;
   }
   _planSummary = sum;
+  if(sum.state==='paused'){ closePlanPanel(false); openPausedScreen(sum); return; }
   if(sum.plan==='free'){ closePlanPanel(false); openFreePlanModal(sum); return; }
   panel.innerHTML = renderPaidPanel(sum);
   openPlanPanel(focusFirst);
@@ -2466,6 +2467,119 @@ async function retryPlanPanel(){
 
 // Upgrade from the panel/modal. Distinct from startCheckout(), which drives the
 // Settings buttons by id; here there is no such button to disable.
+/**
+ * The paused screen.
+ *
+ * A SCREEN, not a dismissable banner: there is no close button, Escape does
+ * nothing, and clicking the backdrop does nothing. A banner is something you
+ * swipe away and then spend twenty minutes wondering why nothing saves.
+ *
+ * It is NOT a wall, either. Read-only genuinely means read-only — every
+ * screening, audit record and report is still there and still exportable — so
+ * there is one quiet way past it to the data. That link is deliberately the
+ * least prominent thing on the screen, and it does not change any state.
+ */
+let _pausedScreenShown = false;
+function openPausedScreen(sum){
+  if(document.getElementById('pausedScreen')) return;
+  const backdrop=document.createElement('div');
+  backdrop.id='pausedScreen';
+  backdrop.className='modal-backdrop'; backdrop.setAttribute('role','dialog'); backdrop.setAttribute('aria-modal','true');
+  backdrop.setAttribute('aria-label','Your trial has ended');
+  backdrop.style.zIndex='10001';
+  const box=document.createElement('div'); box.className='modal-box'; box.style.maxWidth='620px';
+
+  const actions=(sum.actions||[]);
+  const act=function(id){ return actions.find(function(a){return a.id===id;}); };
+  const btn=function(a){ return a ? planActionBtn(a) : ''; };
+
+  // A declined card is explained here rather than leaving the customer on the
+  // same screen with no idea why nothing changed.
+  const declined = sum.resumeError
+    ? '<div class="pp-alert"><div class="pp-alert-t">That card was declined</div>'
+      +'<div class="pp-alert-b">'+escHtml(sum.resumeError)+'</div></div>'
+    : '';
+
+  box.innerHTML=
+    '<div class="modal-head"><h3>Your trial has ended</h3></div>'
+    +'<div class="modal-body">'
+      + declined
+      +'<p style="margin:0 0 14px;line-height:1.55">Your 30-day '+escHtml(sum.planName)+' trial is over and no payment '
+        +'method was added, so nothing was charged. Your account is <b>read-only</b> for now.</p>'
+      +'<div class="pp-sec"><div class="pp-sec-h">Nothing has been deleted</div>'
+        +'<p style="margin:0;line-height:1.55">Every analysis, audit record, report and template is exactly where you '
+        +'left it, and all of it is still readable and exportable. What you cannot do for now is create anything new.</p></div>'
+      +'<div class="pp-sec-h" style="margin-top:16px">Two ways to continue</div>'
+      +'<div class="pp-sec">'
+        +'<div class="pp-row"><span><b>Keep your plan</b><br><span style="color:#6b7280">Add a card and full access comes back immediately.</span></span></div>'
+        +'<div class="pp-foot">'+btn(act('continue_pro'))+btn(act('continue_team'))+'</div>'
+      +'</div>'
+      +'<div class="pp-sec">'
+        +'<div class="pp-row"><span><b>Move to Free</b><br><span style="color:#6b7280">Keep the account and everything in it, with a monthly '
+          +'analysis cap. The cap counts only new work — nothing from your trial.</span></span></div>'
+        +'<div class="pp-foot">'+btn(act('continue_free'))+'</div>'
+      +'</div>'
+      +(actions.length ? '' : '<div style="margin-top:10px">'+(sum.isOwner?planBlockNote(sum):MEMBER_PLAN_NOTE)+'</div>')
+      +'<div style="margin-top:16px;text-align:center">'
+        +'<button type="button" class="auth-link" data-action="dismissPausedScreen">Continue to my data (read-only)</button>'
+      +'</div>'
+    +'</div>';
+
+  document.body.appendChild(backdrop);
+  backdrop.appendChild(box);
+  requestAnimationFrame(function(){ backdrop.classList.add('open'); });
+  _pausedScreenShown = true;
+}
+
+function dismissPausedScreen(){
+  const el=document.getElementById('pausedScreen');
+  if(!el) return;
+  el.classList.remove('open');
+  setTimeout(function(){ try{ el.remove(); }catch(_){} }, 200);
+}
+
+/**
+ * Resume the EXISTING paused subscription.
+ *
+ * Posts to /api/billing/resume, which opens Checkout in setup mode to collect a
+ * card. It never creates a subscription: the card arriving is what triggers the
+ * server-side resume of the one the org already has.
+ */
+async function resumeSubscription(el){
+  const plan = el && el.dataset ? el.dataset.plan : 'pro';
+  if(el) el.disabled = true;
+  try{
+    const d = await api('/api/billing/resume',{method:'POST',body:JSON.stringify({plan})});
+    if(d && d.url){ window.location = d.url; return; }
+    toast('Could not start the card setup.','error');
+  }catch(err){
+    toast((err && err.message) || 'Could not start the card setup.','error');
+  }finally{ if(el) el.disabled = false; }
+}
+
+/**
+ * Move to Free. Confirmed here AND again by the endpoint, because it cancels a
+ * subscription and that cannot be undone.
+ */
+async function continueOnFree(el){
+  const ok = window.confirm(
+    'Move to the Free plan?\n\n'
+    + 'This cancels your subscription — you would have to buy again to come back.\n\n'
+    + 'Nothing is deleted: all your screenings, audit records and reports stay, and stay exportable. '
+    + 'New analyses will be capped monthly, counting only work from now on.'
+  );
+  if(!ok) return;
+  if(el) el.disabled = true;
+  try{
+    await api('/api/billing/continue-free',{method:'POST',body:JSON.stringify({confirm:true})});
+    dismissPausedScreen();
+    toast('You are on the Free plan. Nothing was deleted.','ok');
+    try{ await populatePlanBilling(); }catch(_){}
+  }catch(err){
+    toast((err && err.message) || 'Could not move to Free.','error');
+  }finally{ if(el) el.disabled = false; }
+}
+
 async function startPlanCheckout(el){
   const plan = el && el.dataset ? el.dataset.plan : null;
   if(!plan) return;
@@ -5330,6 +5444,10 @@ const delegatedHandlers = {
     togglePlanPanel,
     retryPlanPanel,
     startPlanCheckout,
+    // The paused screen's three ways out, plus the quiet way past it.
+    resumeSubscription,
+    continueOnFree,
+    dismissPausedScreen,
     showPlanDetail,
     openBillingPortal, inviteMember, copyInviteLink, saveBranding,
     saveSettings, changePassword, saveRetention, setRetentionPreset, exportOrgData, deleteAllOrgData,

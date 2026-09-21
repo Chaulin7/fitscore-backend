@@ -46,6 +46,16 @@ const TRIAL_WILL_END = 'trial_will_end';
 const TRIAL_WELCOME = 'trial_welcome';
 
 /**
+ * Sent when Stripe pauses the subscription — the moment access actually stops.
+ *
+ * Distinct from the day-27 reminder, and needed because that one was a warning
+ * about the future while this one is news about the present. Without it the
+ * customer's next contact with the product is a screen that will not let them
+ * work, with no message explaining why or promising their data is still there.
+ */
+const TRIAL_PAUSED = 'trial_paused';
+
+/**
  * From: address. TRIAL_FROM_EMAIL first so campaign mail can come from a
  * campaign sender, falling back to the shared transactional sender.
  */
@@ -222,11 +232,90 @@ async function sendTrialWelcome({
   }
 }
 
+/** The paused-account message body. */
+function composeTrialPaused({ companyName, planName, portalUrl, appUrl }) {
+  const subject = 'Your CVsprings trial has ended — your data is safe';
+  const text = [
+    companyName ? `Hi ${companyName},` : 'Hi,',
+    '',
+    `Your 30-day ${planName} trial has ended. No payment method was added, so`,
+    'nothing was charged and your account is now read-only.',
+    '',
+    'NOTHING HAS BEEN DELETED. Every analysis, audit record, report and template',
+    'is exactly where you left it, and you can still open and export all of it.',
+    'What you cannot do for now is create anything new.',
+    '',
+    'Two ways to continue:',
+    '',
+    `  Keep your plan   — add a card and full access comes back immediately:`,
+    `                     ${portalUrl || appUrl || '(sign in and open Billing)'}`,
+    '',
+    '  Move to Free     — keep the account and your data on the free tier, with',
+    '                     a monthly analysis cap. Nothing is deleted, and the cap',
+    '                     counts only new work, never anything from your trial.',
+    '',
+    'You can choose either from the Billing screen when you sign in.',
+    '',
+    '— CVsprings',
+    LEGAL_NAME,
+  ].join('\n');
+  return { subject, text };
+}
+
+/**
+ * Send the paused notice, once per subscription, and record the attempt.
+ *
+ * Deduped on (subscriptionId, kind) like the other two: Stripe redelivers
+ * customer.subscription.paused, and a customer who is told twice that their
+ * account has stopped working learns that our mail is noise.
+ */
+async function sendTrialPaused({
+  orgId, subscriptionId, toEmail, companyName, planName = 'Pro', portalUrl, appUrl,
+}) {
+  if (!toEmail) {
+    console.warn('[trial] no address for the paused notice', { orgId, subscriptionId });
+    return { sent: false, skipped: 'NO_RECIPIENT', logId: null };
+  }
+  if (subscriptionId && countTrialEmails(subscriptionId, TRIAL_PAUSED) > 0) {
+    console.log('[trial] paused notice already sent, skipping', { orgId, subscriptionId });
+    return { sent: false, skipped: 'ALREADY_SENT', logId: null };
+  }
+
+  const { subject, text } = composeTrialPaused({ companyName, planName, portalUrl, appUrl });
+  const key = process.env.RESEND_API_KEY;
+
+  if (!key || !Resend) {
+    console.log('[trial] RESEND_API_KEY unset — would send paused notice', { to: toEmail, subject });
+    const logId = logTrialEmail({ orgId, subscriptionId, kind: TRIAL_PAUSED, toEmail, providerId: null, error: null });
+    return { sent: false, skipped: 'NO_PROVIDER', logId };
+  }
+
+  try {
+    const resend = new Resend(key);
+    const { data, error } = await resend.emails.send({ from: fromAddress(), to: toEmail, subject, text });
+    if (error) throw new Error(`Resend responded: ${error.name || 'error'} — ${error.message || 'unknown'}`);
+    const logId = logTrialEmail({
+      orgId, subscriptionId, kind: TRIAL_PAUSED, toEmail, providerId: (data && data.id) || null, error: null,
+    });
+    console.log('[trial] paused notice sent', { orgId, subscriptionId, to: toEmail });
+    return { sent: true, skipped: null, logId };
+  } catch (err) {
+    const logId = logTrialEmail({
+      orgId, subscriptionId, kind: TRIAL_PAUSED, toEmail, providerId: null, error: err.message,
+    });
+    console.error('[trial] paused notice delivery failed', { orgId, subscriptionId, error: err.message });
+    return { sent: false, skipped: 'DELIVERY_FAILED', logId };
+  }
+}
+
 module.exports = {
   TRIAL_WILL_END,
   TRIAL_WELCOME,
+  TRIAL_PAUSED,
   sendTrialWillEnd,
   sendTrialWelcome,
+  sendTrialPaused,
+  composeTrialPaused,
   composeTrialWillEnd,
   composeTrialWelcome,
   fromAddress,

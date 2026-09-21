@@ -427,8 +427,32 @@ function initSchema() {
   // NULL — the value for every organization that has ever mattered — is out of
   // reach of that delete entirely.
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN provisional_until TEXT'); } catch (_) {}
+  // --- Paused-trial recovery --------------------------------------------------
+  // Why a resume did not take. invoices.pay() on the resumption invoice can be
+  // declined, and Stripe then voids that invoice after 23 hours and leaves the
+  // subscription paused. Without a record the customer sees the same paused
+  // screen they started from and no reason for it — so they try the same card
+  // again. Cleared on the next successful resume.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN resume_error TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN resume_error_at TEXT'); } catch (_) {}
+  // When an org deliberately took the Free tier after a trial.
+  //
+  // Load-bearing for the quota, not decorative: usage_counters is a per-month
+  // running total, so an org that downgrades on the 20th would otherwise meet
+  // the Free cap already exhausted by work it did while on a paid trial. The
+  // downgrade zeroes the current month's counter and stamps this, so the cap
+  // counts only what happens afterwards.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN free_tier_since TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_campaign TEXT'); } catch (_) {}
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_converted_at TEXT'); } catch (_) {}
+  // That this org arrived through a no-card trial at all.
+  //
+  // Separate from trial_campaign, which is NULLABLE — an operator may mint an
+  // invite with no campaign — and therefore cannot be used to answer "is this a
+  // trial account". That distinction decides whether a past_due subscription
+  // gets the dunning grace (see isFailedTrialFirstCharge in
+  // services/entitlements.js), so it needs a field that is always set.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_origin_at TEXT'); } catch (_) {}
   // Email the trial invite was addressed to, when the org was created by a
   // redemption and has no user yet.
   //
@@ -619,7 +643,7 @@ function initSchema() {
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_invites_org_id ON invites(org_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_invites_token_hash ON invites(token_hash)');
 
-  // --- No-card trial invites --------------------------------------------------
+    // --- No-card trial invites --------------------------------------------------
   // One row per prospect we hand a 30-day trial link to. The token is the URL
   // credential for GET /start, so it is a v4 uuid and the PRIMARY KEY: unique by
   // construction, and a lookup is the index.
@@ -1753,6 +1777,46 @@ function createFeatureRequestIfUnderQuota({ orgId, userEmail, category, title, b
   return tx.immediate();
 }
 
+/**
+ * Zero an org's counter for one period.
+ *
+ * Used only by the post-trial downgrade to Free. Deliberately a hard reset
+ * rather than a subtraction: the counter has no per-analysis rows to subtract,
+ * and the rule being implemented is "the Free cap counts nothing from before
+ * the downgrade", which is exactly a reset.
+ */
+function resetUsage(orgId, periodKey = currentPeriodKey()) {
+  getDb().prepare(`
+    INSERT INTO usage_counters (org_id, period_key, analysis_count) VALUES (?, ?, 0)
+    ON CONFLICT(org_id, period_key) DO UPDATE SET analysis_count = 0
+  `).run(orgId, periodKey);
+  return 0;
+}
+
+/** Record that a resume attempt failed, with the reason to show the customer. */
+function setResumeError(orgId, message) {
+  getDb().prepare('UPDATE organizations SET resume_error = ?, resume_error_at = ? WHERE id = ?')
+    .run(message || null, message ? nowIso() : null, orgId);
+}
+
+function getResumeError(orgId) {
+  const row = getDb().prepare(
+    'SELECT resume_error AS message, resume_error_at AS at FROM organizations WHERE id = ?',
+  ).get(orgId);
+  return row && row.message ? row : null;
+}
+
+/** Mark the org as having deliberately taken Free, and clear the month's usage. */
+function markFreeTierSince(orgId, at) {
+  getDb().prepare('UPDATE organizations SET free_tier_since = ? WHERE id = ?').run(at || nowIso(), orgId);
+  return resetUsage(orgId);
+}
+
+function getFreeTierSince(orgId) {
+  const row = getDb().prepare('SELECT free_tier_since AS at FROM organizations WHERE id = ?').get(orgId);
+  return row ? row.at : null;
+}
+
 // --- Billing state (Stripe; attached to the organization) ------------------
 
 function getOrgBilling(orgId) {
@@ -1760,7 +1824,10 @@ function getOrgBilling(orgId) {
     SELECT stripe_customer_id AS stripeCustomerId, plan, subscription_status AS subscriptionStatus,
            current_period_end AS currentPeriodEnd, plan_updated_at AS planUpdatedAt,
            stripe_event_created AS stripeEventCreated, stripe_subscription_id AS stripeSubscriptionId,
-           comped, cancel_at_period_end AS cancelAtPeriodEnd
+           comped, cancel_at_period_end AS cancelAtPeriodEnd,
+           resume_error AS resumeError, free_tier_since AS freeTierSince,
+           trial_campaign AS trialCampaign, trial_converted_at AS trialConvertedAt,
+           trial_origin_at AS trialOriginAt
     FROM organizations WHERE id = ?
   `).get(orgId);
   return row || null;
@@ -2067,9 +2134,19 @@ function getOrgTrial(orgId) {
   `).get(orgId) || null;
 }
 
+/**
+ * Record that this org came in through a trial, and which campaign if any.
+ *
+ * trial_origin_at is stamped unconditionally (once); the campaign is optional
+ * and may legitimately be null, which is exactly why the two are separate.
+ */
 function setOrgTrialCampaign(orgId, campaign) {
-  getDb().prepare('UPDATE organizations SET trial_campaign = COALESCE(?, trial_campaign) WHERE id = ?')
-    .run(campaign || null, orgId);
+  getDb().prepare(`
+    UPDATE organizations
+       SET trial_campaign = COALESCE(?, trial_campaign),
+           trial_origin_at = COALESCE(trial_origin_at, ?)
+     WHERE id = ?
+  `).run(campaign || null, nowIso(), orgId);
 }
 
 /**
@@ -2132,6 +2209,11 @@ module.exports = {
   getUsageCount,
   incrementUsage,
   reserveUsage,
+  resetUsage,
+  setResumeError,
+  getResumeError,
+  markFreeTierSince,
+  getFreeTierSince,
   refundUsage,
   insertDemoRequest,
   countRecentFeatureRequests,

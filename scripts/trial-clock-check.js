@@ -73,6 +73,10 @@ const IDEM = (step) => `${MARKER}-${step}-${RUN.id}`;
 const args = process.argv.slice(2);
 const NO_PAUSE = args.includes('--no-pause');
 const CLEANUP_ONLY = args.includes('--cleanup');
+// --scenarios runs the four paused-recovery journeys instead of the single
+// trial walk-through. Each builds its own clock, drives the REAL app endpoints,
+// asserts the one-subscription invariant, and deletes its clock.
+const SCENARIOS = args.includes('--scenarios');
 
 // --- Guards -----------------------------------------------------------------
 
@@ -292,7 +296,191 @@ async function cleanup(orgId) {
 
 // --- Main -------------------------------------------------------------------
 
+// --- Paused-recovery scenarios ----------------------------------------------
+
+const APP = process.env.CLOCK_CHECK_APP_URL || 'http://localhost:3000';
+
+/** A fresh org + owner + session in the app's own database. */
+async function makeOwnerSession(name) {
+  const auth = require('../src/services/authService');
+  const org = auth.createOrganization(name);
+  const user = auth.createUser({
+    email: `${MARKER}-${RUN.id}-${Math.random().toString(36).slice(2, 8)}@cvsprings.test`,
+    passwordHash: await auth.hashPassword('CorrectHorseBattery1!'),
+    orgId: org.id, role: 'owner',
+  });
+  return { orgId: org.id, token: auth.createSession(user.id).rawToken, email: user.email };
+}
+
+const appCall = (token, method, path, body) => fetch(APP + path, {
+  method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  ...(body ? { body: JSON.stringify(body) } : {}),
+});
+
+/** Build a customer + subscription on a clock and run it into the paused state. */
+async function buildPausedOrg(label) {
+  const frozen = Math.floor(Date.now() / 1000);
+  const clock = await stripe.testHelpers.testClocks.create({ frozen_time: frozen, name: `${MARKER}-${label}` });
+  const customer = await stripe.customers.create({
+    test_clock: clock.id, email: `${label}@cvsprings.test`, name: label,
+    address: { country: 'NL', postal_code: '1011AB', city: 'Amsterdam', line1: 'Teststraat 1' },
+  });
+  const session = await makeOwnerSession(`${MARKER}-${label}`);
+  db.setOrgStripeCustomerId(session.orgId, customer.id);
+  // Exactly what GET /start does, so the scenario exercises a trial-originated
+  // org rather than a bare one that happens to have a subscription.
+  db.setOrgTrialCampaign(session.orgId, MARKER);
+
+  const sub = await stripe.subscriptions.create({
+    customer: customer.id, items: [{ price: PRICE_PRO }],
+    trial_period_days: 30,
+    trial_settings: { end_behavior: { missing_payment_method: 'pause' } },
+    automatic_tax: { enabled: true },
+    metadata: { orgId: session.orgId, plan: 'pro', campaign: MARKER },
+  });
+  await advanceTo(clock.id, frozen + 31 * DAY, 'day 31');
+  await sleep(6000); // let the webhook land
+
+  const paused = await stripe.subscriptions.retrieve(sub.id);
+  console.log(`   paused at Stripe: ${paused.status} | app records: ${(db.getOrgBilling(session.orgId) || {}).subscriptionStatus}`);
+  return { clock, customer, sub, ...session };
+}
+
+const liveSubsFor = async (clockId) => {
+  const l = await stripe.subscriptions.list({ test_clock: clockId, status: 'all', limit: 20 });
+  return l.data.filter((x) => x.status !== 'canceled');
+};
+
+function check(label, ok, results) {
+  console.log(`   ${ok ? 'PASS' : 'FAIL'}  ${label}`);
+  results.push(ok);
+  return ok;
+}
+
+async function runScenarios() {
+  const results = [];
+  const clocks = [];
+
+  try {
+    // --- 1. Continue on Free ------------------------------------------------
+    hr('SCENARIO 1 — Continue on Free');
+    {
+      const ctx = await buildPausedOrg('free');
+      clocks.push(ctx.clock.id);
+      const res = await appCall(ctx.token, 'POST', '/api/billing/continue-free', {});
+      check('unconfirmed request is refused', res.status === 400, results);
+
+      const ok = await appCall(ctx.token, 'POST', '/api/billing/continue-free', { confirm: true });
+      const body = await ok.json();
+      check('confirmed downgrade succeeds', ok.status === 200 && body.plan === 'free', results);
+      check('exactly zero live subscriptions', (await liveSubsFor(ctx.clock.id)).length === 0, results);
+      check('app is on Free', (db.getOrgBilling(ctx.orgId) || {}).plan === 'free', results);
+      check('month usage reset to 0', db.getUsageCount(ctx.orgId) === 0, results);
+      check('free_tier_since stamped', !!db.getFreeTierSince(ctx.orgId), results);
+    }
+
+    // --- 2. Continue on Pro -------------------------------------------------
+    hr('SCENARIO 2 — Continue on Pro (resume the existing subscription)');
+    {
+      const ctx = await buildPausedOrg('pro');
+      clocks.push(ctx.clock.id);
+      const res = await appCall(ctx.token, 'POST', '/api/billing/resume', { plan: 'pro' });
+      const body = await res.json();
+      check('resume opens a SETUP-mode checkout', res.status === 200 && /checkout\.stripe\.com/.test(body.url || ''), results);
+
+      // The card arriving is what the real customer's Checkout completion does.
+      await stripe.paymentMethods.attach('pm_card_visa', { customer: ctx.customer.id });
+      await sleep(10000);
+
+      const sub = await stripe.subscriptions.retrieve(ctx.sub.id);
+      check('the EXISTING subscription is active', sub.status === 'active' && sub.id === ctx.sub.id, results);
+      check('exactly one live subscription', (await liveSubsFor(ctx.clock.id)).length === 1, results);
+      const invs = await stripe.invoices.list({ customer: ctx.customer.id, limit: 5 });
+      const paid = invs.data.find((i) => i.amount_paid > 0);
+      check('an invoice for EUR 49 + VAT was paid', !!paid && paid.subtotal === 4900 && paid.amount_paid === 5929, results);
+      check('app records active', (db.getOrgBilling(ctx.orgId) || {}).subscriptionStatus === 'active', results);
+    }
+
+    // --- 3. Pro -> Team from paused ----------------------------------------
+    hr('SCENARIO 3 — Pro to Team from paused (the duplicate-subscription hole)');
+    {
+      const ctx = await buildPausedOrg('team');
+      clocks.push(ctx.clock.id);
+      const blocked = await appCall(ctx.token, 'POST', '/api/billing/checkout', { plan: 'team' });
+      check('plain checkout is refused while paused', blocked.status === 409, results);
+
+      await appCall(ctx.token, 'POST', '/api/billing/resume', { plan: 'team' });
+      const mid = await stripe.subscriptions.retrieve(ctx.sub.id);
+      check('the tier choice is recorded, not yet applied', mid.metadata.pending_plan === 'team'
+        && mid.items.data[0].price.id === PRICE_PRO, results);
+
+      await stripe.paymentMethods.attach('pm_card_visa', { customer: ctx.customer.id });
+      await sleep(10000);
+
+      const sub = await stripe.subscriptions.retrieve(ctx.sub.id);
+      check('the SAME subscription now carries the Team price',
+        sub.id === ctx.sub.id && sub.items.data[0].price.id === process.env.STRIPE_PRICE_TEAM, results);
+      check('status is active', sub.status === 'active', results);
+      const live = await liveSubsFor(ctx.clock.id);
+      check(`EXACTLY ONE live subscription (found ${live.length})`, live.length === 1, results);
+    }
+
+    // --- 4. Declined card ---------------------------------------------------
+    hr('SCENARIO 4 — declined card at resume');
+    {
+      const ctx = await buildPausedOrg('decline');
+      clocks.push(ctx.clock.id);
+      await appCall(ctx.token, 'POST', '/api/billing/resume', { plan: 'pro' });
+      // pm_card_chargeCustomerFail attaches successfully and fails at CHARGE
+      // time, which is the case under test. pm_card_chargeDeclined is refused
+      // at attach, so the card never reaches the resume path at all.
+      await stripe.paymentMethods.attach('pm_card_chargeCustomerFail', { customer: ctx.customer.id });
+      await sleep(12000);
+
+      const sub = await stripe.subscriptions.retrieve(ctx.sub.id);
+      const b = db.getOrgBilling(ctx.orgId) || {};
+      const ent = require('../src/services/entitlements').entitlementForOrg(b);
+      console.log(`   [observed] stripe=${sub.status}  app=${b.subscriptionStatus}  entitlement=${ent}`);
+      const invs = await stripe.invoices.list({ customer: ctx.customer.id, limit: 5 });
+      for (const i of invs.data) console.log(`   [observed] invoice ${i.id} ${i.status} paid=${i.amount_paid}`);
+      check(`the subscription does not become active (stripe=${sub.status})`, sub.status !== 'active', results);
+      check(`the app never shows it as active (app=${b.subscriptionStatus})`, b.subscriptionStatus !== 'active', results);
+      check(`entitlement is not full (${ent})`, ent !== 'full', results);
+      const err = db.getResumeError(ctx.orgId);
+      check(`a decline reason was recorded (${err ? JSON.stringify(err.message) : 'none'})`, !!err, results);
+      check('exactly one live subscription', (await liveSubsFor(ctx.clock.id)).length === 1, results);
+    }
+  } finally {
+    hr('CLEANUP');
+    for (const id of clocks) {
+      try { await stripe.testHelpers.testClocks.del(id); console.log('deleted clock', id); }
+      catch (err) { console.error('could not delete clock', id, err.message); process.exitCode = 1; }
+    }
+    const d = db.getDb();
+    for (const row of d.prepare("SELECT id FROM organizations WHERE name LIKE ?").all(`${MARKER}-%`)) {
+      d.prepare('DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE org_id = ?)').run(row.id);
+      d.prepare('DELETE FROM users WHERE org_id = ?').run(row.id);
+      d.prepare('DELETE FROM trial_emails WHERE org_id = ?').run(row.id);
+      d.prepare('DELETE FROM usage_counters WHERE org_id = ?').run(row.id);
+      d.prepare('DELETE FROM organizations WHERE id = ?').run(row.id);
+    }
+    console.log('removed local scenario orgs');
+    clearRun();
+  }
+
+  hr('SCENARIO RESULTS');
+  const passed = results.filter(Boolean).length;
+  console.log(`${passed} / ${results.length} checks passed`);
+  if (passed !== results.length) process.exitCode = 1;
+}
+
 async function main() {
+  if (SCENARIOS) {
+    if (!RUN) { RUN = { id: require('crypto').randomUUID().slice(0, 8), frozenTime: Math.floor(Date.now() / 1000) }; saveRun(RUN); }
+    await runScenarios();
+    return;
+  }
+
   if (CLEANUP_ONLY) {
     if (!RUN) RUN = { id: 'cleanup', frozenTime: 0 }; // IDEM is unused on this path
     const org = db.getDb().prepare('SELECT id FROM organizations WHERE name = ?').get(MARKER);

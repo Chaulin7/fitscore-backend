@@ -216,6 +216,54 @@ and it also sets the customer's default payment method when they have none —
 otherwise the resumed subscription's first invoice fails and they land in
 `past_due`, which looks to them exactly like the pause they just escaped.
 
+### When the trial pauses
+
+One invariant governs everything here: **an organization never holds more than
+one non-canceled subscription.** A paused subscription is not canceled — it
+carries the plan and bills the moment it resumes — so nothing may sell beside
+it. Enforced server-side: `POST /api/billing/checkout` answers `409
+SUBSCRIPTION_PAUSED` at every tier while a paused subscription exists.
+
+A paused org gets a screen (not a dismissable banner) with three ways out:
+
+| Action | Endpoint | What it does |
+|---|---|---|
+| Continue on Pro | `POST /api/billing/resume {plan:'pro'}` | Checkout in **setup mode** to collect a card. Creates no subscription — `payment_method.attached` resumes the existing one. |
+| Continue on Team | `POST /api/billing/resume {plan:'team'}` | Same, plus `pending_plan` on the subscription. The price is switched on the **existing** subscription at resume time. |
+| Continue on Free | `POST /api/billing/continue-free {confirm:true}` | Cancels the subscription, moves to Free. Requires explicit confirmation. |
+
+Setup mode rather than the billing portal: the portal is a general-purpose
+account screen (cancel, plan-switch, invoice history), which is a strange place
+to send someone whose account is locked and who was asked one question. Setup
+mode is single-purpose and its return URLs are ours. The portal stays available
+separately.
+
+The Team switch changes the price on the existing subscription rather than
+cancelling and re-buying: cancel-then-create has a window where both exist,
+loses the trial's lineage, and puts the customer through a second checkout.
+`proration_behavior` is deliberately **not** sent — Stripe refuses it on a
+paused subscription, and `billing_cycle_anchor: 'now'` on the resume already
+means no prorations.
+
+Moving to Free deletes nothing. Every screening, audit record, report and
+template stays readable and exportable; only creation is capped. The month's
+usage counter is zeroed, because `usage_counters` is a running monthly total
+and the Free cap must count only work done after the downgrade.
+
+**A declined card at resume.** Stripe reports a failed resumption as `past_due`,
+not `paused`, and voids the unpaid invoice after 23 hours. The org stays
+read-only — the dunning grace that normally comes with `past_due` is withheld
+from a trial that has never converted (`trial_origin_at` set,
+`trial_converted_at` null), or declining the card would be a way to keep using
+the product. The reason is stored in `resume_error` and rendered on the screen.
+
+`customer.subscription.paused` is handled as a **side-effect hook only**: it
+sends one "your trial has ended, your data is safe" email and writes no state.
+A live run showed `customer.subscription.resumed` arriving with a stale payload
+(`status: trialing` on a subscription that had just gone active), so these
+lifecycle events are not a trustworthy source of state —
+`customer.subscription.updated` remains the only writer.
+
 ### Access levels
 
 One mapping, in `src/services/entitlements.js`, used everywhere:
@@ -225,6 +273,7 @@ One mapping, in `src/services/entitlements.js`, used everywhere:
 | `trialing`, `active`, `past_due` | full |
 | `paused` | read-only — every GET works, every write returns `402 SUBSCRIPTION_PAUSED` |
 | `canceled`, `unpaid`, `incomplete*` | no paid entitlement; the org falls back to the Free tier and its cap |
+| `past_due` on a trial that never converted | read-only — grace is for customers who have paid |
 
 `/api/billing` is deliberately **not** behind the read-only gate: the way out of
 a pause is the billing portal.

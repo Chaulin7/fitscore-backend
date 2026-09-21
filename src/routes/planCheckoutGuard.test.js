@@ -528,7 +528,7 @@ describe('a dead-but-not-terminal subscription does not block the retry', () => 
     // trialing and paused grant nothing right now, but they will bill. Selling
     // the same tier again here is the double-billing this guard exists to stop,
     // so "not entitled" must NOT be the test for "may buy again".
-    for (const status of ['active', 'past_due', 'trialing', 'paused']) {
+    for (const status of ['active', 'past_due', 'trialing']) {
       setPlan(ORG_A, { plan: 'pro', subscriptionStatus: status, customerId: 'cus_live', comped: false });
       const n = calls.length;
       const res = await post('/api/billing/checkout', { plan: 'pro' });
@@ -539,10 +539,27 @@ describe('a dead-but-not-terminal subscription does not block the retry', () => 
   });
 
   test('those same live states still allow a genuine upgrade to Team', async () => {
-    for (const status of ['active', 'past_due', 'trialing', 'paused']) {
+    for (const status of ['active', 'past_due', 'trialing']) {
       setPlan(ORG_A, { plan: 'pro', subscriptionStatus: status, customerId: 'cus_live', comped: false });
       const res = await post('/api/billing/checkout', { plan: 'team' });
       assert.equal(res.status, 200, `status=${status}: upgrading tier must stay possible`);
+    }
+  });
+
+  test('a PAUSED org is refused checkout entirely — at every tier', async () => {
+    // Paused is handled separately from the three states above, and refused
+    // earlier and harder. It is the one live status where the org already holds
+    // a subscription it is not using: a checkout at ANY tier would leave that
+    // paused one alive beside the new one, which is the duplicate the
+    // one-subscription invariant forbids. The way forward is POST /resume,
+    // which acts on the subscription they already have.
+    for (const plan of ['pro', 'team']) {
+      setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'paused', customerId: 'cus_live', comped: false });
+      const n = calls.length;
+      const res = await post('/api/billing/checkout', { plan });
+      assert.equal(res.status, 409, `paused -> ${plan} must be refused`);
+      assert.equal(res.body.code, 'SUBSCRIPTION_PAUSED');
+      assert.deepEqual(callsSince(n), [], `paused -> ${plan} reached Stripe`);
     }
   });
 });

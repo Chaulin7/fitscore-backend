@@ -232,6 +232,34 @@ function effectiveTierFor(orgBilling) {
   return hasLiveSubscription(orgBilling) ? plan : 'free';
 }
 
+/**
+ * Whether this org is sitting on a subscription Stripe has paused.
+ *
+ * The state a no-card trial lands in on day 30. It is neither entitled nor
+ * gone: the subscription still exists, still carries the plan, and will bill
+ * the moment it is resumed. Everything that might sell this org something has
+ * to ask this first, because the ONE INVARIANT is that an organization never
+ * holds more than one non-canceled subscription — and a paused subscription is
+ * very much not canceled.
+ */
+function isPaused(orgBilling) {
+  return !!orgBilling && orgBilling.subscriptionStatus === 'paused';
+}
+
+/**
+ * Why a fresh Checkout must be refused, or null when it may proceed.
+ *
+ * Split out of the route so the panel and the endpoint cannot disagree about
+ * what is purchasable. A paused org is refused NOT because it is ineligible but
+ * because buying is the wrong verb: it already owns a subscription, and the
+ * right move is to resume that one. Selling it a second one is exactly the
+ * duplicate this invariant exists to prevent.
+ */
+function checkoutBlockedReason(orgBilling) {
+  if (isPaused(orgBilling)) return 'SUBSCRIPTION_PAUSED';
+  return null;
+}
+
 // Whether `target` is a genuine upgrade from `current`. Used by the checkout
 // guard to refuse a same-tier repurchase (which would attach a SECOND Stripe
 // subscription to the org, i.e. bill twice) and any downgrade.
@@ -251,6 +279,8 @@ module.exports = {
   LIVE_SUBSCRIPTION_STATUSES,
   TERMINAL_SUBSCRIPTION_STATUSES,
   hasLiveSubscription,
+  isPaused,
+  checkoutBlockedReason,
   effectiveTierFor,
   getStripe,
   isBillingConfigured,

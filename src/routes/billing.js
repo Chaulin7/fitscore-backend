@@ -24,10 +24,12 @@ const {
   setOrgStripeCustomerId, findOrgByStripeCustomerId, setOrgPlan,
   markTrialInviteRedeemed, findTrialInviteByToken, findTrialInviteByOrg,
   getOrgTrial, setOrgTrialCampaign, markOrgConverted,
+  setResumeError, getResumeError, markFreeTierSince,
 } = require('../services/db');
 const trialEmail = require('../services/trialEmail');
 const trialInvites = require('../services/trialInvites');
-const { tierById, PLANS, ENTITLEMENT_AXES, phraseForAxis } = require('../config/plans');
+const { isFailedTrialFirstCharge } = require('../services/entitlements');
+const { tierById, PLANS, ENTITLEMENT_AXES, phraseForAxis, CURRENCY } = require('../config/plans');
 const { baseUrlFor } = require('../config/appUrl');
 
 const router = express.Router();
@@ -129,6 +131,16 @@ function planPanelState(orgBilling) {
   // Ordered by urgency. past_due outranks a scheduled cancellation because the
   // customer is actively losing access; a scheduled cancellation is not urgent
   // until it happens.
+  // Paused outranks everything below it. A paused org is read-only RIGHT NOW,
+  // which is more urgent than a failing payment on an account that still works.
+  // It used to fall through to 'pro_active' — so the panel told a locked-out
+  // customer their plan was fine and offered them nothing but "Manage billing".
+  if (status === 'paused') return 'paused';
+  // A trial whose resume was declined reads as past_due at Stripe but is, to
+  // the customer, still the paused account they were trying to restart. Same
+  // screen, same three ways out — plus resumeError explaining the decline, so
+  // they do not retry the card that just failed.
+  if (isFailedTrialFirstCharge(b)) return 'paused';
   if (status === 'past_due') return 'past_due';
   if (status === 'incomplete') return 'incomplete';
   if (b.cancelAtPeriodEnd === 1 || b.cancelAtPeriodEnd === true) return 'cancel_scheduled';
@@ -196,6 +208,17 @@ function planActions(state, { isOwner, canCheckout, canPortal, plan }) {
       return portal('manage_billing', 'Manage billing', 'primary');
     case 'team_active':
       return portal('manage_billing', 'Manage billing', 'primary');
+    case 'paused':
+      // Three ways out, and NONE of them is a fresh Checkout at the same tier —
+      // that would leave the paused subscription alive beside a new one. Each
+      // of these acts on the subscription the org already has.
+      return [
+        { id: 'continue_pro', label: 'Continue on Pro', kind: 'primary', action: 'resumeSubscription', plan: 'pro', anchor: 'analyses' },
+        { id: 'continue_team', label: 'Continue on Team', kind: 'ghost', action: 'resumeSubscription', plan: 'team', anchor: 'footer' },
+        // Destructive: it cancels the subscription. The client confirms first,
+        // and the endpoint requires an explicit acknowledgement of its own.
+        { id: 'continue_free', label: 'Continue on Free', kind: 'ghost', action: 'continueOnFree', confirm: true, anchor: 'footer' },
+      ];
     case 'past_due':
       // No upsell while a payment is failing.
       return portal('update_payment', 'Update payment method', 'primary');
@@ -280,6 +303,11 @@ router.get('/plan-summary', requireSession, (req, res) => {
       comped,
       isOwner,
       billingConfigured: configured,
+      // Why the last resume attempt failed, when one did. The panel renders
+      // this on the paused screen so a declined card is explained rather than
+      // presented as the same dead end the customer started from.
+      resumeError: (() => { const e = getResumeError(req.orgId); return e ? e.message : null; })(),
+      freeTierSince: b.freeTierSince || null,
       // One positive flag plus the reason it is false, so the panel never has
       // to infer "why" from a combination of other fields.
       canManageBilling: blockReason === null,
@@ -379,6 +407,17 @@ router.post('/checkout', requireSession, requireOwner, async (req, res) => {
     // function answers "what tier does this org hold", and teaching it to
     // answer 'free' for a comped org would be a trap for any future caller
     // that reached for it to gate a feature.
+    // THE INVARIANT, enforced server-side rather than by hiding a button: an
+    // organization never holds more than one non-canceled subscription. A
+    // paused subscription is not canceled — it carries the plan and bills the
+    // moment it resumes — so a paused org must never be sold a second one.
+    // The way forward for them is POST /resume or POST /continue-free, both of
+    // which act on the subscription they already have.
+    if (billing.checkoutBlockedReason(currentBilling) === 'SUBSCRIPTION_PAUSED') {
+      return sendError(res, 409, 'SUBSCRIPTION_PAUSED',
+        'This organization already has a paused subscription. Resume it or move to Free '
+        + 'instead of starting a new one.');
+    }
     const rankAgainst = isComped(currentBilling) ? 'free' : currentPlan;
     if (!billing.isUpgradeFrom(rankAgainst, plan)) {
       return sendError(res, 400, 'PLAN_NOT_AN_UPGRADE',
@@ -434,6 +473,165 @@ router.post('/checkout', requireSession, requireOwner, async (req, res) => {
       return sendError(res, 503, 'TAX_NOT_CONFIGURED', taxConfigMessage(err));
     }
     sendError(res, 502, 'STRIPE_ERROR', err.message);
+  }
+});
+
+/**
+ * POST /api/billing/resume { plan: 'pro' | 'team' } (owner only)
+ *
+ * The way out of a paused trial, for a customer who wants to keep paying.
+ *
+ * IT NEVER CREATES A SUBSCRIPTION. The org already has one — paused, carrying
+ * its plan, ready to bill. All this does is collect a card, because the reason
+ * Stripe paused it is that there is no payment method. The card arriving fires
+ * payment_method.attached, and the handler for that resumes the EXISTING
+ * subscription and pays its resumption invoice. That is the single resume path;
+ * this endpoint deliberately owns none of it.
+ *
+ * CHECKOUT IN SETUP MODE, not the billing portal. Both can take a card, and the
+ * portal needs no code — but the portal is a general-purpose account screen: it
+ * opens on cancel, plan-switch and invoice-history controls, which is a strange
+ * place to send somebody whose account is locked and who was asked one question.
+ * Setup mode is single-purpose, its success and cancel URLs are ours, and it
+ * puts the card on the customer exactly the way the resume path expects. The
+ * portal stays available separately for people who want to manage billing.
+ *
+ * A Team choice is recorded on the subscription's metadata rather than applied
+ * now: if the customer abandons Checkout, nothing has changed, and the org is
+ * still one paused Pro subscription rather than a paused Team one it never
+ * agreed to pay for. The switch happens at resume, next to the payment.
+ */
+router.post('/resume', requireSession, requireOwner, async (req, res) => {
+  try {
+    const stripe = billing.getStripe();
+    if (!stripe) return sendError(res, 503, 'BILLING_NOT_CONFIGURED', 'Billing is not configured on the server.');
+
+    const plan = (req.body || {}).plan || 'pro';
+    if (plan !== 'pro' && plan !== 'team') {
+      return sendError(res, 400, 'VALIDATION_ERROR', "plan must be 'pro' or 'team'.");
+    }
+
+    const orgBilling = getOrgBilling(req.orgId) || {};
+    if (!billing.isPaused(orgBilling)) {
+      return sendError(res, 409, 'NOT_PAUSED',
+        'This organization has no paused subscription to resume.');
+    }
+    const subscriptionId = orgBilling.stripeSubscriptionId;
+    const customerId = orgBilling.stripeCustomerId;
+    if (!subscriptionId || !customerId) {
+      return sendError(res, 409, 'NO_SUBSCRIPTION', 'No paused subscription is attached to this organization.');
+    }
+    if (plan === 'team' && !billing.priceIdForPlan('team')) {
+      return sendError(res, 503, 'BILLING_NOT_CONFIGURED', 'No price configured for the team plan.');
+    }
+
+    // Record the intent. Applied by the resume path, beside the payment.
+    try {
+      await stripe.subscriptions.update(subscriptionId, {
+        metadata: { ...(orgBilling.metadata || {}), pending_plan: plan },
+      });
+    } catch (err) {
+      console.warn('[trial] could not record the pending plan', { subscriptionId, error: err.message });
+    }
+
+    // A new attempt supersedes whatever the last one said went wrong.
+    setResumeError(req.orgId, null);
+
+    const base = appBaseUrl(req);
+    const session = await stripe.checkout.sessions.create({
+      mode: 'setup',
+      customer: customerId,
+      // Required in setup mode — Stripe answers "Missing required param:
+      // currency" without it. Taken from config/plans so it cannot drift from
+      // the currency the prices are actually denominated in.
+      currency: CURRENCY.code.toLowerCase(),
+      success_url: `${base}/?billing=resumed`,
+      cancel_url: `${base}/?billing=cancel`,
+      metadata: { orgId: req.orgId, resume_plan: plan, subscriptionId },
+      // The address is already on the customer from the trial checkout; this
+      // keeps it current and keeps Stripe Tax able to locate them.
+      customer_update: { address: 'auto', name: 'auto' },
+    });
+    return res.json({ url: session.url });
+  } catch (err) {
+    if (isTaxConfigError(err)) return sendError(res, 503, 'TAX_NOT_CONFIGURED', taxConfigMessage(err));
+    return sendError(res, 502, 'STRIPE_ERROR', err.message);
+  }
+});
+
+/**
+ * POST /api/billing/continue-free { confirm: true } (owner only)
+ *
+ * The other way out: keep the account, drop the subscription.
+ *
+ * DESTRUCTIVE IN ONE DIRECTION ONLY — it cancels a subscription, which cannot
+ * be undone; the customer would have to buy again. So it requires an explicit
+ * `confirm: true` in the body on top of the client's own confirmation dialog.
+ * Two confirmations for one irreversible act is not excessive when the same
+ * button is two pixels from "Continue on Pro".
+ *
+ * NO DATA IS TOUCHED. Every screening, audit record, report and template stays
+ * exactly where it is and stays readable and exportable — the Free tier is a
+ * product, not a tombstone. The only thing that changes is what they may
+ * CREATE from here.
+ *
+ * The month's usage counter is zeroed. usage_counters is a running monthly
+ * total, so an org that downgrades on the 20th would otherwise meet the Free
+ * cap already spent on work it did during a paid trial — charged, in effect,
+ * for the trial twice.
+ */
+router.post('/continue-free', requireSession, requireOwner, async (req, res) => {
+  try {
+    const stripe = billing.getStripe();
+    if (!stripe) return sendError(res, 503, 'BILLING_NOT_CONFIGURED', 'Billing is not configured on the server.');
+
+    if (!(req.body || {}).confirm) {
+      return sendError(res, 400, 'CONFIRMATION_REQUIRED',
+        'Moving to Free cancels the subscription and cannot be undone. Send { "confirm": true } to proceed.');
+    }
+
+    const orgBilling = getOrgBilling(req.orgId) || {};
+    if (!billing.isPaused(orgBilling)) {
+      return sendError(res, 409, 'NOT_PAUSED', 'This organization has no paused subscription.');
+    }
+    const subscriptionId = orgBilling.stripeSubscriptionId;
+
+    if (subscriptionId) {
+      try {
+        await stripe.subscriptions.cancel(subscriptionId);
+      } catch (err) {
+        // A subscription Stripe has already removed is not an error here: the
+        // goal state is "no live subscription", and that is the goal state.
+        if (!/No such subscription|already canceled/i.test(err.message || '')) {
+          return sendError(res, 502, 'STRIPE_ERROR', err.message);
+        }
+        console.warn('[trial] subscription already gone at continue-free', { subscriptionId });
+      }
+    }
+
+    // Written here rather than waiting for customer.subscription.deleted, so
+    // the response the customer gets back is already true. The webhook applies
+    // the same absolute state when it lands, which is why that is safe.
+    setOrgPlan(req.orgId, {
+      plan: 'free',
+      subscriptionStatus: 'canceled',
+      currentPeriodEnd: null,
+      stripeSubscriptionId: null,
+      cancelAtPeriodEnd: 0,
+    });
+    setResumeError(req.orgId, null);
+    const periodKey = currentPeriodKey();
+    markFreeTierSince(req.orgId, new Date().toISOString());
+
+    console.log('[trial] org moved to Free after a paused trial', { orgId: req.orgId, subscriptionId });
+    return res.json({
+      plan: 'free',
+      subscriptionStatus: 'canceled',
+      usage: { periodKey, analyses: { used: getUsageCount(req.orgId, periodKey), limit: billing.FREE_MONTHLY_LIMIT } },
+      dataRetained: true,
+    });
+  } catch (err) {
+    return sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
 });
 
@@ -513,7 +711,15 @@ async function cancelSupersededSubscriptions(subscription, plan) {
   for (const other of (list && list.data) || []) {
     if (!other || other.id === subscription.id) continue;
     if (!NON_TERMINAL_SUBSCRIPTION_STATUSES.has(other.status)) continue;
-    if (billing.planForPriceId(priceIdOf(other)) !== plan) continue;
+    // Same tier, OR paused at ANY tier.
+    //
+    // The same-tier rule above protects a legitimate second subscription at a
+    // different tier. A PAUSED one is never that: it is a lapsed trial the
+    // customer is not using, and leaving it alive means it resumes and bills
+    // alongside whatever they just started. That is the duplicate the
+    // one-subscription invariant forbids, so paused loses regardless of tier.
+    const otherIsPausedAnyTier = other.status === 'paused';
+    if (!otherIsPausedAnyTier && billing.planForPriceId(priceIdOf(other)) !== plan) continue;
     try {
       await stripe.subscriptions.cancel(other.id);
       console.warn('[billing] cancelled a superseded duplicate subscription', {
@@ -683,6 +889,53 @@ async function handleTrialWillEnd(req, stripe, subscription, orgId) {
 }
 
 /**
+ * customer.subscription.paused — tell them, once.
+ *
+ * Writes NO state. The status is already correct by the time this runs:
+ * customer.subscription.updated carries the same transition and goes through
+ * the ordering guard, which is where plan state belongs. This handler exists
+ * for the one thing that event cannot do, which is say something to the person
+ * whose account just stopped working.
+ */
+async function handleSubscriptionPaused(req, stripe, subscription, orgId) {
+  const { email, companyName } = trialRecipientFor(orgId, subscription);
+  const plan = billing.planForPriceId(priceIdOf(subscription))
+    || (subscription.metadata && subscription.metadata.plan) || 'pro';
+  const tier = tierById(plan);
+  const base = appBaseUrl(req);
+  const portalUrl = await billingPortalUrlFor(stripe, subscription.customer, `${base}/`);
+
+  const result = await trialEmail.sendTrialPaused({
+    orgId,
+    subscriptionId: subscription.id,
+    toEmail: email,
+    companyName,
+    planName: tier ? tier.name : 'Pro',
+    portalUrl,
+    appUrl: `${base}/dashboard`,
+  });
+  console.log('[trial] subscription paused — notice handled', {
+    orgId, subscriptionId: subscription.id, sent: result.sent, skipped: result.skipped,
+  });
+}
+
+/**
+ * A customer-facing sentence for a failed resume.
+ *
+ * Stripe's own decline messages are written for the cardholder and are more
+ * specific than anything worth inventing here ("Your card was declined.",
+ * "Your card has insufficient funds."), so they are preferred when present.
+ * Anything else collapses to a generic line — an internal Stripe error is not
+ * the customer's problem to read.
+ */
+function declineReason(err) {
+  const declineCodes = new Set(['card_declined', 'expired_card', 'incorrect_cvc', 'insufficient_funds', 'processing_error']);
+  if (err && err.code && declineCodes.has(err.code) && err.message) return err.message;
+  if (err && err.type === 'StripeCardError' && err.message) return err.message;
+  return 'The card could not be charged. Try a different payment method.';
+}
+
+/**
  * payment_method.attached — the card arrived, so resume.
  *
  * THIS IS REQUIRED, and it is the single least obvious thing in the feature.
@@ -762,7 +1015,48 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
   }
 
   for (const sub of paused) {
+    const orgId = orgIdFromCustomer(customerId);
     try {
+      // --- apply a pending tier change, before the money moves -------------
+      // POST /resume records { pending_plan } on the subscription when the
+      // customer chose a different tier on their way out of the pause. It is
+      // applied HERE, beside the payment, rather than when they clicked: an
+      // abandoned Checkout then leaves the org exactly as it was — one paused
+      // subscription at the tier they actually had — instead of a paused Team
+      // subscription nobody agreed to pay for.
+      //
+      // Switching the price on the EXISTING subscription is what keeps the
+      // one-subscription invariant. The alternative — cancel the paused one and
+      // sell a new Team subscription — has a window in which both exist, loses
+      // the trial's lineage and metadata, and puts the customer through a
+      // second checkout for something they already told us they wanted.
+      const pendingPlan = sub.metadata && sub.metadata.pending_plan;
+      const targetPrice = pendingPlan ? billing.priceIdForPlan(pendingPlan) : null;
+      const currentPrice = priceIdOf(sub);
+      if (targetPrice && currentPrice && targetPrice !== currentPrice) {
+        const itemId = sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].id;
+        if (itemId) {
+          // NO proration_behavior. Stripe refuses it outright on a paused
+          // subscription — "You cannot set `proration_behavior` while a
+          // subscription is `paused`" — and sending it aborts the whole resume,
+          // leaving the customer paused with a recorded failure.
+          //
+          // Omitting it is not a compromise here. The resume immediately after
+          // this uses billing_cycle_anchor 'now', which per Stripe's docs
+          // resets the cycle and generates NO prorations: the customer is
+          // billed one full period at the new price, which is the intended
+          // outcome. Prorating the paused gap would charge them for time they
+          // had no access to.
+          await stripe.subscriptions.update(sub.id, {
+            items: [{ id: itemId, price: targetPrice }],
+            metadata: { ...sub.metadata, pending_plan: '' },
+          });
+          console.log('[trial] switched the paused subscription to a new tier before resuming', {
+            subscriptionId: sub.id, from: billing.planForPriceId(currentPrice), to: pendingPlan,
+          });
+        }
+      }
+
       // Name the card on the SUBSCRIPTION as well, not only on the customer.
       // A live test-clock run showed the resumption invoice being raised with a
       // PaymentIntent stuck at requires_payment_method, and then voided, while
@@ -789,6 +1083,11 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
       if (finalStatus === 'paused' && invoiceId) {
         const invoice = await stripe.invoices.retrieve(invoiceId);
         if (invoice && invoice.status === 'open') {
+          // A DECLINE LANDS HERE, as a thrown Stripe error. It must not be
+          // swallowed: Stripe voids an unpaid resumption invoice after 23 hours
+          // and leaves the subscription paused, so a customer whose card was
+          // refused would otherwise see the same locked screen with no reason
+          // and try the same card again.
           const paid = await stripe.invoices.pay(invoiceId);
           console.log('[trial] paid the resumption invoice', {
             subscriptionId: sub.id, invoiceId, status: paid && paid.status, amountPaid: paid && paid.amount_paid,
@@ -797,13 +1096,18 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
           finalStatus = after && after.status;
         }
       }
+      if (finalStatus === 'active' && orgId) setResumeError(orgId, null);
       console.log('[trial] resumed a paused subscription after a card was added', {
         customerId, subscriptionId: sub.id, status: finalStatus,
       });
     } catch (err) {
+      // The org stays PAUSED and therefore read-only — never shown as active —
+      // and the reason is recorded for the panel to render.
+      const declineMessage = declineReason(err);
       console.error('[trial] could not resume a paused subscription', {
-        customerId, subscriptionId: sub.id, error: err.message,
+        customerId, subscriptionId: sub.id, orgId, error: err.message,
       });
+      if (orgId) setResumeError(orgId, declineMessage);
     }
   }
 }
@@ -975,6 +1279,13 @@ async function handleWebhook(req, res) {
     'customer.subscription.trial_will_end',
     'payment_method.attached',
     'invoice.paid',
+    // A SIDE-EFFECT HOOK ONLY. It never writes status, and that is not
+    // fastidiousness: a live run showed customer.subscription.resumed arriving
+    // with a STALE payload (status 'trialing' on a subscription that had just
+    // gone active), so these lifecycle events are not a trustworthy source of
+    // state. customer.subscription.updated remains the only writer, behind the
+    // ordering guard. This one exists to send one email.
+    'customer.subscription.paused',
   ]);
 
   try {
@@ -1059,6 +1370,8 @@ async function handleWebhook(req, res) {
         const orgId = (obj.metadata && obj.metadata.orgId) || orgIdFromCustomer(obj.customer);
         if (event.type === 'customer.subscription.trial_will_end') {
           await handleTrialWillEnd(req, stripe, obj, orgId);
+        } else if (event.type === 'customer.subscription.paused') {
+          await handleSubscriptionPaused(req, stripe, obj, orgId);
         } else if (event.type === 'invoice.paid') {
           handleInvoicePaid(obj, orgId);
         }
