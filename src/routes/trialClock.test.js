@@ -89,6 +89,32 @@ function customerHasPaymentMethod(customerId) {
   return !!(c && c.invoice_settings && c.invoice_settings.default_payment_method);
 }
 
+/**
+ * An invoice raised and finalized but NOT collected — what resume() produces.
+ * Payment is a separate, explicit step; see invoices.pay below.
+ */
+function openInvoiceFor(sub, billingReason) {
+  const invoice = {
+    id: nextId('in'),
+    customer: sub.customer,
+    subscription: sub.id,
+    billing_reason: billingReason,
+    currency: 'eur',
+    subtotal: PRO_EX_VAT_CENTS,
+    tax: PRO_TAX_CENTS,
+    total: PRO_TOTAL_CENTS,
+    amount_paid: 0,
+    status: 'open',
+    auto_advance: false,
+    created: clock.frozen_time,
+    metadata: {},
+  };
+  INVOICES.push(invoice);
+  emit('invoice.created', { ...invoice });
+  emit('invoice.finalized', { ...invoice });
+  return invoice;
+}
+
 /** Generate the invoice a billing cycle produces, and the event for it. */
 function invoiceFor(sub, billingReason) {
   const invoice = {
@@ -144,9 +170,25 @@ function advanceTo(unixSeconds) {
         && sub.trial_settings.end_behavior
         && sub.trial_settings.end_behavior.missing_payment_method === 'pause') {
         // PAUSE. Not cancel, and no invoice is generated at all.
+        //
+        // pause_collection STAYS NULL. This is the real payload shape, captured
+        // from scripts/trial-clock-check.js against live test-mode Stripe:
+        //
+        //   customer.subscription.updated  status=paused  pause_collection=null
+        //   customer.subscription.paused   status=paused  pause_collection=null
+        //
+        // This file previously set pause_collection = { behavior: 'void' },
+        // which was an assumption, and a wrong one. pause_collection belongs to
+        // the MANUAL pause feature (subscriptions.update with pause_collection);
+        // a trial paused for a missing payment method is a different mechanism
+        // that only moves `status`. The wrong fixture hid a production bug for
+        // the entire life of this test — see the resume branch in
+        // routes/billing.js, which filtered on pause_collection and therefore
+        // never matched a single real subscription.
         sub.status = 'paused';
-        sub.pause_collection = { behavior: 'void' };
         emit('customer.subscription.updated', { ...sub });
+        // A dedicated event the previous model did not have at all.
+        emit('customer.subscription.paused', { ...sub });
       } else {
         sub.status = 'canceled';
         emit('customer.subscription.updated', { ...sub });
@@ -214,18 +256,67 @@ const fakeStripe = () => ({
     update: async (id, p) => {
       const sub = SUBS.get(id);
       if (!sub) return { id };
-      // Stripe unsets pause_collection when it is sent as an empty string.
+      // Clearing pause_collection unsets a MANUAL pause and nothing else.
+      // On a trial-paused subscription pause_collection is already null, so
+      // this is a no-op — which is exactly what it is against real Stripe, and
+      // exactly why the old handler silently did nothing.
       if ('pause_collection' in p && (p.pause_collection === '' || p.pause_collection === null)) {
         if (sub.pause_collection) {
           sub.pause_collection = null;
-          sub.status = 'active';
-          sub.current_period_end = clock.frozen_time + 30 * DAY;
           emit('customer.subscription.updated', { ...sub });
-          // Collection resuming bills the period that was voided.
-          invoiceFor(sub, 'subscription_cycle');
         }
       }
       return { ...sub };
+    },
+    /**
+     * The real way out of a trial pause.
+     *
+     * Per Stripe's docs: "Initiates resumption of a paused subscription… If
+     * Stripe doesn't generate a resumption invoice, the subscription becomes
+     * active immediately. When a resumption invoice is generated, Stripe
+     * finalizes it immediately. If the invoice is paid… the subscription
+     * becomes active." With billing_cycle_anchor 'now' the cycle resets and a
+     * full-amount invoice is raised with no proration.
+     */
+    resume: async (id, p = {}) => {
+      const sub = SUBS.get(id);
+      if (!sub) return { id };
+      if (sub.status !== 'paused') return { ...sub }; // already running
+      if (!customerHasPaymentMethod(sub.customer)) {
+        const err = new Error('The subscription could not be resumed: no payment method.');
+        err.type = "StripeInvalidRequestError";
+        throw err;
+      }
+      // The subscription STAYS PAUSED here. resume() raises and finalizes a
+      // resumption invoice but does not collect it — captured live: the invoice
+      // sits `open` with auto_advance false and a PaymentIntent at
+      // requires_confirmation. Only paying it flips the subscription to active.
+      const invoice = openInvoiceFor(sub, 'subscription_cycle');
+      sub.latest_invoice = invoice.id;
+      return { ...sub };
+    },
+  },
+  invoices: {
+    retrieve: async (id) => ({ ...INVOICES.find((i) => i.id === id) }),
+    /**
+     * Pay an open invoice. This is the step that actually finishes a resume:
+     * the subscription only becomes active once its resumption invoice is paid.
+     */
+    pay: async (id) => {
+      const invoice = INVOICES.find((i) => i.id === id);
+      if (!invoice || invoice.status !== 'open') return { ...invoice };
+      invoice.status = 'paid';
+      invoice.amount_paid = invoice.total;
+      emit('invoice.paid', { ...invoice });
+      const sub = SUBS.get(invoice.subscription);
+      if (sub && sub.status === 'paused') {
+        sub.status = 'active';
+        sub.pause_collection = null;
+        sub.current_period_end = clock.frozen_time + 30 * DAY;
+        emit('customer.subscription.updated', { ...sub });
+        emit('customer.subscription.resumed', { ...sub });
+      }
+      return { ...invoice };
     },
   },
   paymentMethods: {
@@ -426,7 +517,8 @@ describe('30 days, no payment method', () => {
     await advance(3);
     assert.equal(SUBS.get(ctx.sub.id).status, 'paused');
     assert.notEqual(SUBS.get(ctx.sub.id).status, 'canceled');
-    assert.ok(SUBS.get(ctx.sub.id).pause_collection, 'collection is paused at Stripe');
+    assert.equal(SUBS.get(ctx.sub.id).pause_collection, null,
+      'a trial pause does NOT set pause_collection — status is the only signal');
     assert.equal(statusOf(ctx.orgId), 'paused', 'and the org records it');
   });
 
@@ -540,18 +632,18 @@ describe('paused, card added on day 35', () => {
 
   test('the account is paused and read-only before the card arrives', () => {
     assert.equal(SUBS.get(ctx.sub.id).status, 'paused');
-    assert.ok(SUBS.get(ctx.sub.id).pause_collection);
+    assert.equal(SUBS.get(ctx.sub.id).pause_collection, null, 'null, as real Stripe reports it');
     assert.equal(entitlementOf(ctx.orgId), ENTITLEMENT.READ_ONLY);
   });
 
-  test('attaching a card on day 35 clears pause_collection', async () => {
+  test('attaching a card on day 35 resumes the subscription', async () => {
     await advance(5);
     assert.equal(entitlementOf(ctx.orgId), ENTITLEMENT.READ_ONLY, 'still paused on day 35');
 
     await attachCard(ctx.customerId, 'pm_card_gamma');
 
-    assert.equal(SUBS.get(ctx.sub.id).pause_collection, null,
-      'pause_collection is cleared — Stripe does NOT do this on its own');
+    assert.equal(SUBS.get(ctx.sub.id).status, 'active',
+      'resumed — Stripe does NOT do this when a card is merely attached');
   });
 
   test('full access is restored', () => {

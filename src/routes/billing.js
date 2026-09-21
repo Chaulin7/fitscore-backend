@@ -683,25 +683,51 @@ async function handleTrialWillEnd(req, stripe, subscription, orgId) {
 }
 
 /**
- * payment_method.attached — the card arrived, so un-pause.
+ * payment_method.attached — the card arrived, so resume.
  *
  * THIS IS REQUIRED, and it is the single least obvious thing in the feature.
- * Attaching a payment method does NOT resume a paused subscription: Stripe
- * leaves pause_collection set until something explicitly clears it. Without
- * this handler a customer adds their card, sees the portal confirm it, and
- * stays locked in read-only forever with no error anywhere to explain why.
+ * Attaching a payment method does NOT resume a paused subscription. Stripe's
+ * own documentation is explicit: a trial that ends with no payment method and
+ * `missing_payment_method: 'pause'` moves to status `paused` and "remains
+ * `paused` until explicitly resumed". Without this handler a customer adds
+ * their card, sees the portal confirm it, and stays locked in read-only
+ * forever with no error anywhere to explain why.
+ *
+ * DETECTION IS BY STATUS, NOT BY pause_collection. This is the correction a
+ * live test-clock run forced (scripts/trial-clock-check.js). The two are
+ * different mechanisms:
+ *
+ *   status === 'paused'   a trial ended with no payment method. This is the
+ *                         one this product produces, and pause_collection on
+ *                         such a subscription is NULL.
+ *   pause_collection set  the MANUAL pause feature, applied through
+ *                         subscriptions.update. It does not change `status`,
+ *                         and nothing in this product ever sets it.
+ *
+ * The previous version filtered on `sub.pause_collection` being truthy, which
+ * is never true for a trial pause, so it returned early every single time. The
+ * bug survived because the test stub asserted the same wrong shape — it set
+ * pause_collection = { behavior: 'void' } on pause, and so agreed with the code
+ * about something Stripe does not do.
+ *
+ * AND THE RESUME ACTION IS subscriptions.resume, not an update that clears
+ * pause_collection. Clearing a field that is already null does nothing.
+ * `billing_cycle_anchor: 'now'` resets the cycle and raises a full-amount
+ * invoice with no proration, which is what converts the trial into money
+ * immediately rather than at some inherited anchor date.
  *
  * IDEMPOTENT by construction, which matters because Stripe redelivers and
  * because a customer may attach several cards:
- *   - a subscription with no pause_collection is skipped, so a second delivery
- *     does nothing;
+ *   - only a subscription whose status is 'paused' is touched, so a second
+ *     delivery (by which time it is 'active') does nothing;
  *   - the default payment method is only set when the customer has none, so a
  *     later card never silently replaces the one they chose;
- *   - clearing pause_collection is itself absolute, not a toggle.
+ *   - resume() on an already-active subscription is not called at all.
  *
- * The subscription.updated event Stripe emits in response flows through the
- * ordinary path above and writes status 'active' — which restores full access
- * through the entitlement helper, with nothing here needing to know that.
+ * ORDER IS LOAD-BEARING: the default payment method is set BEFORE the resume.
+ * Resuming generates an invoice that Stripe finalizes immediately, and per the
+ * docs, if there is no payment attempt within 23 hours Stripe voids it and the
+ * subscription stays paused. Resuming first would race the customer's own card.
  */
 async function handlePaymentMethodAttached(stripe, paymentMethod) {
   const customerId = paymentMethod && paymentMethod.customer;
@@ -715,13 +741,13 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
     return;
   }
 
-  const paused = ((list && list.data) || []).filter((sub) => sub && sub.pause_collection);
+  const paused = ((list && list.data) || []).filter((sub) => sub && sub.status === 'paused');
   if (paused.length === 0) return; // nothing paused: a normal card update
 
   // Give the customer a default payment method if they have none. A resumed
-  // subscription with nothing to charge just fails its next invoice and lands
-  // in past_due, which looks to the customer exactly like the pause they just
-  // paid to escape. Only when unset — never overwriting a deliberate choice.
+  // subscription with nothing to charge just fails its invoice and stays
+  // paused, which looks to the customer exactly like the pause they just paid
+  // to escape. Only when unset — never overwriting a deliberate choice.
   try {
     const customer = await stripe.customers.retrieve(customerId);
     const hasDefault = customer && customer.invoice_settings
@@ -737,10 +763,42 @@ async function handlePaymentMethodAttached(stripe, paymentMethod) {
 
   for (const sub of paused) {
     try {
-      // Stripe unsets pause_collection when it is sent as an empty string.
-      await stripe.subscriptions.update(sub.id, { pause_collection: '' });
+      // Name the card on the SUBSCRIPTION as well, not only on the customer.
+      // A live test-clock run showed the resumption invoice being raised with a
+      // PaymentIntent stuck at requires_payment_method, and then voided, while
+      // the customer's invoice_settings.default_payment_method was correctly
+      // set — so the customer-level default alone is not what Stripe charges a
+      // resumption against. Only set when the subscription has none of its own.
+      if (!sub.default_payment_method) {
+        await stripe.subscriptions.update(sub.id, { default_payment_method: paymentMethod.id });
+      }
+      const resumed = await stripe.subscriptions.resume(sub.id, { billing_cycle_anchor: 'now' });
+
+      // PAY THE RESUMPTION INVOICE. resume() raises and finalizes it but does
+      // NOT collect it: a live run showed the invoice sitting `open` with
+      // auto_advance false and its PaymentIntent at requires_confirmation, and
+      // Stripe voids it after 23 hours, leaving the customer paused. The docs
+      // say the subscription becomes active only "if the invoice is paid or
+      // marked uncollectible" — so paying it is the step that finishes the
+      // resume, and without it the whole flow silently reverts.
+      //
+      // Guarded on status 'open', so a redelivery (by which time it is 'paid')
+      // pays nothing twice.
+      let finalStatus = resumed && resumed.status;
+      const invoiceId = resumed && resumed.latest_invoice;
+      if (finalStatus === 'paused' && invoiceId) {
+        const invoice = await stripe.invoices.retrieve(invoiceId);
+        if (invoice && invoice.status === 'open') {
+          const paid = await stripe.invoices.pay(invoiceId);
+          console.log('[trial] paid the resumption invoice', {
+            subscriptionId: sub.id, invoiceId, status: paid && paid.status, amountPaid: paid && paid.amount_paid,
+          });
+          const after = await stripe.subscriptions.retrieve(sub.id);
+          finalStatus = after && after.status;
+        }
+      }
       console.log('[trial] resumed a paused subscription after a card was added', {
-        customerId, subscriptionId: sub.id,
+        customerId, subscriptionId: sub.id, status: finalStatus,
       });
     } catch (err) {
       console.error('[trial] could not resume a paused subscription', {
@@ -903,10 +961,10 @@ async function handleWebhook(req, res) {
   //
   //   trial_will_end       sends an email. Skipping it as "stale" would drop
   //                        the one message the conversion depends on.
-  //   payment_method.attached  clears pause_collection at Stripe. It carries no
-  //                        org state to be out of order with, and the
-  //                        subscription.updated it provokes goes through the
-  //                        guarded path above and is what actually writes
+  //   payment_method.attached  resumes the paused subscription at Stripe. It
+  //                        carries no org state to be out of order with, and
+  //                        the subscription.updated it provokes goes through
+  //                        the guarded path above and is what actually writes
   //                        'active'.
   //   invoice.paid         records a conversion, guarded by its own
   //                        write-once column rather than by event ordering.
