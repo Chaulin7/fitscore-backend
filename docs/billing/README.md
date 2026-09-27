@@ -350,6 +350,15 @@ double-count a campaign.
 
 ## Going live (later, with paid hosting)
 
+> **Back up the database first**, and take the backup with SQLite's `.backup`
+> rather than `cp` — in WAL mode a `cp` of the `.db` alone can capture a nearly
+> empty file with the data still in the `-wal` sidecar. The command, the reason,
+> and how to find the real database path live in one place: the main README's
+> [Backing up the production database](../../README.md#backing-up-the-production-database).
+>
+> The trial migrations are additive and lose nothing (see the migration notes
+> above), so the backup is insurance against the deploy, not against the schema.
+
 1. Recreate the products/prices in **live mode**; set the `price_...` env vars to
    the live IDs.
 2. Set `STRIPE_SECRET_KEY` to the live secret key.

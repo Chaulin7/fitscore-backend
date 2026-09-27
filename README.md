@@ -260,7 +260,63 @@ ALLOWED_ORIGINS=https://cvsprings.com,https://www.cvsprings.com,https://app.cvsp
 - New `templates` table.
 - Indexes added on `audit_log(created_at, role, decision)` and `audit_changes(audit_id)`.
 
-All schema changes are idempotent and run automatically on first request. **However, Render's filesystem is ephemeral** — to retain audit history across deploys, point `DB_PATH` at a mounted persistent disk (or migrate to Postgres in Section 3).
+All schema changes are idempotent and run automatically on first request. **However, Render's filesystem is ephemeral** — to retain audit history across deploys, point `DATABASE_PATH` at a file on a mounted persistent disk (or migrate to Postgres in Section 3).
+
+### Where the database actually is
+
+**Read it from the environment. Do not trust a path written in prose, including here.**
+
+```bash
+echo "$DATABASE_PATH"        # canonical
+echo "$DB_PATH"              # legacy alias, still honoured
+```
+
+`src/services/db.js` resolves `DATABASE_PATH || DB_PATH`, falling back to
+`data/audit.db` relative to the repo — which is the **local development** default
+and is never the production file. The app prints the resolved path once at boot:
+
+```
+[db] sqlite database opened { dbPath: '…', synchronous: 1 }
+```
+
+That log line is the authoritative answer for a running instance. If it shows a
+path inside the project directory rather than the mounted disk, the data will not
+survive the next deploy.
+
+This section exists because the path has been written down wrongly more than once:
+an earlier revision of this file claimed `/var/data/audit.db`, a directory that
+does not exist on Render, and `docs/extraction-determinism.md` records a
+July 2026 invocation using a third path again. Every one of those was correct
+for nobody. The environment is the only thing that knows.
+
+### Backing up the production database
+
+Run this from the Render shell, in the service that has the disk mounted:
+
+```bash
+sqlite3 "$DATABASE_PATH" ".backup '$DATABASE_PATH.backup-$(date +%F)'"
+```
+
+**Use `.backup`, not `cp`.** This database runs in WAL mode. `.backup` takes a
+read lock, walks the live database, and writes **one self-contained file** with
+every committed transaction folded in. A plain `cp` of the `.db` file copies only
+the main file — and in WAL mode most recent data lives in the `-wal` sidecar
+until a checkpoint folds it back, so a `cp` taken at the wrong moment produces a
+file that opens cleanly and is nearly empty.
+
+That is not hypothetical. The existing `/opt/render/project/data/backups/pre-deploy.db`
+is a **4 KB main file beside an 800 KB `-wal`** — a `cp`-style copy whose data is
+almost entirely in the sidecar. Restoring that `.db` on its own would silently
+lose nearly everything in it.
+
+If you have a `cp`-style backup already, it is only restorable while the `.db`,
+`-wal` and `-shm` files are kept **together and unseparated**; SQLite reassembles
+them on open. Moving or compressing the `.db` alone destroys it. Prefer
+re-taking the backup with `.backup`, which has no such dependency.
+
+A clean shutdown also checkpoints the WAL back into the main file and removes both
+sidecars, so a backup taken while the service is stopped is safe to `cp` — but
+`.backup` is safe either way and needs no downtime.
 
 ### Logging
 
@@ -272,7 +328,7 @@ The brief's Section 3 (Stripe billing + magic-link auth + plan enforcement + usa
 
 1. A Stripe account with three products (Starter free / Pro €49 / Team €199 with their price IDs).
 2. An email provider account (Resend, Postmark or Mailgun).
-3. A persistent database — either a mounted disk on Render with `DB_PATH=/var/data/audit.db`, or a managed Postgres URL (recommended).
+3. A persistent database — either a mounted disk on Render (set `DATABASE_PATH` to a file on it; `DB_PATH` is the legacy alias) or a managed Postgres URL (recommended). **Read the path from the environment, never from this file** — see [Where the database actually is](#where-the-database-actually-is).
 4. The env vars listed in the commented-out blocks of `.env.example`.
 
 Once those are in place, Section 3 is roughly 6–10 hours of focused work (auth + usage tracking + Stripe checkout/portal/webhooks + tests).
