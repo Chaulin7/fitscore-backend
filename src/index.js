@@ -19,6 +19,8 @@ const mediaAssetsRouter = require('./routes/mediaAssets');
 const featureRequestsRouter = require('./routes/featureRequests');
 const plansRouter = require('./routes/plans');
 const adminMetricsRouter = require('./routes/adminMetrics');
+const adminTrialInvitesRouter = require('./routes/adminTrialInvites');
+const trialStartRouter = require('./routes/trialStart');
 const { productJsonLd } = require('./config/plans');
 const { MEDIA_PLACEHOLDERS, URL_PREFIX: MEDIA_URL_PREFIX, assetUrl, logMediaAssets, DEMO_VIDEO_UPLOAD_DATE } = require('./config/mediaAssets');
 const { configuredBaseUrl, warnDeprecatedAliases } = require('./config/appUrl');
@@ -28,6 +30,7 @@ const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulSh
 const { startProvenanceSweep } = require('./services/provenanceCache');
 const { startMetricsSnapshotSchedule } = require('./services/metricsSchedule');
 const { mutationLimiter } = require('./middleware/rateLimits');
+const { requireWriteAccess } = require('./middleware/requireWriteAccess');
 
 // Optional pino logger (graceful fallback if not installed yet)
 let pinoHttp = null;
@@ -289,7 +292,21 @@ function serveNoncedHtml(page) {
 // is already logged in.
 app.get('/', serveNoncedHtml('index.html'));
 app.get('/login', serveNoncedHtml('app.html'));
-app.get('/signup', serveNoncedHtml('app.html'));
+// /signup carries the trial claim link (/signup?t=<token>). The token is
+// validated here so an unusable one is logged with its reason at the moment the
+// prospect hits it, rather than surfacing later as "adoption silently did
+// nothing" — but the page is served either way. An invalid link falls through
+// to an ordinary signup, which is the whole point: somebody whose link expired
+// still wants an account. The authoritative check is POST /api/auth/signup,
+// which re-validates and consumes the token in one guarded write.
+app.get('/signup', (req, res, next) => {
+  const token = req.query && req.query.t;
+  if (token) {
+    const check = require('./services/trialInvites').validateSignupToken(token);
+    if (!check.ok) console.warn('[trial] signup link not usable', { reason: check.reason });
+  }
+  return serveNoncedHtml('app.html')(req, res, next);
+});
 app.get('/dashboard', serveNoncedHtml('app.html'));
 // Plain-text walkthrough of the product demo video, linked from its figcaption
 // on the landing page. Clean URL because it is a page a visitor may be sent
@@ -311,6 +328,18 @@ app.use(express.static(PUBLIC_DIR, { index: false }));
 // so it is deliberately NOT behind requireSession — a 401 here would confirm the
 // path exists. generalLimiter still applies.
 app.use('/admin', generalLimiter, adminMetricsRouter);
+// POST /admin/trial-invites — mints no-card trial tokens. Same mount, same
+// limiter, same 404-on-everything owner guard (middleware/adminAuth), kept in
+// its own router because minting subscriptions and rendering a metrics page
+// have nothing to do with each other.
+app.use('/admin', generalLimiter, adminTrialInvitesRouter);
+
+// --- No-card trial entry point ---------------------------------------------
+// GET /start?t=<token> — public by necessity: the prospect clicking it has no
+// account yet. The token IS the credential, and the router validates it before
+// anything else happens. Mounted here, outside /api, because it is a link a
+// human follows and it answers with a redirect, not with JSON.
+app.use('/start', generalLimiter, trialStartRouter);
 
 // --- Routes ---------------------------------------------------------------
 // Session auth (Authorization: Bearer {sessionToken}) protects every /api/*
@@ -351,15 +380,21 @@ app.get('/api/meta', generalLimiter, (req, res) => {
     },
   });
 });
-app.use('/api/analyze', analyzeLimiter, requireSession, analyzeRouter);
-app.use('/api/audit', generalLimiter, requireSessionOrDownloadToken, mutationLimiter, auditRouter);
+// requireWriteAccess sits after requireSession everywhere it appears: it reads
+// req.orgId. It refuses only unsafe methods, so every GET below is unaffected
+// and a read-only (paused) account keeps full read access to its own data.
+// Deliberately NOT on /api/billing — the way out of a paused subscription is
+// the billing portal, and gating that behind the entitlement only a card can
+// restore would lock the customer out of the fix.
+app.use('/api/analyze', analyzeLimiter, requireSession, requireWriteAccess, analyzeRouter);
+app.use('/api/audit', generalLimiter, requireSessionOrDownloadToken, requireWriteAccess, mutationLimiter, auditRouter);
 app.use('/api/stats', generalLimiter, requireSession, statsRouter);
-app.use('/api/templates', generalLimiter, requireSession, mutationLimiter, templatesRouter);
+app.use('/api/templates', generalLimiter, requireSession, requireWriteAccess, mutationLimiter, templatesRouter);
 // requireSession BEFORE mutationLimiter is load-bearing: mutationLimiter keys on
 // req.orgId, which requireSession sets. Reversed, every org silently falls back
 // to IP-keying. These two are burst guards; the 5-per-rolling-24h business quota
 // is enforced in SQL inside the route.
-app.use('/api/feature-requests', generalLimiter, requireSession, mutationLimiter, featureRequestsRouter);
+app.use('/api/feature-requests', generalLimiter, requireSession, requireWriteAccess, mutationLimiter, featureRequestsRouter);
 
 // --- /health (DB ping) ----------------------------------------------------
 app.get('/health', async (req, res) => {
@@ -476,6 +511,9 @@ const server = app.listen(PORT, () => {
   log(' GET  /api/templates          - Templates CRUD (auth required)');
   log(' POST /api/feature-requests   - Submit a feature request (Pro/Team, auth required)');
   log(' GET  /admin/metrics          - Internal operator metrics (owner only)');
+  log(' POST /admin/trial-invites    - Mint 30-day no-card trial tokens (owner only)');
+  log(' GET  /admin/abandoned-trials  - Dry-run sweep of expired, unredeemed trial orgs (owner only)');
+  log(' GET  /start?t=token          - Redeem a trial token into Stripe Checkout');
   log(' GET  /health                 - Health check');
 });
 

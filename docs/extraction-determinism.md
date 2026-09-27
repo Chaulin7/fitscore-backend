@@ -182,3 +182,13 @@ project root on Render so `better-sqlite3` resolves:
 ```
 DB_PATH=/opt/render/project/src/data/audit.db node scripts/scan-leak-fingerprint.js
 ```
+
+> The path above is left as it was typed, because this is a record of one
+> invocation on one date and rewriting it would falsify the record. **Do not copy
+> it.** It is not where the database is today — and it disagrees with every other
+> path this repo has claimed, which is the reason the README now says to read
+> `DATABASE_PATH` from the environment instead. To re-run this audit:
+>
+> ```
+> DB_PATH="$DATABASE_PATH" node scripts/scan-leak-fingerprint.js
+> ```

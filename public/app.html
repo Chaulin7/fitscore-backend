@@ -1083,6 +1083,11 @@ img, video, table { max-width: 100%; }
     </a>
   </div>
   <div class="auth-card">
+    <!-- Soft, non-error notices on the auth screen: the trial claim link's
+         "completing setup for X", and the "you already have an account"
+         redirect GET /start sends an existing customer to. Separate element
+         from #authError so a notice is never styled as a failure. -->
+    <div class="msg msg-ok" id="authNotice" role="status" aria-live="polite"></div>
     <div class="msg msg-err" id="authError" role="alert" aria-live="polite"></div>
     <form id="authLoginForm" autocomplete="on">
       <h2>Sign in</h2>
@@ -2051,7 +2056,13 @@ async function doSignup(){
   clearAuthError();
   setAuthBusy('suCreateBtn', true);
   try {
-    const d = await api('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, orgName: orgName || undefined }) });
+    const d = await api('/api/auth/signup', { method: 'POST', body: JSON.stringify({
+      email, password, orgName: orgName || undefined,
+      // The trial claim link, when this signup came from /signup?t=. The server
+      // re-validates and consumes it; nothing here is trusted.
+      trialToken: _pendingTrialToken || undefined,
+    }) });
+    _pendingTrialToken = null;
     try { localStorage.setItem(SESSION_KEY, d.sessionToken); } catch (_) {}
     document.getElementById('suPassword').value = '';
     onAuthed(d);
@@ -2432,6 +2443,7 @@ async function loadPlanPanel(focusFirst){
     return;
   }
   _planSummary = sum;
+  if(sum.state==='paused'){ closePlanPanel(false); openPausedScreen(sum); return; }
   if(sum.plan==='free'){ closePlanPanel(false); openFreePlanModal(sum); return; }
   panel.innerHTML = renderPaidPanel(sum);
   openPlanPanel(focusFirst);
@@ -2455,6 +2467,119 @@ async function retryPlanPanel(){
 
 // Upgrade from the panel/modal. Distinct from startCheckout(), which drives the
 // Settings buttons by id; here there is no such button to disable.
+/**
+ * The paused screen.
+ *
+ * A SCREEN, not a dismissable banner: there is no close button, Escape does
+ * nothing, and clicking the backdrop does nothing. A banner is something you
+ * swipe away and then spend twenty minutes wondering why nothing saves.
+ *
+ * It is NOT a wall, either. Read-only genuinely means read-only — every
+ * screening, audit record and report is still there and still exportable — so
+ * there is one quiet way past it to the data. That link is deliberately the
+ * least prominent thing on the screen, and it does not change any state.
+ */
+let _pausedScreenShown = false;
+function openPausedScreen(sum){
+  if(document.getElementById('pausedScreen')) return;
+  const backdrop=document.createElement('div');
+  backdrop.id='pausedScreen';
+  backdrop.className='modal-backdrop'; backdrop.setAttribute('role','dialog'); backdrop.setAttribute('aria-modal','true');
+  backdrop.setAttribute('aria-label','Your trial has ended');
+  backdrop.style.zIndex='10001';
+  const box=document.createElement('div'); box.className='modal-box'; box.style.maxWidth='620px';
+
+  const actions=(sum.actions||[]);
+  const act=function(id){ return actions.find(function(a){return a.id===id;}); };
+  const btn=function(a){ return a ? planActionBtn(a) : ''; };
+
+  // A declined card is explained here rather than leaving the customer on the
+  // same screen with no idea why nothing changed.
+  const declined = sum.resumeError
+    ? '<div class="pp-alert"><div class="pp-alert-t">That card was declined</div>'
+      +'<div class="pp-alert-b">'+escHtml(sum.resumeError)+'</div></div>'
+    : '';
+
+  box.innerHTML=
+    '<div class="modal-head"><h3>Your trial has ended</h3></div>'
+    +'<div class="modal-body">'
+      + declined
+      +'<p style="margin:0 0 14px;line-height:1.55">Your 30-day '+escHtml(sum.planName)+' trial is over and no payment '
+        +'method was added, so nothing was charged. Your account is <b>read-only</b> for now.</p>'
+      +'<div class="pp-sec"><div class="pp-sec-h">Nothing has been deleted</div>'
+        +'<p style="margin:0;line-height:1.55">Every analysis, audit record, report and template is exactly where you '
+        +'left it, and all of it is still readable and exportable. What you cannot do for now is create anything new.</p></div>'
+      +'<div class="pp-sec-h" style="margin-top:16px">Two ways to continue</div>'
+      +'<div class="pp-sec">'
+        +'<div class="pp-row"><span><b>Keep your plan</b><br><span style="color:#6b7280">Add a card and full access comes back immediately.</span></span></div>'
+        +'<div class="pp-foot">'+btn(act('continue_pro'))+btn(act('continue_team'))+'</div>'
+      +'</div>'
+      +'<div class="pp-sec">'
+        +'<div class="pp-row"><span><b>Move to Free</b><br><span style="color:#6b7280">Keep the account and everything in it, with a monthly '
+          +'analysis cap. The cap counts only new work — nothing from your trial.</span></span></div>'
+        +'<div class="pp-foot">'+btn(act('continue_free'))+'</div>'
+      +'</div>'
+      +(actions.length ? '' : '<div style="margin-top:10px">'+(sum.isOwner?planBlockNote(sum):MEMBER_PLAN_NOTE)+'</div>')
+      +'<div style="margin-top:16px;text-align:center">'
+        +'<button type="button" class="auth-link" data-action="dismissPausedScreen">Continue to my data (read-only)</button>'
+      +'</div>'
+    +'</div>';
+
+  document.body.appendChild(backdrop);
+  backdrop.appendChild(box);
+  requestAnimationFrame(function(){ backdrop.classList.add('open'); });
+  _pausedScreenShown = true;
+}
+
+function dismissPausedScreen(){
+  const el=document.getElementById('pausedScreen');
+  if(!el) return;
+  el.classList.remove('open');
+  setTimeout(function(){ try{ el.remove(); }catch(_){} }, 200);
+}
+
+/**
+ * Resume the EXISTING paused subscription.
+ *
+ * Posts to /api/billing/resume, which opens Checkout in setup mode to collect a
+ * card. It never creates a subscription: the card arriving is what triggers the
+ * server-side resume of the one the org already has.
+ */
+async function resumeSubscription(el){
+  const plan = el && el.dataset ? el.dataset.plan : 'pro';
+  if(el) el.disabled = true;
+  try{
+    const d = await api('/api/billing/resume',{method:'POST',body:JSON.stringify({plan})});
+    if(d && d.url){ window.location = d.url; return; }
+    toast('Could not start the card setup.','error');
+  }catch(err){
+    toast((err && err.message) || 'Could not start the card setup.','error');
+  }finally{ if(el) el.disabled = false; }
+}
+
+/**
+ * Move to Free. Confirmed here AND again by the endpoint, because it cancels a
+ * subscription and that cannot be undone.
+ */
+async function continueOnFree(el){
+  const ok = window.confirm(
+    'Move to the Free plan?\n\n'
+    + 'This cancels your subscription — you would have to buy again to come back.\n\n'
+    + 'Nothing is deleted: all your screenings, audit records and reports stay, and stay exportable. '
+    + 'New analyses will be capped monthly, counting only work from now on.'
+  );
+  if(!ok) return;
+  if(el) el.disabled = true;
+  try{
+    await api('/api/billing/continue-free',{method:'POST',body:JSON.stringify({confirm:true})});
+    dismissPausedScreen();
+    toast('You are on the Free plan. Nothing was deleted.','ok');
+    try{ await populatePlanBilling(); }catch(_){}
+  }catch(err){
+    toast((err && err.message) || 'Could not move to Free.','error');
+  }finally{ if(el) el.disabled = false; }
+}
+
 async function startPlanCheckout(el){
   const plan = el && el.dataset ? el.dataset.plan : null;
   if(!plan) return;
@@ -2928,6 +3053,27 @@ async function resumeCheckoutIntent(){
 // Keep the usage chip fresh after each completed analysis.
 document.addEventListener('cv:analyze_completed', function(){ refreshUsage(); });
 
+let _pendingTrialToken = null;
+
+/** Show a soft, non-error notice on the auth screen. */
+function showAuthNotice(text){
+  const el = document.getElementById('authNotice');
+  if (!el) return;
+  el.textContent = text;
+  el.style.display = 'block';
+}
+
+/**
+ * What a trial claim link refers to, for the "finishing setup for X" line.
+ * Never throws and never blocks the form: a failure here just means an
+ * ordinary signup, which is the correct fallback for an unusable link.
+ */
+async function describeTrialToken(token){
+  try {
+    return await api('/api/auth/trial-invite?t=' + encodeURIComponent(token));
+  } catch (_) { return null; }
+}
+
 async function bootAuth(){
   const wire = function(formId, fn){
     const f = document.getElementById(formId);
@@ -2956,6 +3102,39 @@ async function bootAuth(){
   // 0) A purchase intent handed over by the pricing page (/signup?plan=pro).
   //    Validated here; consumed by resumeCheckoutIntent once auth succeeds.
   const planIntent = await capturePlanIntent(params);
+
+  // 0b) Arriving from a no-card trial: /signup?t=<token>.
+  //     The token is the claim on an organization whose trial is already
+  //     running, so this takes precedence over an existing session the same way
+  //     a team invite does — somebody finishing a trial signup on a shared
+  //     browser must not have it silently attached to whoever is logged in.
+  const trialToken = params && params.get('t');
+  if (trialToken) {
+    const described = await describeTrialToken(trialToken);
+    if (described && described.valid) {
+      _pendingTrialToken = trialToken;
+      showAuthScreen('signup');
+      showAuthNotice(described.companyName
+        ? `Finishing setup for ${described.companyName}. Your trial is already running — create a login to open it.`
+        : 'Your trial is already running — create a login to open it.');
+      const emailField = document.getElementById('suEmail');
+      if (emailField && described.email && !emailField.value) emailField.value = described.email;
+      return;
+    }
+    // An unusable link falls through to an ordinary signup, exactly as the
+    // server does. No error is shown: they may simply be signing up normally.
+  }
+
+  // 0c) Sent here by GET /start because the invited address already has an
+  //     account. Two reasons, two messages — a customer who is fine, and a
+  //     lapsed trial that needs a card before it works again.
+  const trialState = params && params.get('trial');
+  if (trialState === 'existing_account') {
+    showAuthNotice('You already have a CVsprings account, and this trial is on it. Sign in to continue.');
+  } else if (trialState === 'resume') {
+    showAuthNotice('Your CVsprings account is here and your data is intact — your trial ended without a '
+      + 'payment method, so it is paused. Sign in, then add a card in Billing to pick up where you left off.');
+  }
 
   // 1) Arriving from a password-reset email link
   const resetToken = params && params.get('reset_token');
@@ -5265,6 +5444,10 @@ const delegatedHandlers = {
     togglePlanPanel,
     retryPlanPanel,
     startPlanCheckout,
+    // The paused screen's three ways out, plus the quiet way past it.
+    resumeSubscription,
+    continueOnFree,
+    dismissPausedScreen,
     showPlanDetail,
     openBillingPortal, inviteMember, copyInviteLink, saveBranding,
     saveSettings, changePassword, saveRetention, setRetentionPreset, exportOrgData, deleteAllOrgData,

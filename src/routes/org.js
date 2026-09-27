@@ -15,6 +15,10 @@
 const express = require('express');
 const multer = require('multer');
 const { requireSession } = require('../middleware/auth');
+// The read-only gate. This router resolves the session per route rather than at
+// the mount, so the gate goes on each mutating route instead of in index.js —
+// same middleware, same single source of the status -> entitlement rule.
+const { requireWriteAccess } = require('../middleware/requireWriteAccess');
 const auth = require('../services/authService');
 const branding = require('../services/branding');
 const fileSec = require('../services/fileSecurity');
@@ -51,7 +55,7 @@ function requireOwner(req, res, next) {
 
 // PATCH /api/org — update retention setting (server-side, org-wide). The floor
 // is enforced here (validateRetentionDays) and re-checked inside the purge job.
-router.patch('/', requireSession, requireOwner, (req, res) => {
+router.patch('/', requireSession, requireWriteAccess, requireOwner, (req, res) => {
   try {
     const check = validateRetentionDays((req.body || {}).retentionDays);
     if (!check.ok) return sendError(res, 400, check.code, check.message, 'retentionDays');
@@ -88,7 +92,7 @@ router.get('/retention/preview', requireSession, requireOwner, (req, res) => {
 });
 
 // PATCH /api/org/branding — per-org report branding (owner only)
-router.patch('/branding', requireSession, requireOwner, (req, res) => {
+router.patch('/branding', requireSession, requireWriteAccess, requireOwner, (req, res) => {
   try {
     const body = req.body || {};
     const name = body.brandDisplayName == null ? null : String(body.brandDisplayName).trim();
@@ -145,7 +149,7 @@ function requireCustomBranding(req, res, next) {
 }
 
 // POST /api/org/branding/logo — multipart, field name "logo" (owner + entitled)
-router.post('/branding/logo', requireSession, requireOwner, requireCustomBranding, (req, res) => {
+router.post('/branding/logo', requireSession, requireWriteAccess, requireOwner, requireCustomBranding, (req, res) => {
   logoUpload(req, res, (uploadErr) => {
     if (uploadErr) {
       // multer's own rejection, including the size cap firing at the edge.
@@ -189,7 +193,7 @@ router.get('/branding/logo', requireSession, requireOwner, (req, res) => {
 });
 
 // DELETE /api/org/branding/logo — revert to the CVsprings mark (owner + entitled)
-router.delete('/branding/logo', requireSession, requireOwner, requireCustomBranding, (req, res) => {
+router.delete('/branding/logo', requireSession, requireWriteAccess, requireOwner, requireCustomBranding, (req, res) => {
   try {
     auth.setOrganizationLogo(req.orgId, null);
     res.json(branding.publicBranding(auth.getOrganizationBranding(req.orgId)));
@@ -247,7 +251,7 @@ router.get('/export', sessionOrDownloadToken, requireOwner, (req, res) => {
 });
 
 // DELETE /api/org/audit-data — org-wide hard delete, typed-name confirmation
-router.delete('/audit-data', requireSession, requireOwner, (req, res) => {
+router.delete('/audit-data', requireSession, requireWriteAccess, requireOwner, (req, res) => {
   try {
     const org = auth.getOrganizationById(req.orgId);
     const confirm = String((req.body || {}).confirm || '');

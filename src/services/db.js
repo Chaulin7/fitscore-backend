@@ -399,7 +399,71 @@ function initSchema() {
   // services/billing.js reads it, because a customer who has cancelled has paid
   // through the end of the period and keeps everything until then.
   try { getDb().exec('ALTER TABLE organizations ADD COLUMN cancel_at_period_end INTEGER NOT NULL DEFAULT 0'); } catch (_) {}
+  // --- No-card trial attribution ---------------------------------------------
+  // Which campaign brought this org in, and whether the trial ever turned into
+  // money. Both are set once and never cleared: trial_campaign at redemption
+  // (routes/trialStart.js), trial_converted_at when the first non-zero invoice
+  // is paid (the invoice.paid branch in routes/billing.js).
+  //
+  // trial_converted_at doubles as the idempotency key for that branch — Stripe
+  // will redeliver invoice.paid, and "already converted" is a null check rather
+  // than an event-id ledger.
+  // --- Provisional organizations ---------------------------------------------
+  // An expiry instant, not a boolean, and it is doing two jobs at once.
+  //
+  // Signup creates an organization before it knows whether the account will
+  // adopt a trial org instead (routes/auth.js). If it does, the one just
+  // created is a throwaway that has to be removed, or every trial signup leaves
+  // an empty org inflating the org and signup counts on /admin/metrics.
+  //
+  // deleteOrganizationIfEmpty will ONLY touch a row whose provisional_until is
+  // set and still in the future. That makes this simultaneously the marker
+  // ("this row was made moments ago by a request that may discard it") and the
+  // age bound ("and only for the next few seconds"). One column, so the two
+  // cannot get out of step, and it self-expires: a request that dies midway
+  // leaves an org that becomes permanently undeletable by that path rather than
+  // one that stays deletable forever.
+  //
+  // NULL — the value for every organization that has ever mattered — is out of
+  // reach of that delete entirely.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN provisional_until TEXT'); } catch (_) {}
+  // --- Paused-trial recovery --------------------------------------------------
+  // Why a resume did not take. invoices.pay() on the resumption invoice can be
+  // declined, and Stripe then voids that invoice after 23 hours and leaves the
+  // subscription paused. Without a record the customer sees the same paused
+  // screen they started from and no reason for it — so they try the same card
+  // again. Cleared on the next successful resume.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN resume_error TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN resume_error_at TEXT'); } catch (_) {}
+  // When an org deliberately took the Free tier after a trial.
+  //
+  // Load-bearing for the quota, not decorative: usage_counters is a per-month
+  // running total, so an org that downgrades on the 20th would otherwise meet
+  // the Free cap already exhausted by work it did while on a paid trial. The
+  // downgrade zeroes the current month's counter and stamps this, so the cap
+  // counts only what happens afterwards.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN free_tier_since TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_campaign TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_converted_at TEXT'); } catch (_) {}
+  // That this org arrived through a no-card trial at all.
+  //
+  // Separate from trial_campaign, which is NULLABLE — an operator may mint an
+  // invite with no campaign — and therefore cannot be used to answer "is this a
+  // trial account". That distinction decides whether a past_due subscription
+  // gets the dunning grace (see isFailedTrialFirstCharge in
+  // services/entitlements.js), so it needs a field that is always set.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_origin_at TEXT'); } catch (_) {}
+  // Email the trial invite was addressed to, when the org was created by a
+  // redemption and has no user yet.
+  //
+  // It is NOT an adoption key. Matching on it is what the token-carried bridge
+  // replaced: an unproved address let anyone who knew a prospect's email claim
+  // that company's organization. It survives as the fallback RECIPIENT for the
+  // trial emails (trialRecipientFor in routes/billing.js), where knowing where
+  // to write is all it is being trusted with.
+  try { getDb().exec('ALTER TABLE organizations ADD COLUMN trial_invite_email TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_stripe_customer ON organizations(stripe_customer_id)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_org_trial_invite_email ON organizations(trial_invite_email)');
 
   // Server-held provenance for a single analysis, claimable by the save that
   // follows it. Previously an in-memory Map, so every deploy and every idle
@@ -549,6 +613,15 @@ function initSchema() {
       created_at TEXT NOT NULL
     )
   `);
+  // Whether this address has been proved to belong to the person using it.
+  //
+  // NULL means unverified, and today that is EVERY row: this codebase has no
+  // email-verification step yet. The column exists because the trial's
+  // email-match fallback must never adopt an organization on an unproved
+  // address — signing up as someone@theircompany.com would otherwise hand the
+  // attacker that company's trial. See adoptTrialOrgOnVerification in
+  // services/trialAdoption.js, which is the only intended writer's counterpart.
+  try { getDb().exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT'); } catch (_) {}
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id)');
 
@@ -569,6 +642,89 @@ function initSchema() {
   `);
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_invites_org_id ON invites(org_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_invites_token_hash ON invites(token_hash)');
+
+    // --- No-card trial invites --------------------------------------------------
+  // One row per prospect we hand a 30-day trial link to. The token is the URL
+  // credential for GET /start, so it is a v4 uuid and the PRIMARY KEY: unique by
+  // construction, and a lookup is the index.
+  //
+  // Stored in the CLEAR, unlike invites.token_hash above, and the difference is
+  // deliberate. A team invite grants membership of an existing organization —
+  // its token is a credential over somebody else's data, so the server keeps
+  // only a hash. A trial token grants nothing but the right to open a Checkout
+  // Session that bills EUR 0 for 30 days; the operator hands these out by name
+  // in a campaign and needs to answer "which token did we send this company"
+  // from the table, which a hash cannot do.
+  //
+  // org_id / stripe_customer_id are written at redemption (routes/trialStart.js)
+  // and are what lets every trial webhook resolve an account through the
+  // existing customer -> org path rather than inventing a second one.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS trial_invites (
+      token TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      company_name TEXT,
+      campaign TEXT,
+      created_at TEXT NOT NULL,
+      redeemed_at TEXT,
+      expires_at TEXT NOT NULL
+    )
+  `);
+  // Written when the token is redeemed; null until then.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN org_id TEXT'); } catch (_) {}
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN stripe_customer_id TEXT'); } catch (_) {}
+  // The plan the trial was opened at ('pro' by default, 'team' via ?plan=team).
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN plan TEXT'); } catch (_) {}
+  // Mirrors organizations.trial_converted_at, so campaign reporting can be
+  // answered from this table alone without joining every org.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN converted_at TEXT'); } catch (_) {}
+  // --- The signup link ---------------------------------------------------
+  // Redemption is not the end of the token's life. The prospect finishes
+  // Checkout and is sent to /signup?t=<token>, and THAT is what attaches them
+  // to the organization the trial is already running on.
+  //
+  // consumed_at is the single-use guard for that second step, separate from
+  // redeemed_at on purpose: redeemed_at means "the trial started", consumed_at
+  // means "an account was attached to it". Collapsing them would either let one
+  // link create accounts forever or stop the prospect signing up at all.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN consumed_at TEXT'); } catch (_) {}
+  // The user the token was consumed by. Storage only — the operator's answer to
+  // "who ended up on this trial", which org_id alone does not give once an org
+  // can have members.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN consumed_by_user_id TEXT'); } catch (_) {}
+  // When the signup link stops working, set at redemption to 14 days out.
+  //
+  // A separate deadline from expires_at, which governs whether the trial may be
+  // STARTED. Once it has started the org exists and is billing, so the link
+  // that claims it is a live credential over a real account and cannot be
+  // allowed to sit in an inbox indefinitely. Stored rather than derived from
+  // redeemed_at + 14d so an operator can extend one link for one prospect
+  // without a code change.
+  try { getDb().exec('ALTER TABLE trial_invites ADD COLUMN signup_expires_at TEXT'); } catch (_) {}
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_email ON trial_invites(email)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_campaign ON trial_invites(campaign)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_org ON trial_invites(org_id)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_invites_customer ON trial_invites(stripe_customer_id)');
+
+  // One row per trial lifecycle email actually attempted. `Log the send` needs
+  // to survive the process that sent it: the trial_will_end reminder is the one
+  // message standing between a paused account and a converted one, so "did it
+  // go out, when, and did the provider take it" has to be answerable later —
+  // from an operator's SQL prompt, not from a log line that scrolled away.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS trial_emails (
+      id TEXT PRIMARY KEY,
+      org_id TEXT,
+      subscription_id TEXT,
+      kind TEXT NOT NULL,
+      to_email TEXT NOT NULL,
+      sent_at TEXT NOT NULL,
+      provider_id TEXT,
+      error TEXT
+    )
+  `);
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_emails_org ON trial_emails(org_id, sent_at DESC)');
+  getDb().exec('CREATE INDEX IF NOT EXISTS idx_trial_emails_sub_kind ON trial_emails(subscription_id, kind)');
 
   // templates is also created by routes/templates.js; ensure it exists here so
   // the org_id migration can run regardless of module load order.
@@ -1621,6 +1777,46 @@ function createFeatureRequestIfUnderQuota({ orgId, userEmail, category, title, b
   return tx.immediate();
 }
 
+/**
+ * Zero an org's counter for one period.
+ *
+ * Used only by the post-trial downgrade to Free. Deliberately a hard reset
+ * rather than a subtraction: the counter has no per-analysis rows to subtract,
+ * and the rule being implemented is "the Free cap counts nothing from before
+ * the downgrade", which is exactly a reset.
+ */
+function resetUsage(orgId, periodKey = currentPeriodKey()) {
+  getDb().prepare(`
+    INSERT INTO usage_counters (org_id, period_key, analysis_count) VALUES (?, ?, 0)
+    ON CONFLICT(org_id, period_key) DO UPDATE SET analysis_count = 0
+  `).run(orgId, periodKey);
+  return 0;
+}
+
+/** Record that a resume attempt failed, with the reason to show the customer. */
+function setResumeError(orgId, message) {
+  getDb().prepare('UPDATE organizations SET resume_error = ?, resume_error_at = ? WHERE id = ?')
+    .run(message || null, message ? nowIso() : null, orgId);
+}
+
+function getResumeError(orgId) {
+  const row = getDb().prepare(
+    'SELECT resume_error AS message, resume_error_at AS at FROM organizations WHERE id = ?',
+  ).get(orgId);
+  return row && row.message ? row : null;
+}
+
+/** Mark the org as having deliberately taken Free, and clear the month's usage. */
+function markFreeTierSince(orgId, at) {
+  getDb().prepare('UPDATE organizations SET free_tier_since = ? WHERE id = ?').run(at || nowIso(), orgId);
+  return resetUsage(orgId);
+}
+
+function getFreeTierSince(orgId) {
+  const row = getDb().prepare('SELECT free_tier_since AS at FROM organizations WHERE id = ?').get(orgId);
+  return row ? row.at : null;
+}
+
 // --- Billing state (Stripe; attached to the organization) ------------------
 
 function getOrgBilling(orgId) {
@@ -1628,7 +1824,10 @@ function getOrgBilling(orgId) {
     SELECT stripe_customer_id AS stripeCustomerId, plan, subscription_status AS subscriptionStatus,
            current_period_end AS currentPeriodEnd, plan_updated_at AS planUpdatedAt,
            stripe_event_created AS stripeEventCreated, stripe_subscription_id AS stripeSubscriptionId,
-           comped, cancel_at_period_end AS cancelAtPeriodEnd
+           comped, cancel_at_period_end AS cancelAtPeriodEnd,
+           resume_error AS resumeError, free_tier_since AS freeTierSince,
+           trial_campaign AS trialCampaign, trial_converted_at AS trialConvertedAt,
+           trial_origin_at AS trialOriginAt
     FROM organizations WHERE id = ?
   `).get(orgId);
   return row || null;
@@ -1680,6 +1879,506 @@ function setOrgPlan(orgId, fields) {
   getDb().prepare(`UPDATE organizations SET ${sets.join(', ')} WHERE id = ?`).run(...params);
 }
 
+// --- No-card trial invites --------------------------------------------------
+
+/**
+ * Insert one trial invite. The caller supplies the token so the URL it hands
+ * back and the row it wrote cannot be two different strings.
+ */
+function createTrialInvite({ token, email, companyName, campaign, expiresAt, createdAt }) {
+  const created = createdAt || nowIso();
+  getDb().prepare(`
+    INSERT INTO trial_invites (token, email, company_name, campaign, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(token, email, companyName || null, campaign || null, created, expiresAt);
+  return { token, email, companyName: companyName || null, campaign: campaign || null, createdAt: created, expiresAt };
+}
+
+function findTrialInviteByToken(token) {
+  if (typeof token !== 'string' || !token) return null;
+  return getDb().prepare(`
+    SELECT token, email, company_name AS companyName, campaign, created_at AS createdAt,
+           redeemed_at AS redeemedAt, expires_at AS expiresAt, org_id AS orgId,
+           stripe_customer_id AS stripeCustomerId, plan, converted_at AS convertedAt,
+           consumed_at AS consumedAt, consumed_by_user_id AS consumedByUserId,
+           signup_expires_at AS signupExpiresAt
+    FROM trial_invites WHERE token = ?
+  `).get(token) || null;
+}
+
+/**
+ * Mark a token spent, and record what it was spent on.
+ *
+ * Guarded by `redeemed_at IS NULL` in SQL rather than by a read-then-write, so
+ * two concurrent /start requests carrying the same token cannot both redeem it.
+ * Returns whether THIS call was the one that did it.
+ */
+function markTrialInviteRedeemed(token, { redeemedAt, orgId, stripeCustomerId, plan, signupExpiresAt } = {}) {
+  const info = getDb().prepare(`
+    UPDATE trial_invites
+       SET redeemed_at = ?, org_id = COALESCE(?, org_id),
+           stripe_customer_id = COALESCE(?, stripe_customer_id), plan = COALESCE(?, plan),
+           signup_expires_at = COALESCE(signup_expires_at, ?)
+     WHERE token = ? AND redeemed_at IS NULL
+  `).run(redeemedAt || nowIso(), orgId || null, stripeCustomerId || null, plan || null,
+    signupExpiresAt || null, token);
+  return info.changes === 1;
+}
+
+/**
+ * Spend the SIGNUP half of the token: an account has now been attached.
+ *
+ * Guarded by `consumed_at IS NULL` in SQL, like redemption, so two concurrent
+ * signups carrying the same link cannot both adopt the organization. Returns
+ * whether THIS call was the one that consumed it — the caller uses that to
+ * decide whether to adopt or to fall through to an ordinary signup.
+ */
+function markTrialInviteConsumed(token, { consumedAt, userId } = {}) {
+  const info = getDb().prepare(`
+    UPDATE trial_invites
+       SET consumed_at = ?, consumed_by_user_id = COALESCE(?, consumed_by_user_id)
+     WHERE token = ? AND consumed_at IS NULL
+  `).run(consumedAt || nowIso(), userId || null, token);
+  return info.changes === 1;
+}
+
+/**
+ * A redeemed, unconsumed, unexpired invite for this address.
+ *
+ * The email-match FALLBACK's lookup, for the case where the prospect lost the
+ * link. It is only ever safe to act on when the caller has proved the address
+ * belongs to whoever is asking — see services/trialAdoption.js, which is the
+ * only caller and which refuses on an unverified address.
+ */
+function findAdoptableInviteByEmail(email, nowIsoString) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return null;
+  return getDb().prepare(`
+    SELECT token, email, company_name AS companyName, campaign, org_id AS orgId,
+           redeemed_at AS redeemedAt, consumed_at AS consumedAt,
+           signup_expires_at AS signupExpiresAt
+      FROM trial_invites
+     WHERE email = ? AND redeemed_at IS NOT NULL AND consumed_at IS NULL
+       AND org_id IS NOT NULL
+       AND (signup_expires_at IS NULL OR signup_expires_at > ?)
+     ORDER BY redeemed_at DESC LIMIT 1
+  `).get(normalized, nowIsoString || nowIso()) || null;
+}
+
+/** Mark an address proved. The counterpart a real verification step would call. */
+function markEmailVerified(userId, verifiedAt) {
+  getDb().prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?')
+    .run(verifiedAt || nowIso(), userId);
+}
+
+/** Whether this user's address has been proved. */
+function isEmailVerified(userId) {
+  const row = getDb().prepare('SELECT email_verified_at AS at FROM users WHERE id = ?').get(userId);
+  return !!(row && row.at);
+}
+
+/**
+ * Every table that scopes rows to an organization, derived from the schema.
+ *
+ * NOT a hand-maintained list, and the difference is not academic: the list this
+ * replaced named eight tables and the schema has fifteen. An organization
+ * holding usage_counters, purge_runs, analysis_provenance, run_nonces,
+ * audit_changes, trial_emails or admin_access_log rows passed the emptiness
+ * check and was deleted.
+ *
+ * Derivation is by COLUMN NAME rather than by PRAGMA foreign_key_list, because
+ * this schema declares no REFERENCES clauses at all — foreign_key_list returns
+ * nothing for every table here, so an FK-based derivation would silently
+ * enumerate the empty set and make the check pass unconditionally. `org_id` is
+ * the actual convention, enforced by every query in this file.
+ *
+ * Read once per process and cached: the schema cannot change while the process
+ * is up (initSchema runs at boot, before any request), and this is on the
+ * signup path.
+ */
+let _orgScopedTables = null;
+function orgScopedTables() {
+  if (_orgScopedTables) return _orgScopedTables;
+  const db = getDb();
+  const tables = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+  ).all().map((r) => r.name);
+
+  _orgScopedTables = tables.filter((t) => {
+    if (t === 'organizations') return false; // the parent, not a child
+    return db.prepare(`PRAGMA table_info(${t})`).all().some((c) => c.name === 'org_id');
+  });
+  return _orgScopedTables;
+}
+
+/**
+ * Whether nothing at all hangs off this organization.
+ *
+ * Enumerated from the schema (orgScopedTables) rather than from a list, and a
+ * table that cannot be READ counts as occupied — an error here must never be
+ * mistaken for emptiness, because the caller's next move is a DELETE.
+ *
+ * `ignore` lets a caller exclude tables it is about to delete from itself. The
+ * abandoned-trial sweep needs that: the invite row it is cleaning up points AT
+ * the org, so trial_invites would otherwise report the org as occupied by the
+ * very row being swept.
+ */
+function orgIsEmpty(orgId, { ignore = [] } = {}) {
+  if (!orgId) return false;
+  const db = getDb();
+  const skip = new Set(ignore);
+  for (const table of orgScopedTables()) {
+    if (skip.has(table)) continue;
+    try {
+      if (db.prepare(`SELECT 1 FROM ${table} WHERE org_id = ? LIMIT 1`).get(orgId)) return false;
+    } catch (_) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** How long a provisional organization stays eligible for cleanup. */
+const PROVISIONAL_ORG_TTL_MS = 60 * 1000;
+
+/**
+ * Delete a PROVISIONAL organization, and only if nothing hangs off it.
+ *
+ * This runs a DELETE against the table the entire product is scoped by, on a
+ * path that fires for every signup, so it is written to be unable to reach a
+ * real organization even if the emptiness check below is wrong.
+ *
+ * THREE INDEPENDENT GUARDS, each sufficient on its own:
+ *
+ *   1. provisional_until must be set AND in the future. Every organization that
+ *      has ever been used has NULL there and is unreachable by this function
+ *      whatever else happens. The window is PROVISIONAL_ORG_TTL_MS.
+ *   2. created_at must match the value the caller was handed at creation, so
+ *      the row deleted is provably the row that request just made and not
+ *      another org that happens to be provisional at the same moment.
+ *   3. every org-scoped table must be empty, enumerated from the schema rather
+ *      than from a list somebody has to remember to update.
+ *
+ * All three are in the DELETE's own WHERE clause where they can be, rather than
+ * checked and then acted on, so nothing can change between the check and the
+ * write.
+ *
+ * A stranded empty org is a blemish. A deleted populated one is unrecoverable.
+ * Everything here is arranged around that asymmetry.
+ *
+ * @param {string} orgId
+ * @param {{createdAt: string}} expect the createdAt returned by createOrganization
+ * @returns {boolean} whether a row was deleted
+ */
+function deleteOrganizationIfEmpty(orgId, { createdAt } = {}) {
+  if (!orgId || !createdAt) return false;
+  const db = getDb();
+
+  // Guard 1 + 2, read first so a refusal can say which one refused.
+  const row = db.prepare(`
+    SELECT provisional_until AS provisionalUntil, created_at AS createdAt,
+           stripe_customer_id AS customerId, stripe_subscription_id AS subscriptionId
+      FROM organizations WHERE id = ?
+  `).get(orgId);
+  if (!row) return false;
+  if (row.createdAt !== createdAt) return false;
+  if (!row.provisionalUntil || Date.parse(row.provisionalUntil) <= Date.now()) return false;
+  // Nor may it have anything to do with money.
+  if (row.customerId || row.subscriptionId) return false;
+
+  // Guard 3, shared with the abandoned-trial sweep so there is one definition of
+  // "empty" rather than two that drift.
+  if (!orgIsEmpty(orgId)) return false;
+
+  const info = db.prepare(`
+    DELETE FROM organizations
+     WHERE id = ? AND created_at = ?
+       AND provisional_until IS NOT NULL AND provisional_until > ?
+       AND stripe_customer_id IS NULL AND stripe_subscription_id IS NULL
+  `).run(orgId, createdAt, nowIso());
+  return info.changes === 1;
+}
+
+/** Mark a provisional organization permanent — it is being kept. */
+function clearProvisional(orgId) {
+  getDb().prepare('UPDATE organizations SET provisional_until = NULL WHERE id = ?').run(orgId);
+}
+
+/** Move a user onto another organization. Used only by trial adoption. */
+function setUserOrg(userId, orgId) {
+  getDb().prepare('UPDATE users SET org_id = ? WHERE id = ?').run(orgId, userId);
+}
+
+/**
+ * Attach the org and customer a token is being redeemed against, without
+ * spending it. GET /start writes these BEFORE Checkout opens, so a session the
+ * customer abandons still leaves the org linked and the next attempt reuses it
+ * instead of creating a second Stripe customer. redeemed_at stays null until
+ * checkout.session.completed says the customer actually finished.
+ */
+function setTrialInviteTarget(token, { orgId, stripeCustomerId, plan } = {}) {
+  getDb().prepare(`
+    UPDATE trial_invites
+       SET org_id = COALESCE(?, org_id), stripe_customer_id = COALESCE(?, stripe_customer_id),
+           plan = COALESCE(?, plan)
+     WHERE token = ?
+  `).run(orgId || null, stripeCustomerId || null, plan || null, token);
+}
+
+function findTrialInviteByOrg(orgId) {
+  if (!orgId) return null;
+  return getDb().prepare(`
+    SELECT token, email, company_name AS companyName, campaign, redeemed_at AS redeemedAt,
+           org_id AS orgId, plan, converted_at AS convertedAt
+    FROM trial_invites WHERE org_id = ? ORDER BY created_at DESC LIMIT 1
+  `).get(orgId) || null;
+}
+
+/**
+ * Claim the organization for a trial invite, atomically, and create it if this
+ * caller is the one that wins the claim.
+ *
+ * WHY THIS IS ONE TRANSACTION. GET /start used to resolve-or-create an org, then
+ * `await` a Stripe call, then write the org id back onto the invite. Two
+ * requests arriving together — which a corporate mail scanner's prefetch and the
+ * human's own click reliably do — both saw org_id as null across that await and
+ * both created an organization and a Stripe customer. Whichever wrote last owned
+ * the invite; the other pair was orphaned forever.
+ *
+ * The fix is not to detect prefetches. It is to make the claim indivisible:
+ * better-sqlite3 is synchronous, so a transaction here cannot be interleaved by
+ * another request at all, and BEGIN IMMEDIATE serialises it against any other
+ * process. The loser reads the winner's org_id and reuses it.
+ *
+ * `preferOrgId` is for the case where the invited address already has an
+ * account: that org is the right answer, and claiming it still has to go
+ * through the same guarded write so concurrent callers agree on it.
+ *
+ * @returns {{orgId: string|null, created: boolean, wonClaim: boolean}}
+ */
+function reserveTrialInviteOrg(token, { preferOrgId, name, email, retentionDays } = {}) {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    const invite = db.prepare('SELECT org_id AS orgId FROM trial_invites WHERE token = ?').get(token);
+    if (!invite) return { orgId: null, created: false, wonClaim: false };
+    // Already claimed — by an earlier visit, or by the request that beat us here.
+    if (invite.orgId) return { orgId: invite.orgId, created: false, wonClaim: false };
+
+    if (preferOrgId) {
+      const info = db.prepare('UPDATE trial_invites SET org_id = ? WHERE token = ? AND org_id IS NULL')
+        .run(preferOrgId, token);
+      return { orgId: preferOrgId, created: false, wonClaim: info.changes === 1 };
+    }
+
+    const id = uuidv4();
+    const createdAt = nowIso();
+    db.prepare(`
+      INSERT INTO organizations (id, name, created_at, retention_days, trial_invite_email)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, String(name || '').trim() || 'Trial organization', createdAt,
+      retentionDays || RETENTION_DEFAULT_DAYS, String(email || '').trim().toLowerCase() || null);
+
+    const info = db.prepare('UPDATE trial_invites SET org_id = ? WHERE token = ? AND org_id IS NULL')
+      .run(id, token);
+    if (info.changes !== 1) {
+      // Unreachable inside this transaction, and it throws rather than returning
+      // so the INSERT above is rolled back instead of leaving an orphan behind.
+      throw new Error(`trial invite ${token} was claimed concurrently inside a transaction`);
+    }
+    return { orgId: id, created: true, wonClaim: true };
+  });
+  return tx.immediate();
+}
+
+/** Create the organization a trial redemption hangs off, before any user exists. */
+function createTrialOrganization({ name, email, retentionDays }) {
+  const id = uuidv4();
+  const createdAt = nowIso();
+  getDb().prepare(`
+    INSERT INTO organizations (id, name, created_at, retention_days, trial_invite_email)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, String(name || '').trim() || 'Trial organization', createdAt,
+    retentionDays || RETENTION_DEFAULT_DAYS, String(email || '').trim().toLowerCase() || null);
+  return { id, createdAt };
+}
+
+/** The campaign a trial org came from, and whether it has already converted. */
+function getOrgTrial(orgId) {
+  return getDb().prepare(`
+    SELECT trial_campaign AS campaign, trial_converted_at AS convertedAt,
+           trial_invite_email AS inviteEmail
+    FROM organizations WHERE id = ?
+  `).get(orgId) || null;
+}
+
+/**
+ * Record that this org came in through a trial, and which campaign if any.
+ *
+ * trial_origin_at is stamped unconditionally (once); the campaign is optional
+ * and may legitimately be null, which is exactly why the two are separate.
+ */
+function setOrgTrialCampaign(orgId, campaign) {
+  getDb().prepare(`
+    UPDATE organizations
+       SET trial_campaign = COALESCE(?, trial_campaign),
+           trial_origin_at = COALESCE(trial_origin_at, ?)
+     WHERE id = ?
+  `).run(campaign || null, nowIso(), orgId);
+}
+
+/**
+ * Record the conversion, once.
+ *
+ * `trial_converted_at IS NULL` in the WHERE clause is the idempotency: Stripe
+ * redelivers invoice.paid, and a redelivery must not move the conversion date
+ * forward or double-count the campaign. Returns whether this call converted it.
+ */
+function markOrgConverted(orgId, { convertedAt, campaign } = {}) {
+  const at = convertedAt || nowIso();
+  const info = getDb().prepare(`
+    UPDATE organizations
+       SET trial_converted_at = ?, trial_campaign = COALESCE(trial_campaign, ?)
+     WHERE id = ? AND trial_converted_at IS NULL
+  `).run(at, campaign || null, orgId);
+  if (info.changes === 1) {
+    getDb().prepare('UPDATE trial_invites SET converted_at = ? WHERE org_id = ? AND converted_at IS NULL')
+      .run(at, orgId);
+  }
+  return info.changes === 1;
+}
+
+/**
+ * Abandoned trial invites: expired, never redeemed, holding an org nobody used.
+ *
+ * GET /start reserves an organization and a Stripe customer before the prospect
+ * reaches Checkout, because the trial webhooks have no other handle to resolve.
+ * Most prospects never finish — and a link prefetch provisions for prospects who
+ * never even clicked. Those orgs are real rows that inflate the org and signup
+ * counts on /admin/metrics forever.
+ *
+ * DRY RUN BY DEFAULT. Nothing is deleted unless `apply` is true. This deletes
+ * organizations, so the honest default is to report what it would do and let a
+ * human look first.
+ *
+ * Four conditions, all required:
+ *   - the invite has expired (expires_at in the past);
+ *   - it was never redeemed (redeemed_at null) and never consumed;
+ *   - the org carries no subscription id and no live subscription status;
+ *   - the org is empty by the schema-derived check, ignoring only the trial rows
+ *     this sweep is deleting itself.
+ *
+ * It never touches an org with a user, an analysis, an audit record, a template
+ * or a subscription. An org that fails any check is reported as skipped, with
+ * the reason, rather than silently passed over.
+ *
+ * @returns {{scanned: number, deleted: object[], skipped: object[], applied: boolean}}
+ */
+function sweepAbandonedTrialInvites({ now = Date.now(), apply = false, limit = 500 } = {}) {
+  const db = getDb();
+  const nowIsoStr = new Date(now).toISOString();
+
+  const candidates = db.prepare(`
+    SELECT t.token, t.email, t.org_id AS orgId, t.expires_at AS expiresAt,
+           t.stripe_customer_id AS stripeCustomerId,
+           o.stripe_subscription_id AS subscriptionId,
+           o.subscription_status AS subscriptionStatus,
+           o.name AS orgName
+      FROM trial_invites t
+      JOIN organizations o ON o.id = t.org_id
+     WHERE t.redeemed_at IS NULL
+       AND t.consumed_at IS NULL
+       AND t.org_id IS NOT NULL
+       AND t.expires_at <= ?
+     ORDER BY t.expires_at ASC
+     LIMIT ?
+  `).all(nowIsoStr, limit);
+
+  const deleted = [];
+  const skipped = [];
+
+  for (const row of candidates) {
+    // Money, at any strength, disqualifies it outright.
+    if (row.subscriptionId) {
+      skipped.push({ token: row.token, orgId: row.orgId, reason: 'HAS_SUBSCRIPTION_ID' });
+      continue;
+    }
+    if (row.subscriptionStatus && !TERMINAL_TRIAL_SWEEP_STATUSES.has(row.subscriptionStatus)) {
+      skipped.push({ token: row.token, orgId: row.orgId, reason: `STATUS_${row.subscriptionStatus}` });
+      continue;
+    }
+    // Empty by the same check deleteOrganizationIfEmpty uses, minus the two
+    // tables this sweep removes rows from itself.
+    if (!orgIsEmpty(row.orgId, { ignore: ['trial_invites', 'trial_emails'] })) {
+      skipped.push({ token: row.token, orgId: row.orgId, reason: 'ORG_NOT_EMPTY' });
+      continue;
+    }
+
+    const record = {
+      token: row.token,
+      orgId: row.orgId,
+      orgName: row.orgName,
+      email: row.email,
+      expiresAt: row.expiresAt,
+      stripeCustomerId: row.stripeCustomerId || null,
+    };
+
+    if (!apply) { deleted.push({ ...record, dryRun: true }); continue; }
+
+    // One transaction per invite: a failure on one must not roll back the rest,
+    // and must never leave an org deleted with its invite still pointing at it.
+    try {
+      db.transaction(() => {
+        db.prepare('DELETE FROM trial_emails WHERE org_id = ?').run(row.orgId);
+        db.prepare('DELETE FROM trial_invites WHERE token = ?').run(row.token);
+        const info = db.prepare(`
+          DELETE FROM organizations
+           WHERE id = ? AND stripe_subscription_id IS NULL
+        `).run(row.orgId);
+        if (info.changes !== 1) throw new Error('organization row did not delete');
+      }).immediate();
+      deleted.push(record);
+    } catch (err) {
+      skipped.push({ token: row.token, orgId: row.orgId, reason: `DELETE_FAILED: ${err.message}` });
+    }
+  }
+
+  return { scanned: candidates.length, deleted, skipped, applied: !!apply };
+}
+
+// Statuses on an abandoned trial org that do NOT protect it from the sweep.
+// NULL is the ordinary case (the trial never started). The terminal ones mean a
+// subscription existed and is finished, which is not a reason to keep an
+// otherwise empty org alive. Anything else — active, trialing, past_due,
+// paused, incomplete — protects it.
+const TERMINAL_TRIAL_SWEEP_STATUSES = new Set(['canceled', 'unpaid', 'incomplete_expired']);
+
+/** Append one trial-email attempt. Returns the row id. */
+function logTrialEmail({ orgId, subscriptionId, kind, toEmail, providerId, error, sentAt }) {
+  const id = uuidv4();
+  getDb().prepare(`
+    INSERT INTO trial_emails (id, org_id, subscription_id, kind, to_email, sent_at, provider_id, error)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, orgId || null, subscriptionId || null, kind, toEmail, sentAt || nowIso(),
+    providerId || null, error || null);
+  return id;
+}
+
+/** Trial emails of one kind already logged for a subscription (send-once checks). */
+function countTrialEmails(subscriptionId, kind) {
+  const row = getDb().prepare(
+    'SELECT COUNT(*) AS n FROM trial_emails WHERE subscription_id = ? AND kind = ? AND error IS NULL',
+  ).get(subscriptionId, kind);
+  return row ? row.n : 0;
+}
+
+function listTrialEmails(orgId) {
+  return getDb().prepare(`
+    SELECT id, org_id AS orgId, subscription_id AS subscriptionId, kind, to_email AS toEmail,
+           sent_at AS sentAt, provider_id AS providerId, error
+    FROM trial_emails WHERE org_id = ? ORDER BY sent_at DESC
+  `).all(orgId);
+}
+
 module.exports = {
   getDb,
   assertNotTheRealDatabase, // shared with routes/templates.js, the other connection
@@ -1692,6 +2391,11 @@ module.exports = {
   getUsageCount,
   incrementUsage,
   reserveUsage,
+  resetUsage,
+  setResumeError,
+  getResumeError,
+  markFreeTierSince,
+  getFreeTierSince,
   refundUsage,
   insertDemoRequest,
   countRecentFeatureRequests,
@@ -1704,6 +2408,30 @@ module.exports = {
   setOrgStripeCustomerId,
   findOrgByStripeCustomerId,
   setOrgPlan,
+  createTrialInvite,
+  findTrialInviteByToken,
+  markTrialInviteRedeemed,
+  markTrialInviteConsumed,
+  findAdoptableInviteByEmail,
+  markEmailVerified,
+  isEmailVerified,
+  setUserOrg,
+  deleteOrganizationIfEmpty,
+  clearProvisional,
+  orgScopedTables,
+  PROVISIONAL_ORG_TTL_MS,
+  setTrialInviteTarget,
+  findTrialInviteByOrg,
+  createTrialOrganization,
+  reserveTrialInviteOrg,
+  orgIsEmpty,
+  getOrgTrial,
+  setOrgTrialCampaign,
+  markOrgConverted,
+  logTrialEmail,
+  sweepAbandonedTrialInvites,
+  countTrialEmails,
+  listTrialEmails,
   runRetentionPurge,
   startRetentionSchedule,
   validateRetentionDays,

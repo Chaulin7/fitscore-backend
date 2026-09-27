@@ -25,84 +25,27 @@
 const express = require('express');
 const crypto = require('crypto');
 
-const authService = require('../services/authService');
 const metrics = require('../services/metrics');
 const stripeReconcile = require('../services/stripeReconcile');
 const { getDb } = require('../services/db');
 const { BRANDMARK_SVG } = require('../services/brandmark');
 const { CURRENCY } = require('../config/plans');
-// The owner rule lives in config/platformOwner so this guard and the
+// The owner rule lives in config/platformOwner so the guard and the
 // isPlatformOwner flag on the session payload cannot drift apart. See the
-// header there for why a second copy would fail quietly.
-const { ownerEmail, isPlatformOwner } = require('../config/platformOwner');
+// header there for why a second copy would fail quietly. Only the address is
+// needed here — for the "signed in as" line the page renders.
+const { ownerEmail } = require('../config/platformOwner');
+const { requirePlatformOwner } = require('../middleware/adminAuth');
 
 const router = express.Router();
 
 const ROUTE_PATH = '/admin/metrics';
 
-function notFound(res) {
-  // Byte-identical to the application's catch-all in src/index.js.
-  return res.status(404).json({ error: 'Not found', code: 'NOT_FOUND', path: ROUTE_PATH });
-}
-
-/**
- * Resolve the caller, or null.
- *
- * Two credentials, both existing mechanisms, no new one invented:
- *
- *   Authorization: Bearer …  the normal session token, same lookup
- *                            middleware/auth.requireSession does.
- *   ?dt=…                    a single-use 60s download token from
- *                            POST /api/auth/download-token. This page is opened
- *                            in a browser tab, and a browser tab cannot send an
- *                            Authorization header — the same constraint that
- *                            put ?dt= on the HTML report and the CSV export.
- *
- * A session token is never accepted from the query string. It is long-lived,
- * and a URL lands in browser history, in a Referer, and in any log that does
- * not strip query strings. The download token is minted for one navigation and
- * is dead by the time the page has rendered.
- */
-function resolveCaller(req) {
-  const header = req.headers.authorization || '';
-  const bearer = /^Bearer\s+(.+)$/i.exec(header);
-  if (bearer) {
-    const found = authService.findSessionByToken(bearer[1].trim());
-    if (found && found.user) return { user: found.user, authMethod: 'session' };
-  }
-
-  const dt = req.query && req.query.dt;
-  if (dt && req.method === 'GET') {
-    const grant = authService.consumeDownloadToken(String(dt));
-    if (grant && grant.userId) {
-      const user = authService.findUserById(grant.userId);
-      if (user) return { user, authMethod: 'download_token' };
-    }
-  }
-
-  return null;
-}
-
-/**
- * Owner-only guard. 404 on every failure path.
- *
- * The ownership rule itself is config/platformOwner.isPlatformOwner — email AND
- * role 'owner', compared timing-safely. This function's job is the 404, not the
- * rule: routes/auth publishes the same predicate to the SPA so the menu item and
- * this gate agree by construction rather than by both being kept up to date.
- *
- * Re-derived from the session on every request. The client's isPlatformOwner
- * flag is a rendering hint and is never consulted here.
- */
-function isOwner(req, res, next) {
-  const caller = resolveCaller(req);
-  if (!caller) return notFound(res);
-  if (!isPlatformOwner(caller.user)) return notFound(res);
-
-  req.adminUser = caller.user;
-  req.adminAuthMethod = caller.authMethod;
-  return next();
-}
+// The guard now lives in middleware/adminAuth.js — it grew a second caller
+// (POST /admin/trial-invites) and its rules are too subtle to hold twice. The
+// local name is kept so the routes below and the export at the bottom read
+// exactly as they did.
+const isOwner = requirePlatformOwner;
 
 /**
  * One row per access, written before the page is rendered.
