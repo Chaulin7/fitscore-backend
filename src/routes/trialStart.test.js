@@ -77,6 +77,7 @@ const auth = require('./../services/authService');
 const trialStartRouter = require('./trialStart');
 const adminTrialInvitesRouter = require('./adminTrialInvites');
 const billingRouter = require('./billing');
+const trialInvites = require('../services/trialInvites');
 
 let server; let base; let operatorToken; let memberToken;
 
@@ -366,6 +367,62 @@ describe('GET /start — the token is spent by checkout.session.completed', () =
     await webhook('checkout.session.completed', session);
     assert.equal(db.findTrialInviteByToken(inv.token).redeemedAt, first,
       'the redemption timestamp does not move');
+  });
+});
+
+describe('a link prefetch must not burn the invite', () => {
+  /**
+   * Corporate mail scanners, link previewers and some clients fetch every URL in
+   * an email before a human touches it. If that GET spent the token, the
+   * prospect's link would be dead on arrival and there would be nothing in the
+   * product to explain why.
+   *
+   * It cannot, structurally: redeemed_at is written in exactly one place —
+   * redeemTrialToken, on checkout.session.completed — and /start only calls
+   * setTrialInviteTarget, whose UPDATE does not name that column. These tests
+   * pin the property at the route so a future edit to /start cannot quietly
+   * acquire it.
+   */
+  let invite;
+
+  before(async () => {
+    const body = await (await mint({
+      invites: [{ email: 'scanned@mu.test', company_name: 'Mu Recruitment', campaign: 'q4' }],
+    })).json();
+    [invite] = body.invites;
+  });
+
+  test('repeated prefetches leave the token unspent and unconsumed', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      const res = await startRaw(`?t=${invite.token}`);
+      assert.equal(res.status, 302, `prefetch ${i + 1} still answers`);
+      assert.match(res.headers.get('location'), /checkout\.stripe\.com/,
+        'and still hands out a working Checkout link');
+    }
+    const row = db.findTrialInviteByToken(invite.token);
+    assert.equal(row.redeemedAt, null, 'the trial has not been started');
+    assert.equal(row.consumedAt, null, 'and no account has been claimed');
+  });
+
+  test('the signup link cannot be burned by a prefetch either', () => {
+    // Belt and braces: before redemption the signup link is not even valid, so
+    // a scanner that reached /signup?t= would find nothing to consume.
+    const check = trialInvites.validateSignupToken(invite.token);
+    assert.equal(check.ok, false);
+    assert.equal(check.reason, trialInvites.REASON.NOT_REDEEMED);
+  });
+
+  test('the human clicking after the scanner still gets a working trial', async () => {
+    const target = db.findTrialInviteByToken(invite.token);
+    await webhook('checkout.session.completed', {
+      id: 'cs_scanned',
+      customer: target.stripeCustomerId,
+      subscription: 'sub_scanned',
+      metadata: { orgId: target.orgId, plan: 'pro', trial_token: invite.token, campaign: 'q4' },
+    });
+    const after = db.findTrialInviteByToken(invite.token);
+    assert.ok(after.redeemedAt, 'redeemed only now, by the completion');
+    assert.ok(after.signupExpiresAt, 'and the claim link is now live');
   });
 });
 

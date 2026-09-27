@@ -53,13 +53,22 @@ If `STRIPE_SECRET_KEY` is unset the app still boots; billing endpoints return
   - `customer.subscription.trial_will_end` — no-card trial (see below)
   - `payment_method.attached` — no-card trial (**required**, see below)
   - `invoice.paid` — no-card trial (see below)
+  - `customer.subscription.paused` — no-card trial (see below)
 
-  > The last three are needed by the 30-day no-card trial. If they are not
+  That is **nine** events. The four trial ones are the set `TRIAL_EVENTS` in
+  `src/routes/billing.js`; the five above them are `PLAN_MUTATING` in the same
+  file. If you are configuring the endpoint by hand, count them.
+
+  > The last four are needed by the 30-day no-card trial. If they are not
   > enabled on the endpoint, trials still start and still pause — but the
   > reminder email never goes out and, worse, **a customer who adds a card
-  > stays paused forever**, because nothing clears `pause_collection`. There is
+  > stays paused forever**, because nothing resumes the subscription. There is
   > no error anywhere when this is misconfigured; the symptom is a paying
   > customer with no access.
+  >
+  > `customer.subscription.paused` is the least costly of the four to omit — it
+  > only sends an email — but omitting it means an account goes read-only with
+  > no message at all, which is how a customer concludes their data is gone.
 - The route receives the **raw body** and verifies the `Stripe-Signature`
   header against `STRIPE_WEBHOOK_SECRET`. It is exempt from session auth.
   Handlers are **idempotent** — state is always set from the event, so repeated
