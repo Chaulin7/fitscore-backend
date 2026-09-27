@@ -168,3 +168,150 @@ describe('it cannot reach an org outside the current request', () => {
     assert.equal(row.p, null, 'the safe value is the default');
   });
 });
+
+// --- Abandoned trial invites -------------------------------------------------
+
+describe('sweeping abandoned trial invites', () => {
+  /**
+   * GET /start reserves an org and a Stripe customer before the prospect reaches
+   * Checkout, because the trial webhooks have no other handle. Most prospects
+   * never finish, and a mail scanner's prefetch provisions for prospects who
+   * never even clicked. Those orgs are real rows that inflate the org and signup
+   * counts on /admin/metrics forever.
+   *
+   * The sweep is the only thing that removes them, and it deletes organizations,
+   * so most of what follows asserts that it REFUSES.
+   */
+  const DAY = 86400000;
+  const past = () => new Date(Date.now() - 2 * DAY).toISOString();
+  const future = () => new Date(Date.now() + 2 * DAY).toISOString();
+
+  let seq = 0;
+  /** An abandoned invite: expired, unredeemed, pointing at an empty org. */
+  function abandoned({ expiresAt = past(), redeemed = false, consumed = false } = {}) {
+    seq += 1;
+    const token = `aaaaaaaa-0000-4000-8000-${String(seq).padStart(12, '0')}`;
+    const org = auth.createOrganization(`Abandoned ${seq}`);
+    db.createTrialInvite({
+      token, email: `sweep${seq}@x.test`, companyName: `Abandoned ${seq}`,
+      campaign: 'q4', expiresAt,
+    });
+    db.getDb().prepare('UPDATE trial_invites SET org_id = ?, stripe_customer_id = ? WHERE token = ?')
+      .run(org.id, `cus_sweep_${seq}`, token);
+    if (redeemed) db.getDb().prepare('UPDATE trial_invites SET redeemed_at = ? WHERE token = ?').run(db.nowIso(), token);
+    if (consumed) db.getDb().prepare('UPDATE trial_invites SET consumed_at = ? WHERE token = ?').run(db.nowIso(), token);
+    return { token, orgId: org.id };
+  }
+  const swept = (r, token) => r.deleted.some((d) => d.token === token);
+  const skipReason = (r, token) => (r.skipped.find((x) => x.token === token) || {}).reason;
+
+  test('a dry run reports what it would delete and deletes nothing', () => {
+    const { token, orgId } = abandoned();
+    const r = db.sweepAbandonedTrialInvites();
+    assert.equal(r.applied, false);
+    assert.equal(swept(r, token), true, 'reported as a candidate');
+    assert.equal(orgExists(orgId), true, 'but still there');
+    assert.ok(db.findTrialInviteByToken(token), 'and the invite is still there');
+  });
+
+  test('apply deletes the org, the invite and its email rows', () => {
+    const { token, orgId } = abandoned();
+    db.logTrialEmail({ orgId, subscriptionId: 's', kind: 'trial_welcome', toEmail: 'x@x.test' });
+    const r = db.sweepAbandonedTrialInvites({ apply: true });
+    assert.equal(r.applied, true);
+    assert.equal(swept(r, token), true);
+    assert.equal(orgExists(orgId), false);
+    assert.equal(db.findTrialInviteByToken(token), null);
+    assert.equal(db.listTrialEmails(orgId).length, 0);
+  });
+
+  test('an UNEXPIRED invite is left alone', () => {
+    const { token, orgId } = abandoned({ expiresAt: future() });
+    const r = db.sweepAbandonedTrialInvites({ apply: true });
+    assert.equal(swept(r, token), false);
+    assert.equal(skipReason(r, token), undefined, 'not even a candidate');
+    assert.equal(orgExists(orgId), true);
+  });
+
+  test('a REDEEMED invite is left alone — that trial started', () => {
+    const { token, orgId } = abandoned({ redeemed: true });
+    const r = db.sweepAbandonedTrialInvites({ apply: true });
+    assert.equal(swept(r, token), false);
+    assert.equal(orgExists(orgId), true);
+  });
+
+  test('a CONSUMED invite is left alone', () => {
+    const { token, orgId } = abandoned({ consumed: true });
+    const r = db.sweepAbandonedTrialInvites({ apply: true });
+    assert.equal(swept(r, token), false);
+    assert.equal(orgExists(orgId), true);
+  });
+
+  test('an org with a subscription id is refused, and says so', () => {
+    const { token, orgId } = abandoned();
+    db.setOrgPlan(orgId, {
+      plan: 'pro', subscriptionStatus: 'active', currentPeriodEnd: null, stripeSubscriptionId: 'sub_real',
+    });
+    const r = db.sweepAbandonedTrialInvites({ apply: true });
+    assert.equal(swept(r, token), false);
+    assert.equal(skipReason(r, token), 'HAS_SUBSCRIPTION_ID');
+    assert.equal(orgExists(orgId), true);
+  });
+
+  test('a live subscription status is refused even with no subscription id', () => {
+    for (const status of ['active', 'trialing', 'past_due', 'paused', 'incomplete']) {
+      const { token, orgId } = abandoned();
+      db.setOrgPlan(orgId, { plan: 'pro', subscriptionStatus: status, currentPeriodEnd: null });
+      const r = db.sweepAbandonedTrialInvites({ apply: true });
+      assert.equal(swept(r, token), false, status);
+      assert.equal(skipReason(r, token), `STATUS_${status}`);
+      assert.equal(orgExists(orgId), true, status);
+    }
+  });
+
+  test('a terminal status does not protect an otherwise empty org', () => {
+    const { token, orgId } = abandoned();
+    db.setOrgPlan(orgId, { plan: 'free', subscriptionStatus: 'canceled', currentPeriodEnd: null });
+    const r = db.sweepAbandonedTrialInvites({ apply: true });
+    assert.equal(swept(r, token), true, 'a finished subscription is not a reason to keep an empty org');
+    assert.equal(orgExists(orgId), false);
+  });
+
+  test('ANY child row refuses it, by the same schema-derived check', () => {
+    const cases = {
+      users: (id) => db.getDb().prepare(
+        'INSERT INTO users (id,email,password_hash,org_id,role,created_at) VALUES (?,?,?,?,?,?)',
+      ).run(`su-${id}`, `su-${id}@x.test`, 'h', id, 'owner', db.nowIso()),
+      usage_counters: (id) => db.getDb().prepare(
+        'INSERT INTO usage_counters (org_id,period_key,analysis_count) VALUES (?,?,?)',
+      ).run(id, '2026-09', 3),
+      templates: (id) => db.getDb().prepare(
+        'INSERT INTO templates (id,name,org_id,created_at,updated_at) VALUES (?,?,?,?,?)',
+      ).run(`st-${id}`, 'T', id, db.nowIso(), db.nowIso()),
+    };
+    for (const [table, seed] of Object.entries(cases)) {
+      const { token, orgId } = abandoned();
+      seed(orgId);
+      const r = db.sweepAbandonedTrialInvites({ apply: true });
+      assert.equal(swept(r, token), false, table);
+      assert.equal(skipReason(r, token), 'ORG_NOT_EMPTY', table);
+      assert.equal(orgExists(orgId), true, `${table}: the org survived`);
+    }
+  });
+
+  test('the invite row pointing at the org does not make it look occupied', () => {
+    // trial_invites and trial_emails are org-scoped, so the naive emptiness
+    // check would report every candidate as occupied by the very rows being
+    // swept. If this ever regresses the sweep silently deletes nothing.
+    const { token } = abandoned();
+    const r = db.sweepAbandonedTrialInvites();
+    assert.equal(swept(r, token), true);
+  });
+
+  test('it reports what it scanned', () => {
+    abandoned(); abandoned();
+    const r = db.sweepAbandonedTrialInvites();
+    assert.ok(r.scanned >= 2);
+    assert.equal(typeof r.applied, 'boolean');
+  });
+});

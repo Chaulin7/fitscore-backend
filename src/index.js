@@ -512,6 +512,7 @@ const server = app.listen(PORT, () => {
   log(' POST /api/feature-requests   - Submit a feature request (Pro/Team, auth required)');
   log(' GET  /admin/metrics          - Internal operator metrics (owner only)');
   log(' POST /admin/trial-invites    - Mint 30-day no-card trial tokens (owner only)');
+  log(' GET  /admin/abandoned-trials  - Dry-run sweep of expired, unredeemed trial orgs (owner only)');
   log(' GET  /start?t=token          - Redeem a trial token into Stripe Checkout');
   log(' GET  /health                 - Health check');
 });

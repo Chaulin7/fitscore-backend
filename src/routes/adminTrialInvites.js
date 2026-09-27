@@ -25,6 +25,7 @@ const express = require('express');
 const { requirePlatformOwner } = require('../middleware/adminAuth');
 const { mintInvites, TRIAL_PERIOD_DAYS, DEFAULT_INVITE_TTL_DAYS } = require('../services/trialInvites');
 const { baseUrlFor } = require('../config/appUrl');
+const { sweepAbandonedTrialInvites } = require('../services/db');
 
 const router = express.Router();
 
@@ -103,6 +104,61 @@ router.post('/trial-invites', requirePlatformOwner, (req, res) => {
   } catch (err) {
     console.error('[trial] minting invites failed:', err.message);
     return sendError(res, 500, 'INTERNAL_ERROR', 'Could not create the trial invites.');
+  }
+});
+
+/**
+ * GET  /admin/abandoned-trials            what the sweep would delete
+ * POST /admin/abandoned-trials { confirm } actually delete it
+ *
+ * Operator-triggered, deliberately. NOT on a timer — see docs/billing/README.md
+ * for the reasoning: the volume is a handful of rows, the deletion is
+ * irreversible, and a schedule would perform it at a moment nobody is watching.
+ *
+ * GET is the dry run and is always safe. POST requires `confirm: true` in the
+ * body on top of the owner guard, because it deletes organizations.
+ */
+router.get('/abandoned-trials', requirePlatformOwner, (req, res) => {
+  try {
+    const result = sweepAbandonedTrialInvites({ apply: false });
+    return res.json({
+      ...result,
+      hint: result.deleted.length
+        ? 'POST to this path with { "confirm": true } to delete these.'
+        : 'Nothing to sweep.',
+    });
+  } catch (err) {
+    console.error('[trial] abandoned-trial dry run failed:', err.message);
+    return sendError(res, 500, 'INTERNAL_ERROR', 'Could not scan for abandoned trials.');
+  }
+});
+
+router.post('/abandoned-trials', requirePlatformOwner, (req, res) => {
+  try {
+    if (!(req.body || {}).confirm) {
+      return sendError(res, 400, 'CONFIRMATION_REQUIRED',
+        'This deletes organizations and cannot be undone. GET this path first to see what would '
+        + 'go, then send { "confirm": true }.');
+    }
+    const result = sweepAbandonedTrialInvites({ apply: true });
+    console.log('[trial] swept abandoned trial invites', {
+      scanned: result.scanned,
+      deleted: result.deleted.length,
+      skipped: result.skipped.length,
+      by: req.adminUser.email,
+    });
+    return res.json({
+      ...result,
+      // Stripe customers are NOT deleted here. They cost nothing, they carry the
+      // only record that the outreach happened, and deleting them is an
+      // irreversible write to an external system on a path whose whole purpose
+      // is tidiness. The ids are returned so an operator can remove them by hand
+      // if they want to.
+      stripeCustomersRetained: result.deleted.map((d) => d.stripeCustomerId).filter(Boolean),
+    });
+  } catch (err) {
+    console.error('[trial] abandoned-trial sweep failed:', err.message);
+    return sendError(res, 500, 'INTERNAL_ERROR', 'Could not sweep abandoned trials.');
   }
 });
 

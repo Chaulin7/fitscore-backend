@@ -35,14 +35,38 @@ process.env.ADMIN_OWNER_EMAIL = 'operator@cvsprings.test';
 // --- Stripe stub ------------------------------------------------------------
 const calls = [];
 const CUSTOMERS = new Map();
+const IDEMPOTENT = new Map(); // idempotencyKey -> customer id
 let customerSeq = 0;
+
+/**
+ * Network latency, modelled.
+ *
+ * Without it the concurrency tests below prove nothing. A stub whose async
+ * functions resolve in a microtask lets one Express handler run to completion
+ * before Node even picks up the second request, so the two never interleave and
+ * the race cannot occur — the tests passed against the pre-fix code, which is
+ * how a worthless test looks. A real Stripe call yields to the event loop, and
+ * that yield is precisely the window the old read-then-create fell through.
+ */
+const netDelay = () => new Promise((r) => setTimeout(r, 15));
 
 const fakeStripe = () => ({
   customers: {
-    create: async (p) => {
+    // Honours idempotencyKey, because that is the mechanism /start relies on to
+    // stop a concurrent second request creating a second customer. A stub that
+    // ignored it would report a race the real Stripe does not have — or hide one
+    // it does.
+    create: async (p, opts) => {
+      await netDelay();
+      const key = opts && opts.idempotencyKey;
+      if (key && IDEMPOTENT.has(key)) {
+        calls.push({ call: 'customers.create', idempotentReplay: true, id: IDEMPOTENT.get(key) });
+        return { id: IDEMPOTENT.get(key) };
+      }
       const id = `cus_trial_${++customerSeq}`;
       CUSTOMERS.set(id, { id, ...p });
-      calls.push({ call: 'customers.create', email: p.email, name: p.name, metadata: p.metadata, id });
+      if (key) IDEMPOTENT.set(key, id);
+      calls.push({ call: 'customers.create', email: p.email, name: p.name, metadata: p.metadata, id, key });
       return { id };
     },
     retrieve: async (id) => CUSTOMERS.get(id) || { id, invoice_settings: {} },
@@ -423,6 +447,94 @@ describe('a link prefetch must not burn the invite', () => {
     const after = db.findTrialInviteByToken(invite.token);
     assert.ok(after.redeemedAt, 'redeemed only now, by the completion');
     assert.ok(after.signupExpiresAt, 'and the claim link is now live');
+  });
+});
+
+describe('two concurrent /start calls on one token', () => {
+  /**
+   * The prefetch race, driven directly. A mail scanner's fetch and the human's
+   * click arrive together on the same URL, and before the claim was made
+   * indivisible both provisioned: two organizations, two Stripe customers, and
+   * whichever wrote last owned the invite while the other pair was orphaned.
+   *
+   * These assert COUNTS, not the absence of an exception — the old code did not
+   * throw either.
+   */
+  let invite;
+  let orgsBefore;
+  let orgsAfter;
+  let responses;
+  // Snapshotted here because the file-level beforeEach clears `calls` between
+  // tests, and every assertion below is about the ONE burst fired in before().
+  let raceCalls;
+
+  before(async () => {
+    const body = await (await mint({
+      invites: [{ email: 'race@nu.test', company_name: 'Nu Recruitment', campaign: 'q4' }],
+    })).json();
+    [invite] = body.invites;
+    orgsBefore = db.getDb().prepare('SELECT COUNT(*) AS n FROM organizations').get().n;
+    calls.length = 0;
+
+    responses = await Promise.all([
+      startRaw(`?t=${invite.token}`),
+      startRaw(`?t=${invite.token}`),
+    ]);
+    raceCalls = [...calls];
+    orgsAfter = db.getDb().prepare('SELECT COUNT(*) AS n FROM organizations').get().n;
+  });
+
+  test('both requests succeed', () => {
+    for (const res of responses) {
+      assert.equal(res.status, 302);
+      assert.match(res.headers.get('location'), /checkout\.stripe\.com/);
+    }
+  });
+
+  test('EXACTLY ONE organization was created', () => {
+    assert.equal(orgsAfter - orgsBefore, 1, 'a second org here is the orphan this fix exists to prevent');
+    const named = db.getDb().prepare('SELECT COUNT(*) AS n FROM organizations WHERE trial_invite_email = ?')
+      .get('race@nu.test').n;
+    assert.equal(named, 1);
+  });
+
+  test('EXACTLY ONE Stripe customer was created', () => {
+    const created = raceCalls.filter((c) => c.call === 'customers.create' && !c.idempotentReplay);
+    assert.equal(created.length, 1, `expected one real create, got ${created.length}`);
+    const distinct = new Set(raceCalls.filter((c) => c.call === 'customers.create').map((c) => c.id));
+    assert.equal(distinct.size, 1, 'both requests must end up on the same customer');
+  });
+
+  test('both requests resolved to the same org, and the invite points at it', () => {
+    const row = db.findTrialInviteByToken(invite.token);
+    const org = db.getDb().prepare('SELECT id FROM organizations WHERE trial_invite_email = ?')
+      .get('race@nu.test');
+    assert.equal(row.orgId, org.id, 'the invite owns the org that was actually created');
+    const sessions = raceCalls.filter((c) => c.call === 'checkout.sessions.create');
+    assert.equal(sessions.length, 2, 'both callers got a session');
+    assert.equal(new Set(sessions.map((c) => c.params.metadata.orgId)).size, 1,
+      'and both sessions name the SAME org, so whichever completes lands in the right place');
+    assert.equal(new Set(sessions.map((c) => c.params.customer)).size, 1,
+      'against the same customer');
+  });
+
+  test('and the token is still unspent — a prefetch costs nothing', () => {
+    const row = db.findTrialInviteByToken(invite.token);
+    assert.equal(row.redeemedAt, null);
+    assert.equal(row.consumedAt, null);
+  });
+
+  test('a burst of five behaves the same way', async () => {
+    const body = await (await mint({ invites: [{ email: 'burst@xi.test', company_name: 'Xi BV' }] })).json();
+    const tok = body.invites[0].token;
+    const n0 = db.getDb().prepare('SELECT COUNT(*) AS n FROM organizations').get().n;
+    calls.length = 0;
+    await Promise.all(Array.from({ length: 5 }, () => startRaw(`?t=${tok}`)));
+    const burst = [...calls];
+    const n1 = db.getDb().prepare('SELECT COUNT(*) AS n FROM organizations').get().n;
+    assert.equal(n1 - n0, 1, 'still one org');
+    assert.equal(burst.filter((c) => c.call === 'customers.create' && !c.idempotentReplay).length, 1,
+      'still one customer');
   });
 });
 

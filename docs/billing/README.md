@@ -195,6 +195,50 @@ If the invited address already has an account, `/start` puts the trial on
 **their** organization and signing up again answers `409 TRIAL_ALREADY_YOURS`
 telling them to log in — never a duplicate account.
 
+### Abandoned invites, and why the sweep is not scheduled
+
+`GET /start` reserves an organization and a Stripe customer **before** the
+prospect reaches Checkout, because the trial webhooks have no handle to resolve
+an account by other than the customer id. Two consequences:
+
+- most prospects never finish, so most reserved orgs are never used;
+- corporate mail scanners and link previewers fetch the URL before a human
+  clicks, so some are reserved for prospects who never clicked at all.
+
+A prefetch is harmless to the token — `redeemed_at` is written only by
+`checkout.session.completed`, and the claim link is not even valid until then —
+and it cannot double-provision: the org is claimed in one `BEGIN IMMEDIATE`
+transaction, and the Stripe customer is created under an idempotency key derived
+from the token. Nothing inspects the request; there is no prefetch to detect,
+only a claim made indivisible.
+
+What a prefetch does leave is an empty org, which inflates the org and signup
+counts on `/admin/metrics`. The sweep removes them:
+
+| | |
+|---|---|
+| `GET /admin/abandoned-trials` | Dry run. Always safe. Lists what would go and why anything was skipped. |
+| `POST /admin/abandoned-trials` `{confirm:true}` | Deletes. Owner only, plus the explicit confirmation. |
+
+It deletes only where **all four** hold: the invite has expired, was never
+redeemed or consumed, the org carries no subscription id and no live
+subscription status, and the org is empty by the same schema-derived check
+`deleteOrganizationIfEmpty` uses — ignoring only the trial rows the sweep removes
+itself. Anything else is reported as skipped with a reason.
+
+Stripe customers are **not** deleted. They cost nothing, they are the only record
+that the outreach happened, and deleting them is an irreversible write to an
+external system on a path whose purpose is tidiness. The ids come back in the
+response so they can be removed by hand.
+
+**It is deliberately not on a timer.** The existing schedules (retention purge,
+provenance sweep, metrics snapshot) all either write derived data or delete on an
+org's own declared retention policy. This deletes organizations on a rule the
+customer never agreed to, the volume is a handful of rows, and a schedule would
+do it at a moment nobody is watching. Run the dry run when the org count looks
+wrong, read it, then confirm. If the volume ever justifies automation, the
+scheduling helpers in `src/services/db.js` are the pattern to follow.
+
 ### The email fallback is not live
 
 `services/trialAdoption.adoptByVerifiedEmail()` exists for the prospect who lost

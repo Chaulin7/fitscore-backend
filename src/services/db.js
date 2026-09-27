@@ -2011,6 +2011,33 @@ function orgScopedTables() {
   return _orgScopedTables;
 }
 
+/**
+ * Whether nothing at all hangs off this organization.
+ *
+ * Enumerated from the schema (orgScopedTables) rather than from a list, and a
+ * table that cannot be READ counts as occupied — an error here must never be
+ * mistaken for emptiness, because the caller's next move is a DELETE.
+ *
+ * `ignore` lets a caller exclude tables it is about to delete from itself. The
+ * abandoned-trial sweep needs that: the invite row it is cleaning up points AT
+ * the org, so trial_invites would otherwise report the org as occupied by the
+ * very row being swept.
+ */
+function orgIsEmpty(orgId, { ignore = [] } = {}) {
+  if (!orgId) return false;
+  const db = getDb();
+  const skip = new Set(ignore);
+  for (const table of orgScopedTables()) {
+    if (skip.has(table)) continue;
+    try {
+      if (db.prepare(`SELECT 1 FROM ${table} WHERE org_id = ? LIMIT 1`).get(orgId)) return false;
+    } catch (_) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** How long a provisional organization stays eligible for cleanup. */
 const PROVISIONAL_ORG_TTL_MS = 60 * 1000;
 
@@ -2059,15 +2086,9 @@ function deleteOrganizationIfEmpty(orgId, { createdAt } = {}) {
   // Nor may it have anything to do with money.
   if (row.customerId || row.subscriptionId) return false;
 
-  // Guard 3. A table that cannot be read counts as occupied: an error here must
-  // not be mistaken for emptiness.
-  for (const table of orgScopedTables()) {
-    try {
-      if (db.prepare(`SELECT 1 FROM ${table} WHERE org_id = ? LIMIT 1`).get(orgId)) return false;
-    } catch (_) {
-      return false;
-    }
-  }
+  // Guard 3, shared with the abandoned-trial sweep so there is one definition of
+  // "empty" rather than two that drift.
+  if (!orgIsEmpty(orgId)) return false;
 
   const info = db.prepare(`
     DELETE FROM organizations
@@ -2111,6 +2132,62 @@ function findTrialInviteByOrg(orgId) {
            org_id AS orgId, plan, converted_at AS convertedAt
     FROM trial_invites WHERE org_id = ? ORDER BY created_at DESC LIMIT 1
   `).get(orgId) || null;
+}
+
+/**
+ * Claim the organization for a trial invite, atomically, and create it if this
+ * caller is the one that wins the claim.
+ *
+ * WHY THIS IS ONE TRANSACTION. GET /start used to resolve-or-create an org, then
+ * `await` a Stripe call, then write the org id back onto the invite. Two
+ * requests arriving together — which a corporate mail scanner's prefetch and the
+ * human's own click reliably do — both saw org_id as null across that await and
+ * both created an organization and a Stripe customer. Whichever wrote last owned
+ * the invite; the other pair was orphaned forever.
+ *
+ * The fix is not to detect prefetches. It is to make the claim indivisible:
+ * better-sqlite3 is synchronous, so a transaction here cannot be interleaved by
+ * another request at all, and BEGIN IMMEDIATE serialises it against any other
+ * process. The loser reads the winner's org_id and reuses it.
+ *
+ * `preferOrgId` is for the case where the invited address already has an
+ * account: that org is the right answer, and claiming it still has to go
+ * through the same guarded write so concurrent callers agree on it.
+ *
+ * @returns {{orgId: string|null, created: boolean, wonClaim: boolean}}
+ */
+function reserveTrialInviteOrg(token, { preferOrgId, name, email, retentionDays } = {}) {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    const invite = db.prepare('SELECT org_id AS orgId FROM trial_invites WHERE token = ?').get(token);
+    if (!invite) return { orgId: null, created: false, wonClaim: false };
+    // Already claimed — by an earlier visit, or by the request that beat us here.
+    if (invite.orgId) return { orgId: invite.orgId, created: false, wonClaim: false };
+
+    if (preferOrgId) {
+      const info = db.prepare('UPDATE trial_invites SET org_id = ? WHERE token = ? AND org_id IS NULL')
+        .run(preferOrgId, token);
+      return { orgId: preferOrgId, created: false, wonClaim: info.changes === 1 };
+    }
+
+    const id = uuidv4();
+    const createdAt = nowIso();
+    db.prepare(`
+      INSERT INTO organizations (id, name, created_at, retention_days, trial_invite_email)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, String(name || '').trim() || 'Trial organization', createdAt,
+      retentionDays || RETENTION_DEFAULT_DAYS, String(email || '').trim().toLowerCase() || null);
+
+    const info = db.prepare('UPDATE trial_invites SET org_id = ? WHERE token = ? AND org_id IS NULL')
+      .run(id, token);
+    if (info.changes !== 1) {
+      // Unreachable inside this transaction, and it throws rather than returning
+      // so the INSERT above is rolled back instead of leaving an orphan behind.
+      throw new Error(`trial invite ${token} was claimed concurrently inside a transaction`);
+    }
+    return { orgId: id, created: true, wonClaim: true };
+  });
+  return tx.immediate();
 }
 
 /** Create the organization a trial redemption hangs off, before any user exists. */
@@ -2169,6 +2246,111 @@ function markOrgConverted(orgId, { convertedAt, campaign } = {}) {
   }
   return info.changes === 1;
 }
+
+/**
+ * Abandoned trial invites: expired, never redeemed, holding an org nobody used.
+ *
+ * GET /start reserves an organization and a Stripe customer before the prospect
+ * reaches Checkout, because the trial webhooks have no other handle to resolve.
+ * Most prospects never finish — and a link prefetch provisions for prospects who
+ * never even clicked. Those orgs are real rows that inflate the org and signup
+ * counts on /admin/metrics forever.
+ *
+ * DRY RUN BY DEFAULT. Nothing is deleted unless `apply` is true. This deletes
+ * organizations, so the honest default is to report what it would do and let a
+ * human look first.
+ *
+ * Four conditions, all required:
+ *   - the invite has expired (expires_at in the past);
+ *   - it was never redeemed (redeemed_at null) and never consumed;
+ *   - the org carries no subscription id and no live subscription status;
+ *   - the org is empty by the schema-derived check, ignoring only the trial rows
+ *     this sweep is deleting itself.
+ *
+ * It never touches an org with a user, an analysis, an audit record, a template
+ * or a subscription. An org that fails any check is reported as skipped, with
+ * the reason, rather than silently passed over.
+ *
+ * @returns {{scanned: number, deleted: object[], skipped: object[], applied: boolean}}
+ */
+function sweepAbandonedTrialInvites({ now = Date.now(), apply = false, limit = 500 } = {}) {
+  const db = getDb();
+  const nowIsoStr = new Date(now).toISOString();
+
+  const candidates = db.prepare(`
+    SELECT t.token, t.email, t.org_id AS orgId, t.expires_at AS expiresAt,
+           t.stripe_customer_id AS stripeCustomerId,
+           o.stripe_subscription_id AS subscriptionId,
+           o.subscription_status AS subscriptionStatus,
+           o.name AS orgName
+      FROM trial_invites t
+      JOIN organizations o ON o.id = t.org_id
+     WHERE t.redeemed_at IS NULL
+       AND t.consumed_at IS NULL
+       AND t.org_id IS NOT NULL
+       AND t.expires_at <= ?
+     ORDER BY t.expires_at ASC
+     LIMIT ?
+  `).all(nowIsoStr, limit);
+
+  const deleted = [];
+  const skipped = [];
+
+  for (const row of candidates) {
+    // Money, at any strength, disqualifies it outright.
+    if (row.subscriptionId) {
+      skipped.push({ token: row.token, orgId: row.orgId, reason: 'HAS_SUBSCRIPTION_ID' });
+      continue;
+    }
+    if (row.subscriptionStatus && !TERMINAL_TRIAL_SWEEP_STATUSES.has(row.subscriptionStatus)) {
+      skipped.push({ token: row.token, orgId: row.orgId, reason: `STATUS_${row.subscriptionStatus}` });
+      continue;
+    }
+    // Empty by the same check deleteOrganizationIfEmpty uses, minus the two
+    // tables this sweep removes rows from itself.
+    if (!orgIsEmpty(row.orgId, { ignore: ['trial_invites', 'trial_emails'] })) {
+      skipped.push({ token: row.token, orgId: row.orgId, reason: 'ORG_NOT_EMPTY' });
+      continue;
+    }
+
+    const record = {
+      token: row.token,
+      orgId: row.orgId,
+      orgName: row.orgName,
+      email: row.email,
+      expiresAt: row.expiresAt,
+      stripeCustomerId: row.stripeCustomerId || null,
+    };
+
+    if (!apply) { deleted.push({ ...record, dryRun: true }); continue; }
+
+    // One transaction per invite: a failure on one must not roll back the rest,
+    // and must never leave an org deleted with its invite still pointing at it.
+    try {
+      db.transaction(() => {
+        db.prepare('DELETE FROM trial_emails WHERE org_id = ?').run(row.orgId);
+        db.prepare('DELETE FROM trial_invites WHERE token = ?').run(row.token);
+        const info = db.prepare(`
+          DELETE FROM organizations
+           WHERE id = ? AND stripe_subscription_id IS NULL
+        `).run(row.orgId);
+        if (info.changes !== 1) throw new Error('organization row did not delete');
+      }).immediate();
+      deleted.push(record);
+    } catch (err) {
+      skipped.push({ token: row.token, orgId: row.orgId, reason: `DELETE_FAILED: ${err.message}` });
+    }
+  }
+
+  return { scanned: candidates.length, deleted, skipped, applied: !!apply };
+}
+
+// Statuses on an abandoned trial org that do NOT protect it from the sweep.
+// NULL is the ordinary case (the trial never started). The terminal ones mean a
+// subscription existed and is finished, which is not a reason to keep an
+// otherwise empty org alive. Anything else — active, trialing, past_due,
+// paused, incomplete — protects it.
+const TERMINAL_TRIAL_SWEEP_STATUSES = new Set(['canceled', 'unpaid', 'incomplete_expired']);
 
 /** Append one trial-email attempt. Returns the row id. */
 function logTrialEmail({ orgId, subscriptionId, kind, toEmail, providerId, error, sentAt }) {
@@ -2241,10 +2423,13 @@ module.exports = {
   setTrialInviteTarget,
   findTrialInviteByOrg,
   createTrialOrganization,
+  reserveTrialInviteOrg,
+  orgIsEmpty,
   getOrgTrial,
   setOrgTrialCampaign,
   markOrgConverted,
   logTrialEmail,
+  sweepAbandonedTrialInvites,
   countTrialEmails,
   listTrialEmails,
   runRetentionPurge,

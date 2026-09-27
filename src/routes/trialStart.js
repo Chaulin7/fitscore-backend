@@ -32,7 +32,7 @@ const billing = require('../services/billing');
 const auth = require('../services/authService');
 const trialInvites = require('../services/trialInvites');
 const {
-  getOrgBilling, setOrgStripeCustomerId, createTrialOrganization, setOrgTrialCampaign,
+  getOrgBilling, setOrgStripeCustomerId, reserveTrialInviteOrg, setOrgTrialCampaign,
 } = require('../services/db');
 const { baseUrlFor } = require('../config/appUrl');
 
@@ -176,19 +176,31 @@ function invitedAddressResolvesTo(invite) {
  *   3. nobody yet — reserve one, named for the company on the invite.
  */
 function resolveOrgForInvite(invite) {
-  if (invite.orgId) return { orgId: invite.orgId, created: false };
-
   const existingUser = auth.findUserByEmail(invite.email);
-  if (existingUser && existingUser.org_id) return { orgId: existingUser.org_id, created: false };
-
-  const org = createTrialOrganization({
+  // One guarded, synchronous write decides it for everybody. Two requests on the
+  // same token — the prefetch and the click — cannot both create: the loser reads
+  // the winner's org_id out of the same transaction and reuses it. See
+  // db.reserveTrialInviteOrg for why this is a transaction rather than a
+  // read-then-write, and note that nothing here inspects the request: there is no
+  // prefetch to detect, only a claim to make indivisible.
+  return reserveTrialInviteOrg(invite.token, {
+    preferOrgId: existingUser && existingUser.org_id ? existingUser.org_id : null,
     name: invite.companyName || invite.email,
     email: invite.email,
   });
-  return { orgId: org.id, created: true };
 }
 
 /** Create the org's Stripe customer, or reuse the one it already has. */
+/**
+ * Create the org's Stripe customer, or reuse the one it already has.
+ *
+ * The idempotency key is the fix for the other half of the prefetch race. The
+ * org claim above is synchronous and therefore indivisible, but this is an
+ * `await` — two requests that both read "no customer yet" would both create one,
+ * and the database would keep whichever wrote last. A key derived from the
+ * invite token makes Stripe itself return the SAME customer for every request on
+ * that token, so there is nothing to race over.
+ */
 async function ensureCustomer(stripe, orgId, invite) {
   const current = getOrgBilling(orgId);
   if (current && current.stripeCustomerId) return current.stripeCustomerId;
@@ -198,7 +210,7 @@ async function ensureCustomer(stripe, orgId, invite) {
     email: invite.email,
     name: (org && org.name) || invite.companyName || undefined,
     metadata: { orgId, trial_token: invite.token, ...(invite.campaign ? { campaign: invite.campaign } : {}) },
-  });
+  }, { idempotencyKey: `trial-customer-${invite.token}` });
   setOrgStripeCustomerId(orgId, customer.id);
   return customer.id;
 }
@@ -241,6 +253,7 @@ router.get('/', async (req, res) => {
     }
 
     const { orgId } = resolveOrgForInvite(invite);
+    if (!orgId) return softFail(req, res, 'NO_ORG_RESERVED', { token: invite.token });
 
     // The remaining live states — 'paused', and anything the set above does not
     // name — still must not be sold a second subscription, because Checkout
