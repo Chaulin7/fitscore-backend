@@ -1251,7 +1251,7 @@ function welcomeRecipients(session, invite) {
  * Best-effort — a mail failure must not fail the webhook, because the trial
  * itself is already correctly set up by the time this runs.
  */
-async function sendTrialWelcomeFor(req, session, invite, orgId) {
+async function sendTrialWelcomeFor(req, session, invite, orgId, subscription) {
   if (!invite || !invite.orgId) return;
   const base = appBaseUrl(req);
   const signupUrl = trialInvites.signupUrl(base, invite.token);
@@ -1268,7 +1268,13 @@ async function sendTrialWelcomeFor(req, session, invite, orgId) {
       companyName: invite.companyName || (org ? org.name : null),
       planName: tier ? tier.name : 'Pro',
       signupUrl,
-      trialEndsAt: null,
+      // The real trial end, off the subscription this checkout just created.
+      // This was hardcoded null, which meant the welcome email had no date to
+      // print and fell through to a shared fallback phrase belonging to the
+      // trial_will_end message — "none is needed until in three days".
+      trialEndsAt: subscription && subscription.trial_end
+        ? new Date(subscription.trial_end * 1000).toISOString()
+        : null,
     });
   }
 }
@@ -1353,9 +1359,10 @@ async function handleWebhook(req, res) {
 
         if (event.type === 'checkout.session.completed') {
           if (obj.customer) setOrgStripeCustomerId(orgId, obj.customer);
+          let completedSub = null;
           if (obj.subscription) {
-            const sub = await stripe.subscriptions.retrieve(obj.subscription);
-            await applySubscription(orgId, sub, event.created); // writes subscription id too
+            completedSub = await stripe.subscriptions.retrieve(obj.subscription);
+            await applySubscription(orgId, completedSub, event.created); // writes subscription id too
           }
           // Spend the trial token, if this session came from GET /start. After
           // the subscription is applied, so a failure here cannot cost the
@@ -1363,7 +1370,7 @@ async function handleWebhook(req, res) {
           const redeemed = redeemTrialToken(obj, orgId);
           // Then the welcome, carrying the /signup?t= link that attaches an
           // account to the trial now running.
-          await sendTrialWelcomeFor(req, obj, redeemed, orgId);
+          await sendTrialWelcomeFor(req, obj, redeemed, orgId, completedSub);
         } else if (event.type === 'customer.subscription.deleted') {
           if (!concernsCurrentSubscription(orgId, obj.id)) {
             console.warn('[billing] ignoring deletion of a superseded subscription', {
