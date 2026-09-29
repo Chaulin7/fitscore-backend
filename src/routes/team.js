@@ -31,10 +31,11 @@ const router = express.Router();
 // advertises — one number, not two that can drift.
 const { TEAM_MAX_MEMBERS } = billing;
 
-function sendError(res, status, code, message, field, reason) {
+function sendError(res, status, code, message, field, reason, params) {
   const body = { error: message, code };
   if (field) body.field = field;
   if (reason) body.reason = reason; // stable sub-code for client translation
+  if (params) body.params = params; // the values that sentence is built from
   return res.status(status).json(body);
 }
 
@@ -93,7 +94,8 @@ router.post('/invite', requireSession, requireWriteAccess, requireOwner, async (
       return sendError(res, 403, 'TEAM_PLAN_REQUIRED', 'Inviting members requires an active Team plan.');
     }
     if (atSeatLimit(req.orgId)) {
-      return sendError(res, 403, 'SEAT_LIMIT', `Your plan is limited to ${TEAM_MAX_MEMBERS} members.`);
+      return sendError(res, 403, 'SEAT_LIMIT', `Your plan is limited to ${TEAM_MAX_MEMBERS} members.`, null,
+        'PLAN_LIMIT', { max: TEAM_MAX_MEMBERS });
     }
     const email = auth.normalizeEmail((req.body || {}).email);
     if (!email || !auth.isValidEmail(email)) {

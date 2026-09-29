@@ -26,9 +26,14 @@ const { getAllAudits, getAuditChanges, deleteAllOrgAuditData, getDb, getOrgBilli
 
 const router = express.Router();
 
-function sendError(res, status, code, message, field) {
+// `detail` ({ reason, params }): a stable sub-code under `code` and the values
+// its sentence is built from, so the app can show the error translated.
+// `error` stays the English message it always was.
+function sendError(res, status, code, message, field, detail) {
   const body = { error: message, code };
   if (field) body.field = field;
+  if (detail && detail.reason) body.reason = detail.reason;
+  if (detail && detail.params) body.params = detail.params;
   return res.status(status).json(body);
 }
 
@@ -58,7 +63,7 @@ function requireOwner(req, res, next) {
 router.patch('/', requireSession, requireWriteAccess, requireOwner, (req, res) => {
   try {
     const check = validateRetentionDays((req.body || {}).retentionDays);
-    if (!check.ok) return sendError(res, 400, check.code, check.message, 'retentionDays');
+    if (!check.ok) return sendError(res, 400, check.code, check.message, 'retentionDays', check);
     auth.setOrganizationRetention(req.orgId, check.days);
     res.json({ retentionDays: check.days });
   } catch (err) {
@@ -84,7 +89,7 @@ router.get('/retention', requireSession, requireOwner, (req, res) => {
 router.get('/retention/preview', requireSession, requireOwner, (req, res) => {
   try {
     const check = validateRetentionDays(req.query.days);
-    if (!check.ok) return sendError(res, 400, check.code, check.message, 'days');
+    if (!check.ok) return sendError(res, 400, check.code, check.message, 'days', check);
     res.json(countPurgeableRows(req.orgId, check.days));
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
@@ -158,7 +163,8 @@ router.post('/branding/logo', requireSession, requireWriteAccess, requireOwner, 
         tooBig
           ? `Logo is larger than the ${Math.round(fileSec.MAX_LOGO_BYTES / 1024)} KB limit.`
           : (uploadErr.message || 'Upload failed.'),
-        'logo');
+        'logo',
+        tooBig ? { reason: 'LOGO_TOO_LARGE', params: { kb: Math.round(fileSec.MAX_LOGO_BYTES / 1024) } } : null);
     }
     try {
       const image = fileSec.validateLogoUpload(req.file && req.file.buffer, 'logo');
@@ -170,7 +176,7 @@ router.post('/branding/logo', requireSession, requireWriteAccess, requireOwner, 
     } catch (e) {
       // validateLogoUpload throws INVALID_FILE with a message written for a
       // human — surface it rather than a generic failure.
-      return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'logo');
+      return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'logo', e);
     }
   });
 });

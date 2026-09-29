@@ -63,7 +63,7 @@ async function extractFromDocx(filePath) {
     if (err && err.code === 'PROCESSING_TIMEOUT') throw err;
     const e = Object.assign(
       new Error('This DOCX file could not be read — it may be corrupted. Try re-saving it, then upload again.'),
-      { statusCode: 422, code: 'UNPROCESSABLE_FILE' }
+      { statusCode: 422, code: 'UNPROCESSABLE_FILE', reason: 'DOCX' }
     );
     e.cause = err;
     throw e;

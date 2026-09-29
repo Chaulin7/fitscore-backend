@@ -34,8 +34,10 @@ const { baseUrlFor } = require('../config/appUrl');
 
 const router = express.Router();
 
-function sendError(res, status, code, message) {
-  return res.status(status).json({ error: message, code });
+// `params`: the values the English message is built from, so the app can say
+// it in the reader's language.
+function sendError(res, status, code, message, params) {
+  return res.status(status).json(params ? { error: message, code, params } : { error: message, code });
 }
 
 function requireOwner(req, res, next) {
@@ -421,7 +423,7 @@ router.post('/checkout', requireSession, requireOwner, async (req, res) => {
     const rankAgainst = isComped(currentBilling) ? 'free' : currentPlan;
     if (!billing.isUpgradeFrom(rankAgainst, plan)) {
       return sendError(res, 400, 'PLAN_NOT_AN_UPGRADE',
-        `This organization is already on the ${rankAgainst} plan.`);
+        `This organization is already on the ${rankAgainst} plan.`, { plan: rankAgainst });
     }
 
     const priceId = billing.priceIdForPlan(plan);

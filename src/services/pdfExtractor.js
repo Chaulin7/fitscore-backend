@@ -62,8 +62,10 @@ const PDFJS_VERSION = require('pdfjs-dist/package.json').version;
 // engine error on .cause. Codes reuse the existing taxonomy (INVALID_FILE,
 // UNPROCESSABLE_FILE, IMAGE_ONLY_PDF, PROCESSING_TIMEOUT); PDF_ENCRYPTED is
 // the only genuinely new code.
-function extractionError(message, code, statusCode, cause) {
-  const e = Object.assign(new Error(message), { statusCode, code });
+// `detail` ({ reason, params }) names which INVALID_FILE refusal this is,
+// for the app's translated message; the English `message` is unchanged.
+function extractionError(message, code, statusCode, cause, detail) {
+  const e = Object.assign(new Error(message), { statusCode, code }, detail || {});
   if (cause !== undefined) e.cause = cause;
   return e;
 }
@@ -238,7 +240,8 @@ async function extractPdfTextInner(buffer) {
   if (buffer.length > MAX_PDF_BYTES) {
     throw extractionError(
       `PDF is too large to process (max ${Math.round(MAX_PDF_BYTES / (1024 * 1024))} MB).`,
-      'INVALID_FILE', 400
+      'INVALID_FILE', 400, undefined,
+      { reason: 'PDF_TOO_LARGE', params: { mb: Math.round(MAX_PDF_BYTES / (1024 * 1024)) } }
     );
   }
 
@@ -268,14 +271,14 @@ async function extractPdfTextInner(buffer) {
       }
       throw extractionError(
         'This PDF could not be read — the file may be corrupted or malformed. Try re-saving or re-exporting it, then upload again.',
-        'UNPROCESSABLE_FILE', 422, err
+        'UNPROCESSABLE_FILE', 422, err, { reason: 'PDF' }
       );
     }
 
     if (doc.numPages > MAX_PAGES) {
       throw extractionError(
         `PDF has too many pages to process (max ${MAX_PAGES}).`,
-        'INVALID_FILE', 400
+        'INVALID_FILE', 400, undefined, { reason: 'PDF_TOO_MANY_PAGES', params: { max: MAX_PAGES } }
       );
     }
 

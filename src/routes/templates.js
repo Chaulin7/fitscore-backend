@@ -50,9 +50,14 @@ function initTemplatesSchema() {
 
 function nowIso() { return new Date().toISOString(); }
 
-function sendError(res, status, code, message, field) {
+// `detail` ({ reason, params }): a stable sub-code under `code` and the values
+// its sentence is built from, so the app can show the error translated.
+// `error` stays the English message it always was.
+function sendError(res, status, code, message, field, detail) {
   const body = { error: message, code };
   if (field) body.field = field;
+  if (detail && detail.reason) body.reason = detail.reason;
+  if (detail && detail.params) body.params = detail.params;
   return res.status(status).json(body);
 }
 
@@ -93,16 +98,16 @@ router.post('/', (req, res) => {
   try {
     const { name, role, jobDescription, weights } = req.body || {};
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return sendError(res, 400, 'VALIDATION_ERROR', 'name is required.', 'name');
+      return sendError(res, 400, 'VALIDATION_ERROR', 'name is required.', 'name', { reason: 'REQUIRED' });
     }
     if (name.length > 200) {
-      return sendError(res, 400, 'VALIDATION_ERROR', 'name too long (max 200 chars).', 'name');
+      return sendError(res, 400, 'VALIDATION_ERROR', 'name too long (max 200 chars).', 'name', { reason: 'TOO_LONG', params: { max: 200 } });
     }
     if (jobDescription && typeof jobDescription !== 'string') {
-      return sendError(res, 400, 'VALIDATION_ERROR', 'jobDescription must be a string.', 'jobDescription');
+      return sendError(res, 400, 'VALIDATION_ERROR', 'jobDescription must be a string.', 'jobDescription', { reason: 'NOT_TEXT' });
     }
     if (jobDescription && jobDescription.length > 50000) {
-      return sendError(res, 400, 'VALIDATION_ERROR', 'jobDescription too long (max 50000 chars).', 'jobDescription');
+      return sendError(res, 400, 'VALIDATION_ERROR', 'jobDescription too long (max 50000 chars).', 'jobDescription', { reason: 'TOO_LONG', params: { max: 50000 } });
     }
 
     const id = uuidv4();
@@ -142,14 +147,14 @@ router.patch('/:id', (req, res) => {
       if (!(f in body)) continue;
       if (f === 'name') {
         const v = (body.name || '').toString().trim();
-        if (!v) return sendError(res, 400, 'VALIDATION_ERROR', 'name cannot be empty.', 'name');
-        if (v.length > 200) return sendError(res, 400, 'VALIDATION_ERROR', 'name too long.', 'name');
+        if (!v) return sendError(res, 400, 'VALIDATION_ERROR', 'name cannot be empty.', 'name', { reason: 'REQUIRED' });
+        if (v.length > 200) return sendError(res, 400, 'VALIDATION_ERROR', 'name too long.', 'name', { reason: 'TOO_LONG', params: { max: 200 } });
         sets.push('name = @name'); params.name = v;
       } else if (f === 'role') {
         sets.push('role = @role'); params.role = (body.role || '').toString().slice(0, 200);
       } else if (f === 'jobDescription') {
         const v = (body.jobDescription || '').toString();
-        if (v.length > 50000) return sendError(res, 400, 'VALIDATION_ERROR', 'jobDescription too long.', 'jobDescription');
+        if (v.length > 50000) return sendError(res, 400, 'VALIDATION_ERROR', 'jobDescription too long.', 'jobDescription', { reason: 'TOO_LONG', params: { max: 50000 } });
         sets.push('job_description = @jobDescription'); params.jobDescription = v;
       } else if (f === 'weights') {
         sets.push('weights = @weights');
