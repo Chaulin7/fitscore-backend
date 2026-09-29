@@ -36,10 +36,14 @@ const { priceFormatter } = require('./plans');
 
 const router = express.Router();
 
-// `params`: the values the English message is built from, so the app can say
-// it in the reader's language.
-function sendError(res, status, code, message, params) {
-  return res.status(status).json(params ? { error: message, code, params } : { error: message, code });
+// `detail` ({ reason, params }): a stable sub-code under `code` and the values
+// the English message is built from, so the app can say it in the reader's
+// language. `error` stays the English message.
+function sendError(res, status, code, message, detail) {
+  const body = { error: message, code };
+  if (detail && detail.reason) body.reason = detail.reason;
+  if (detail && detail.params) body.params = detail.params;
+  return res.status(status).json(body);
 }
 
 function requireOwner(req, res, next) {
@@ -484,14 +488,16 @@ router.post('/checkout', requireSession, requireOwner, async (req, res) => {
     // The way forward for them is POST /resume or POST /continue-free, both of
     // which act on the subscription they already have.
     if (billing.checkoutBlockedReason(currentBilling) === 'SUBSCRIPTION_PAUSED') {
+      // Same code as the read-only gate's refusal (requireWriteAccess), with a
+      // reason, because the sentence the customer needs is a different one.
       return sendError(res, 409, 'SUBSCRIPTION_PAUSED',
         'This organization already has a paused subscription. Resume it or move to Free '
-        + 'instead of starting a new one.');
+        + 'instead of starting a new one.', { reason: 'ALREADY_PAUSED' });
     }
     const rankAgainst = isComped(currentBilling) ? 'free' : currentPlan;
     if (!billing.isUpgradeFrom(rankAgainst, plan)) {
       return sendError(res, 400, 'PLAN_NOT_AN_UPGRADE',
-        `This organization is already on the ${rankAgainst} plan.`, { plan: rankAgainst });
+        `This organization is already on the ${rankAgainst} plan.`, { params: { plan: rankAgainst } });
     }
 
     const priceId = billing.priceIdForPlan(plan);
