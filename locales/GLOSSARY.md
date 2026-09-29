@@ -10,6 +10,7 @@ in each language. When a term is missing, add it here with the key(s) that use i
 | Address | **je / jij / jouw**, app and marketing alike | **Sie / Ihr** (formal), everywhere |
 | Register | Professional B2B, plain and direct. No English words where a common Dutch one exists. | Professional B2B. Established anglicisms from HR tech are fine (Score, Shortlist, Recruiter, Dashboard). |
 | Quotation marks | “…” | „…“ |
+| People nouns | not gendered in Dutch (kandidaat, collega, eigenaar) | **generic masculine** — the current convention: Kandidat, Nutzer, Inhaber, Kollege (e.g. „Senden Sie diesen Link an Ihren Kollegen.“). No pair forms („Kollegin oder Kollege“), gender star or colon, so every string reads the same way; if this changes, it changes for all of `de.json` at once. |
 | Dashes | spaced em dash (—) as in the English copy | spaced en dash (–) in running text; the page's own em-dash layout marks (e.g. `CL. 01 — …`) stay |
 
 ## Product terms
@@ -20,7 +21,7 @@ in each language. When a term is missing, add it here with the key(s) that use i
 | FitScore / score | FitScore / score | FitScore / Score | Product name; lower-case *score* in running text (nl). |
 | CV | cv (pl. cv's) | Lebenslauf (pl. Lebensläufe); **CV-** in product compounds (CV-Screening, CV-Analysen) | Dutch spelling per Woordenlijst: lower-case *cv*. |
 | CV screening | cv-screening | CV-Screening | |
-| candidate | kandidaat | Kandidat (pl. Kandidaten) | German uses the generic masculine here (see review list). |
+| candidate | kandidaat | Kandidat (pl. Kandidaten) | German uses the generic masculine (see Tone → People nouns). |
 | vacancy | vacature | Stelle | |
 | role / position | functie | Stelle | “Role” in the app means the vacancy being screened for. |
 | job description (JD) | functieomschrijving | Stellenbeschreibung | No abbreviation in nl/de. |
