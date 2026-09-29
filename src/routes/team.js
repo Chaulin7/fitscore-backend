@@ -31,9 +31,10 @@ const router = express.Router();
 // advertises — one number, not two that can drift.
 const { TEAM_MAX_MEMBERS } = billing;
 
-function sendError(res, status, code, message, field) {
+function sendError(res, status, code, message, field, reason) {
   const body = { error: message, code };
   if (field) body.field = field;
+  if (reason) body.reason = reason; // stable sub-code for client translation
   return res.status(status).json(body);
 }
 
@@ -80,7 +81,7 @@ async function deliverInviteEmail(email, orgName, inviteUrl) {
 function sessionResponse(rawToken, user, org) {
   return {
     sessionToken: rawToken,
-    user: { email: user.email, orgId: user.org_id, role: user.role },
+    user: { email: user.email, orgId: user.org_id, role: user.role, preferredLanguage: user.preferred_language || null },
     org: { name: org ? org.name : null },
   };
 }
@@ -150,8 +151,8 @@ router.post('/accept', async (req, res) => {
     if (atSeatLimit(invite.org_id)) {
       return sendError(res, 403, 'SEAT_LIMIT', 'This organization has reached its member limit.');
     }
-    const pwError = auth.validatePassword(password);
-    if (pwError) return sendError(res, 400, 'VALIDATION_ERROR', pwError, 'password');
+    const pwProblem = auth.passwordProblem(password);
+    if (pwProblem) return sendError(res, 400, 'VALIDATION_ERROR', pwProblem.message, 'password', pwProblem.reason);
     if (auth.findUserByEmail(invite.email)) {
       return sendError(res, 409, 'EMAIL_TAKEN', 'An account with this email already exists.');
     }

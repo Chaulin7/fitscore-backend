@@ -46,15 +46,23 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
 
-// Returns an error message string, or null when the password is acceptable.
-function validatePassword(password) {
+// Returns { reason, message } when the password is unacceptable, else null.
+// `reason` is a stable code the client translates; `message` is the English
+// text the API has always sent, kept for any client that shows it verbatim.
+function passwordProblem(password) {
   if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`;
+    return { reason: 'PASSWORD_TOO_SHORT', message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.` };
   }
   if (COMMON_PASSWORDS.has(password.toLowerCase())) {
-    return 'That password is too common. Please choose a less guessable one.';
+    return { reason: 'PASSWORD_TOO_COMMON', message: 'That password is too common. Please choose a less guessable one.' };
   }
   return null;
+}
+
+// Returns an error message string, or null when the password is acceptable.
+function validatePassword(password) {
+  const problem = passwordProblem(password);
+  return problem ? problem.message : null;
 }
 
 async function hashPassword(password) {
@@ -199,6 +207,15 @@ function recordLoginSuccess(user) {
 
 function setUserPassword(userId, passwordHash) {
   getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+}
+
+/**
+ * Save (or, with null, clear) the user's UI language. The caller validates;
+ * the column's CHECK constraint refuses anything but 'en' | 'nl' | 'de' | NULL
+ * regardless.
+ */
+function setUserPreferredLanguage(userId, lang) {
+  getDb().prepare('UPDATE users SET preferred_language = ? WHERE id = ?').run(lang, userId);
 }
 
 // --- Team members & invitations ----------------------------------------------
@@ -446,6 +463,7 @@ module.exports = {
   normalizeEmail,
   isValidEmail,
   validatePassword,
+  passwordProblem,
   hashPassword,
   verifyPassword,
   createOrganization,
@@ -473,6 +491,7 @@ module.exports = {
   recordLoginFailure,
   recordLoginSuccess,
   setUserPassword,
+  setUserPreferredLanguage,
   createSession,
   findSessionByToken,
   deleteSession,

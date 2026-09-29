@@ -622,6 +622,20 @@ function initSchema() {
   // attacker that company's trial. See adoptTrialOrgOnVerification in
   // services/trialAdoption.js, which is the only intended writer's counterpart.
   try { getDb().exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT'); } catch (_) {}
+  // The user's chosen UI language: 'en' | 'nl' | 'de', or NULL for "no choice
+  // made", in which case pages follow the lang cookie and then the browser's
+  // Accept-Language. NULL default, so every existing row is unaffected. The
+  // CHECK is the database's half of the validation in PATCH /api/auth/me
+  // (src/i18n/ui.js validatePreferredLanguage).
+  //
+  // DISPLAY ONLY. Nothing in scoring, extraction, provenance binding or the
+  // audit log reads this column; src/i18n/determinism.test.js fails the build
+  // if any of those modules starts to.
+  try {
+    getDb().exec("ALTER TABLE users ADD COLUMN preferred_language TEXT DEFAULT NULL CHECK (preferred_language IN ('en', 'nl', 'de'))");
+  } catch (err) {
+    if (!/duplicate column/i.test(err.message)) throw err;
+  }
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)');
   getDb().exec('CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id)');
 

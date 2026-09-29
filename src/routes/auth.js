@@ -10,13 +10,17 @@ const brandingService = require('../services/branding');
 const { getDb } = require('../services/db');
 const { baseUrlFor } = require('../config/appUrl');
 const { isPlatformOwner } = require('../config/platformOwner');
+const { validatePreferredLanguage } = require('../i18n/ui');
 
 const router = express.Router();
 
-function sendError(res, status, code, message, field) {
+function sendError(res, status, code, message, field, reason) {
   const body = { error: message };
   if (code) body.code = code;
   if (field) body.field = field;
+  // A stable sub-code under `code` (e.g. PASSWORD_TOO_SHORT) so the client can
+  // translate the message; `error` stays the English text it always was.
+  if (reason) body.reason = reason;
   return res.status(status).json(body);
 }
 
@@ -35,6 +39,8 @@ function sessionResponse(rawToken, user, org) {
       orgId: user.org_id,
       role: user.role,
       isPlatformOwner: isPlatformOwner(user),
+      // The saved UI language, or null. Display-only; see PATCH /me below.
+      preferredLanguage: user.preferred_language || null,
     },
     org: { name: org ? org.name : null },
   };
@@ -132,8 +138,8 @@ router.post('/signup', signupLimiter, async (req, res) => {
     if (!normEmail || !auth.isValidEmail(normEmail)) {
       return sendError(res, 400, 'VALIDATION_ERROR', 'A valid email address is required.', 'email');
     }
-    const pwError = auth.validatePassword(password);
-    if (pwError) return sendError(res, 400, 'VALIDATION_ERROR', pwError, 'password');
+    const pwProblem = auth.passwordProblem(password);
+    if (pwProblem) return sendError(res, 400, 'VALIDATION_ERROR', pwProblem.message, 'password', pwProblem.reason);
 
     // The trial signup link, if this signup came from /signup?t=<token>.
     // Accepted from the body OR the query string: the SPA posts it, and a
@@ -298,9 +304,33 @@ router.get('/me', requireSession, (req, res) => {
       orgId: req.orgId,
       role: req.user.role,
       isPlatformOwner: isPlatformOwner(req.user),
+      preferredLanguage: req.user.preferred_language || null,
     },
     org: { name: org ? org.name : null, retentionDays: org ? org.retentionDays : null, branding },
   });
+});
+
+// --- PATCH /api/auth/me -----------------------------------------------------------
+// The signed-in user's own preferences. Today that is one field:
+//   { preferredLanguage: 'en' | 'nl' | 'de' | null }   (null clears it)
+//
+// Any role, and deliberately reachable by a PAUSED (read-only) account: this
+// router is mounted without requireWriteAccess, and a customer locked out of
+// writing must still be able to read their own data in their own language.
+// The value is a display preference and nothing else — scoring, extraction,
+// provenance and the audit log never read it (src/i18n/determinism.test.js).
+router.patch('/me', requireSession, (req, res) => {
+  const body = (req.body && typeof req.body === 'object') ? req.body : {};
+  const fields = Object.keys(body);
+  if (!fields.includes('preferredLanguage') || fields.length !== 1) {
+    return sendError(res, 400, 'VALIDATION_ERROR', 'Send exactly one field: preferredLanguage.', 'preferredLanguage');
+  }
+  const check = validatePreferredLanguage(body.preferredLanguage);
+  if (!check.ok) {
+    return sendError(res, 400, 'VALIDATION_ERROR', "preferredLanguage must be 'en', 'nl', 'de' or null.", 'preferredLanguage');
+  }
+  auth.setUserPreferredLanguage(req.userId, check.value);
+  return res.json({ preferredLanguage: check.value });
 });
 
 // --- POST /api/auth/change-password ----------------------------------------------
@@ -314,8 +344,8 @@ router.post('/change-password', requireSession, async (req, res) => {
     const ok = typeof currentPassword === 'string' && await auth.verifyPassword(currentPassword, user.password_hash);
     if (!ok) return sendError(res, 400, 'VALIDATION_ERROR', 'Current password is incorrect.', 'currentPassword');
 
-    const pwError = auth.validatePassword(newPassword);
-    if (pwError) return sendError(res, 400, 'VALIDATION_ERROR', pwError, 'newPassword');
+    const pwProblem = auth.passwordProblem(newPassword);
+    if (pwProblem) return sendError(res, 400, 'VALIDATION_ERROR', pwProblem.message, 'newPassword', pwProblem.reason);
 
     auth.setUserPassword(user.id, await auth.hashPassword(newPassword));
     // Keep this session alive; kill every other one for the user.
@@ -365,8 +395,8 @@ router.post('/reset-password', async (req, res) => {
     const reset = auth.findValidPasswordReset(token);
     if (!reset) return sendError(res, 400, 'INVALID_RESET_TOKEN', 'This reset link is invalid or has expired.');
 
-    const pwError = auth.validatePassword(newPassword);
-    if (pwError) return sendError(res, 400, 'VALIDATION_ERROR', pwError, 'newPassword');
+    const pwProblem = auth.passwordProblem(newPassword);
+    if (pwProblem) return sendError(res, 400, 'VALIDATION_ERROR', pwProblem.message, 'newPassword', pwProblem.reason);
 
     auth.setUserPassword(reset.user_id, await auth.hashPassword(newPassword));
     auth.markPasswordResetUsed(reset.id);
