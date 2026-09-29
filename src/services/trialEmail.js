@@ -28,6 +28,11 @@ let Resend = null;
 try { ({ Resend } = require('resend')); } catch (_) { /* SDK optional until configured */ }
 
 const { logTrialEmail, countTrialEmails } = require('./db');
+// The numbers the product actually enforces. Every duration printed below is
+// interpolated from these rather than typed into the copy: a trial length or a
+// link deadline that changes in one place and not the other is a message that
+// lies to the customer, and nothing would fail to reveal it.
+const { TRIAL_PERIOD_DAYS, SIGNUP_LINK_TTL_DAYS } = require('./trialInvites');
 const { LEGAL_NAME } = require('../config/legal');
 
 /** The kind written to trial_emails.kind. One constant, used by the send-once check and the tests. */
@@ -63,10 +68,22 @@ function fromAddress() {
   return process.env.TRIAL_FROM_EMAIL || process.env.EMAIL_FROM || 'no-reply@cvsprings.com';
 }
 
+/**
+ * A date, or null when there isn't one.
+ *
+ * It used to return the string 'in three days' for a missing date. That phrase
+ * belongs to ONE of the three messages below — Stripe fires trial_will_end three
+ * days out — and this helper is shared by all of them, so the welcome email
+ * rendered "none is needed until in three days": the wrong number, in broken
+ * grammar, on the first message a new customer ever receives.
+ *
+ * A formatter has no business carrying one caller's prose. It returns null now,
+ * and each composer says its own thing when there is no date to show.
+ */
 function formatDate(iso) {
-  if (!iso) return 'in three days';
+  if (!iso) return null;
   const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return 'in three days';
+  if (!Number.isFinite(ms)) return null;
   return new Date(ms).toISOString().slice(0, 10);
 }
 
@@ -79,11 +96,16 @@ function formatDate(iso) {
  * one who knows they are not.
  */
 function composeTrialWillEnd({ companyName, planName, trialEndsAt, portalUrl }) {
-  const subject = `Your CVsprings trial ends ${formatDate(trialEndsAt)} — add a payment method to continue`;
+  const ends = formatDate(trialEndsAt);
+  const subject = ends
+    ? `Your CVsprings trial ends ${ends} — add a payment method to continue`
+    : 'Your CVsprings trial is ending — add a payment method to continue';
   const text = [
     companyName ? `Hi ${companyName},` : 'Hi,',
     '',
-    `Your 30-day CVsprings ${planName} trial ends on ${formatDate(trialEndsAt)}.`,
+    ends
+      ? `Your ${TRIAL_PERIOD_DAYS}-day CVsprings ${planName} trial ends on ${ends}.`
+      : `Your ${TRIAL_PERIOD_DAYS}-day CVsprings ${planName} trial is ending in the next few days.`,
     'You never entered a card, so nothing will be charged and nothing will happen',
     'automatically — which also means access stops unless you add one.',
     '',
@@ -164,13 +186,15 @@ function composeTrialWelcome({ companyName, planName, signupUrl, trialEndsAt }) 
   const text = [
     companyName ? `Hi ${companyName},` : 'Hi,',
     '',
-    `Your 30-day ${planName} trial has started. No card was taken and none is`,
-    `needed until ${formatDate(trialEndsAt)}.`,
+    `Your ${TRIAL_PERIOD_DAYS}-day ${planName} trial has started. No card was taken,`,
+    (formatDate(trialEndsAt)
+      ? `and none is needed until ${formatDate(trialEndsAt)}.`
+      : `and none is needed for ${TRIAL_PERIOD_DAYS} days.`),
     '',
     'One step left — create your login:',
     signupUrl,
     '',
-    'This link is personal to your trial and works for the next 14 days. It puts',
+    `This link is personal to your trial and works for the next ${SIGNUP_LINK_TTL_DAYS} days. It puts`,
     'you straight onto the account the trial is already running on, so use it',
     'rather than signing up from the website — a fresh signup creates a separate,',
     'empty account.',
@@ -238,7 +262,7 @@ function composeTrialPaused({ companyName, planName, portalUrl, appUrl }) {
   const text = [
     companyName ? `Hi ${companyName},` : 'Hi,',
     '',
-    `Your 30-day ${planName} trial has ended. No payment method was added, so`,
+    `Your ${TRIAL_PERIOD_DAYS}-day ${planName} trial has ended. No payment method was added, so`,
     'nothing was charged and your account is now read-only.',
     '',
     'NOTHING HAS BEEN DELETED. Every analysis, audit record, report and template',
