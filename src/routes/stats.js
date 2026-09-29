@@ -2,6 +2,7 @@
 
 const express = require('express');
 const { getAllAudits } = require('../services/db');
+const { isScoredRecord } = require('../services/scoredRecord');
 
 const router = express.Router();
 
@@ -21,7 +22,9 @@ function startOfDayIso(d) {
 // Returns dashboard summary metrics.
 router.get('/overview', (req, res) => {
   try {
-    const records = getAllAudits({ orgId: req.orgId });
+    // Screening outcomes only: a record with no score is a CV that could not
+    // be analysed, not an analysis (services/scoredRecord.js).
+    const records = getAllAudits({ orgId: req.orgId }).filter(isScoredRecord);
 
     const totalAnalyses = records.length;
     let totalShortlisted = 0, totalRejected = 0, totalOnHold = 0;
@@ -119,7 +122,9 @@ function summarizeGroup(records) {
 
 router.get('/score-distribution', (req, res) => {
   try {
-    const records = getAllAudits({ orgId: req.orgId });
+    // Screening outcomes only: a record with no score is a CV that could not
+    // be analysed, not an analysis (services/scoredRecord.js).
+    const records = getAllAudits({ orgId: req.orgId }).filter(isScoredRecord);
     const byRole = new Map();
     for (const r of records) {
       const key = (r.role || '').trim() || '(no role)';

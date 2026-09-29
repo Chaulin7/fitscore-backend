@@ -17,6 +17,7 @@
  */
 
 const crypto = require('crypto');
+const { isScoredRecord } = require('./scoredRecord');
 
 // This report's own engine identity. Built the same way MODEL_ID is in
 // routes/analyze.js, but it is NOT that value: the engine that produced a bias
@@ -326,7 +327,7 @@ function reliabilityLevel(n) {
 const STANDARD_LIMITATIONS = [
   'Sample size affects statistical reliability. Small samples can show apparent differences that are due to chance rather than systematic patterns. Treat results from samples below 50 records with particular caution.',
   'CVsprings does not hold and cannot analyse protected characteristics such as gender, ethnicity, age, or disability status. The only grouping dimension available is whether a CV was submitted anonymously (the anonymized flag set by the recruiter). This report cannot detect bias on any other dimension.',
-  'This report is a monitoring aid to support human review of AI-assisted screening. It does not certify legal compliance, does not detect all forms of bias, and does not replace a formal equality impact assessment. Decisions about hiring remain the responsibility of the human recruiter.',
+  'This report is a monitoring aid to support human review of automated screening. It does not certify legal compliance, does not detect all forms of bias, and does not replace a formal equality impact assessment. Decisions about hiring remain the responsibility of the human recruiter.',
   'Score differences between groups may reflect legitimate factors (e.g., different role requirements, different candidate pools) as well as potential calibration issues. A difference alone does not establish bias.',
   'Decision inconsistency within a score band may reflect legitimate factors (additional information available to the recruiter, soft criteria, role-specific judgements) and is not itself evidence of bias.',
 ];
@@ -342,11 +343,18 @@ const STANDARD_LIMITATIONS = [
  * @param {object}   options - { role?: string, from?: string, to?: string }
  * @returns {object} Structured analysis per spec Section 1.4
  */
-function analyzeBias(records, options) {
+function analyzeBias(allRecords, options) {
   options = options || {};
   const role = options.role || null;
   const from = options.from || null;
   const to = options.to || null;
+  // Only screening outcomes are statistics. A record with no score is a CV
+  // that could not be analysed (see services/scoredRecord.js); counting it
+  // would inflate the sample, and its decision — if the old app let one be
+  // recorded — would enter the shortlist rates against no score at all. It is
+  // excluded from every figure, and the exclusion is stated.
+  const records = (allRecords || []).filter(isScoredRecord);
+  const excludedUnscored = (allRecords || []).length - records.length;
   const totalRecords = records.length;
   const reliability = reliabilityLevel(totalRecords);
 
@@ -457,6 +465,11 @@ function analyzeBias(records, options) {
   // Unshifted role-then-engine so the list order matches the rendered order.
   if (roles.mixed) limitations.unshift(roles.caveat);
   if (scoringEngines.mixed) limitations.unshift(scoringEngines.caveat);
+  if (excludedUnscored > 0) {
+    limitations.unshift(excludedUnscored + ' record' + (excludedUnscored !== 1 ? 's' : '')
+      + ' without a score (CVs that could not be analysed) '
+      + (excludedUnscored !== 1 ? 'are' : 'is') + ' excluded from every figure in this report.');
+  }
 
   return {
     generatedAt: new Date().toISOString(),
@@ -469,7 +482,7 @@ function analyzeBias(records, options) {
     ruleset: RULESET_VERSION,
     scoringEngines,
     roles,
-    scope: { role, from, to, totalRecords },
+    scope: { role, from, to, totalRecords, excludedUnscored },
     reliability,
     anonymisation,
     scoreDistribution,

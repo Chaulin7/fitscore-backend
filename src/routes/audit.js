@@ -4,6 +4,7 @@ const express = require('express');
 const { insertAudit, deleteAudit, getRoles, getRoleHistory, getAuditById, updateAudit, getAuditChanges, getAuditsByTenant, queryAuditLog, getFilteredAuditRows, getAuditFilterValues, isLegacyCandidateFilter, getOrgTimezone, getOrgBilling } = require('../services/db');
 const { startOfZonedDayUtc, endOfZonedDayUtc, formatInTimeZone } = require('../services/timezone');
 const { analyzeBias } = require('../services/biasAudit');
+const { isScoredRecord } = require('../services/scoredRecord');
 const { getOrganizationBranding } = require('../services/authService');
 const { resolveBranding } = require('../services/branding');
 const { buildProvenance } = require('../services/provenance');
@@ -157,6 +158,16 @@ function resolveBinding(orgId, analysisId) {
       ok: false, status: 409, code: 'ANALYSIS_EXPIRED', state: BIND_STATE.UNBOUND,
       message: 'This analysis has expired and can no longer be saved. Re-run it to save the result.',
       ageMs: info.ageMs,
+    };
+  }
+  // Only a scored analysis is ever bound (analyze.js writes provenance for
+  // scored files only), so this cannot fire today. It is the save path's own
+  // statement of the rule, so a regression elsewhere cannot write a record —
+  // and let a decision be attached — for a CV that was never scored.
+  if (!isScoredRecord(info.record)) {
+    return {
+      ok: false, status: 409, code: 'NOT_SCORED', state: BIND_STATE.UNBOUND, ageMs: info.ageMs,
+      message: 'This CV could not be analysed, so there is no result to save.',
     };
   }
   return { ok: true, bound: info.record, state: BIND_STATE.VOUCHED, ageMs: info.ageMs };
@@ -632,7 +643,7 @@ function renderBiasReportHtml(report, branding) {
 
     // Disclaimer box (prominent, not buried)
     '<div class="disclaimer"><strong>Important — Please Read</strong>' +
-    'This report is a monitoring aid to help recruiters review their use of AI-assisted screening. ' +
+    'This report is a monitoring aid to help recruiters review their use of automated screening. ' +
     'It does not certify legal compliance, does not detect all forms of bias, and cannot analyse characteristics not present in the data. ' +
     'CVsprings does not hold and cannot analyse protected characteristics (gender, ethnicity, age, disability status). ' +
     'All hiring decisions remain the responsibility of the human recruiter. ' +
@@ -781,6 +792,16 @@ router.patch('/:id', async (req, res) => {
       const validDecisions = ['shortlist', 'hold', 'reject'];
       if (d !== null && !validDecisions.includes(d)) return sendError(res, 400, 'VALIDATION_ERROR', 'decision must be one of: shortlist, hold, reject, or empty.', 'decision');
       patch.decision = d;
+      // A decision needs a score to be a decision ABOUT. A record without one
+      // (a CV that could not be analysed, saved by the pre-binding app) can
+      // have a decision cleared, never set.
+      if (d !== null) {
+        const existing = getAuditById(req.params.id, req.orgId);
+        if (!existing) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
+        if (!isScoredRecord(existing)) {
+          return sendError(res, 409, 'NOT_SCORED', 'This record has no score, so no decision can be recorded against it.', 'decision');
+        }
+      }
     }
     if ('note' in patch) {
       const no = patch.note == null ? null : String(patch.note);
@@ -804,6 +825,8 @@ router.get('/report/:id', async (req, res) => {
   try {
     const record = getAuditById(req.params.id, req.orgId);
     if (!record) return sendError(res, 404, 'NOT_FOUND', 'Record not found.', 'id');
+    // The report renders a score; a record without one would come out as 0.
+    if (!isScoredRecord(record)) return sendError(res, 409, 'NOT_SCORED', 'This record has no score, so there is no report to generate.', 'id');
     // Branding entitlement is resolved here, at generation time, from the org's
     // current billing row — so a plan change (including a downgrade) applies to
     // the very next report with nothing to invalidate.

@@ -366,6 +366,22 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     reserved = req.files.length;
 
     const results = [];
+    // A file that fails validation or extraction is a FAILED result: status
+    // 'failed', the error's code/reason/params, and no score fields at all —
+    // never overall 0, never a null the client could coerce to 0. It is not
+    // ranked, not numbered as a candidate, not bound for saving, and not
+    // counted against quota. A scored file is status 'scored', and its result
+    // does not depend on whether other files in the batch failed.
+    const failedResult = (file, e) => ({
+      status: 'failed',
+      fileName: file.originalname,
+      displayName: path.basename(file.originalname, path.extname(file.originalname)),
+      error: e.message,
+      code: e.code,
+      ...(e.reason ? { reason: e.reason } : {}),
+      ...(e.params ? { params: e.params } : {}),
+    });
+    let scoredIndex = 0;
     // Provenance is COLLECTED here and committed in one transaction after the
     // loop, not written per candidate. Two reasons: a better-sqlite3
     // transaction is synchronous and cannot span the `await` below, and a batch
@@ -381,21 +397,17 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
         try { extracted = await validateAndExtract(file, 'cvs'); }
         catch (ve) {
           if (ve.code === 'FILE_REJECTED') console.warn('[security] upload rejected by AV scan', { org: req.orgId, file: file.originalname });
-          results.push({
-            candidateName: path.basename(file.originalname, path.extname(file.originalname)),
-            fileName: file.originalname,
-            error: ve.message,
-            code: ve.code || 'INVALID_FILE',
-            ...(ve.reason ? { reason: ve.reason } : {}),
-            ...(ve.params ? { params: ve.params } : {}),
-          });
+          results.push(failedResult(file, { ...ve, message: ve.message, code: ve.code || 'INVALID_FILE' }));
           continue;
         }
         let cvText = extracted.text;
         if (anonymize) cvText = anonymizeText(cvText);
         const scored = scoreCV(cvText, jobDescription, weights);
+        // Numbered among the SCORED candidates, so a failed file earlier in
+        // the batch does not shift anyone's name.
+        scoredIndex += 1;
         const candidateName = anonymize
-          ? 'Candidate #' + (results.length + 1)
+          ? 'Candidate #' + scoredIndex
           : path.basename(file.originalname, path.extname(file.originalname));
         const extraction = extractionSummary(extracted);
         const analysisId = uuidv4(); // one per candidate, NOT one per batch
@@ -405,13 +417,12 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
           candidateName, fileName: file.originalname,
           jobDescription, appVersion: req.body.appVersion, analysisTimestamp,
         }));
-        results.push({ candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp, analysisId, extraction, ...scored });
+        results.push({ status: 'scored', candidateName, fileName: file.originalname, anonymized: anonymize, modelId: MODEL_ID, analysisTimestamp, analysisId, extraction, ...scored });
       } catch (fileErr) {
-        results.push({
-          candidateName: path.basename(file.originalname, path.extname(file.originalname)),
-          fileName: file.originalname,
-          error: fileErr.message
-        });
+        // Not a property of the file we can name; the internal message stays
+        // in the log, not in the response.
+        console.error('[analyze] batch file failed unexpectedly', { org: req.orgId, message: fileErr && fileErr.message });
+        results.push(failedResult(file, { code: 'ANALYSIS_FAILED', message: 'This CV could not be analysed. Try uploading it again.' }));
       }
     }
 
@@ -431,14 +442,20 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
       for (const r of results) delete r.analysisId;
     }
 
-    results.sort((a, b) => (b.overall || 0) - (a.overall || 0));
+    // Scored candidates ranked by score (stable for ties); failed files after
+    // them, in upload order. A failed file has no score to rank by.
+    const scoredResults = results.filter((r) => r.status === 'scored').sort((a, b) => b.overall - a.overall);
+    const failedResults = results.filter((r) => r.status === 'failed');
     // Whole batch was reserved atomically at the gate; refund the files that
     // failed to score so errored files don't burn quota (unchanged behavior).
-    const scoredCount = results.filter((r) => !r.error).length;
+    const scoredCount = scoredResults.length;
     refundUsage(req.orgId, reserved - scoredCount);
     reserved = 0; // settled — the outer catch must not refund again
     recordUsage(req, 'analyze_batch', scoredCount);
-    res.json({ count: results.length, modelId: MODEL_ID, results });
+    res.json({
+      count: results.length, scored: scoredCount, failed: failedResults.length,
+      modelId: MODEL_ID, results: [...scoredResults, ...failedResults],
+    });
   } catch (err) {
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');

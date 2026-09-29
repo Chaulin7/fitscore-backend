@@ -613,6 +613,23 @@ html[lang="en"] .en-note{display:none}
 .score-hi-row{border-left:3px solid #16a34a!important}
 .score-med-row{border-left:3px solid #d97706!important}
 .score-lo-row{border-left:3px solid #dc2626!important}
+/* A file that could not be analysed: its own row, not a low score. No rank,
+   no score pill, no decision — the reason and the fix, across the score
+   columns, on a muted amber ground so it cannot be read as a result. */
+.lb tr.failed-row td{background:#fffbeb;color:#78350f;vertical-align:top}
+.lb tr.failed-row td.failed-mark{border-left:3px dashed #d97706;text-align:center;color:#b45309;font-size:15px}
+.failed-badge{display:inline-block;margin-top:4px;padding:1px 8px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;letter-spacing:.02em}
+.failed-body{position:sticky;left:0;display:grid;grid-template-columns:minmax(120px,200px) minmax(0,1fr);gap:4px 24px;align-items:start}
+/* The table scrolls sideways on a phone; the reason wraps to what is visible:
+   the viewport less the page and card padding and the mark column. */
+@media(max-width:640px){.failed-body{grid-template-columns:minmax(0,1fr);max-width:calc(100vw - 136px)}}
+.failed-reason{font-size:13px;line-height:1.45}
+.failed-hint{margin-top:3px;font-size:12px;color:#92400e}
+.batch-failed-note{display:block;margin:0 20px 12px}
+.batch-failed-note[hidden],.bs-failed[hidden]{display:none}
+.bs-failed{color:#b45309;font-weight:600}
+.score-pill.pill-na{background:#f3f4f6;color:#6b7280}
+.unscored-badge{display:inline-block;margin-left:4px;padding:0 6px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700}
 /* ── Score text colour in single result ── */
 .score-hi-text{color:#15803d!important;font-weight:800}
 .score-med-text{color:#b45309!important;font-weight:800}
@@ -1635,11 +1652,12 @@ img, video, table { max-width: 100%; }
         </div>
       </div>
       <div class="batch-summary" id="batchSummary" style="display:none">
-        <div class="bs-card"><div class="bs-val" id="bsTotalCVs">0</div><div class="bs-label" data-i18n="app.batch.total">CVs Analysed</div></div>
+        <div class="bs-card"><div class="bs-val" id="bsTotalCVs">0</div><div class="bs-label" data-i18n="app.batch.total">CVs Analysed</div><div class="bs-sub bs-failed" id="bsFailedSub" hidden></div></div>
         <div class="bs-card"><div class="bs-val" id="bsAvgScore">—</div><div class="bs-label" data-i18n="app.batch.avg">Avg Score</div><div class="bs-sub" data-i18n="app.batch.outOf">out of 100</div></div>
         <div class="bs-card"><div class="bs-val" id="bsShortlisted">0</div><div class="bs-label" data-i18n="app.batch.above">Above threshold</div><div class="bs-sub" id="bsSubThreshold" data-i18n="app.batch.threshold" data-i18n-vars='{"n":70}'>score &ge; 70</div></div>
         <div class="bs-card"><div class="bs-val" id="bsTopCandidate" style="font-size:14px;padding-top:4px">—</div><div class="bs-label" data-i18n="app.batch.top">Top Candidate</div></div>
       </div>
+      <div class="msg msg-warn batch-failed-note" id="batchFailedNote" role="status" hidden></div>
       <div style="overflow-x:auto">
         <div class="batch-controls">
           <label data-i18n="app.batch.sortBy">Sort by</label>
@@ -3943,7 +3961,7 @@ async function analyzeBatch(files,jd,weights,anon,role,errEl){
     }
     setProgress(80,I18N.t('app.loading.comparing'));
     setProgress(100,I18N.t('app.loading.complete'));
-    document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'batch', count: (data && data.results && data.results.length) || 0, role: role || 'unknown' } }));
+    document.dispatchEvent(new CustomEvent('cv:analyze_completed', { detail: { mode: 'batch', count: (data && typeof data.scored === 'number') ? data.scored : ((data && data.results) || []).filter(r=>!isFailedResult(r)).length, role: role || 'unknown' } }));
     const batchNonce=newRunNonce(); // one screening pass = one run
     lastBatchResults=(data.results||[]).map(res=>({...res,role,_runNonce:batchNonce}));
     renderBatchResults(lastBatchResults,role);
@@ -4012,42 +4030,75 @@ function ringBox(label,val,isOverall,color){
   return h('div', { class: 'score-box'+(isOverall?' overall':'') }, h('div', { class: 's-label' }, label), ring);
 }
 
+// A batch result that is not a score. The server marks it status 'failed';
+// anything without a numeric overall is treated the same way, so a response
+// from an older server during a deploy can never show a failure as a 0.
+function isFailedResult(r){ return !!r && (r.status === 'failed' || typeof r.overall !== 'number'); }
+// The sentence for a failed file, from its code / reason / params like any
+// API error, with the server's English as the fallback.
+function failedReason(r){
+  return apiErrorText({ code: r.code || 'ANALYSIS_FAILED', reason: r.reason, params: r.params, message: r.error }, 'errors.ANALYSIS_FAILED');
+}
+
 // The batch table. Called with the results as the app holds them (with each
 // row's _decision), so a re-render — a language switch — keeps the recruiter's
 // choices. Saving is not this function's business: autosave runs once, after
 // the analysis, not on every render.
+//
+// A failed file gets a row of its own kind: no rank, no score, no decision,
+// no save — its reason and how to fix it, across the score columns. It is not
+// in the count, the summary figures or the ranking. data-idx is always the
+// index into lastBatchResults, which is what the row actions look up.
 function renderBatchResults(results,role){
   var _br=document.getElementById('batchResults');_br.style.display='block';_br.classList.remove('slide-in','success-flash');void _br.offsetWidth;_br.classList.add('slide-in','success-flash');
   document.getElementById('singleResults').style.display='none';
-  fill(document.getElementById('batchTitle'), I18N.t('app.batch.ranked', { count: results.length }) + (role ? ' · ' + role : ''));
-  const decisionSelect=function(r,i){
-    const sel=h('select', { class: 'dec-sel', 'data-action': 'batch-decision', 'data-idx': i, 'aria-label': I18N.t('app.table.decision') },
+  const scored=results.filter(r=>!isFailedResult(r));
+  const failed=results.filter(isFailedResult);
+  fill(document.getElementById('batchTitle'), I18N.t('app.batch.ranked', { count: scored.length }) + (role ? ' · ' + role : ''));
+  const note=document.getElementById('batchFailedNote');
+  if(note){ note.hidden=!failed.length; if(failed.length) setKey(note, 'app.batch.failedSummary', { count: failed.length }); }
+  const decisionSelect=function(r,idx){
+    const sel=h('select', { class: 'dec-sel', 'data-action': 'batch-decision', 'data-idx': idx, 'aria-label': I18N.t('app.table.decision') },
       h('option', { value: '' }, I18N.t('app.decision.pick')),
       ['shortlist','hold','reject'].map(function(code){ return h('option', { value: code }, decisionLabel(code)); }));
     sel.value=r._decision||'';
     return sel;
   };
   const dash=function(v){ return v??'—'; };
-  fill(document.getElementById('batchBody'), results.map((r,i)=>{
-    const s=r.overall||0;
-    const thr=getScoreThreshold();
+  const thr=getScoreThreshold();
+  const scoredRows=scored.map((r,rank)=>{
+    const idx=results.indexOf(r);
+    const s=r.overall;
     const pill=s>=thr?'pill-hi':s>=50?'pill-med':'pill-lo';
-    const rc=i===0?'r1':i===1?'r2':i===2?'r3':'rn';
-    const name=r.anonymized?I18N.t('app.batch.candidateN',{n:i+1}):(r.candidateName||r.fileName);
-    const notes=h('textarea', { class: 'row-notes', placeholder: I18N.t('app.decision.notePlaceholder'), rows: 1, 'data-action': 'batch-note', 'data-idx': i, 'aria-label': I18N.t('app.decision.notes') });
-    notes.value=getBatchNote(i);
-    return h('tr', { class: s>=thr?'score-hi-row':s>=50?'score-med-row':'score-lo-row', style: 'animation:fadeUp .3s ease '+(i*.05)+'s both',
+    const rc=rank===0?'r1':rank===1?'r2':rank===2?'r3':'rn';
+    const name=r.anonymized?I18N.t('app.batch.candidateN',{n:rank+1}):(r.candidateName||r.fileName);
+    const notes=h('textarea', { class: 'row-notes', placeholder: I18N.t('app.decision.notePlaceholder'), rows: 1, 'data-action': 'batch-note', 'data-idx': idx, 'aria-label': I18N.t('app.decision.notes') });
+    notes.value=getBatchNote(idx);
+    return h('tr', { class: s>=thr?'score-hi-row':s>=50?'score-med-row':'score-lo-row', style: 'animation:fadeUp .3s ease '+(rank*.05)+'s both',
         'data-score': s, 'data-name': r.candidateName||r.fileName||'' },
-      h('td', { style: 'border-left:3px solid '+(s>=thr?'#16a34a':s>=50?'#d97706':'#dc2626') }, h('span', { class: 'rank-badge '+rc }, i+1)),
+      h('td', { style: 'border-left:3px solid '+(s>=thr?'#16a34a':s>=50?'#d97706':'#dc2626') }, h('span', { class: 'rank-badge '+rc }, rank+1)),
       h('td', { style: 'font-weight:600;color:#111827' }, name),
       h('td', null, h('span', { class: 'score-pill '+pill }, s)),
       h('td', null, dash(r.scores?.keywords)), h('td', null, dash(r.scores?.skills)),
       h('td', null, dash(r.scores?.experience)), h('td', null, dash(r.scores?.education)),
-      h('td', null, decisionSelect(r,i)),
-      h('td', null, h('button', { class: 'btn btn-ghost btn-sm', 'data-action': 'batch-save', 'data-idx': i }, I18N.t('common.save'))),
+      h('td', null, decisionSelect(r,idx)),
+      h('td', null, h('button', { class: 'btn btn-ghost btn-sm', 'data-action': 'batch-save', 'data-idx': idx }, I18N.t('common.save'))),
       h('td', null, notes));
-  }));
-  updateBatchSummary(results);
+  });
+  // One cell across every column after the mark, its content sticky at the
+  // table's left edge: on a phone the table scrolls sideways, and the reason
+  // must stay readable without scrolling to it.
+  const failedRows=failed.map(r=>h('tr', { class: 'failed-row', 'data-failed': '1', 'data-name': r.displayName||r.fileName||'' },
+    h('td', { class: 'failed-mark' }, h('span', { 'aria-hidden': 'true' }, '⚠')),
+    h('td', { colspan: '9' }, h('div', { class: 'failed-body' },
+      h('div', { class: 'failed-name' },
+        h('div', { style: 'font-weight:600;color:#111827;overflow-wrap:anywhere' }, r.displayName||r.fileName),
+        h('span', { class: 'failed-badge' }, I18N.t('app.batch.failedBadge'))),
+      h('div', { class: 'failed-reason' },
+        h('div', null, failedReason(r)),
+        h('div', { class: 'failed-hint' }, I18N.t('app.batch.failedHint')))))));
+  fill(document.getElementById('batchBody'), scoredRows, failedRows);
+  updateBatchSummary(scored, failed.length);
 }
 function getAutosaveBatch(){try{return localStorage.getItem('cvsprings_autosave_batch')==='1';}catch(_){return false;}}
 function setAutosaveBatch(v){try{localStorage.setItem('cvsprings_autosave_batch',v?'1':'0');}catch(_){}}
@@ -4055,6 +4106,7 @@ async function autosaveBatchToAudit(){
   if(!Array.isArray(lastBatchResults)||!lastBatchResults.length||!API)return;
   let saved=0;
   for(let i=0;i<lastBatchResults.length;i++){
+    if(isFailedResult(lastBatchResults[i])) continue; // nothing to save: it was never scored
     try{await saveSingleBatch(i);saved++;}catch(_){}
   }
   if(typeof plausible==='function'){try{plausible('audit_saved',{props:{source:'batch_autosave',count:saved}});}catch(_){}}
@@ -4063,7 +4115,7 @@ function focusAuditSearch(){
   try{switchTab('audit',document.querySelector('.nav-btn[data-tab="audit"]'));}catch(_){}
   setTimeout(function(){const el=document.getElementById('auditSearch');if(el){el.focus();el.select&&el.select();}},60);
 }
-function setBatchDecision(i,v){if(lastBatchResults[i])lastBatchResults[i]._decision=v;}
+function setBatchDecision(i,v){if(lastBatchResults[i]&&!isFailedResult(lastBatchResults[i]))lastBatchResults[i]._decision=v;}
 // A save the server would not vouch for used to be written anyway and flagged
 // with a soft note. It is now refused outright: the audit row is built entirely
 // from the server's record of the analysis, so a missing record leaves nothing
@@ -4098,7 +4150,7 @@ async function saveToAudit(){
   catch(e){toast(bindingErrorText(e),'error',7000);}
 }
 async function saveSingleBatch(i){
-  if(!API||!lastBatchResults[i])return;
+  if(!API||!lastBatchResults[i]||isFailedResult(lastBatchResults[i]))return;
   const res=lastBatchResults[i];
   // Same five inputs as the single save; see saveToAudit. The candidate name
   // shown in the toast is the client's copy of what the server returned at
@@ -4114,10 +4166,14 @@ async function saveSingleBatch(i){
 }
 async function saveAllToAudit(){
   if(!API||!lastBatchResults.length)return;
-  const ok = await confirmModal({ title:I18N.t('app.batch.saveAllTitle'), message:I18N.t('app.batch.saveAllBody',{count:lastBatchResults.length}), confirmLabel:I18N.t('app.batch.saveAllTitle') });
+  // Scored CVs only: a failed file has no result to save, and the server
+  // would refuse it.
+  const scored=lastBatchResults.filter(r=>!isFailedResult(r));
+  if(!scored.length){ toast(I18N.t('app.batch.nothingToSave'),'info'); return; }
+  const ok = await confirmModal({ title:I18N.t('app.batch.saveAllTitle'), message:I18N.t('app.batch.saveAllBody',{count:scored.length}), confirmLabel:I18N.t('app.batch.saveAllTitle') });
   if(!ok)return;
   let saved=0, rejected=0, lastErr=null;
-  for(const res of lastBatchResults){
+  for(const res of scored){
     // Same five inputs as the single save; see saveToAudit.
     const body={analysisId:res.analysisId||null,
       decision:res._decision||'',note:'',
@@ -4130,16 +4186,28 @@ async function saveAllToAudit(){
   // per-record detail is noise. A rejection is no longer a quality caveat on a
   // saved row — the row was not written at all — so it is reported as a
   // failure, with the server's reason rather than a generic count.
-  const total=lastBatchResults.length;
+  const total=scored.length;
   if(rejected) toast(I18N.t('app.batch.savedSome',{saved,total,count:rejected,reason:bindingErrorText(lastErr)}),'error',7000);
   else toast(I18N.t('app.batch.savedAll',{saved,total}),'success');
 }
 // The CSV stays English (headers and decision codes) for now: it is a data
-// export read by other tools, translated with the reports in Phase 3.
+// export read by other tools, translated with the reports in Phase 3. A file
+// that could not be analysed is a row with Status "failed", its error, and
+// empty score cells — never zeros — and no rank.
 function exportBatchCsv(){
   if(!lastBatchResults.length)return;
-  const rows=[['Rank','Candidate','Overall','Keywords','Skills','Experience','Education','Decision','Role'].join(',')];
-  lastBatchResults.forEach((r,i)=>rows.push([i+1,'"'+escCsv(r.candidateName||r.fileName)+'"',r.overall||0,r.scores?.keywords||0,r.scores?.skills||0,r.scores?.experience||0,r.scores?.education||0,'"'+escCsv(r._decision||'')+'"','"'+escCsv(r.role||'')+'"'].join(',')));
+  const q=(v)=>'"'+escCsv(v==null?'':v)+'"';
+  const rows=[['Rank','Candidate','Overall','Keywords','Skills','Experience','Education','Decision','Role','Status','Error'].join(',')];
+  let rank=0;
+  lastBatchResults.forEach((r)=>{
+    if(isFailedResult(r)){
+      rows.push(['',q(r.displayName||r.fileName),'','','','','','',q(r.role||''),'failed',q((r.code||'')+(r.reason?'.'+r.reason:'')+(r.error?': '+r.error:''))].join(','));
+      return;
+    }
+    rank++;
+    const sc=r.scores||{};
+    rows.push([rank,q(r.candidateName||r.fileName),r.overall,sc.keywords??'',sc.skills??'',sc.experience??'',sc.education??'',q(r._decision||''),q(r.role||''),'scored',''].join(','));
+  });
   download('batch-results.csv',rows.join('\n'),'text/csv');
 }
 async function openReport(){
@@ -4311,22 +4379,28 @@ function renderAuditTable(records){
   const thr=getScoreThreshold();
   const dash=function(v){ return v??'—'; };
   fill(tb, records.map(rec=>{
-    const s=rec.overall||0;
-    const pill=s>=thr?'pill-hi':s>=50?'pill-med':'pill-lo';
+    // A record with no score is a CV that could not be analysed, saved by the
+    // pre-binding app. It is shown for what it is — no 0, a 'not scored' badge —
+    // and takes no decision (the server refuses one too, NOT_SCORED).
+    const scored=typeof rec.overall==='number';
+    const s=rec.overall;
+    const pill=!scored?'pill-na':s>=thr?'pill-hi':s>=50?'pill-med':'pill-lo';
     // Display only: the option values are the stored codes, and a change sends
     // the code. The label is the reader's word for it.
     const sel=h('select', { class: 'dec-sel', 'data-action': 'audit-decision', 'data-id': rec.id, 'aria-label': I18N.t('app.table.decision') },
       h('option', { value: '' }, '—'),
       ['shortlist','hold','reject'].map(code=>h('option', { value: code }, decisionLabel(code))));
     sel.value=rec.decision||'';
-    return h('tr', null,
+    if(!scored){ sel.disabled=true; sel.setAttribute('title', I18N.t('app.audit.notScoredTitle')); }
+    return h('tr', scored ? null : { class: 'unscored-row' },
       h('td', { style: 'font-size:11px;color:#9ca3af;white-space:nowrap' }, rec.createdAt?fmtInOrgTz(rec.createdAt):'—'),
       h('td', null,
         h('button', { type: 'button', class: 'audit-cand-link', 'data-action': 'auditFilterCandidate', 'data-cid': rec.candidateId||'', title: I18N.t('app.audit.showCandidate') }, rec.candidateName),
         rec.anonymized ? [' ', h('span', { style: 'font-size:10px;color:#9ca3af' }, I18N.t('app.audit.anon'))] : null,
-        rec.candidateLegacy ? [' ', h('span', { class: 'legacy-badge', title: I18N.t('app.audit.legacyTitle') }, I18N.t('app.audit.legacyBadge'))] : null),
+        rec.candidateLegacy ? [' ', h('span', { class: 'legacy-badge', title: I18N.t('app.audit.legacyTitle') }, I18N.t('app.audit.legacyBadge'))] : null,
+        scored ? null : h('span', { class: 'unscored-badge', title: I18N.t('app.audit.notScoredTitle') }, I18N.t('app.audit.notScored'))),
       h('td', { style: 'color:#6b7280;font-size:12px' }, rec.role||'—'),
-      h('td', null, h('span', { class: 'score-pill '+pill }, s)),
+      h('td', null, h('span', { class: 'score-pill '+pill }, scored ? s : '—')),
       h('td', null, dash(rec.scores?.keywords)), h('td', null, dash(rec.scores?.skills)),
       h('td', null, dash(rec.scores?.experience)), h('td', null, dash(rec.scores?.education)),
       h('td', null, sel),
@@ -4334,7 +4408,8 @@ function renderAuditTable(records){
       h('td', { class: 'col-reviewer', style: 'font-size:11px;color:#6b7280;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis', title: rec.reviewedBy||'' }, rec.reviewedBy||'—'),
       h('td', { style: 'white-space:nowrap;display:flex;gap:4px' },
         h('button', { type: 'button', class: 'history-btn', 'data-action': 'audit-history', 'data-id': rec.id, title: I18N.t('app.history.title'), 'aria-label': I18N.t('app.history.title') }, '⧉'),
-        h('button', { class: 'btn btn-ghost btn-sm', 'data-action': 'audit-report', 'data-id': rec.id, title: I18N.t('app.results.report'), 'aria-label': I18N.t('app.results.report') }, '📊'),
+        // No report for a record without a score: it would show a 0 (the server refuses it).
+        scored ? h('button', { class: 'btn btn-ghost btn-sm', 'data-action': 'audit-report', 'data-id': rec.id, title: I18N.t('app.results.report'), 'aria-label': I18N.t('app.results.report') }, '📊') : null,
         h('button', { class: 'btn btn-danger btn-sm', 'data-action': 'audit-delete', 'data-id': rec.id, title: I18N.t('app.audit.deleteTitle'), 'aria-label': I18N.t('app.audit.deleteTitle') }, '🗑')));
   }));
 }
@@ -4466,27 +4541,32 @@ function renderRoleHistory(){
   const history=_roleHistory.history;
   if(!history.length){fill(content, h('div', { class: 'empty-state' }, I18N.t('app.roles.noRecords')));return;}
   const thr=getScoreThreshold();
-  const avg=Math.round(history.reduce((s,r)=>s+(r.overall||0),0)/history.length);
-  const top=history[0];const short=history.filter(r=>r.decision==='shortlist').length;
+  // Scored records only (the server already sends only those; this holds the
+  // line against an older one). "Top score" is the highest, not the latest:
+  // the history is newest first.
+  const scored=history.filter(r=>typeof r.overall==='number');
+  const avg=scored.length?Math.round(scored.reduce((s,r)=>s+r.overall,0)/scored.length):null;
+  const top=scored.length?Math.max(...scored.map(r=>r.overall)):null;
+  const short=scored.filter(r=>r.decision==='shortlist').length;
   const statC=(l,v,c)=>h('div', { style: 'background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:16px 20px;min-width:110px;flex:1;box-shadow:0 1px 4px rgba(0,0,0,0.05)' },
     h('div', { style: 'font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px' }, l),
-    h('div', { style: 'font-size:30px;font-weight:800;color:'+c }, I18N.formatNumber(v)));
+    h('div', { style: 'font-size:30px;font-weight:800;color:'+c }, v==null?'—':I18N.formatNumber(v)));
   const th=(key)=>h('th', null, I18N.t(key));
   const abbr=(key, full)=>h('th', null, h('abbr', { title: I18N.t(full) }, I18N.t(key)));
   const dash=function(v){ return v??'—'; };
   fill(content,
     h('div', { style: 'display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap' },
-      statC(I18N.t('app.roles.candidates'),history.length,'#0f2847'),
-      statC(I18N.t('app.batch.avg'),avg,avg>=thr?'#059669':avg>=50?'#d97706':'#dc2626'),
-      statC(I18N.t('app.roles.top'),top.overall||0,'#059669'),
+      statC(I18N.t('app.roles.candidates'),scored.length,'#0f2847'),
+      statC(I18N.t('app.batch.avg'),avg,avg==null?'#6b7280':avg>=thr?'#059669':avg>=50?'#d97706':'#dc2626'),
+      statC(I18N.t('app.roles.top'),top,'#059669'),
       statC(I18N.t('app.roles.shortlisted'),short,'#7c3aed')),
     h('div', { style: 'overflow-x:auto' }, h('table', { class: 'data-table' },
       h('thead', null, h('tr', null, h('th', null, '#'), th('app.table.candidate'), th('app.table.overall'),
         abbr('app.table.kw','common.dimension.keywords'), abbr('app.table.sk','common.dimension.skills'),
         abbr('app.table.ex','common.dimension.experience'), abbr('app.table.ed','common.dimension.education'),
         th('app.table.decision'))),
-      h('tbody', null, history.map((r,i)=>{
-        const s=r.overall||0;const pill=s>=thr?'pill-hi':s>=50?'pill-med':'pill-lo';
+      h('tbody', null, scored.map((r,i)=>{
+        const s=r.overall;const pill=s>=thr?'pill-hi':s>=50?'pill-med':'pill-lo';
         const dc=r.decision==='shortlist'?'#15803d':r.decision==='reject'?'#b91c1c':'#a16207';
         return h('tr', { style: 'animation:fadeUp .25s ease '+(i*.04)+'s both' },
           h('td', { style: 'color:#9ca3af;font-size:12px' }, i+1),
@@ -4670,6 +4750,10 @@ function sortBatch(key) {
   if (!tbody) return;
   const rows = Array.from(tbody.querySelectorAll('tr'));
   rows.sort((a, b) => {
+    // Files that could not be analysed stay below the ranking, whatever the sort.
+    const fa = a.dataset.failed === '1', fb = b.dataset.failed === '1';
+    if (fa !== fb) return fa ? 1 : -1;
+    if (fa && fb) return 0;
     if (key === 'score') {
       const aVal = parseFloat(a.dataset.score || 0);
       const bVal = parseFloat(b.dataset.score || 0);
@@ -5130,18 +5214,21 @@ function buildWhyNodes(data){
 }
 
 // ── Batch summary panel ─────────────────────────────────────────
-function updateBatchSummary(results){
-  if(!results || !results.length) return;
+// Figures over the SCORED candidates only; a failed file is counted apart
+// (the "not analysed" line) and never averages in as a 0.
+function updateBatchSummary(results, failedCount){
   const summary = document.getElementById('batchSummary');
   if(summary) summary.style.display = 'grid';
   const total = results.length;
-  const avg = Math.round(results.reduce((s,r)=>s+(r.overall||0),0)/total);
-  const shortlisted = results.filter(r=>(r.overall||0)>=getScoreThreshold()).length;
-  const top = results.reduce((a,b)=>(a.overall||0)>=(b.overall||0)?a:b, results[0]);
-  const topName = top.candidateName || top.fileName || '—';
   const el = id=>document.getElementById(id);
+  const avg = total ? Math.round(results.reduce((s,r)=>s+r.overall,0)/total) : null;
+  const shortlisted = results.filter(r=>r.overall>=getScoreThreshold()).length;
+  const top = total ? results.reduce((a,b)=>b.overall>a.overall?b:a, results[0]) : null;
+  const topName = top ? (top.candidateName || top.fileName || '—') : '—';
   if(el('bsTotalCVs')) el('bsTotalCVs').textContent = I18N.formatNumber(total);
-  if(el('bsAvgScore')) el('bsAvgScore').textContent = I18N.formatNumber(avg);
+  const failedSub = el('bsFailedSub');
+  if(failedSub){ failedSub.hidden = !failedCount; if(failedCount) setKey(failedSub, 'app.batch.totalFailed', { count: failedCount }); }
+  if(el('bsAvgScore')) el('bsAvgScore').textContent = avg == null ? '—' : I18N.formatNumber(avg);
   if(el('bsShortlisted')) el('bsShortlisted').textContent = I18N.formatNumber(shortlisted);
   setKey(el('bsSubThreshold'), 'app.batch.threshold', { n: getScoreThreshold() });
   if(el('bsTopCandidate')) { el('bsTopCandidate').textContent = topName.length > 18 ? topName.substring(0,16)+'…' : topName; el('bsTopCandidate').title = topName; }
