@@ -5622,21 +5622,37 @@ function getBatchNote(idx){
 }
 
 /* ── Keyboard shortcuts ── */
-document.addEventListener('keydown', function(e){
-  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-    // Don't let the global Enter shortcut reach through an open dialog: pressing
-    // Enter in the feature-request modal would start an analysis behind it, and
-    // would also swallow Enter-activation of the dialog's own buttons.
-    var fq = document.getElementById('freqModal');
-    if (fq && fq.classList.contains('open')) return;
-    var tag = document.activeElement.tagName.toLowerCase();
-    if (tag === 'textarea' || tag === 'input' || tag === 'select') return;
-    // Enter on the language switcher opens it / picks a language (public/
-    // i18n.js); it must not start an analysis behind the menu.
-    if (document.activeElement.closest && document.activeElement.closest('[data-lang-switch]')) return;
-    var btn = document.getElementById('analyzeBtn');
-    if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+// Enter = Analyze, but only where Enter has no job of its own: with focus on
+// the page itself, or in one of the analyzer's own single-line fields (role,
+// weights). Never on a button, link or select (Enter activates or picks),
+// never in a textarea (Enter is a newline), never in the language switcher or
+// anything else inside a dialog or menu, and never while a dialog, menu or
+// panel is open over the analyzer — or when the analyzer is not the tab on
+// screen. Kept free of side effects so it can be tested on its own.
+var ANALYZE_ENTER_BLOCKERS = [
+  '.modal-backdrop.open', '#_dlgBackdrop', '#pausedScreen', '#history-overlay.open', '#settingsPanel.open',
+  '#planPanel:not([hidden])', '#accountDropdown:not([hidden])', '.lang-menu:not([hidden])', '#tplPanel.open',
+];
+var ANALYZE_ENTER_FIELD_TYPES = ['text', 'number', 'search', 'range'];
+function shouldAnalyzeOnEnter(e, doc){
+  if (!e || e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return false;
+  if (!doc.querySelector('#tab-analyzer.active')) return false;
+  var shown = function(id){ var el = doc.getElementById(id); return !!el && !!el.style.display && el.style.display !== 'none'; };
+  if (shown('authScreen') || shown('loadingOverlay')) return false;
+  for (var i = 0; i < ANALYZE_ENTER_BLOCKERS.length; i++) {
+    if (doc.querySelector(ANALYZE_ENTER_BLOCKERS[i])) return false;
   }
+  var a = doc.activeElement;
+  if (!a || a === doc.body || a === doc.documentElement) return true;
+  if (a.closest && a.closest('[role="dialog"], [role="menu"], .modal-backdrop, [data-lang-switch]')) return false;
+  if (String(a.tagName || '').toLowerCase() !== 'input') return false;
+  if (ANALYZE_ENTER_FIELD_TYPES.indexOf(String(a.type || 'text').toLowerCase()) < 0) return false;
+  return !!(a.closest && a.closest('#analyzer-tool'));
+}
+document.addEventListener('keydown', function(e){
+  if (!shouldAnalyzeOnEnter(e, document)) return;
+  var btn = document.getElementById('analyzeBtn');
+  if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
 });
 
 /* ── Keep-alive ping (prevent Render cold start) ── */
