@@ -17,6 +17,12 @@
  */
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const { createDocument } = require('./miniDom');
+
+const I18N_SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'i18n.js'), 'utf8');
 
 /**
  * Pull a top-level function declaration out of source by brace matching.
@@ -72,6 +78,10 @@ function makeDom(startUrl, store = {}) {
   const els = {};
   const nav = { to: null };
   const url = new URL(startUrl);
+  // Real (mini) nodes underneath, so code that builds UI with createElement /
+  // textContent — which is all of it since the translation layer — runs, and
+  // a test can read the result back through innerHTML / textContent.
+  const nodes = createDocument();
 
   const localStorage = {
     getItem: (k) => (k in store ? store[k] : null),
@@ -85,17 +95,26 @@ function makeDom(startUrl, store = {}) {
     get location() { return location; },
     set location(v) { nav.to = String(v); },
   };
+  // Filled in below, once `document` exists (public/i18n.js reads it here).
+  windowObj.document = null;
 
   class CustomEvent {
     constructor(type, init) { this.type = type; this.detail = init && init.detail; }
   }
 
   const document = {
+    readyState: 'complete',
+    documentElement: nodes.documentElement,
     addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
     dispatchEvent: (ev) => { for (const fn of listeners[ev.type] || []) fn(ev); return true; },
     getElementById: (id) => els[id] || null,
     querySelectorAll: (sel) => Object.values(els).filter((el) => el._selectors.includes(sel)),
+    createElement: nodes.createElement,
+    createElementNS: nodes.createElementNS,
+    createTextNode: nodes.createTextNode,
+    createDocumentFragment: nodes.createDocumentFragment,
   };
+  windowObj.document = document;
 
   /**
    * @param {string} id
@@ -104,20 +123,10 @@ function makeDom(startUrl, store = {}) {
    *   real selector parsing, so a test states the match explicitly.
    */
   function mkEl(id, opts = {}) {
-    const el = {
-      id,
-      textContent: '',
-      innerHTML: '',
-      className: '',
-      style: {},
-      disabled: false,
-      dataset: {},
-      _attrs: { ...(opts.attrs || {}) },
-      _selectors: opts.selectors || [],
-    };
-    el.getAttribute = (k) => (k in el._attrs ? el._attrs[k] : null);
-    el.setAttribute = (k, v) => { el._attrs[k] = String(v); };
-    el.closest = () => el;
+    const el = nodes.createElement(opts.tag || 'div');
+    el.id = id;
+    for (const [k, v] of Object.entries(opts.attrs || {})) el.setAttribute(k, v);
+    el._selectors = opts.selectors || [];
     els[id] = el;
     return el;
   }
@@ -153,6 +162,26 @@ function recordingFetch(base) {
   return fn;
 }
 
+/**
+ * Run the real public/i18n.js inside a vm context, with the real dictionary
+ * for `lang`, and expose it as the page code expects: a global `I18N`.
+ * `ctx.window.document` (or `ctx.document`) must be a DOM with createElement
+ * and friends — makeDom()'s or miniDom's createDocument().
+ */
+function loadI18n(ctx, lang = 'en') {
+  const { messagesFor } = require('../../src/i18n/ui');
+  const doc = (ctx.window && ctx.window.document) || ctx.document;
+  assert.ok(doc, 'loadI18n needs ctx.window.document or ctx.document');
+  if (!ctx.window) ctx.window = { document: doc };
+  const dict = JSON.stringify({ lang, mode: 'negotiated', dev: false, version: 'test', messages: messagesFor(lang) });
+  const realGet = doc.getElementById;
+  doc.getElementById = (id) => (id === 'i18n-dict' ? { textContent: dict } : realGet.call(doc, id));
+  try { vm.runInContext(I18N_SRC, ctx); } finally { doc.getElementById = realGet; }
+  ctx.I18N = ctx.window.I18N;
+  assert.ok(ctx.I18N, 'public/i18n.js did not define I18N');
+  return ctx.I18N;
+}
+
 module.exports = {
-  extractFunction, extractLine, scriptBlockContaining, makeDom, recordingFetch,
+  extractFunction, extractLine, scriptBlockContaining, makeDom, recordingFetch, loadI18n,
 };

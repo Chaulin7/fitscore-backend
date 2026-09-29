@@ -8,7 +8,8 @@
 <link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CVsprings · Integrations &amp; API</title>
+<title data-i18n="integrations.meta.title">CVsprings · Integrations &amp; API</title>
+__I18N_HEAD__
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -46,96 +47,106 @@ a{color:#0f2847}
 .site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
 .site-footer a{color:#93c5fd}
 @media(max-width:640px){.topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}.card-head{flex-direction:column;align-items:flex-start;gap:6px}}
+/* Phone: brand and language flag share the first row; the page links wrap
+   onto the rows below. As one fixed-height row the bar ran off-screen at
+   375px (it already did before the flag was added). */
+@media(max-width:640px){
+  .topbar{flex-wrap:wrap;height:auto;min-height:60px;padding:6px 14px;gap:2px 4px}
+  .topbar > .lang-switch{order:1}
+  .topbar::after{content:"";order:1;flex-basis:100%;height:0}
+  .topbar .nav-btn{order:2;padding:6px 10px}
+}
 </style>
 </head>
 <body>
 <div class="topbar">
-  <a class="topbar-brand" href="/">
+  <a class="topbar-brand" href="/" aria-label="CVsprings home" data-i18n-attr="aria-label:common.homeLabel">
     <span class="brandmark" aria-hidden="true"></span>
     <span class="brand-name">CV<em>springs</em></span>
   </a>
-  <a class="nav-btn" href="/login">App</a>
-  <a class="nav-btn" href="/compliance.html">EU AI Act</a>
-  <a class="nav-btn" href="/privacy.html">Privacy</a>
-  <a class="nav-btn" href="/terms.html">Terms</a>
+  <a class="nav-btn" href="/login" data-i18n="common.nav.app">App</a>
+  <a class="nav-btn" href="/compliance.html" data-i18n="common.nav.euAiAct">EU AI Act</a>
+  <a class="nav-btn" href="/privacy.html" data-i18n="common.nav.privacy">Privacy</a>
+  <a class="nav-btn" href="/terms.html" data-i18n="common.nav.terms">Terms</a>
+  __LANG_SWITCHER_DARK__
 </div>
 
 <div class="page">
   <div class="hero">
-    <h1>Integrations &amp; API</h1>
-    <p>How CVsprings connects to recruiting workflows — what works today, and where we&rsquo;re headed. Each capability is tagged so you always know what&rsquo;s live versus planned. We have no ATS partnerships yet; platform names below indicate intended targets only.</p>
+    <h1 data-i18n="integrations.hero.title">Integrations &amp; API</h1>
+    <p data-i18n="integrations.hero.lede">How CVsprings connects to recruiting workflows — what works today, and where we&rsquo;re headed. Each capability is tagged so you always know what&rsquo;s live versus planned. We have no ATS partnerships yet; platform names below indicate intended targets only.</p>
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">Today</span><span class="tag tag-now">Available now</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="integrations.today.title">Today</span><span class="tag tag-now" data-i18n="integrations.tag.now">Available now</span></div>
     <div class="card-body">
-      <p>Integration today means <strong>manual upload and export</strong>:</p>
+      <p data-i18n-html="integrations.today.intro_html">Integration today means <strong>manual upload and export</strong>:</p>
       <ul>
-        <li>Single &amp; batch CV upload (PDF/DOCX) scored against a job description.</li>
-        <li>CSV export of ranked results and the full audit log.</li>
-        <li>Professional branded PDF candidate assessment reports.</li>
-        <li>Reusable role / job-description templates.</li>
+        <li data-i18n="integrations.today.upload">Single &amp; batch CV upload (PDF/DOCX) scored against a job description.</li>
+        <li data-i18n="integrations.today.csv">CSV export of ranked results and the full audit log.</li>
+        <li data-i18n="integrations.today.reports">Professional branded PDF candidate assessment reports.</li>
+        <li data-i18n="integrations.today.templates">Reusable role / job-description templates.</li>
       </ul>
-      <p class="note">There is no programmatic API or automated ATS push/pull yet — everything below is direction, not a live capability.</p>
+      <p class="note" data-i18n="integrations.today.note">There is no programmatic API or automated ATS push/pull yet — everything below is direction, not a live capability.</p>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">Public REST API</span><span class="tag tag-planned">Planned</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="integrations.api.title">Public REST API</span><span class="tag tag-planned" data-i18n="integrations.tag.planned">Planned</span></div>
     <div class="card-body">
-      <p>Authenticate with a per-org API key and call documented endpoints to submit CVs/JDs and retrieve scores, audit records, and templates — the same analysis the web app produces, programmatically.</p>
-      <div class="use">Use case: embed CVsprings scoring into your own recruiting tooling. A draft technical specification (auth, endpoints, schemas, webhooks, limits) is available to prospects &mdash; request it via the contact below.</div>
+      <p data-i18n="integrations.api.body">Authenticate with a per-org API key and call documented endpoints to submit CVs/JDs and retrieve scores, audit records, and templates — the same analysis the web app produces, programmatically.</p>
+      <div class="use" data-i18n="integrations.api.use">Use case: embed CVsprings scoring into your own recruiting tooling. A draft technical specification (auth, endpoints, schemas, webhooks, limits) is available to prospects &mdash; request it via the contact below.</div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">Webhooks</span><span class="tag tag-planned">Planned</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="integrations.webhooks.title">Webhooks</span><span class="tag tag-planned" data-i18n="integrations.tag.planned">Planned</span></div>
     <div class="card-body">
-      <p>Register a callback URL and receive a signed notification when an analysis (especially a large batch) finishes, instead of polling.</p>
-      <div class="use">Use case: trigger the next step in your workflow the moment results are ready.</div>
+      <p data-i18n="integrations.webhooks.body">Register a callback URL and receive a signed notification when an analysis (especially a large batch) finishes, instead of polling.</p>
+      <div class="use" data-i18n="integrations.webhooks.use">Use case: trigger the next step in your workflow the moment results are ready.</div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">Native ATS connectors</span><span class="tag tag-exploring">Exploring</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="integrations.ats.title">Native ATS connectors</span><span class="tag tag-exploring" data-i18n="integrations.tag.exploring">Exploring</span></div>
     <div class="card-body">
-      <p>The generic pattern: your ATS pushes a new application plus the job description to CVsprings → CVsprings scores it → the score and the recruiter&rsquo;s decision are written back to the ATS record, so scoring appears inside the tool your team already uses.</p>
-      <p>Platforms we <strong>intend to support</strong> (examples of common ATS targets &mdash; <strong>not existing integrations or partnerships</strong>): Greenhouse, Lever, Teamtailor, Recruitee, Personio, SmartRecruiters.</p>
-      <div class="use">Priority follows client demand — tell us which ATS you use.</div>
+      <p data-i18n="integrations.ats.body">The generic pattern: your ATS pushes a new application plus the job description to CVsprings → CVsprings scores it → the score and the recruiter&rsquo;s decision are written back to the ATS record, so scoring appears inside the tool your team already uses.</p>
+      <p data-i18n-html="integrations.ats.platforms_html">Platforms we <strong>intend to support</strong> (examples of common ATS targets &mdash; <strong>not existing integrations or partnerships</strong>): Greenhouse, Lever, Teamtailor, Recruitee, Personio, SmartRecruiters.</p>
+      <div class="use" data-i18n="integrations.ats.use">Priority follows client demand — tell us which ATS you use.</div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">Middleware (Zapier / Make)</span><span class="tag tag-exploring">Exploring</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="integrations.middleware.title">Middleware (Zapier / Make)</span><span class="tag tag-exploring" data-i18n="integrations.tag.exploring">Exploring</span></div>
     <div class="card-body">
-      <p>Once the public API exists, a Zapier/Make connector could bridge CVsprings to many tools without a bespoke integration per platform.</p>
-      <div class="use">Use case: a lower-effort path to broad coverage while native connectors mature.</div>
+      <p data-i18n="integrations.middleware.body">Once the public API exists, a Zapier/Make connector could bridge CVsprings to many tools without a bespoke integration per platform.</p>
+      <div class="use" data-i18n="integrations.middleware.use">Use case: a lower-effort path to broad coverage while native connectors mature.</div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">Sequencing</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="integrations.sequencing.title">Sequencing</span></div>
     <div class="card-body">
-      <p>We commit to <strong>phases, not dates</strong>. Order reflects dependency; priority within exploration follows what clients ask for.</p>
-      <div class="phase"><span class="n">1</span><div><strong>Public REST API + API keys</strong> <span class="tag tag-planned">Planned</span><br><span class="note">Foundation for everything else.</span></div></div>
-      <div class="phase"><span class="n">2</span><div><strong>Webhooks</strong> <span class="tag tag-planned">Planned</span><br><span class="note">Analysis-complete callbacks with signed payloads.</span></div></div>
-      <div class="phase"><span class="n">3</span><div><strong>First native ATS connector(s)</strong> <span class="tag tag-exploring">Exploring</span><br><span class="note">Built for the platform the most clients request.</span></div></div>
-      <div class="phase"><span class="n">4</span><div><strong>Broader connector coverage / middleware</strong> <span class="tag tag-exploring">Exploring</span></div></div>
+      <p data-i18n-html="integrations.sequencing.intro_html">We commit to <strong>phases, not dates</strong>. Order reflects dependency; priority within exploration follows what clients ask for.</p>
+      <div class="phase"><span class="n">1</span><div><strong data-i18n="integrations.sequencing.p1">Public REST API + API keys</strong> <span class="tag tag-planned" data-i18n="integrations.tag.planned">Planned</span><br><span class="note" data-i18n="integrations.sequencing.p1note">Foundation for everything else.</span></div></div>
+      <div class="phase"><span class="n">2</span><div><strong data-i18n="integrations.sequencing.p2">Webhooks</strong> <span class="tag tag-planned" data-i18n="integrations.tag.planned">Planned</span><br><span class="note" data-i18n="integrations.sequencing.p2note">Analysis-complete callbacks with signed payloads.</span></div></div>
+      <div class="phase"><span class="n">3</span><div><strong data-i18n="integrations.sequencing.p3">First native ATS connector(s)</strong> <span class="tag tag-exploring" data-i18n="integrations.tag.exploring">Exploring</span><br><span class="note" data-i18n="integrations.sequencing.p3note">Built for the platform the most clients request.</span></div></div>
+      <div class="phase"><span class="n">4</span><div><strong data-i18n="integrations.sequencing.p4">Broader connector coverage / middleware</strong> <span class="tag tag-exploring" data-i18n="integrations.tag.exploring">Exploring</span></div></div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">Request an integration / API access</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="integrations.request.title">Request an integration / API access</span></div>
     <div class="card-body">
-      <p>Integrations are prioritised by demand. Tell us which ATS you use and what you&rsquo;d like to automate &mdash; it directly informs what we build first.</p>
-      <a class="cta" id="contactCta" href="#">Contact us</a>
-      <p class="note" style="margin-top:10px">API usage, once available, is subject to the same human-oversight principle as the rest of the product: scores are advisory and all hiring decisions remain with the recruiter. See the <a href="/compliance.html">compliance page</a>.</p>
+      <p data-i18n="integrations.request.body">Integrations are prioritised by demand. Tell us which ATS you use and what you&rsquo;d like to automate &mdash; it directly informs what we build first.</p>
+      <a class="cta" id="contactCta" href="#" data-i18n="integrations.request.cta">Contact us</a>
+      <p class="note" style="margin-top:10px" data-i18n-html="integrations.request.note_html">API usage, once available, is subject to the same human-oversight principle as the rest of the product: scores are advisory and all hiring decisions remain with the recruiter. See the <a href="/compliance.html">compliance page</a>.</p>
     </div>
   </div>
 </div>
 
 <footer class="site-footer">
-  CVsprings &mdash; AI-powered candidate fit analysis &nbsp;&middot;&nbsp; <a href="/login">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/compliance.html">EU AI Act</a> &nbsp;&middot;&nbsp; <a href="/privacy.html">Privacy</a> &nbsp;&middot;&nbsp; <a href="/terms.html">Terms</a>
+  <span data-i18n="common.footer.product">CVsprings &mdash; AI-powered candidate fit analysis</span> &nbsp;&middot;&nbsp; <a href="/login" data-i18n="common.footer.backToApp">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/compliance.html" data-i18n="common.nav.euAiAct">EU AI Act</a> &nbsp;&middot;&nbsp; <a href="/privacy.html" data-i18n="common.nav.privacy">Privacy</a> &nbsp;&middot;&nbsp; <a href="/terms.html" data-i18n="common.nav.terms">Terms</a>
   <br>__LEGAL_FOOTER__
 </footer>
 
@@ -145,18 +156,22 @@ a{color:#0f2847}
   var API = '';
   try { API = (localStorage.getItem('cvsprings_api_url') || 'https://cvsprings7.onrender.com').replace(/\/+$/, ''); } catch (_) {}
   var cta = document.getElementById('contactCta');
+  function noAddress(){
+    if (!cta) return;
+    cta.textContent = I18N.t('integrations.request.ctaFallback');
+    cta.removeAttribute('href');
+    cta.style.background = '#6b7280';
+  }
   fetch(API + '/api/meta', { headers: { 'Accept': 'application/json' } })
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(meta){
       if (cta && meta && meta.supportEmail) {
-        cta.href = 'mailto:' + meta.supportEmail + '?subject=' + encodeURIComponent('CVsprings — integration / API access');
-      } else if (cta) {
-        cta.textContent = 'Contact us via the in-app About panel';
-        cta.removeAttribute('href');
-        cta.style.background = '#6b7280';
+        cta.href = 'mailto:' + meta.supportEmail + '?subject=' + encodeURIComponent(I18N.t('integrations.request.subject'));
+      } else {
+        noAddress();
       }
     })
-    .catch(function(){ if (cta) { cta.textContent = 'Contact us via the in-app About panel'; cta.removeAttribute('href'); cta.style.background = '#6b7280'; } });
+    .catch(noAddress);
 })();
 </script>
 </body>

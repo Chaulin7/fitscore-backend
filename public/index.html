@@ -22,8 +22,12 @@
   }catch(_){/* no forwarding on very old browsers */}
 })();
 </script>
-<title>CVsprings — Deterministic CV screening</title>
-<meta name="description" content="Rules-based CV screening for boutique recruitment agencies. Same input, same output, every time. Built for EU AI Act and GDPR compliance."/>
+<title data-i18n="landing.meta.title">CVsprings — Deterministic CV screening</title>
+<meta name="description" content="Rules-based CV screening for boutique recruitment agencies. Same input, same output, every time. Built for EU AI Act and GDPR compliance." data-i18n-attr="content:landing.meta.description"/>
+<!-- UI language: stylesheet, canonical + hreflang alternates, the dictionary
+     (a JSON data block) and /i18n.js. Substituted per language at startup by
+     src/i18n/pages.js. -->
+__I18N_HEAD__
 <!-- Favicons. Google reads these from the home page specifically and caches the
      result by URL for a long time, so the paths are fixed: build new artwork
      with scripts/build-icons.mjs, never rename the files. .ico first with
@@ -102,6 +106,10 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:6
 .btn-ghost:hover{background:var(--ink);color:var(--paper)}
 .nav-cta{padding:8px 18px;font-size:14px}
 @media(max-width:860px){.navlinks > a{display:none}.nav-btns{margin-left:0}}
+/* Dutch and German labels are longer ("Registrieren", "Plan een demo"), so the
+   in-page links give way earlier there; the buttons never wrap mid-label. */
+.nav-cta{white-space:nowrap}
+@media(max-width:1000px){html:not([lang="en"]) .navlinks > a{display:none}}
 @media(max-width:560px){.nav-demo{display:none}.wordmark .wordtext{display:none}}
 
 /* ---------- hero ---------- */
@@ -259,7 +267,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;
 .foot-brand{font-family:var(--display);font-weight:700}
 .foot-meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);margin-top:6px}
 footer nav{border:none;position:static;background:none}
-footer nav{display:flex;gap:22px;font-size:13px}
+footer nav{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:13px}
 footer nav a{color:var(--ink-soft);text-decoration:none}
 footer nav a:hover{color:var(--ink);text-decoration:underline}
 </style>
@@ -269,25 +277,26 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 <div class="metastrip">
   <div class="wrap">
     <span>DOC. CVSPRINGS-LP-02</span>
-    <span>ENGINE: RULES-BASED · NO LLM IN CANDIDATE PATH</span>
-    <span>REGION: EU · NL-HOSTED</span>
+    <span data-i18n="landing.metastrip.engine">ENGINE: RULES-BASED · NO LLM IN CANDIDATE PATH</span>
+    <span data-i18n="landing.metastrip.region">REGION: EU · NL-HOSTED</span>
   </div>
 </div>
 
 <nav>
   <div class="wrap">
-    <a class="wordmark" href="/" aria-label="CVsprings home">
+    <a class="wordmark" href="/" aria-label="CVsprings home" data-i18n-attr="aria-label:common.homeLabel">
       <span class="logomark" aria-hidden="true"></span>
       <span class="wordtext">CV<span>springs</span></span>
     </a>
     <div class="navlinks">
-      <a href="#clauses">How it works</a>
-      <a href="#statement">Why no AI</a>
-      <a href="#pricing">Pricing</a>
+      <a href="#clauses" data-i18n="landing.nav.how">How it works</a>
+      <a href="#statement" data-i18n="landing.nav.why">Why no AI</a>
+      <a href="#pricing" data-i18n="landing.nav.pricing">Pricing</a>
       <div class="nav-btns">
-        <a class="btn btn-ghost nav-cta" href="/login">Log in</a>
-        <a class="btn btn-ghost nav-cta" href="/signup">Sign up</a>
-        <a class="btn btn-primary nav-cta nav-demo" href="#demo">Book a demo</a>
+        __LANG_SWITCHER_LIGHT__
+        <a class="btn btn-ghost nav-cta" href="/login" data-i18n="common.login">Log in</a>
+        <a class="btn btn-ghost nav-cta" href="/signup" data-i18n="common.signup">Sign up</a>
+        <a class="btn btn-primary nav-cta nav-demo" href="#demo" data-i18n="landing.nav.demo">Book a demo</a>
       </div>
     </div>
   </div>
@@ -296,19 +305,19 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 <header class="hero">
   <div class="wrap">
     <div>
-      <div class="eyebrow">Deterministic CV screening</div>
-      <h1>Screening that gives the same answer twice.</h1>
-      <p class="lede">CVsprings scores candidates with a transparent, rules-based engine — no language model ever reads your candidates' data. Same CV, same job profile, same result. Every time. Provable.</p>
+      <div class="eyebrow" data-i18n="landing.hero.eyebrow">Deterministic CV screening</div>
+      <h1 data-i18n="landing.hero.title">Screening that gives the same answer twice.</h1>
+      <p class="lede" data-i18n="landing.hero.lede">CVsprings scores candidates with a transparent, rules-based engine — no language model ever reads your candidates' data. Same CV, same job profile, same result. Every time. Provable.</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="#demo">Book a 15-minute demo</a>
-        <a class="btn btn-ghost" href="#statement">Why we don't use AI</a>
+        <a class="btn btn-primary" href="#demo" data-i18n="landing.hero.ctaDemo">Book a 15-minute demo</a>
+        <a class="btn btn-ghost" href="#statement" data-i18n="landing.hero.ctaWhy">Why we don't use AI</a>
       </div>
-      <div class="hero-note">Built for boutique agencies in the Benelux &amp; DACH · EU AI Act ready</div>
+      <div class="hero-note" data-i18n="landing.hero.note">Built for boutique agencies in the Benelux &amp; DACH · EU AI Act ready</div>
     </div>
 
-    <div class="repro" aria-label="Reproducibility check demonstration">
+    <div class="repro" aria-label="Reproducibility check demonstration" data-i18n-attr="aria-label:landing.repro.label">
       <div class="repro-head">
-        <span>Reproducibility check</span>
+        <span data-i18n="landing.repro.title">Reproducibility check</span>
         <span>candidate_014.pdf</span>
       </div>
       <div class="repro-body">
@@ -316,26 +325,26 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
           <div class="run-head"><span>RUN 1</span><span>2026-07-17 · 08:14:02 UTC</span></div>
           <div class="run-rows">
             <div><span class="k">fit_score</span>82 / 100</div>
-            <div><span class="k">skills_matched</span>11 of 14 required</div>
-            <div><span class="k">eu_eligibility</span>confirmed</div>
+            <div><span class="k">skills_matched</span><span data-i18n="landing.repro.skillsValue" data-i18n-vars='{"matched":11,"total":14}'>11 of 14 required</span></div>
+            <div><span class="k">eu_eligibility</span><span data-i18n="landing.repro.confirmed">confirmed</span></div>
           </div>
         </div>
         <div class="run">
           <div class="run-head"><span>RUN 2</span><span id="run2time">2026-07-17 · 14:47:36 UTC</span></div>
           <div class="run-rows">
             <div><span class="k">fit_score</span>82 / 100</div>
-            <div><span class="k">skills_matched</span>11 of 14 required</div>
-            <div><span class="k">eu_eligibility</span>confirmed</div>
+            <div><span class="k">skills_matched</span><span data-i18n="landing.repro.skillsValue" data-i18n-vars='{"matched":11,"total":14}'>11 of 14 required</span></div>
+            <div><span class="k">eu_eligibility</span><span data-i18n="landing.repro.confirmed">confirmed</span></div>
           </div>
         </div>
         <div class="hashline" id="hashline">
           sha256(run_1) == sha256(run_2)<br>
-          <b>9f4c2ab1…e77d0c31 ✓ IDENTICAL OUTPUT</b>
+          <b>9f4c2ab1…e77d0c31 ✓ <span data-i18n="landing.repro.identical">IDENTICAL OUTPUT</span></b>
         </div>
       </div>
       <div class="repro-foot">
-        <button class="rerun" id="rerunBtn" type="button">Run again ↻</button>
-        <span class="rerun-note" id="runCount">Verified 2× today</span>
+        <button class="rerun" id="rerunBtn" type="button" data-i18n="landing.repro.rerun">Run again ↻</button>
+        <span class="rerun-note" id="runCount" data-i18n="landing.repro.verified" data-i18n-vars='{"n":2}'>Verified 2× today</span>
       </div>
     </div>
   </div>
@@ -343,28 +352,28 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 
 <section class="clauses" id="clauses">
   <div class="wrap">
-    <div class="section-eyebrow">Operating principles</div>
-    <h2>Compliance isn't a feature we added. It's the architecture.</h2>
+    <div class="section-eyebrow" data-i18n="landing.clauses.eyebrow">Operating principles</div>
+    <h2 data-i18n="landing.clauses.title">Compliance isn't a feature we added. It's the architecture.</h2>
     <div class="clause-grid">
       <div class="clause">
-        <div class="cl">CL. 01 — TRANSPARENCY</div>
-        <h3>Every score is explainable</h3>
-        <p>Each candidate assessment shows exactly which rules fired, which skills matched, and why. No black box, no "the model decided." Your client asks why — you answer in one click.</p>
+        <div class="cl" data-i18n="landing.clauses.c1.label">CL. 01 — TRANSPARENCY</div>
+        <h3 data-i18n="landing.clauses.c1.title">Every score is explainable</h3>
+        <p data-i18n="landing.clauses.c1.body">Each candidate assessment shows exactly which rules fired, which skills matched, and why. No black box, no "the model decided." Your client asks why — you answer in one click.</p>
       </div>
       <div class="clause">
-        <div class="cl">CL. 02 — REPRODUCIBILITY</div>
-        <h3>Same input, same output</h3>
-        <p>The extraction and scoring engine is fully deterministic. Re-run any assessment months later for an audit and get byte-identical results. Try that with an LLM-based screener.</p>
+        <div class="cl" data-i18n="landing.clauses.c2.label">CL. 02 — REPRODUCIBILITY</div>
+        <h3 data-i18n="landing.clauses.c2.title">Same input, same output</h3>
+        <p data-i18n="landing.clauses.c2.body">The extraction and scoring engine is fully deterministic. Re-run any assessment months later for an audit and get byte-identical results. Try that with an LLM-based screener.</p>
       </div>
       <div class="clause">
-        <div class="cl">CL. 03 — AUDITABILITY</div>
-        <h3>A trail regulators can read</h3>
-        <p>Every action is logged against a formal assessment schema aligned with EU AI Act traceability requirements. Export the full audit trail per candidate or per role.</p>
+        <div class="cl" data-i18n="landing.clauses.c3.label">CL. 03 — AUDITABILITY</div>
+        <h3 data-i18n="landing.clauses.c3.title">A trail regulators can read</h3>
+        <p data-i18n="landing.clauses.c3.body">Every action is logged against a formal assessment schema aligned with EU AI Act traceability requirements. Export the full audit trail per candidate or per role.</p>
       </div>
       <div class="clause">
-        <div class="cl">CL. 04 — DATA MINIMISATION</div>
-        <h3>Candidate data stays in the EU</h3>
-        <p>No candidate data is sent to third-party AI providers — because there are none in the pipeline. Processing is GDPR-scoped by design, with per-candidate deletion on request.</p>
+        <div class="cl" data-i18n="landing.clauses.c4.label">CL. 04 — DATA MINIMISATION</div>
+        <h3 data-i18n="landing.clauses.c4.title">Candidate data stays in the EU</h3>
+        <p data-i18n="landing.clauses.c4.body">No candidate data is sent to third-party AI providers — because there are none in the pipeline. Processing is GDPR-scoped by design, with per-candidate deletion on request.</p>
       </div>
     </div>
   </div>
@@ -378,11 +387,11 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 <section class="recording" id="recording">
   <div class="wrap">
     <div class="marginalia">
-      <div class="section-eyebrow">FIG. 01 — Recorded session</div>
-      <div class="section-eyebrow">Runtime 00:01:13 · No audio · Captions embedded</div>
+      <div class="section-eyebrow" data-i18n="landing.recording.eyebrow">FIG. 01 — Recorded session</div>
+      <div class="section-eyebrow" data-i18n="landing.recording.runtime">Runtime 00:01:13 · No audio · Captions embedded</div>
     </div>
-    <h2>The four clauses, running.</h2>
-    <p class="lede">One pass through the engine: a role defined explicitly, a candidate scored with every point traced to the line that earned it, the audit log, and the bias report. Nothing is edited between steps.</p>
+    <h2 data-i18n="landing.recording.title">The four clauses, running.</h2>
+    <p class="lede" data-i18n="landing.recording.lede">One pass through the engine: a role defined explicitly, a candidate scored with every point traced to the line that earned it, the audit log, and the bias report. Nothing is edited between steps.</p>
 
     <figure class="rec-figure">
       <div class="rec-shell">
@@ -400,42 +409,43 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
                  data-src1080="__DEMO_VIDEO_1080__"
                  data-src720="__DEMO_VIDEO_720__"></video>
           <button type="button" class="rec-play" data-action="playDemo"
-                  aria-label="Play the recorded screening session — 1 minute 13 seconds, silent, with captions on screen">
-            <span class="rec-play-control">PLAY 00:01:13</span>
-            <span class="rec-play-spec">SILENT · CAPTIONED ON SCREEN</span>
+                  aria-label="Play the recorded screening session — 1 minute 13 seconds, silent, with captions on screen"
+                  data-i18n-attr="aria-label:landing.recording.playLabel">
+            <span class="rec-play-control" data-i18n="landing.recording.play">PLAY 00:01:13</span>
+            <span class="rec-play-spec" data-i18n="landing.recording.spec">SILENT · CAPTIONED ON SCREEN</span>
           </button>
         </div>
-        <div class="rec-ledger">SOURCE cvsprings engine v1 · DATA synthetic candidates · EDITS none</div>
+        <div class="rec-ledger" data-i18n="landing.recording.ledger">SOURCE cvsprings engine v1 · DATA synthetic candidates · EDITS none</div>
       </div>
-      <figcaption><span class="fig">Fig. 01</span> — Screening walkthrough on synthetic candidate data. For a run against your own CVs, <a href="#demo">book the 15-minute demo</a> — we do it live, twice. <a href="/demo-transcript">Text version</a>.</figcaption>
+      <figcaption><span class="fig" data-i18n="landing.recording.fig">Fig. 01</span> <span data-i18n-html="landing.recording.caption_html">— Screening walkthrough on synthetic candidate data. For a run against your own CVs, <a href="#demo">book the 15-minute demo</a> — we do it live, twice. <a href="/demo-transcript">Text version</a>.</span></figcaption>
     </figure>
   </div>
 </section>
 
 <section class="statement" id="statement">
   <div class="wrap">
-    <div class="section-eyebrow">A deliberate choice</div>
-    <h2>Why we don't use AI to read CVs.</h2>
-    <p>Most screening tools put a language model between your candidates and your shortlist. It reads the CV, forms an impression, and returns a score it cannot explain and will not repeat. Run the same CV twice and you can get two different answers.</p>
-    <p>Under the EU AI Act, screening candidates is <strong>high-risk</strong> — when it's done by an AI system. The obligations that follow are not light: risk management, data governance, technical documentation, logging, human oversight, conformity assessment. And a good part of that lands on you, the agency deploying the tool, not only on the vendor who built it.</p>
-    <p>So we made the unfashionable choice: <strong>a rules engine you configure.</strong> The thresholds, the weights, the knockouts are yours, written down in advance, applied the same way to every candidate. No model reads the CV. Nothing infers, because there is nothing to infer from — the rules are the rules, and they run exactly as written.</p>
-    <p>Which is the point. Every score comes with the rule that produced it. The audit trail is attested by the server, not supplied by the browser. And a determinism check runs before every release: same CV, same rules, same score, or the build doesn't ship.</p>
-    <p>Less magical. Entirely defensible.</p>
-    <div class="sig">— CVsprings, engineering principle nº 1</div>
+    <div class="section-eyebrow" data-i18n="landing.statement.eyebrow">A deliberate choice</div>
+    <h2 data-i18n="landing.statement.title">Why we don't use AI to read CVs.</h2>
+    <p data-i18n="landing.statement.p1">Most screening tools put a language model between your candidates and your shortlist. It reads the CV, forms an impression, and returns a score it cannot explain and will not repeat. Run the same CV twice and you can get two different answers.</p>
+    <p data-i18n-html="landing.statement.p2_html">Under the EU AI Act, screening candidates is <strong>high-risk</strong> — when it's done by an AI system. The obligations that follow are not light: risk management, data governance, technical documentation, logging, human oversight, conformity assessment. And a good part of that lands on you, the agency deploying the tool, not only on the vendor who built it.</p>
+    <p data-i18n-html="landing.statement.p3_html">So we made the unfashionable choice: <strong>a rules engine you configure.</strong> The thresholds, the weights, the knockouts are yours, written down in advance, applied the same way to every candidate. No model reads the CV. Nothing infers, because there is nothing to infer from — the rules are the rules, and they run exactly as written.</p>
+    <p data-i18n="landing.statement.p4">Which is the point. Every score comes with the rule that produced it. The audit trail is attested by the server, not supplied by the browser. And a determinism check runs before every release: same CV, same rules, same score, or the build doesn't ship.</p>
+    <p data-i18n="landing.statement.p5">Less magical. Entirely defensible.</p>
+    <div class="sig" data-i18n="landing.statement.sig">— CVsprings, engineering principle nº 1</div>
   </div>
 </section>
 
 <section class="pricing" id="pricing">
   <div class="wrap">
-    <div class="section-eyebrow">Pricing</div>
-    <h2>Simple, transparent pricing.</h2>
+    <div class="section-eyebrow" data-i18n="landing.pricing.eyebrow">Pricing</div>
+    <h2 data-i18n="landing.pricing.title">Simple, transparent pricing.</h2>
     <!-- Soft notice for a trial link that could not be used (expired, already
          redeemed, or unrecognised). GET /start sends every one of those cases
          here with ?trial=unavailable and one wording, because distinguishing
          them to an anonymous caller would confirm which tokens exist. Hidden
          until the script below finds the parameter; there is no path where a
          visitor arriving normally sees it. -->
-    <p class="trial-notice" id="trialNotice" hidden>
+    <p class="trial-notice" id="trialNotice" hidden data-i18n-html="landing.pricing.trialUnavailable_html">
       That trial link can’t be used any more — it may have expired or already been
       started. You can still start on any plan below, or
       <a href="#demo">book a demo</a> and we’ll set one up for you.
@@ -450,11 +460,11 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
       <div class="tier skel" aria-hidden="true"><h3>&nbsp;</h3><div class="price">&nbsp;</div><div class="meter">&nbsp;</div><ul><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li></ul><span class="btn btn-ghost">&nbsp;</span></div>
     </div>
     <div class="included" id="pricingIncluded" data-skeleton="1" aria-busy="true">
-      <div class="included-head">Included on every plan</div>
+      <div class="included-head" data-i18n="pricing.included">Included on every plan</div>
       <ul aria-hidden="true"><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li></ul>
     </div>
     <noscript>
-      <p style="margin-top:16px">Pricing needs JavaScript to load. <a href="#demo">Book a demo</a> and we'll walk you through the tiers.</p>
+      <p style="margin-top:16px" data-i18n-html="landing.pricing.noscript_html">Pricing needs JavaScript to load. <a href="#demo">Book a demo</a> and we'll walk you through the tiers.</p>
     </noscript>
   </div>
 </section>
@@ -462,38 +472,38 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
 <section class="demo" id="demo">
   <div class="wrap">
     <div class="pitch">
-      <div class="section-eyebrow">Book a demo</div>
-      <h2>Bring your own CVs. We'll run them live.</h2>
-      <p><strong>Send us 3 anonymised CVs and your job spec.</strong> In a 15-minute call we run them through the engine in front of you — twice, so you can watch the outputs match.</p>
-      <p>No slideshow, no generic sample data. You leave the call knowing exactly what CVsprings says about <em>your</em> candidates, and why.</p>
-      <p>Prefer to look before you talk? Start with our <a href="/eu-ai-act-checklist.pdf" target="_blank" rel="noopener">one-page EU AI Act checklist for recruitment tooling</a> — no form needed.</p>
+      <div class="section-eyebrow" data-i18n="landing.demo.eyebrow">Book a demo</div>
+      <h2 data-i18n="landing.demo.title">Bring your own CVs. We'll run them live.</h2>
+      <p data-i18n-html="landing.demo.p1_html"><strong>Send us 3 anonymised CVs and your job spec.</strong> In a 15-minute call we run them through the engine in front of you — twice, so you can watch the outputs match.</p>
+      <p data-i18n-html="landing.demo.p2_html">No slideshow, no generic sample data. You leave the call knowing exactly what CVsprings says about <em>your</em> candidates, and why.</p>
+      <p data-i18n-html="landing.demo.p3_html">Prefer to look before you talk? Start with our <a href="/eu-ai-act-checklist.pdf" target="_blank" rel="noopener">one-page EU AI Act checklist for recruitment tooling</a> — no form needed.</p>
     </div>
     <div class="demo-form">
-      <div class="form-head">Demo request — form D-01</div>
+      <div class="form-head" data-i18n="landing.demo.form.head">Demo request — form D-01</div>
       <form id="formFields" novalidate>
         <input class="hp-field" type="text" id="f-website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
         <div class="field">
-          <label for="f-name">Name</label>
-          <input id="f-name" type="text" autocomplete="name" placeholder="Sanne de Vries">
+          <label for="f-name" data-i18n="landing.demo.form.name">Name</label>
+          <input id="f-name" type="text" autocomplete="name" placeholder="Sanne de Vries" data-i18n-attr="placeholder:landing.demo.form.namePlaceholder">
         </div>
         <div class="field">
-          <label for="f-email">Work email</label>
-          <input id="f-email" type="email" autocomplete="email" placeholder="sanne@agency.nl">
+          <label for="f-email" data-i18n="landing.demo.form.email">Work email</label>
+          <input id="f-email" type="email" autocomplete="email" placeholder="sanne@agency.nl" data-i18n-attr="placeholder:landing.demo.form.emailPlaceholder">
         </div>
         <div class="field">
-          <label for="f-agency">Agency</label>
-          <input id="f-agency" type="text" placeholder="Agency name — Benelux or DACH">
+          <label for="f-agency" data-i18n="landing.demo.form.agency">Agency</label>
+          <input id="f-agency" type="text" placeholder="Agency name — Benelux or DACH" data-i18n-attr="placeholder:landing.demo.form.agencyPlaceholder">
         </div>
         <div class="field">
-          <label for="f-note">Anything we should prepare? <span style="font-weight:400;color:var(--ink-soft)">(optional)</span></label>
-          <textarea id="f-note" rows="2" placeholder="e.g. we mostly place finance roles in Frankfurt"></textarea>
-          <div class="hint">You can attach your 3 anonymised CVs in the reply to our confirmation email.</div>
+          <label for="f-note"><span data-i18n="landing.demo.form.note">Anything we should prepare?</span> <span style="font-weight:400;color:var(--ink-soft)" data-i18n="common.optional">(optional)</span></label>
+          <textarea id="f-note" rows="2" placeholder="e.g. we mostly place finance roles in Frankfurt" data-i18n-attr="placeholder:landing.demo.form.notePlaceholder"></textarea>
+          <div class="hint" data-i18n="landing.demo.form.hint">You can attach your 3 anonymised CVs in the reply to our confirmation email.</div>
         </div>
-        <button class="btn btn-primary" id="submitBtn" type="submit">Request 15-minute demo</button>
+        <button class="btn btn-primary" id="submitBtn" type="submit" data-i18n="landing.demo.form.submit">Request 15-minute demo</button>
         <div class="form-err" id="formError" aria-live="polite"></div>
-        <div class="form-fine">We reply within one working day. Your details are used only to schedule this demo — nothing else, no list, no drip campaign. That would be a strange look for us.</div>
+        <div class="form-fine" data-i18n="landing.demo.form.fine">We reply within one working day. Your details are used only to schedule this demo — nothing else, no list, no drip campaign. That would be a strange look for us.</div>
       </form>
-      <div class="confirm" id="confirmBox" aria-live="polite">
+      <div class="confirm" id="confirmBox" aria-live="polite" data-i18n-html="landing.demo.form.confirm_html">
         ✓ REQUEST LOGGED<br>
         Check your inbox — a confirmation with a scheduling link and the compliance checklist is on its way.
       </div>
@@ -505,16 +515,16 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   <div class="wrap">
     <div>
       <div class="foot-brand">CVsprings</div>
-      <div class="foot-meta">Deterministic CV screening · Made in the Netherlands</div>
+      <div class="foot-meta" data-i18n="common.footerTagline">Deterministic CV screening · Made in the Netherlands</div>
       <div class="foot-meta">__LEGAL_FOOTER__</div>
       <div class="foot-meta">© 2026 CVsprings</div>
     </div>
-    <nav aria-label="Footer">
-      <a href="#">Privacy policy</a>
-      <a href="#">Data processing agreement</a>
-      <a href="#">Imprint / Impressum</a>
-      <a href="/login">Log in</a>
-      <a href="/signup">Sign up</a>
+    <nav aria-label="Footer" data-i18n-attr="aria-label:common.footerNav">
+      <a href="#" data-i18n="landing.footer.privacy">Privacy policy</a>
+      <a href="#" data-i18n="landing.footer.dpa">Data processing agreement</a>
+      <a href="#" data-i18n="landing.footer.imprint">Imprint / Impressum</a>
+      <a href="/login" data-i18n="common.login">Log in</a>
+      <a href="/signup" data-i18n="common.signup">Sign up</a>
     </nav>
   </div>
 </footer>
@@ -539,6 +549,14 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   // shared list below the cards rather than being repeated identically in all
   // three. Only the marketing CTA is page-specific, so it lives here.
   //
+  // The copy arrives in the page's language: ?lang= asks src/routes/plans.js
+  // for the translated table. Amounts, plan ids and capability flags are the
+  // same in every language — only the words and the price FORMAT differ.
+  //
+  // Built with DOM calls, never innerHTML: every string here is translated
+  // copy or server data, none of it is markup, and text set through
+  // textContent cannot become markup whatever it contains.
+  //
   // The markup starts as a skeleton at final dimensions (see #pricingTiers), so
   // this swap changes text, not layout. On failure the skeleton is replaced with
   // a link to the demo form rather than left pulsing forever.
@@ -556,45 +574,70 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   //                            /api/billing/checkout expects, published by
   //                            plans.js itself rather than retyped here.
   //   SECONDARY_DEMO        -> tiers that also keep a link to the demo form.
+  // Both maps hold translation keys (locales/*.json, `pricing.*`).
   var DEMO_HREF='#demo';
-  var SECONDARY_DEMO={team:'Or book a demo'};
-  var BADGE={pro:'Most agencies'};
-  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  var SECONDARY_DEMO={team:'pricing.cta.orDemo'};
+  var BADGE={pro:'pricing.badge.pro'};
+  function el(tag,attrs,text){
+    var node=document.createElement(tag);
+    if(attrs)Object.keys(attrs).forEach(function(k){ node.setAttribute(k,attrs[k]); });
+    if(text!=null)node.textContent=text;
+    return node;
+  }
+  function replaceChildren(node,children){
+    node.textContent='';
+    children.forEach(function(c){ node.appendChild(c); });
+  }
 
-  function ctaHtml(t){
-    if(t.upgradePlan){
-      var plan=esc(t.upgradePlan);
-      return '<button type="button" class="btn btn-primary" data-action="startCheckout" data-plan="'+plan+'">'
-        +'Get '+esc(t.name)+' — '+esc(t.priceLabel)+esc(t.per||'')+'</button>'
-        // No VAT qualifier here: it sits beside the price a few lines up, and
-        // twice on one card reads as clutter rather than as care.
-        +(SECONDARY_DEMO[t.id]
-          ? '<a class="tier-alt" href="'+DEMO_HREF+'">'+esc(SECONDARY_DEMO[t.id])+'</a>' : '')
-        +'<div class="tier-msg" id="tierMsg-'+plan+'" role="status" aria-live="polite"></div>';
+  function ctaNodes(tier){
+    var frag=document.createDocumentFragment();
+    if(tier.upgradePlan){
+      frag.appendChild(el('button',{type:'button','class':'btn btn-primary','data-action':'startCheckout','data-plan':tier.upgradePlan},
+        I18N.t('pricing.cta.get',{name:tier.name,price:tier.priceLabel+(tier.per||'')})));
+      // No VAT qualifier here: it sits beside the price a few lines up, and
+      // twice on one card reads as clutter rather than as care.
+      if(SECONDARY_DEMO[tier.id]) frag.appendChild(el('a',{'class':'tier-alt',href:DEMO_HREF},I18N.t(SECONDARY_DEMO[tier.id])));
+      frag.appendChild(el('div',{'class':'tier-msg',id:'tierMsg-'+tier.upgradePlan,role:'status','aria-live':'polite'}));
+      return frag;
     }
-    if(t.id==='free') return '<a class="btn btn-ghost" href="/signup">Start free</a>';
-    return '<a class="btn btn-ghost" href="'+DEMO_HREF+'">Book a demo</a>';
+    if(tier.id==='free'){
+      frag.appendChild(el('a',{'class':'btn btn-ghost',href:'/signup'},I18N.t('pricing.cta.startFree')));
+      return frag;
+    }
+    frag.appendChild(el('a',{'class':'btn btn-ghost',href:DEMO_HREF},I18N.t('pricing.cta.demo')));
+    return frag;
+  }
+
+  function tierCard(tier){
+    var card=el('div',{'class':'tier'+(tier.featured?' featured':'')});
+    if(BADGE[tier.id])card.appendChild(el('div',{'class':'badge'},I18N.t(BADGE[tier.id])));
+    card.appendChild(el('h3',null,tier.name));
+    var price=el('div',{'class':'price'},tier.priceLabel);
+    var small=el('small',null,' '+tier.per);
+    if(tier.taxNote){
+      small.appendChild(document.createTextNode(' '));
+      small.appendChild(el('span',{'class':'tax'},tier.taxNote));
+    }
+    price.appendChild(small);
+    card.appendChild(price);
+    if(tier.tagline)card.appendChild(el('div',{'class':'meter'},tier.tagline));
+    var list=el('ul');
+    (tier.highlights||[]).forEach(function(h){ list.appendChild(el('li',null,h)); });
+    card.appendChild(list);
+    card.appendChild(ctaNodes(tier));
+    return card;
   }
 
   function render(cfg){
-    grid.innerHTML=(cfg.tiers||[]).map(function(t){
-      return '<div class="tier'+(t.featured?' featured':'')+'">'
-        +(BADGE[t.id]?'<div class="badge">'+esc(BADGE[t.id])+'</div>':'')
-        +'<h3>'+esc(t.name)+'</h3>'
-        +'<div class="price">'+esc(t.priceLabel)+'<small> '+esc(t.per)
-          +(t.taxNote?' <span class="tax">'+esc(t.taxNote)+'</span>':'')+'</small></div>'
-        +(t.tagline?'<div class="meter">'+esc(t.tagline)+'</div>':'')
-        +'<ul>'+(t.highlights||[]).map(function(h){return '<li>'+esc(h)+'</li>';}).join('')+'</ul>'
-        +ctaHtml(t)
-        +'</div>';
-    }).join('');
+    replaceChildren(grid,(cfg.tiers||[]).map(tierCard));
     grid.removeAttribute('data-skeleton');
     grid.removeAttribute('aria-busy');
 
     var baseline=cfg.baseline||[];
     if(included&&baseline.length){
-      included.innerHTML='<div class="included-head">Included on every plan</div>'
-        +'<ul>'+baseline.map(function(b){return '<li>'+esc(b)+'</li>';}).join('')+'</ul>';
+      var list=el('ul');
+      baseline.forEach(function(b){ list.appendChild(el('li',null,b)); });
+      replaceChildren(included,[el('div',{'class':'included-head'},I18N.t('pricing.included')),list]);
       included.removeAttribute('data-skeleton');
       included.removeAttribute('aria-busy');
     }
@@ -606,15 +649,16 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   }
 
   function fail(){
-    grid.innerHTML='<div class="tier" style="grid-column:1/-1;text-align:center">'
-      +'<p>Pricing could not be loaded just now.</p>'
-      +'<a class="btn btn-primary" href="#demo" style="margin-top:16px">Book a demo</a></div>';
+    var box=el('div',{'class':'tier',style:'grid-column:1/-1;text-align:center'});
+    box.appendChild(el('p',null,I18N.t('pricing.loadFailed')));
+    box.appendChild(el('a',{'class':'btn btn-primary',href:'#demo',style:'margin-top:16px'},I18N.t('pricing.cta.demo')));
+    replaceChildren(grid,[box]);
     grid.removeAttribute('data-skeleton');
     grid.removeAttribute('aria-busy');
     if(included)included.style.display='none';
   }
 
-  fetch('/api/plans',{headers:{Accept:'application/json'}})
+  fetch('/api/plans?lang='+encodeURIComponent(I18N.lang),{headers:{Accept:'application/json'}})
     .then(function(r){ if(!r.ok)throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(cfg){ if(!cfg||!cfg.tiers)throw new Error('malformed'); render(cfg); })
     .catch(fail);
@@ -643,9 +687,13 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
   function token(){ try{ return localStorage.getItem(SESSION_KEY)||''; }catch(_){ return ''; } }
   function dropToken(){ try{ localStorage.removeItem(SESSION_KEY); }catch(_){} }
   function msgEl(plan){ return document.getElementById('tierMsg-'+plan); }
-  function showMsg(plan,html,note){
+  // Links inside these messages are supplied here, by the code — a
+  // translation can say where "<a0>book a demo</a0>" sits in its sentence,
+  // never where it points.
+  var DEMO_LINK=[{href:'#demo'}];
+  function showMsg(plan,key,note,links){
     var el=msgEl(plan); if(!el)return;
-    el.innerHTML=html;
+    I18N.setRich(el,key,null,links);
     el.className='tier-msg'+(note?' note':'');
     el.style.display='block';
   }
@@ -678,7 +726,7 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
     if(!token()){ toAuth('/signup',plan); return; }
 
     var label=el.textContent;
-    el.disabled=true; el.textContent='Starting checkout…';
+    el.disabled=true; el.textContent=I18N.t('pricing.checkout.starting');
     function restore(){ el.disabled=false; el.textContent=label; }
 
     // Ask what the org is on BEFORE creating anything: an org already on this
@@ -692,13 +740,13 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
         if(!d)return; // already-on-this-plan branch, already navigating away
         if(d.url){ window.location=d.url; return; }
         restore();
-        showMsg(plan,'Could not start checkout. <a href="#demo">Book a demo</a> and we\'ll set it up with you.');
+        showMsg(plan,'pricing.msg.noCheckout_html',false,DEMO_LINK);
       })
       .catch(function(e){
         restore();
         if(e.status===401){ dropToken(); toAuth('/login',plan); return; } // expired session
         if(e.code==='OWNER_REQUIRED'){
-          showMsg(plan,'Only your organization\'s owner can start a subscription — ask them to upgrade from Settings → Plan &amp; Billing.');
+          showMsg(plan,'pricing.msg.ownerRequired');
           return;
         }
         // Both are "the server cannot take money right now", which from a
@@ -706,10 +754,10 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
         // Stripe Tax text in-app; a stranger on the pricing page does not need
         // to read about our tax registrations.
         if(e.code==='BILLING_NOT_CONFIGURED'||e.code==='TAX_NOT_CONFIGURED'){
-          showMsg(plan,'Card payment isn\'t available right now. <a href="#demo">Book a demo</a> and we\'ll set you up.');
+          showMsg(plan,'pricing.msg.billingUnavailable_html',false,DEMO_LINK);
           return;
         }
-        showMsg(plan,'Could not start checkout. Please try again, or <a href="#demo">book a demo</a>.');
+        showMsg(plan,'pricing.msg.checkoutFailed_html',false,DEMO_LINK);
       });
   }
 
@@ -735,13 +783,13 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
       var plan=btn.getAttribute('data-plan');
       if(plan===currentPlan){
         btn.disabled=true;
-        btn.textContent='Your current plan';
-        showMsg(plan,'Manage it from your <a href="'+APP_URL+'">dashboard</a>.',true);
+        btn.textContent=I18N.t('pricing.msg.currentPlan');
+        showMsg(plan,'pricing.msg.manage_html',true,[{href:APP_URL}]);
         return;
       }
       if(!isOwner){
         btn.disabled=true;
-        showMsg(plan,'Only your organization’s owner can start a subscription.',true);
+        showMsg(plan,'pricing.msg.ownerOnly',true);
       }
     });
   }
@@ -808,7 +856,7 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
     function p(x){return String(x).padStart(2,'0')}
     t.textContent=d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate())+' · '+p(d.getUTCHours())+':'+p(d.getUTCMinutes())+':'+p(d.getUTCSeconds())+' UTC';
     n+=1;
-    count.textContent='Verified '+n+'× today';
+    count.textContent=I18N.t('landing.repro.verified',{n:n});
     hash.classList.remove('flash');
     void hash.offsetWidth;
     hash.classList.add('flash');
@@ -829,7 +877,7 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
       emailField.focus();
       emailField.style.outline='2px solid #B3242C';
       emailField.style.outlineOffset='-1px';
-      showFormError('Enter a valid work email address.');
+      showFormError(I18N.t('landing.demo.form.invalidEmail'));
       return;
     }
     var btn=document.getElementById('submitBtn');
@@ -849,7 +897,7 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
       form.style.display='none';
       document.getElementById('confirmBox').style.display='block';
     }).catch(function(){
-      showFormError('Something went wrong — email us at support@cvsprings.com instead.');
+      showFormError(I18N.t('landing.demo.form.failed',{email:'support@cvsprings.com'}));
     }).finally(function(){ btn.disabled=false; });
   });
 })();

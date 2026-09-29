@@ -36,7 +36,9 @@ const INDEX_HTML = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
 const APP_HTML = fs.readFileSync(path.join(PUBLIC_DIR, 'app.html'), 'utf8');
 const BILLING_SRC = fs.readFileSync(path.join(__dirname, 'billing.js'), 'utf8');
 
-const { extractFunction, extractLine } = require('../../test/helpers/pageSandbox');
+const { extractFunction, extractLine, loadI18n } = require('../../test/helpers/pageSandbox');
+const { createDocument, toHtml } = require('../../test/helpers/miniDom');
+const EN = require('../../locales/en.json');
 
 const { marketingView, productJsonLd, PLANS: RAW_PLANS, CURRENCY, TAX } = require('../config/plans');
 const PLANS = marketingView();
@@ -66,17 +68,21 @@ function withoutComments(src) {
 // The pricing-card CTA renderer, run against the real plan table.
 // ---------------------------------------------------------------------------
 
-const ctaSandbox = vm.createContext({});
+// The renderer builds DOM nodes (never an HTML string, since the translation
+// layer), so it runs against a small real DOM and the English dictionary, and
+// the nodes are serialized back to markup for the assertions below.
+const ctaSandbox = vm.createContext({ document: createDocument() });
+loadI18n(ctaSandbox, 'en');
 vm.runInContext([
-  extractFunction(INDEX_HTML, 'esc'),
+  extractFunction(INDEX_HTML, 'el'),
   extractLine(INDEX_HTML, 'var DEMO_HREF='),
   extractLine(INDEX_HTML, 'var SECONDARY_DEMO='),
-  extractFunction(INDEX_HTML, 'ctaHtml'),
+  extractFunction(INDEX_HTML, 'ctaNodes'),
 ].join('\n'), ctaSandbox);
 
 function ctaFor(tier) {
   ctaSandbox.__t = tier;
-  return vm.runInContext('ctaHtml(__t)', ctaSandbox);
+  return toHtml(vm.runInContext('ctaNodes(__t)', ctaSandbox));
 }
 
 describe('pricing cards sell the paid tiers instead of booking a call', () => {
@@ -131,7 +137,9 @@ describe('pricing cards sell the paid tiers instead of booking a call', () => {
   });
 
   test('the top-nav "Book a demo" CTA is untouched', () => {
-    assert.match(INDEX_HTML, /<a class="btn btn-primary nav-cta nav-demo" href="#demo">Book a demo<\/a>/);
+    // Plus its translation key; the English it renders is unchanged.
+    assert.match(INDEX_HTML, /<a class="btn btn-primary nav-cta nav-demo" href="#demo" data-i18n="landing\.nav\.demo">Book a demo<\/a>/);
+    assert.equal(EN['landing.nav.demo'], 'Book a demo');
   });
 });
 
@@ -210,7 +218,8 @@ describe('entitlement is decided before the visitor clicks', () => {
     const fn = extractFunction(INDEX_HTML, 'applyEntitlement');
     assert.match(fn, /role==='owner'/);
     assert.match(fn, /btn\.disabled=true;/);
-    assert.match(fn, /owner can start a subscription/);
+    assert.match(fn, /showMsg\(plan,'pricing\.msg\.ownerOnly',true\)/);
+    assert.match(EN['pricing.msg.ownerOnly'], /owner can start a subscription/);
     // Styled as a note, not as the error it would be after a failed click.
     assert.match(fn, /,true\)/);
   });
@@ -218,7 +227,8 @@ describe('entitlement is decided before the visitor clicks', () => {
   test('the tier an org is already on is labelled, not sold', () => {
     const fn = extractFunction(INDEX_HTML, 'applyEntitlement');
     assert.match(fn, /plan===currentPlan/);
-    assert.match(fn, /Your current plan/);
+    assert.match(fn, /I18N\.t\('pricing\.msg\.currentPlan'\)/);
+    assert.equal(EN['pricing.msg.currentPlan'], 'Your current plan');
   });
 
   test('it fails open, leaving the server-enforced click path in charge', () => {
@@ -410,7 +420,7 @@ describe('no served page hardcodes a price', () => {
     // The button deliberately carries NO qualifier — it would be the second on
     // one card. The price line beside it is the single statement.
     assert.doesNotMatch(INDEX_HTML, /cta-tax/);
-    assert.match(INDEX_HTML, /t\.taxNote\?' <span class="tax">'/);          // card price
+    assert.match(INDEX_HTML, /if\(tier\.taxNote\)\{[\s\S]{0,120}el\('span',\{'class':'tax'\},tier\.taxNote\)/); // card price
     assert.match(APP_HTML, /p\.taxNote\?' <span style="font-weight:400">'/); // settings compare
     assert.match(APP_HTML, /tier\.taxNote\?' <span style="font-weight:400">'/); // detail modal
     assert.match(APP_HTML, /t\.taxNote\?' '\+t\.taxNote:''/);             // quota prompt

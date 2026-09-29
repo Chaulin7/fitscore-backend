@@ -8,7 +8,8 @@
 <link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CVsprings · Candidate Fit Analyzer</title>
+<title data-i18n="common.appTitle">CVsprings · Candidate Fit Analyzer</title>
+__I18N_HEAD__
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -42,6 +43,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .brand-name{font-size:18px;font-weight:800;color:#ffffff;letter-spacing:-.4px;text-shadow:0 0 18px rgba(255,255,255,0.35)}
 .brand-name em{font-style:normal;color:#7dd3fc}
 .topbar-nav{display:flex;gap:2px}
+.topbar-nav .lang-switch--drawer{display:none}
 .nav-btn{
   background:none;border:none;
   color:rgba(255,255,255,0.65);
@@ -1039,6 +1041,9 @@ img, video, table { max-width: 100%; }
       /* The underline marker is centred on the label, which reads as stray on a
          left-aligned full-width drawer row. */
       .topbar-nav.mobile-open .nav-btn.active::after{display:none}
+      /* Language: the bar copy gives way to the drawer copy. */
+      .topbar > .lang-switch{display:none}
+      .topbar-nav.mobile-open .lang-switch--drawer{display:flex}
     }
 </style>
 <!-- Plausible analytics — swap data-domain to your real Plausible site domain when ready -->
@@ -1068,18 +1073,19 @@ img, video, table { max-width: 100%; }
     <img src="/logo.png" alt="">
   </div>
   <div class="splash-brand">CV<em>springs</em></div>
-  <div class="splash-status">Starting up<span class="splash-dots"><span>.</span><span>.</span><span>.</span></span></div>
+  <div class="splash-status"><span data-i18n="auth.splash.starting">Starting up</span><span class="splash-dots"><span>.</span><span>.</span><span>.</span></span></div>
 </div>
 <!-- Auth screen (login / signup / reset) -->
-<div id="authScreen" role="dialog" aria-modal="true" aria-label="Sign in to CVsprings">
-  <a class="auth-brand-wrap" href="/" aria-label="CVsprings home">
+<div id="authScreen" role="dialog" aria-modal="true" aria-label="Sign in to CVsprings" data-i18n-attr="aria-label:auth.dialogLabel">
+  __LANG_SWITCHER_AUTH__
+  <a class="auth-brand-wrap" href="/" aria-label="CVsprings home" data-i18n-attr="aria-label:common.homeLabel">
     <span class="brandmark" aria-hidden="true"></span>
     <div class="splash-brand">CV<em>springs</em></div>
   </a>
   <div class="auth-back-row">
     <a class="auth-back" href="/">
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-      Back to home
+      <span data-i18n="auth.backHome">Back to home</span>
     </a>
   </div>
   <div class="auth-card">
@@ -1090,65 +1096,65 @@ img, video, table { max-width: 100%; }
     <div class="msg msg-ok" id="authNotice" role="status" aria-live="polite"></div>
     <div class="msg msg-err" id="authError" role="alert" aria-live="polite"></div>
     <form id="authLoginForm" autocomplete="on">
-      <h2>Sign in</h2>
-      <input class="text-input" type="email" id="authEmail" placeholder="Email" autocomplete="email" required>
+      <h2 data-i18n="auth.login.title">Sign in</h2>
+      <input class="text-input" type="email" id="authEmail" placeholder="Email" autocomplete="email" required data-i18n-attr="placeholder:auth.field.email;aria-label:auth.field.email">
       <div class="pw-wrap">
-        <input class="text-input" type="password" id="authPassword" placeholder="Password" autocomplete="current-password" required>
+        <input class="text-input" type="password" id="authPassword" placeholder="Password" autocomplete="current-password" required data-i18n-attr="placeholder:auth.field.password;aria-label:auth.field.password">
         <button class="pw-toggle" type="button" data-pw-toggle aria-label="Show password" aria-pressed="false">
           <svg class="pw-ic pw-ic-eye" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
           <svg class="pw-ic pw-ic-eyeoff" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </button>
       </div>
-      <button class="btn btn-primary" type="submit" id="authLoginBtn">Sign in</button>
+      <button class="btn btn-primary" type="submit" id="authLoginBtn" data-i18n="auth.login.submit">Sign in</button>
       <div class="auth-links">
-        <button type="button" class="auth-link" id="authForgotLink">Forgot password?</button>
-        <button type="button" class="auth-link" id="authToSignup">Create an account</button>
+        <button type="button" class="auth-link" id="authForgotLink" data-i18n="auth.login.forgot">Forgot password?</button>
+        <button type="button" class="auth-link" id="authToSignup" data-i18n="auth.login.toSignup">Create an account</button>
       </div>
     </form>
     <form id="authSignupForm" style="display:none">
-      <h2>Create your account</h2>
-      <input class="text-input" type="email" id="suEmail" placeholder="Work email" autocomplete="email" required>
+      <h2 data-i18n="auth.signup.title">Create your account</h2>
+      <input class="text-input" type="email" id="suEmail" placeholder="Work email" autocomplete="email" required data-i18n-attr="placeholder:auth.field.workEmail;aria-label:auth.field.workEmail">
       <div class="pw-wrap">
-        <input class="text-input" type="password" id="suPassword" placeholder="Password (min 10 characters)" autocomplete="new-password" required>
+        <input class="text-input" type="password" id="suPassword" placeholder="Password (min 10 characters)" autocomplete="new-password" required data-i18n-attr="placeholder:auth.field.newPassword;aria-label:auth.field.newPassword">
         <button class="pw-toggle" type="button" data-pw-toggle aria-label="Show password" aria-pressed="false">
           <svg class="pw-ic pw-ic-eye" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
           <svg class="pw-ic pw-ic-eyeoff" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </button>
       </div>
-      <input class="text-input" type="text" id="suOrgName" placeholder="Company / team name" autocomplete="organization">
-      <button class="btn btn-primary" type="submit" id="suCreateBtn">Create account</button>
-      <div class="auth-links"><button type="button" class="auth-link" id="authToLogin">Back to sign in</button></div>
+      <input class="text-input" type="text" id="suOrgName" placeholder="Company / team name" autocomplete="organization" data-i18n-attr="placeholder:auth.field.orgName;aria-label:auth.field.orgName">
+      <button class="btn btn-primary" type="submit" id="suCreateBtn" data-i18n="auth.signup.submit">Create account</button>
+      <div class="auth-links"><button type="button" class="auth-link" id="authToLogin" data-i18n="auth.backToLogin">Back to sign in</button></div>
     </form>
     <form id="authForgotForm" style="display:none">
-      <h2>Reset your password</h2>
-      <p class="auth-note">Enter your email and we&rsquo;ll send you a reset link.</p>
-      <input class="text-input" type="email" id="frEmail" placeholder="Email" autocomplete="email" required>
-      <button class="btn btn-primary" type="submit" id="frSubmitBtn">Send reset link</button>
-      <div class="auth-links"><button type="button" class="auth-link" id="frBackToLogin">Back to sign in</button></div>
+      <h2 data-i18n="auth.forgot.title">Reset your password</h2>
+      <p class="auth-note" data-i18n="auth.forgot.note">Enter your email and we&rsquo;ll send you a reset link.</p>
+      <input class="text-input" type="email" id="frEmail" placeholder="Email" autocomplete="email" required data-i18n-attr="placeholder:auth.field.email;aria-label:auth.field.email">
+      <button class="btn btn-primary" type="submit" id="frSubmitBtn" data-i18n="auth.forgot.submit">Send reset link</button>
+      <div class="auth-links"><button type="button" class="auth-link" id="frBackToLogin" data-i18n="auth.backToLogin">Back to sign in</button></div>
     </form>
     <form id="authResetForm" style="display:none">
-      <h2>Set a new password</h2>
+      <h2 data-i18n="auth.reset.title">Set a new password</h2>
       <div class="pw-wrap">
-        <input class="text-input" type="password" id="rpPassword" placeholder="New password (min 10 characters)" autocomplete="new-password" required>
+        <input class="text-input" type="password" id="rpPassword" placeholder="New password (min 10 characters)" autocomplete="new-password" required data-i18n-attr="placeholder:auth.field.resetPassword;aria-label:auth.field.resetPassword">
         <button class="pw-toggle" type="button" data-pw-toggle aria-label="Show password" aria-pressed="false">
           <svg class="pw-ic pw-ic-eye" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
           <svg class="pw-ic pw-ic-eyeoff" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </button>
       </div>
-      <button class="btn btn-primary" type="submit" id="rpSubmitBtn">Set new password</button>
+      <button class="btn btn-primary" type="submit" id="rpSubmitBtn" data-i18n="auth.reset.submit">Set new password</button>
     </form>
     <form id="authAcceptForm" style="display:none">
-      <h2 id="acceptTitle">Accept invitation</h2>
-      <p class="auth-note" id="acceptNote">Set a password to join your team.</p>
+      <h2 id="acceptTitle" data-i18n="auth.accept.title">Accept invitation</h2>
+      <p class="auth-note" id="acceptNote" data-i18n="auth.accept.note">Set a password to join your team.</p>
       <div class="pw-wrap">
-        <input class="text-input" type="password" id="acceptPassword" placeholder="Choose a password (min 10 characters)" autocomplete="new-password" required>
+        <input class="text-input" type="password" id="acceptPassword" placeholder="Choose a password (min 10 characters)" autocomplete="new-password" required data-i18n-attr="placeholder:auth.field.choosePassword;aria-label:auth.field.choosePassword">
         <button class="pw-toggle" type="button" data-pw-toggle aria-label="Show password" aria-pressed="false">
           <svg class="pw-ic pw-ic-eye" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
           <svg class="pw-ic pw-ic-eyeoff" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </button>
       </div>
-      <button class="btn btn-primary" type="submit" id="acceptBtn">Join</button>
-      <div class="auth-links"><button type="button" class="auth-link" id="acceptToLogin">Back to sign in</button></div>
+      <button class="btn btn-primary" type="submit" id="acceptBtn" data-i18n="auth.accept.submit">Join</button>
+      <div class="auth-links"><button type="button" class="auth-link" id="acceptToLogin" data-i18n="auth.backToLogin">Back to sign in</button></div>
     </form>
   </div>
 </div>
@@ -1185,11 +1191,18 @@ img, video, table { max-width: 100%; }
          hides it by plan. Inside .topbar-nav so it collapses into the drawer
          with the rest; carries no data-tab, so switchTab never sees it. -->
     <button class="nav-btn" id="featureRequestNavBtn" type="button" data-action="openFeatureRequest" title="Suggest an improvement">Suggest</button>
+    <!-- The language switcher's drawer copy. Hidden while the nav is inline
+         (the bar carries its own copy, below); shown inside the mobile drawer,
+         where the bar copy is hidden. Both are the same component — public/
+         i18n.js keeps every switcher on the page in step. -->
+    __LANG_SWITCHER_DRAWER__
   </nav>
   <span class="nav-status-pill" id="navStatusPill" title="Backend status"><span class="dot" id="navStatusDot"></span><span class="conn-label" id="navStatusLabel">Not connected</span></span>
   <button type="button" class="nav-search-btn" id="navSearchBtn" data-action="focusAuditSearch" title="Search audit log" aria-label="Search audit log">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
   </button>
+  <!-- Language: the flag of the active language; opens en/nl/de. -->
+  __LANG_SWITCHER_DARK__
   <!-- Immediately left of the avatar, where it sat relative to the email chip.
        A real <button> on EVERY tier, Free included: the panel behind it is
        where a free org sees what it has and what upgrading buys, where a paid
@@ -1306,6 +1319,20 @@ img, video, table { max-width: 100%; }
   </div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3 style="margin-top:0">Preferences</h3>
+  <!-- Language. Same setting as the flag in the top bar (both go through
+       I18N.setLanguage, and each follows the other). Applies immediately and is
+       saved to the account — it is not part of "Save Settings" below, which
+       stores this browser's defaults. The label is deliberately trilingual:
+       whoever opened the panel in the wrong language can still find it. -->
+  <div class="settings-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 4px">
+    <label for="setLanguage" style="font-size:13px;color:#374151" data-i18n="settings.language.label">Language / Taal / Sprache</label>
+    <select class="text-input" id="setLanguage" data-lang-select data-action="setLanguage" style="width:auto;min-width:150px">
+      <option value="en" lang="en">English</option>
+      <option value="nl" lang="nl">Nederlands</option>
+      <option value="de" lang="de">Deutsch</option>
+    </select>
+  </div>
+  <div style="font-size:11px;color:#6b7280;margin:0 0 10px" data-i18n="settings.language.hint">Changes the interface language right away and is saved to your account.</div>
   <label class="settings-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#374151">
     <input type="checkbox" id="autosaveBatchToggle" data-action="setAutosaveBatch">
     <span>Auto-save batch results to audit log</span>
@@ -1750,6 +1777,7 @@ async function api(path, options = {}) {
       if (res.status === 401 && data && data.code === 'AUTH_REQUIRED') { try { handleUnauthorized(); } catch (_) {} }
       const err = new Error((data && data.error) || ('HTTP ' + res.status));
       err.status = res.status; err.code = data && data.code; err.field = data && data.field;
+      err.reason = data && data.reason; // stable sub-code, for translated messages
       err.lockedUntil = data && data.lockedUntil;
       throw err;
     }
@@ -2004,6 +2032,26 @@ document.addEventListener('keydown', function(e){
   items[next].focus();
 });
 
+// ── UI language ↔ account ───────────────────────────────────────────────────
+// The page arrives already rendered in the language the server chose from the
+// lang cookie / Accept-Language (src/i18n/pages.js). A signed-in account's
+// saved preference outranks both, but the server cannot see the session when
+// it renders the page (the token lives in localStorage), so it is adopted here,
+// behind the splash screen, and the cookie follows — from the next load on the
+// server renders it directly.
+function adoptAccountLanguage(d){
+  const saved = d && d.user && d.user.preferredLanguage;
+  if (saved && saved !== I18N.lang) I18N.setLanguage(saved, { source: 'account' });
+}
+// A change made with the flag menu or the Settings select is saved to the
+// account, so every device follows. Adopting the saved value (source
+// 'account') is not written back.
+I18N.onChange(function(lang, source){
+  if (source !== 'user' || !getSessionToken()) return;
+  api('/api/auth/me', { method: 'PATCH', body: JSON.stringify({ preferredLanguage: lang }) })
+    .catch(function(){ toast(I18N.t('settings.language.saveFailed'), 'error'); });
+});
+
 function onAuthed(d){
   try {
     if (d && d.user && d.user.email) localStorage.setItem(USER_EMAIL_KEY, d.user.email);
@@ -2012,6 +2060,9 @@ function onAuthed(d){
   // Server-computed (config/platformOwner) and deliberately not stored. The
   // owner's address is never sent to a client — only this boolean.
   _isPlatformOwner = !!(d && d.user && d.user.isPlatformOwner);
+  // The account's saved language outranks the cookie and the browser. Guarded:
+  // test sandboxes lift onAuthed() out of this page without the i18n layer.
+  if (typeof adoptAccountLanguage === 'function') adoptAccountLanguage(d);
   updateAccountChip();
   hideAuthScreen();
   initApp();
@@ -2022,7 +2073,7 @@ function onAuthed(d){
 async function doLogin(){
   const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
-  if (!email || !password) { showAuthError('Enter your email and password.'); return; }
+  if (!email || !password) { showAuthError(I18N.t('auth.login.missing')); return; }
   clearAuthError();
   setAuthBusy('authLoginBtn', true);
   try {
@@ -2032,16 +2083,18 @@ async function doLogin(){
     onAuthed(d);
   } catch (e) {
     if (e && e.code === 'ACCOUNT_LOCKED') {
-      var when = '';
+      var until = null;
       try {
         if (e.lockedUntil) {
           var dt = new Date(e.lockedUntil);
-          if (!isNaN(dt.getTime())) when = ' until ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          if (!isNaN(dt.getTime())) until = I18N.formatTime(dt);
         }
       } catch (_) {}
-      showAuthError('Too many failed sign-in attempts — this account is locked' + when + '. Try again later or reset your password with “Forgot password?”.');
+      showAuthError(until
+        ? I18N.t('auth.login.lockedUntil', { time: until })
+        : I18N.t('auth.login.locked'));
     } else {
-      showAuthError(e.message || 'Login failed. Please try again.');
+      showAuthError(I18N.errorMessage(e, 'auth.login.failed'));
     }
   } finally {
     setAuthBusy('authLoginBtn', false);
@@ -2052,7 +2105,7 @@ async function doSignup(){
   const email = document.getElementById('suEmail').value.trim();
   const password = document.getElementById('suPassword').value;
   const orgName = document.getElementById('suOrgName').value.trim();
-  if (!email || !password) { showAuthError('Enter an email and a password (min 10 characters).'); return; }
+  if (!email || !password) { showAuthError(I18N.t('auth.signup.missing')); return; }
   clearAuthError();
   setAuthBusy('suCreateBtn', true);
   try {
@@ -2067,7 +2120,7 @@ async function doSignup(){
     document.getElementById('suPassword').value = '';
     onAuthed(d);
   } catch (e) {
-    showAuthError(e.message || 'Could not create the account.');
+    showAuthError(I18N.errorMessage(e, 'auth.signup.failed'));
   } finally {
     setAuthBusy('suCreateBtn', false);
   }
@@ -2075,14 +2128,14 @@ async function doSignup(){
 
 async function doForgotRequest(){
   const email = document.getElementById('frEmail').value.trim();
-  if (!email) { showAuthError('Enter your email address.'); return; }
+  if (!email) { showAuthError(I18N.t('auth.forgot.missing')); return; }
   clearAuthError();
   setAuthBusy('frSubmitBtn', true);
   try {
     await api('/api/auth/request-reset', { method: 'POST', body: JSON.stringify({ email }) });
-    showAuthError('If an account exists for that email, a reset link is on its way.', 'ok');
+    showAuthError(I18N.t('auth.forgot.sent'), 'ok');
   } catch (e) {
-    showAuthError(e.message || 'Could not request a reset link.');
+    showAuthError(I18N.errorMessage(e, 'auth.forgot.failed'));
   } finally {
     setAuthBusy('frSubmitBtn', false);
   }
@@ -2090,7 +2143,7 @@ async function doForgotRequest(){
 
 async function doResetPassword(){
   const newPassword = document.getElementById('rpPassword').value;
-  if (!newPassword) { showAuthError('Enter a new password (min 10 characters).'); return; }
+  if (!newPassword) { showAuthError(I18N.t('auth.reset.missing')); return; }
   clearAuthError();
   setAuthBusy('rpSubmitBtn', true);
   try {
@@ -2103,9 +2156,9 @@ async function doResetPassword(){
       history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
     } catch (_) {}
     setAuthMode('login');
-    showAuthError('Password updated — please sign in.', 'ok');
+    showAuthError(I18N.t('auth.reset.done'), 'ok');
   } catch (e) {
-    showAuthError(e.message || 'Could not reset the password.');
+    showAuthError(I18N.errorMessage(e, 'auth.reset.failed'));
   } finally {
     setAuthBusy('rpSubmitBtn', false);
   }
@@ -2113,7 +2166,7 @@ async function doResetPassword(){
 
 async function doAcceptInvite(){
   const password = document.getElementById('acceptPassword').value;
-  if (!password) { showAuthError('Choose a password (min 10 characters).'); return; }
+  if (!password) { showAuthError(I18N.t('auth.accept.missing')); return; }
   clearAuthError();
   setAuthBusy('acceptBtn', true);
   try {
@@ -2128,7 +2181,11 @@ async function doAcceptInvite(){
     } catch (_) {}
     onAuthed(d);
   } catch (e) {
-    showAuthError(e.message || 'Could not accept the invitation.');
+    // Two codes mean something specific on THIS screen (the org behind the
+    // invite, not the reader's own access), so they get their own wording.
+    if (e && e.code === 'SEAT_LIMIT') showAuthError(I18N.t('auth.accept.seatLimit'));
+    else if (e && e.code === 'TEAM_PLAN_REQUIRED') showAuthError(I18N.t('auth.accept.teamPlan'));
+    else showAuthError(I18N.errorMessage(e, 'auth.accept.failed'));
   } finally {
     setAuthBusy('acceptBtn', false);
   }
@@ -3114,9 +3171,11 @@ async function bootAuth(){
     if (described && described.valid) {
       _pendingTrialToken = trialToken;
       showAuthScreen('signup');
+      // companyName is data: t() interpolates it as text and showAuthNotice
+      // sets textContent, so a name can never become markup.
       showAuthNotice(described.companyName
-        ? `Finishing setup for ${described.companyName}. Your trial is already running — create a login to open it.`
-        : 'Your trial is already running — create a login to open it.');
+        ? I18N.t('auth.trial.finishingFor', { company: described.companyName })
+        : I18N.t('auth.trial.running'));
       const emailField = document.getElementById('suEmail');
       if (emailField && described.email && !emailField.value) emailField.value = described.email;
       return;
@@ -3130,10 +3189,9 @@ async function bootAuth(){
   //     lapsed trial that needs a card before it works again.
   const trialState = params && params.get('trial');
   if (trialState === 'existing_account') {
-    showAuthNotice('You already have a CVsprings account, and this trial is on it. Sign in to continue.');
+    showAuthNotice(I18N.t('auth.trial.existingAccount'));
   } else if (trialState === 'resume') {
-    showAuthNotice('Your CVsprings account is here and your data is intact — your trial ended without a '
-      + 'payment method, so it is paused. Sign in, then add a card in Billing to pick up where you left off.');
+    showAuthNotice(I18N.t('auth.trial.resume'));
   }
 
   // 1) Arriving from a password-reset email link
@@ -5353,6 +5411,9 @@ document.addEventListener('keydown', function(e){
     if (fq && fq.classList.contains('open')) return;
     var tag = document.activeElement.tagName.toLowerCase();
     if (tag === 'textarea' || tag === 'input' || tag === 'select') return;
+    // Enter on the language switcher opens it / picks a language (public/
+    // i18n.js); it must not start an analysis behind the menu.
+    if (document.activeElement.closest && document.activeElement.closest('[data-lang-switch]')) return;
     var btn = document.getElementById('analyzeBtn');
     if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
   }
@@ -5521,7 +5582,7 @@ Object.keys(delegatedHandlers).forEach(function(eventType){
     setHidden(slashed, !hidden); // slashed eye shows WHILE the password is hidden
     setHidden(plain, hidden);    // plain eye shows ONCE the password is visible
     btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
-    btn.setAttribute('aria-label', hidden ? 'Show password' : 'Hide password');
+    btn.setAttribute('aria-label', I18N.t(hidden ? 'auth.password.show' : 'auth.password.hide'));
   }
 
   Array.prototype.forEach.call(document.querySelectorAll('.pw-toggle[data-pw-toggle]'), function(btn){
@@ -5533,6 +5594,9 @@ Object.keys(delegatedHandlers).forEach(function(eventType){
       input.type = input.type === 'password' ? 'text' : 'password';
       sync(btn);
     });
+    // The label depends on state, so a language switch re-derives it rather
+    // than re-applying a fixed key.
+    I18N.onChange(function(){ sync(btn); });
   });
 })();
 </script>

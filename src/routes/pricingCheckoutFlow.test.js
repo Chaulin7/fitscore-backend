@@ -37,7 +37,7 @@ const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  extractFunction, scriptBlockContaining, makeDom, recordingFetch,
+  extractFunction, scriptBlockContaining, makeDom, recordingFetch, loadI18n,
 } = require('../../test/helpers/pageSandbox');
 
 const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'cvsprings-checkout-e2e-'));
@@ -149,6 +149,8 @@ function landingPage(sessionToken) {
     CustomEvent: dom.CustomEvent, fetch: http,
     console, setTimeout, encodeURIComponent, URL, URLSearchParams, Promise, Error, Object, Array, JSON,
   });
+  // The page's messages come from the translation runtime (English here).
+  loadI18n(ctx, 'en');
   vm.runInContext(checkoutBlock, ctx);
 
   // The CTA buttons the card renderer emits, with the attributes it gives them.

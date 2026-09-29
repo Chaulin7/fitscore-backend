@@ -8,7 +8,8 @@
 <link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CVsprings · EU AI Act Compliance</title>
+<title data-i18n="compliance.meta.title">CVsprings · EU AI Act Compliance</title>
+__I18N_HEAD__
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -56,29 +57,46 @@ td:first-child{font-weight:600;color:#0f2847;white-space:nowrap}
 .site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
 .site-footer a{color:#93c5fd}
 @media(max-width:640px){.topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}td:first-child{white-space:normal}}
+/* Phone: brand and language flag share the first row; the page links wrap
+   onto the rows below. As one fixed-height row the bar ran off-screen at
+   375px (it already did before the flag was added). */
+@media(max-width:640px){
+  .topbar{flex-wrap:wrap;height:auto;min-height:60px;padding:6px 14px;gap:2px 4px}
+  .topbar > .lang-switch{order:1}
+  .topbar::after{content:"";order:1;flex-basis:100%;height:0}
+  .topbar .nav-btn{order:2;padding:6px 10px}
+}
 </style>
 </head>
 <body>
 <div class="topbar">
-  <a class="topbar-brand" href="/">
+  <a class="topbar-brand" href="/" aria-label="CVsprings home" data-i18n-attr="aria-label:common.homeLabel">
     <img class="brandmark" src="/brandmark-white.svg" alt="" width="50" height="50">
     <span class="brand-name">CV<em>springs</em></span>
   </a>
-  <a class="nav-btn" href="/login">App</a>
-  <a class="nav-btn" href="/bias-report.html">Bias &amp; Monitoring</a>
-  <a class="nav-btn" href="/privacy.html">Privacy</a>
-  <a class="nav-btn" href="/terms.html">Terms</a>
-  <a class="nav-btn" href="/integrations.html">Integrations</a>
+  <a class="nav-btn" href="/login" data-i18n="common.nav.app">App</a>
+  <a class="nav-btn" href="/bias-report.html" data-i18n="common.nav.bias">Bias &amp; Monitoring</a>
+  <a class="nav-btn" href="/privacy.html" data-i18n="common.nav.privacy">Privacy</a>
+  <a class="nav-btn" href="/terms.html" data-i18n="common.nav.terms">Terms</a>
+  <a class="nav-btn" href="/integrations.html" data-i18n="common.nav.integrations">Integrations</a>
+  __LANG_SWITCHER_DARK__
 </div>
 
+<!-- TODO(i18n-legal): the BODY of this page is regulatory prose (EU AI Act
+     obligations, dates, what the product claims to do) and is deliberately NOT
+     translated. Only the shell is: top bar, footer, title, the Copy buttons,
+     and the notice below that says so. Each English block carries lang="en"
+     so screen readers keep pronouncing it as English inside a nl/de page.
+     Translate the body only from a reviewed legal translation. -->
 <div class="page">
-  <div class="hero">
+  __I18N_ENGLISH_ONLY__
+  <div class="hero" lang="en">
     <div class="tag">EU AI Act &middot; High-risk AI (Annex III, point 4)</div>
     <h1>How CVsprings approaches the EU AI Act</h1>
     <p>AI systems used for recruitment and candidate filtering are classified as <strong>high-risk</strong> under Annex III, point 4 of the EU AI Act. Provider obligations (Articles 9&ndash;15) apply from <strong>2 December 2027</strong>. CVsprings is building toward full conformity ahead of that date: the features and documents on this page describe what the product does today, and what remains in progress.</p>
   </div>
 
-  <div class="card">
+  <div class="card" lang="en">
     <div class="card-head"><span class="card-title">What this means in practice</span></div>
     <div class="card-body">
       <p>CVsprings is an advisory candidate-fit scoring tool. It produces scores that support a recruiter's screening work; it never makes or executes a hiring decision. Our design approach maps each relevant AI Act obligation to a concrete product behaviour &mdash; the table below lists only what is actually implemented.</p>
@@ -86,7 +104,7 @@ td:first-child{font-weight:600;color:#0f2847;white-space:nowrap}
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" lang="en">
     <div class="card-head"><span class="card-title">Feature &rarr; obligation mapping</span></div>
     <table>
       <thead><tr><th>Obligation</th><th>What CVsprings does today</th></tr></thead>
@@ -119,7 +137,7 @@ td:first-child{font-weight:600;color:#0f2847;white-space:nowrap}
     </table>
   </div>
 
-  <div class="card">
+  <div class="card" lang="en">
     <div class="card-head"><span class="card-title">What we provide to clients</span></div>
     <div class="card-body">
       <p>Alongside the in-product features, CVsprings maintains a compliance document pack for clients and their advisers:</p>
@@ -134,29 +152,29 @@ td:first-child{font-weight:600;color:#0f2847;white-space:nowrap}
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">Candidate notice template</span></div>
+    <div class="card-head" lang="en"><span class="card-title">Candidate notice template</span></div>
     <div class="card-body">
-      <p>Clients can paste this into job postings or applicant communications to meet their own transparency duties:</p>
+      <p lang="en">Clients can paste this into job postings or applicant communications to meet their own transparency duties:</p>
       <div class="notice-box">
-        <div class="notice-lang">English</div>
-        <button class="copy-btn" type="button" data-action="copyNotice" data-target="noticeEn">Copy</button>
-        <span id="noticeEn">As part of our selection process, applications may be assessed with the support of an AI-based tool (CVsprings) that compares CV content against the job requirements. The tool produces an advisory score only; all decisions are made by our recruiters. You may request information about this process or ask for a human-only review by contacting us.</span>
+        <div class="notice-lang" lang="en">English</div>
+        <button class="copy-btn" type="button" data-action="copyNotice" data-target="noticeEn" data-i18n="compliance.copy">Copy</button>
+        <span id="noticeEn" lang="en">As part of our selection process, applications may be assessed with the support of an AI-based tool (CVsprings) that compares CV content against the job requirements. The tool produces an advisory score only; all decisions are made by our recruiters. You may request information about this process or ask for a human-only review by contacting us.</span>
       </div>
       <div class="notice-box">
-        <div class="notice-lang">Nederlands</div>
-        <button class="copy-btn" type="button" data-action="copyNotice" data-target="noticeNl">Copy</button>
-        <span id="noticeNl">Als onderdeel van onze selectieprocedure kunnen sollicitaties worden beoordeeld met ondersteuning van een AI-tool (CVsprings) die de inhoud van het cv vergelijkt met de functie-eisen. De tool geeft uitsluitend een adviserende score; alle beslissingen worden genomen door onze recruiters. U kunt informatie over dit proces opvragen of verzoeken om een beoordeling door uitsluitend een mens door contact met ons op te nemen.</span>
+        <div class="notice-lang" lang="nl">Nederlands</div>
+        <button class="copy-btn" type="button" data-action="copyNotice" data-target="noticeNl" data-i18n="compliance.copy">Copy</button>
+        <span id="noticeNl" lang="nl">Als onderdeel van onze selectieprocedure kunnen sollicitaties worden beoordeeld met ondersteuning van een AI-tool (CVsprings) die de inhoud van het cv vergelijkt met de functie-eisen. De tool geeft uitsluitend een adviserende score; alle beslissingen worden genomen door onze recruiters. U kunt informatie over dit proces opvragen of verzoeken om een beoordeling door uitsluitend een mens door contact met ons op te nemen.</span>
       </div>
     </div>
   </div>
 
-  <div class="disclaimer">
+  <div class="disclaimer" lang="en">
     This page describes CVsprings&rsquo; design approach and is not legal advice. Formal conformity assessment is in progress toward the December 2027 deadline.
   </div>
 </div>
 
 <footer class="site-footer">
-  CVsprings &mdash; AI-powered candidate fit analysis &nbsp;&middot;&nbsp; <a href="/login">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/bias-report.html">Bias &amp; monitoring</a> &nbsp;&middot;&nbsp; <a href="/privacy.html">Privacy Policy</a> &nbsp;&middot;&nbsp; <a href="/terms.html">Terms</a> &nbsp;&middot;&nbsp; <a href="/integrations.html">Integrations</a>
+  <span data-i18n="common.footer.product">CVsprings &mdash; AI-powered candidate fit analysis</span> &nbsp;&middot;&nbsp; <a href="/login" data-i18n="common.footer.backToApp">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/bias-report.html" data-i18n="common.footer.bias">Bias &amp; monitoring</a> &nbsp;&middot;&nbsp; <a href="/privacy.html" data-i18n="common.footer.privacyPolicy">Privacy Policy</a> &nbsp;&middot;&nbsp; <a href="/terms.html" data-i18n="common.nav.terms">Terms</a> &nbsp;&middot;&nbsp; <a href="/integrations.html" data-i18n="common.nav.integrations">Integrations</a>
   <br>__LEGAL_FOOTER__
 </footer>
 
@@ -172,7 +190,7 @@ function copyNotice(el){
   var text = document.getElementById(el.dataset.target).textContent;
   function done(ok){
     var prev = btn.textContent;
-    btn.textContent = ok ? 'Copied!' : 'Copy failed';
+    btn.textContent = I18N.t(ok ? 'compliance.copied' : 'compliance.copyFailed');
     setTimeout(function(){ btn.textContent = prev; }, 1800);
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
