@@ -30,6 +30,7 @@ const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulSh
 const { startProvenanceSweep } = require('./services/provenanceCache');
 const { startMetricsSnapshotSchedule } = require('./services/metricsSchedule');
 const { mutationLimiter } = require('./middleware/rateLimits');
+const { createPages } = require('./i18n/pages');
 const { requireWriteAccess } = require('./middleware/requireWriteAccess');
 
 // Optional pino logger (graceful fallback if not installed yet)
@@ -191,10 +192,13 @@ app.get('/eu-ai-act-checklist.pdf', (req, res) => {
 // __CSP_NONCE__ placeholder that must be replaced with the per-request nonce
 // so the tag matches the CSP header of the same response. Read once at
 // startup (they're static templates — no per-request disk I/O) and served
-// with Cache-Control: no-store, because a cached page would hold a stale
-// nonce that no longer matches the fresh CSP header. These routes are
-// registered BEFORE express.static, and static gets index:false, so the raw
-// placeholder files are never reachable (neither via / nor /index.html).
+// with Cache-Control: private, no-store, because a cached page would hold a
+// stale nonce that no longer matches the fresh CSP header — and, since the UI
+// languages, because the same URL answers in the visitor's language (see
+// src/i18n/pages.js, which also sends Vary: Cookie, Accept-Language). These
+// routes are registered BEFORE express.static, and static gets index:false,
+// so the raw placeholder files are never reachable (neither via / nor
+// /index.html).
 const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html'];
 // Pricing structured data is substituted ONCE at startup, not per request: the
 // tier table is static per deploy (same reasoning as the cached PAYLOAD in
@@ -271,12 +275,13 @@ for (const page of HTML_PAGES) {
   }
   htmlTemplates[page] = html;
 }
+// UI languages: every page above is pre-rendered once per language (en, nl,
+// de) from these templates — see src/i18n/pages.js for how a request's
+// language is chosen and why the headers are what they are. Terms and Privacy
+// stay English until a reviewed translation exists.
+const pages = createPages(htmlTemplates, { log: logger ? (m) => logger.warn(m) : (m) => console.warn(m) });
 function serveNoncedHtml(page) {
-  return (req, res) => {
-    res.set('Content-Type', 'text/html; charset=utf-8');
-    res.set('Cache-Control', 'no-store');
-    res.send(htmlTemplates[page].replaceAll('__CSP_NONCE__', res.locals.cspNonce));
-  };
+  return pages.serve(page);
 }
 // Routing: "/" is the marketing landing page (index.html); the product app
 // serves app.html at three paths, because the SPA decides its own mode from the
@@ -315,6 +320,9 @@ app.get('/demo-transcript', serveNoncedHtml('demo-transcript.html'));
 for (const page of HTML_PAGES) {
   app.get('/' + page, serveNoncedHtml(page));
 }
+// /nl/… and /de/… variants of the public pages, and /locales/{lang}.json for a
+// live language switch in the app.
+app.use(pages.router);
 // Demo video + poster, content-hashed and cached for a year. MUST be mounted
 // before express.static: static would answer these paths first and stamp
 // Cache-Control: public, max-age=0 on a 3.9 MB file for every page view.

@@ -8,7 +8,8 @@
 <link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CVsprings · Bias &amp; Monitoring</title>
+<title data-i18n="bias.meta.title">CVsprings · Bias &amp; Monitoring</title>
+__I18N_HEAD__
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -54,100 +55,110 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .skel{color:transparent;background:linear-gradient(90deg,rgba(0,0,0,0.05),rgba(0,0,0,0.12),rgba(0,0,0,0.05));background-size:200% 100%;animation:skel 1.2s ease-in-out infinite;border-radius:6px}
 @keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @media(max-width:640px){.topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}}
+/* Phone: brand and language flag share the first row; the page links wrap
+   onto the rows below. As one fixed-height row the bar ran off-screen at
+   375px (it already did before the flag was added). */
+@media(max-width:640px){
+  .topbar{flex-wrap:wrap;height:auto;min-height:60px;padding:6px 14px;gap:2px 4px}
+  .topbar > .lang-switch{order:1}
+  .topbar::after{content:"";order:1;flex-basis:100%;height:0}
+  .topbar .nav-btn{order:2;padding:6px 10px}
+}
 </style>
 </head>
 <body>
 <div class="topbar">
-  <a class="topbar-brand" href="/">
+  <a class="topbar-brand" href="/" aria-label="CVsprings home" data-i18n-attr="aria-label:common.homeLabel">
     <img class="brandmark" src="/brandmark-white.svg" alt="" width="50" height="50">
     <span class="brand-name">CV<em>springs</em></span>
   </a>
-  <a class="nav-btn" href="/login">App</a>
-  <a class="nav-btn" href="/compliance.html">EU AI Act</a>
+  <a class="nav-btn" href="/login" data-i18n="common.nav.app">App</a>
+  <a class="nav-btn" href="/compliance.html" data-i18n="common.nav.euAiAct">EU AI Act</a>
+  __LANG_SWITCHER_DARK__
 </div>
 
 <div class="page">
   <div class="hero">
-    <h1>Bias &amp; monitoring</h1>
-    <p>This page explains exactly how CVsprings produces its scores, the design choices that reduce bias risk, the limitations we know about, and a live view of scoring consistency computed from your own organization&rsquo;s audit data.</p>
+    <h1 data-i18n="bias.hero.title">Bias &amp; monitoring</h1>
+    <p data-i18n="bias.hero.lede">This page explains exactly how CVsprings produces its scores, the design choices that reduce bias risk, the limitations we know about, and a live view of scoring consistency computed from your own organization&rsquo;s audit data.</p>
   </div>
 
   <!-- 1. Methodology -->
   <div class="card">
-    <div class="card-head"><span class="card-title">1 &middot; How scores are produced</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="bias.method.title">1 &middot; How scores are produced</span></div>
     <div class="card-body">
-      <p>CVsprings uses a <strong>deterministic, rule-based matching engine</strong> &mdash; not a machine-learning model. The same input always produces the same score, and the same rules are applied identically to every CV. The pipeline:</p>
+      <p data-i18n-html="bias.method.intro_html">CVsprings uses a <strong>deterministic, rule-based matching engine</strong> &mdash; not a machine-learning model. The same input always produces the same score, and the same rules are applied identically to every CV. The pipeline:</p>
       <ol>
-        <li><strong>Text extraction.</strong> Plain text is extracted from the uploaded PDF or DOCX. Images &mdash; including photos &mdash; are never extracted or processed; scanned image-only CVs are rejected with an error rather than scored.</li>
-        <li><strong>Four sub-scores</strong>, each computed by transparent rules:</li>
+        <li data-i18n-html="bias.method.extraction_html"><strong>Text extraction.</strong> Plain text is extracted from the uploaded PDF or DOCX. Images &mdash; including photos &mdash; are never extracted or processed; scanned image-only CVs are rejected with an error rather than scored.</li>
+        <li data-i18n-html="bias.method.subscores_html"><strong>Four sub-scores</strong>, each computed by transparent rules:</li>
       </ol>
       <div class="pill-row">
-        <span class="pill">Keywords</span><span class="pill">Skills</span><span class="pill">Experience</span><span class="pill">Education</span>
+        <span class="pill" data-i18n="common.dimension.keywords">Keywords</span><span class="pill" data-i18n="common.dimension.skills">Skills</span><span class="pill" data-i18n="common.dimension.experience">Experience</span><span class="pill" data-i18n="common.dimension.education">Education</span>
       </div>
       <ul>
-        <li><strong>Keywords</strong> &mdash; the 40 most frequent meaningful words and word pairs are extracted from your job description (common stop-words removed) and looked up in the CV text; the score is the percentage found.</li>
-        <li><strong>Skills</strong> &mdash; a curated list of 168 named skills is checked against the job description; those the JD mentions are then looked up in the CV; the score is the percentage matched (a neutral 50 is used when the JD names none of the listed skills).</li>
-        <li><strong>Experience</strong> &mdash; patterns such as &ldquo;7 years of experience&rdquo; and seniority words (director, principal, lead, senior, junior&hellip;) are detected in both texts and compared, producing a heuristic 0&ndash;100 value.</li>
-        <li><strong>Education</strong> &mdash; the highest qualification keyword found (PhD &gt; Master &gt; Bachelor &gt; diploma/certificate) is compared between CV and JD requirements.</li>
+        <li data-i18n-html="bias.method.keywords_html"><strong>Keywords</strong> &mdash; the 40 most frequent meaningful words and word pairs are extracted from your job description (common stop-words removed) and looked up in the CV text; the score is the percentage found.</li>
+        <li data-i18n-html="bias.method.skills_html"><strong>Skills</strong> &mdash; a curated list of 168 named skills is checked against the job description; those the JD mentions are then looked up in the CV; the score is the percentage matched (a neutral 50 is used when the JD names none of the listed skills).</li>
+        <li data-i18n-html="bias.method.experience_html"><strong>Experience</strong> &mdash; patterns such as &ldquo;7 years of experience&rdquo; and seniority words (director, principal, lead, senior, junior&hellip;) are detected in both texts and compared, producing a heuristic 0&ndash;100 value.</li>
+        <li data-i18n-html="bias.method.education_html"><strong>Education</strong> &mdash; the highest qualification keyword found (PhD &gt; Master &gt; Bachelor &gt; diploma/certificate) is compared between CV and JD requirements.</li>
       </ul>
-      <p>The <strong>overall score</strong> is the weighted average of the four sub-scores using the weights you set (default 40/30/20/10); the verdict bands (&ldquo;Excellent/Good/Partial/Poor Match&rdquo;) are fixed thresholds on that number. Each saved record stores the weights and the scoring-engine version used, so any score can be reconstructed later.</p>
-      <h4>What Anonymize removes</h4>
-      <p>When the Anonymize toggle is on, the following are stripped from the CV text <em>before</em> scoring:</p>
-      <div class="strip-list">
+      <p data-i18n-html="bias.method.overall_html">The <strong>overall score</strong> is the weighted average of the four sub-scores using the weights you set (default 40/30/20/10); the verdict bands (&ldquo;Excellent/Good/Partial/Poor Match&rdquo;) are fixed thresholds on that number. Each saved record stores the weights and the scoring-engine version used, so any score can be reconstructed later.</p>
+      <h4 data-i18n="bias.anon.title">What Anonymize removes</h4>
+      <p data-i18n-html="bias.anon.intro_html">When the Anonymize toggle is on, the following are stripped from the CV text <em>before</em> scoring:</p>
+      <div class="strip-list" data-i18n-html="bias.anon.list_html">
         <strong>Removed:</strong> email addresses &middot; phone numbers &middot; URLs (incl. social profiles) &middot; address-like lines (street number + street word) &middot; standalone year numbers 1940&ndash;2015 (birth-year range) &middot; standalone name lines (2&ndash;4 capitalized words on their own line). Photos are never processed regardless of this setting, because only text is extracted.
       </div>
-      <p>Anonymize is a text-level filter with known gaps &mdash; see the limitations section below for what it <em>cannot</em> remove.</p>
+      <p data-i18n-html="bias.anon.gaps_html">Anonymize is a text-level filter with known gaps &mdash; see the limitations section below for what it <em>cannot</em> remove.</p>
     </div>
   </div>
 
   <!-- 2. Design mitigations -->
   <div class="card">
-    <div class="card-head"><span class="card-title">2 &middot; Design mitigations</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="bias.mitigations.title">2 &middot; Design mitigations</span></div>
     <div class="card-body">
       <ul>
-        <li><strong>No demographic inputs.</strong> CVsprings does not ask for, collect, or use any demographic data (gender, ethnicity, age, disability status) anywhere in the product.</li>
-        <li><strong>Identical treatment within a batch.</strong> Every CV in a batch is scored with the same extraction rules, the same job description, and the same weights &mdash; there is no per-candidate variation in how the engine behaves.</li>
-        <li><strong>Anonymization option</strong> to strip contact details and name lines before scoring (see above for exactly what is removed).</li>
-        <li><strong>Human decision requirement.</strong> No score is ever converted into a decision automatically. Decisions (shortlist / hold / reject) exist only as explicit recruiter input, and each saved record attributes its review to the signed-in user.</li>
-        <li><strong>Immutable records.</strong> Scores, weights and provenance fields cannot be edited after a record is saved; only the recruiter&rsquo;s decision and note can change, and changes are kept in an append-only history.</li>
+        <li data-i18n-html="bias.mitigations.demographics_html"><strong>No demographic inputs.</strong> CVsprings does not ask for, collect, or use any demographic data (gender, ethnicity, age, disability status) anywhere in the product.</li>
+        <li data-i18n-html="bias.mitigations.identical_html"><strong>Identical treatment within a batch.</strong> Every CV in a batch is scored with the same extraction rules, the same job description, and the same weights &mdash; there is no per-candidate variation in how the engine behaves.</li>
+        <li data-i18n-html="bias.mitigations.anonymize_html"><strong>Anonymization option</strong> to strip contact details and name lines before scoring (see above for exactly what is removed).</li>
+        <li data-i18n-html="bias.mitigations.human_html"><strong>Human decision requirement.</strong> No score is ever converted into a decision automatically. Decisions (shortlist / hold / reject) exist only as explicit recruiter input, and each saved record attributes its review to the signed-in user.</li>
+        <li data-i18n-html="bias.mitigations.immutable_html"><strong>Immutable records.</strong> Scores, weights and provenance fields cannot be edited after a record is saved; only the recruiter&rsquo;s decision and note can change, and changes are kept in an append-only history.</li>
       </ul>
     </div>
   </div>
 
   <!-- 3. Known limitations -->
   <div class="card">
-    <div class="card-head"><span class="card-title">3 &middot; Known limitations</span></div>
+    <div class="card-head"><span class="card-title" data-i18n="bias.limits.title">3 &middot; Known limitations</span></div>
     <div class="card-body">
-      <p>We list these candidly because deployers need them to use the tool responsibly:</p>
+      <p data-i18n="bias.limits.intro">We list these candidly because deployers need them to use the tool responsibly:</p>
       <ul>
-        <li><strong>Vocabulary sensitivity.</strong> The engine matches words, not meaning. A candidate who describes the right experience in different words than the job description scores lower than one who mirrors the JD&rsquo;s vocabulary. Non-native phrasing or unconventional CV styles can be penalized for the same reason.</li>
-        <li><strong>Scores vary with JD wording.</strong> Because keywords are extracted from the job description by frequency, rephrasing the JD changes the keyword set and therefore the scores. Compare candidates only within the same JD and weights.</li>
-        <li><strong>Anonymization cannot remove all proxies.</strong> University names, employer names, club memberships, languages, employment gaps, names mentioned mid-sentence, and other indirect signals remain in the text and can correlate with protected characteristics.</li>
-        <li><strong>Anonymize can remove legitimate data.</strong> The birth-year filter (1940&ndash;2015) also removes ordinary dates in that range &mdash; e.g. an older graduation year &mdash; which can slightly change the experience signal for the same CV.</li>
-        <li><strong>Heuristic experience/education detection.</strong> Years of experience and qualifications are detected by text patterns; unusual formats can be missed. Verify tenure and qualifications in interviews rather than relying on the sub-scores.</li>
-        <li><strong>No outcome-level bias detection.</strong> CVsprings does not collect demographic data, so it cannot measure whether outcomes differ across demographic groups. <strong>We recommend that clients periodically review their decision outcomes</strong> against their own equality-monitoring data and processes.</li>
+        <li data-i18n-html="bias.limits.vocabulary_html"><strong>Vocabulary sensitivity.</strong> The engine matches words, not meaning. A candidate who describes the right experience in different words than the job description scores lower than one who mirrors the JD&rsquo;s vocabulary. Non-native phrasing or unconventional CV styles can be penalized for the same reason.</li>
+        <li data-i18n-html="bias.limits.jdWording_html"><strong>Scores vary with JD wording.</strong> Because keywords are extracted from the job description by frequency, rephrasing the JD changes the keyword set and therefore the scores. Compare candidates only within the same JD and weights.</li>
+        <li data-i18n-html="bias.limits.proxies_html"><strong>Anonymization cannot remove all proxies.</strong> University names, employer names, club memberships, languages, employment gaps, names mentioned mid-sentence, and other indirect signals remain in the text and can correlate with protected characteristics.</li>
+        <li data-i18n-html="bias.limits.overStrip_html"><strong>Anonymize can remove legitimate data.</strong> The birth-year filter (1940&ndash;2015) also removes ordinary dates in that range &mdash; e.g. an older graduation year &mdash; which can slightly change the experience signal for the same CV.</li>
+        <li data-i18n-html="bias.limits.heuristic_html"><strong>Heuristic experience/education detection.</strong> Years of experience and qualifications are detected by text patterns; unusual formats can be missed. Verify tenure and qualifications in interviews rather than relying on the sub-scores.</li>
+        <li data-i18n-html="bias.limits.outcomes_html"><strong>No outcome-level bias detection.</strong> CVsprings does not collect demographic data, so it cannot measure whether outcomes differ across demographic groups. <strong>We recommend that clients periodically review their decision outcomes</strong> against their own equality-monitoring data and processes.</li>
       </ul>
-      <div class="warn-box">A high or low score is a signal about text similarity to the job description &mdash; it is not a verdict on the person. Always review the underlying CV before acting on a score.</div>
+      <div class="warn-box" data-i18n="bias.limits.warning">A high or low score is a signal about text similarity to the job description &mdash; it is not a verdict on the person. Always review the underlying CV before acting on a score.</div>
     </div>
   </div>
 
   <!-- 4. Monitoring (auth-gated) -->
   <div class="card" id="monitoringCard">
-    <div class="card-head"><span class="card-title">4 &middot; Scoring consistency in your organization</span></div>
-    <div id="monitoringSignin" class="signin-note">Sign in via the <a href="/login" style="color:#0f2847">main app</a> to view monitoring data computed from your organization&rsquo;s own audit records.</div>
+    <div class="card-head"><span class="card-title" data-i18n="bias.monitor.title">4 &middot; Scoring consistency in your organization</span></div>
+    <div id="monitoringSignin" class="signin-note" data-i18n-html="bias.monitor.signin_html">Sign in via the <a href="/login" style="color:#0f2847">main app</a> to view monitoring data computed from your organization&rsquo;s own audit records.</div>
     <div class="card-body" id="monitoringBody" style="display:none">
-      <div class="mon-note"><strong>What this shows:</strong> scoring consistency within your own audit data &mdash; how scores are distributed per role and how your team&rsquo;s shortlist decisions relate to score bands. <strong>It is not a demographic bias audit &mdash; CVsprings does not collect demographic data.</strong></div>
-      <div id="monitoringContent"><div class="skel" style="height:120px">Loading&hellip;</div></div>
+      <div class="mon-note" data-i18n-html="bias.monitor.note_html"><strong>What this shows:</strong> scoring consistency within your own audit data &mdash; how scores are distributed per role and how your team&rsquo;s shortlist decisions relate to score bands. <strong>It is not a demographic bias audit &mdash; CVsprings does not collect demographic data.</strong></div>
+      <div id="monitoringContent"><div class="skel" style="height:120px" data-i18n="common.loading">Loading&hellip;</div></div>
     </div>
   </div>
 
-  <div style="font-size:12px;color:#9ca3af;line-height:1.6;padding:0 4px">
+  <div style="font-size:12px;color:#9ca3af;line-height:1.6;padding:0 4px" data-i18n-html="bias.disclaimer_html">
     This page documents actual product behaviour and is not legal advice. See the <a href="/compliance.html" style="color:#0f2847">EU AI Act compliance page</a> for how these features map to provider obligations.
   </div>
 </div>
 
 <footer class="site-footer">
-  CVsprings &mdash; AI-powered candidate fit analysis &nbsp;&middot;&nbsp; <a href="/login">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/compliance.html">EU AI Act compliance</a>
+  <span data-i18n="common.footer.product">CVsprings &mdash; AI-powered candidate fit analysis</span> &nbsp;&middot;&nbsp; <a href="/login" data-i18n="common.footer.backToApp">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/compliance.html" data-i18n="common.footer.compliance">EU AI Act compliance</a>
   <br>__LEGAL_FOOTER__
 </footer>
 
@@ -162,58 +173,88 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
     token = localStorage.getItem('cvsprings_session_token') || '';
   } catch (_) {}
 
-  function esc(s){
-    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // Everything below is built with DOM calls, never innerHTML: role names come
+  // from the org's own audit records and labels from the translation
+  // dictionary, and textContent keeps both as text whatever they contain.
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var t = I18N.t;
+  var num = function(n){ return I18N.formatNumber(n); };
+
+  function el(tag, attrs, text){
+    var node = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function(k){ node.setAttribute(k, attrs[k]); });
+    if (text != null) node.textContent = text;
+    return node;
+  }
+  function svgEl(tag, attrs, text){
+    var node = document.createElementNS(SVG_NS, tag);
+    Object.keys(attrs || {}).forEach(function(k){ node.setAttribute(k, String(attrs[k])); });
+    if (text != null) node.textContent = text;
+    return node;
   }
 
-  // Horizontal SVG bar chart. rows: [{label, value, count}], max = scale ceiling.
-  function barChart(rows, max, color, valueSuffix){
+  // Horizontal SVG bar chart. rows: [{label, value, valueText}], max = scale ceiling.
+  function barChart(rows, max, color){
     var barH = 16, gap = 6, labelW = 56, valueW = 70, width = 600;
     var chartW = width - labelW - valueW;
     var height = rows.length * (barH + gap);
-    var svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" width="100%" style="max-width:' + width + 'px;display:block" role="img">';
+    var svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, width: '100%', style: 'max-width:' + width + 'px;display:block', role: 'img' });
     rows.forEach(function(r, i){
       var y = i * (barH + gap);
       var w = max > 0 ? Math.round((r.value / max) * chartW) : 0;
-      svg += '<text x="' + (labelW - 8) + '" y="' + (y + barH - 4) + '" text-anchor="end" font-size="10" font-family="Inter,sans-serif" fill="#9ca3af">' + esc(r.label) + '</text>';
-      svg += '<rect x="' + labelW + '" y="' + y + '" width="' + chartW + '" height="' + barH + '" rx="3" fill="#f3f4f6"/>';
-      if (w > 0) svg += '<rect x="' + labelW + '" y="' + y + '" width="' + Math.max(w, 2) + '" height="' + barH + '" rx="3" fill="' + color + '"/>';
-      svg += '<text x="' + (labelW + chartW + 8) + '" y="' + (y + barH - 4) + '" font-size="10" font-family="Inter,sans-serif" fill="#6b7280">' + esc(r.valueText != null ? r.valueText : (r.value + (valueSuffix || ''))) + '</text>';
+      svg.appendChild(svgEl('text', { x: labelW - 8, y: y + barH - 4, 'text-anchor': 'end', 'font-size': 10, 'font-family': 'Inter,sans-serif', fill: '#9ca3af' }, r.label));
+      svg.appendChild(svgEl('rect', { x: labelW, y: y, width: chartW, height: barH, rx: 3, fill: '#f3f4f6' }));
+      if (w > 0) svg.appendChild(svgEl('rect', { x: labelW, y: y, width: Math.max(w, 2), height: barH, rx: 3, fill: color }));
+      svg.appendChild(svgEl('text', { x: labelW + chartW + 8, y: y + barH - 4, 'font-size': 10, 'font-family': 'Inter,sans-serif', fill: '#6b7280' }, r.valueText));
     });
-    return svg + '</svg>';
+    return svg;
+  }
+
+  // The API labels records with no role as '(no role)'; translated here, at
+  // display time only.
+  function roleLabel(role){
+    if (!role) return t('bias.monitor.allRecords');
+    return role === '(no role)' ? t('bias.monitor.noRole') : role;
   }
 
   function renderGroup(g){
     var histMax = Math.max.apply(null, g.histogram.map(function(b){ return b.count; }).concat([1]));
-    var histRows = g.histogram.map(function(b){ return { label: b.band, value: b.count, valueText: String(b.count) }; });
+    var histRows = g.histogram.map(function(b){ return { label: b.band, value: b.count, valueText: num(b.count) }; });
     var rateRows = g.shortlistRateByBand.map(function(b){
-      return { label: b.band, value: b.rate == null ? 0 : b.rate, valueText: b.rate == null ? 'no data' : (b.rate + '% (' + b.shortlisted + '/' + b.total + ')') };
+      return {
+        label: b.band,
+        value: b.rate == null ? 0 : b.rate,
+        valueText: b.rate == null ? t('bias.monitor.noData') : t('bias.monitor.rate', { rate: b.rate, shortlisted: b.shortlisted, total: b.total }),
+      };
     });
-    return '<div class="role-block">'
-      + '<div class="role-name">' + esc(g.role || 'All records') + '</div>'
-      + '<div class="role-stats">' + g.count + ' record' + (g.count === 1 ? '' : 's')
-      + (g.mean != null ? ' &middot; mean ' + g.mean : '')
-      + (g.median != null ? ' &middot; median ' + g.median : '') + '</div>'
-      + '<div class="chart-label">Score distribution (count per band)</div>'
-      + barChart(histRows, histMax, '#0f2847')
-      + '<div class="chart-label">Shortlist rate by score band (your team&rsquo;s decisions)</div>'
-      + barChart(rateRows, 100, '#7c3aed')
-      + '</div>';
+    var stats = [t('bias.monitor.records', { count: g.count })];
+    if (g.mean != null) stats.push(t('bias.monitor.mean', { value: g.mean }));
+    if (g.median != null) stats.push(t('bias.monitor.median', { value: g.median }));
+    var block = el('div', { 'class': 'role-block' });
+    block.appendChild(el('div', { 'class': 'role-name' }, roleLabel(g.role)));
+    block.appendChild(el('div', { 'class': 'role-stats' }, stats.join(' · ')));
+    block.appendChild(el('div', { 'class': 'chart-label' }, t('bias.monitor.distribution')));
+    block.appendChild(barChart(histRows, histMax, '#0f2847'));
+    block.appendChild(el('div', { 'class': 'chart-label' }, t('bias.monitor.shortlistRate')));
+    block.appendChild(barChart(rateRows, 100, '#7c3aed'));
+    return block;
   }
 
   function show(data){
     document.getElementById('monitoringSignin').style.display = 'none';
     document.getElementById('monitoringBody').style.display = 'block';
     var host = document.getElementById('monitoringContent');
+    host.textContent = '';
     if (!data.totalRecords) {
-      host.innerHTML = '<div class="signin-note" style="padding:8px 0">No audit records yet. Save analyses to the audit log in the main app and this section will populate.</div>';
+      host.appendChild(el('div', { 'class': 'signin-note', style: 'padding:8px 0' }, t('bias.monitor.empty')));
       return;
     }
-    var html = '';
-    if (data.roles && data.roles.length > 1) html += renderGroup(Object.assign({ role: 'All roles combined' }, data.overall, { count: data.totalRecords }));
-    (data.roles || []).forEach(function(r){ html += renderGroup(r); });
-    html += '<div style="font-size:11px;color:#9ca3af">Generated ' + esc(new Date(data.generatedAt).toLocaleString()) + ' from ' + data.totalRecords + ' audit record(s) in your organization.</div>';
-    host.innerHTML = html;
+    if (data.roles && data.roles.length > 1) {
+      host.appendChild(renderGroup(Object.assign({}, data.overall, { role: t('bias.monitor.allRoles'), count: data.totalRecords })));
+    }
+    (data.roles || []).forEach(function(r){ host.appendChild(renderGroup(r)); });
+    host.appendChild(el('div', { style: 'font-size:11px;color:#9ca3af' },
+      t('bias.monitor.generated', { when: I18N.formatDateTime(data.generatedAt), count: data.totalRecords })));
   }
 
   if (!token) return; // not logged in: sections 1-3 only, monitoring stays hidden

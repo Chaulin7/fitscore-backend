@@ -131,7 +131,8 @@ const PLANS = {
   currency: CURRENCY.symbol,
   currencyCode: CURRENCY.code,
 
-  // Included on all plans (not gated in code).
+  // Included on all plans (not gated in code). English copy; each entry's
+  // translation key is BASELINE_IDS below, in the same order.
   baseline: [
     'Deterministic, explainable scoring engine',
     'Skill & eligibility extraction',
@@ -172,6 +173,62 @@ const PLANS = {
     },
   ],
 };
+
+// --- Translation -------------------------------------------------------------
+//
+// The English above is the copy. Dutch and German live in locales/*.json under
+// `plans.*`, keyed by STABLE ids — never by the English string, which is prose
+// someone may reword. en.json carries the same English under the same keys, and
+// src/config/plansI18n.test.js asserts that translating to English through it
+// reproduces marketingView() exactly, so the two cannot drift.
+
+/** Translation ids for PLANS.baseline, index for index. */
+const BASELINE_IDS = Object.freeze([
+  'engine', 'extraction', 'upload', 'audit', 'reports', 'bias', 'templates',
+]);
+
+/** Which PHRASE each tier's highlights were built from, with its parameters. */
+const HIGHLIGHT_IDS = Object.freeze({
+  free: [['analysesCapped', { n: FREE_MONTHLY_LIMIT }], ['seatsSingle']],
+  pro: [['analysesUnlimited'], ['seatsSingle'], ['whiteLabel']],
+  team: [['analysesUnlimited'], ['seatsMulti'], ['whiteLabel']],
+});
+
+/**
+ * marketingView() in another language. `translate(key, vars)` returns the
+ * translated string or null (unknown key), in which case the English stays.
+ * Prices are re-formatted for the locale (€ 49 in Dutch, 49 € in German); the
+ * AMOUNTS are untouched, so nothing a gate or Stripe reads can change.
+ *
+ * @param {string} lang 'en' | 'nl' | 'de'
+ * @param {(key: string, vars?: object) => string|null} translate
+ * @param {(amount: number) => string} formatPrice
+ */
+function localizedMarketingView(lang, translate, formatPrice) {
+  const view = marketingView();
+  const tr = (key, vars, fallback) => {
+    const v = translate(key, vars);
+    return v == null ? fallback : v;
+  };
+  view.lang = lang;
+  view.baseline = view.baseline.map((text, i) => tr('plans.baseline.' + BASELINE_IDS[i], undefined, text));
+  view.tiers = view.tiers.map((t) => {
+    const source = tierById(t.id);
+    const ids = HIGHLIGHT_IDS[t.id] || [];
+    return {
+      ...t,
+      name: tr('plans.tier.' + t.id + '.name', undefined, t.name),
+      priceLabel: formatPrice(source.priceAmount),
+      per: tr('plans.per', undefined, t.per),
+      taxNote: t.taxNote ? tr('plans.taxNote', undefined, t.taxNote) : null,
+      tagline: tr('plans.tier.' + t.id + '.tagline', undefined, t.tagline),
+      highlights: t.highlights.map((text, i) => (ids[i]
+        ? tr('plans.phrase.' + ids[i][0], ids[i][1], text)
+        : text)),
+    };
+  });
+  return view;
+}
 
 // Capabilities applied when a plan id is unknown, missing, or malformed.
 // Deliberately the free set: an org whose plan cannot be identified gets the
@@ -290,5 +347,8 @@ module.exports = {
   tierById,
   capabilitiesFor,
   marketingView,
+  localizedMarketingView,
+  BASELINE_IDS,
+  HIGHLIGHT_IDS,
   productJsonLd,
 };

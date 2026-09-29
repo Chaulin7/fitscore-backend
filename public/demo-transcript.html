@@ -3,12 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CVsprings — Product demo transcript</title>
-<meta name="description" content="A plain-text walkthrough of the CVsprings product demo video: what each step of the deterministic screening run shows, in order.">
+<title data-i18n="transcript.meta.title">CVsprings — Product demo transcript</title>
+<meta name="description" content="A plain-text walkthrough of the CVsprings product demo video: what each step of the deterministic screening run shows, in order." data-i18n-attr="content:transcript.meta.description">
 <!-- Deliberately indexable. This page is the text alternative to a silent
      video with burned-in captions, so it is the only form of that content a
-     crawler, a screen reader user, or anyone on a slow connection can read. -->
-<link rel="canonical" href="/demo-transcript">
+     crawler, a screen reader user, or anyone on a slow connection can read.
+     The canonical link (and the /nl/ + /de/ hreflang alternates) are part of
+     the i18n head block substituted below: each language variant names
+     itself. -->
+__I18N_HEAD__
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="/icon-32.png" sizes="32x32">
 <link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192">
@@ -50,6 +53,7 @@ a{color:var(--stamp)}
 .brand{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
 .back{font-family:var(--mono);font-size:12px;color:var(--ink-soft);text-decoration:none}
 .back:hover{color:var(--stamp)}
+.masthead-actions{display:flex;align-items:center;gap:16px}
 
 main{padding:64px 0 72px}
 .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--stamp);margin-bottom:20px}
@@ -71,21 +75,24 @@ footer{border-top:1px solid var(--rule);padding:40px 0;margin-top:32px}
 <header class="masthead">
   <div class="wrap">
     <a class="brand" href="/">CVsprings</a>
-    <!-- Returns the reader to the player they came from, not just to the top
-         of the landing page. -->
-    <a class="back" href="/#recording">← Back to the recording</a>
+    <div class="masthead-actions">
+      <!-- Returns the reader to the player they came from, not just to the top
+           of the landing page. -->
+      <a class="back" href="/#recording" data-i18n="transcript.back">← Back to the recording</a>
+      __LANG_SWITCHER_LIGHT__
+    </div>
   </div>
 </header>
 
 <main>
   <div class="wrap reading">
-    <div class="eyebrow">Product demo · transcript</div>
-    <h1>What the demo shows</h1>
-    <p class="lede">The demo video runs silently with captions burned in. This page is the same walkthrough in plain text, so it can be read, searched, and quoted without watching anything.</p>
+    <div class="eyebrow" data-i18n="transcript.eyebrow">Product demo · transcript</div>
+    <h1 data-i18n="transcript.title">What the demo shows</h1>
+    <p class="lede" data-i18n="transcript.lede">The demo video runs silently with captions burned in. This page is the same walkthrough in plain text, so it can be read, searched, and quoted without watching anything.</p>
 
     <div class="meta">
-      <span>Runtime 1:13</span>
-      <span>Silent · captions on screen</span>
+      <span data-i18n="transcript.runtime">Runtime 1:13</span>
+      <span data-i18n="transcript.silent">Silent · captions on screen</span>
     </div>
 
     <!-- =====================================================================
@@ -111,7 +118,7 @@ footer{border-top:1px solid var(--rule);padding:40px 0;margin-top:32px}
 <footer>
   <div class="wrap">
     <div class="foot-brand">CVsprings</div>
-    <div class="foot-meta">Deterministic CV screening · Made in the Netherlands</div>
+    <div class="foot-meta" data-i18n="common.footerTagline">Deterministic CV screening · Made in the Netherlands</div>
     <div class="foot-meta">__LEGAL_FOOTER__</div>
     <div class="foot-meta">© 2026 CVsprings</div>
   </div>

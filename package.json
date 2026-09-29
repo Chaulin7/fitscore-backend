@@ -10,6 +10,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "node --test src/**/*.test.js",
+    "lint": "node scripts/lint.js",
+    "i18n:check": "node scripts/i18n-check.js",
     "extraction:baseline": "node scripts/extraction-golden.mjs --write",
     "extraction:verify": "node scripts/extraction-golden.mjs --verify",
     "narrative:baseline": "node scripts/narrative-golden.mjs --write",

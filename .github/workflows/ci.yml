@@ -44,11 +44,18 @@ jobs:
       # Boot-time validation is not lost — "Verify server health endpoint" below
       # starts the app for real and curls /health, which is a stronger check than
       # a require that discarded its result.
+      #
+      # scripts/lint.js runs the same `node --check` over src/, scripts/, test/
+      # and public/i18n.js, and parses locales/*.json — one command, runnable
+      # locally as `npm run lint`.
       - name: Lint (syntax check)
-        shell: bash
-        run: |
-          find src -name '*.js' -print0 | xargs -0 -n1 -P4 node --check
-          echo "syntax OK — $(find src -name '*.js' | wc -l | tr -d ' ') files"
+        run: npm run lint
+
+      # Translations: nl/de have exactly en's keys, no empty values, matching
+      # {placeholders}, matching inline tags on _html keys and none elsewhere,
+      # and every key a page uses exists. Fails the build on any of them.
+      - name: i18n check
+        run: npm run i18n:check
 
       - name: Run tests
         run: npm test
