@@ -643,7 +643,7 @@ function renderBiasReportHtml(report, branding) {
 
     // Disclaimer box (prominent, not buried)
     '<div class="disclaimer"><strong>Important — Please Read</strong>' +
-    'This report is a monitoring aid to help recruiters review their use of AI-assisted screening. ' +
+    'This report is a monitoring aid to help recruiters review their use of automated screening. ' +
     'It does not certify legal compliance, does not detect all forms of bias, and cannot analyse characteristics not present in the data. ' +
     'CVsprings does not hold and cannot analyse protected characteristics (gender, ethnicity, age, disability status). ' +
     'All hiring decisions remain the responsibility of the human recruiter. ' +

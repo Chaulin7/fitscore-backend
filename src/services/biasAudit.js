@@ -327,7 +327,7 @@ function reliabilityLevel(n) {
 const STANDARD_LIMITATIONS = [
   'Sample size affects statistical reliability. Small samples can show apparent differences that are due to chance rather than systematic patterns. Treat results from samples below 50 records with particular caution.',
   'CVsprings does not hold and cannot analyse protected characteristics such as gender, ethnicity, age, or disability status. The only grouping dimension available is whether a CV was submitted anonymously (the anonymized flag set by the recruiter). This report cannot detect bias on any other dimension.',
-  'This report is a monitoring aid to support human review of AI-assisted screening. It does not certify legal compliance, does not detect all forms of bias, and does not replace a formal equality impact assessment. Decisions about hiring remain the responsibility of the human recruiter.',
+  'This report is a monitoring aid to support human review of automated screening. It does not certify legal compliance, does not detect all forms of bias, and does not replace a formal equality impact assessment. Decisions about hiring remain the responsibility of the human recruiter.',
   'Score differences between groups may reflect legitimate factors (e.g., different role requirements, different candidate pools) as well as potential calibration issues. A difference alone does not establish bias.',
   'Decision inconsistency within a score band may reflect legitimate factors (additional information available to the recruiter, soft criteria, role-specific judgements) and is not itself evidence of bias.',
 ];
