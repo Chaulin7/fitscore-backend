@@ -199,4 +199,34 @@ describe('browser runtime', () => {
     assert.equal(I18N.errorMessage({ code: 'INVALID_CREDENTIALS', message: 'x' }), 'Ongeldig e-mailadres of wachtwoord.');
     assert.equal(I18N.errorMessage(new Error('Failed to fetch'), 'auth.login.failed'), 'Inloggen mislukt. Probeer het opnieuw.');
   });
+
+  test('a reason shared by several fields is told apart by code.field.reason', () => {
+    // REQUIRED means one thing for a job description and another for a
+    // template name; the field-qualified key wins over the bare reason.
+    const { I18N } = browser('de');
+    assert.equal(I18N.errorMessage({ code: 'VALIDATION_ERROR', field: 'jobDescription', reason: 'REQUIRED' }),
+      'Eine Stellenbeschreibung ist erforderlich.');
+    assert.equal(I18N.errorMessage({ code: 'VALIDATION_ERROR', field: 'name', reason: 'REQUIRED' }),
+      'Geben Sie der Vorlage einen Namen.');
+  });
+
+  test('the server\'s params fill the translation; the caller\'s vars win', () => {
+    const { I18N } = browser('nl');
+    const err = { code: 'INVALID_FILE', reason: 'FILE_TOO_LARGE', params: { name: 'Jansen.pdf', mb: 10 }, message: 'x' };
+    assert.equal(I18N.errorMessage(err), '“Jansen.pdf” is groter dan 10 MB per bestand.');
+    assert.equal(I18N.errorMessage(err, null, { mb: 12 }), '“Jansen.pdf” is groter dan 12 MB per bestand.');
+    // A file name from the server is text, like every interpolated value.
+    const hostile = { ...err, params: { name: '<img src=x onerror=1>', mb: 10 } };
+    assert.match(I18N.errorMessage(hostile), /^“<img src=x onerror=1>”/, 'returned as plain text for textContent');
+  });
+
+  test('a plural form of a rich key is rich', () => {
+    const { I18N, doc } = browser('en');
+    const box = doc.createElement('div');
+    box.appendChild(I18N.rich('app.tpl.migrate_html', { count: 3 }));
+    assert.equal(box.innerHTML, 'You have <strong>3</strong> templates saved locally. Upload them to your account?');
+    const one = doc.createElement('div');
+    one.appendChild(I18N.rich('app.tpl.migrate_html', { count: 1 }));
+    assert.match(one.innerHTML, /<strong>1<\/strong> template saved locally/);
+  });
 });

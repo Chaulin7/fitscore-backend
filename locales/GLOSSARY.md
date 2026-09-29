@@ -54,6 +54,17 @@ in each language. When a term is missing, add it here with the key(s) that use i
 | Sign up | Registreren | Registrieren | |
 | organization / owner | organisatie / eigenaar | Organisation / Inhaber | |
 | demo | demo | Demo | |
+| KW / SK / EX / ED (sub-score column heads) | TW / VH / ER / OP | SW / KO / BE / AB | Initials of the four sub-scores in each language; the full name is the column's tooltip (`<abbr title>`). |
+| template (role/JD template) | sjabloon | Vorlage | |
+| retention (period) | bewaartermijn | Aufbewahrungsfrist | |
+| purge (retention job) | opschoning / opschoonrun | Löschlauf | |
+| dry run | proefdraaien | Probelauf | |
+| feature request | functieverzoek | Funktionswunsch | |
+| read-only (paused account) | alleen-lezen | schreibgeschützt | |
+| batch | batch | Batch | |
+| Analyzer (tab) | Analyse | Analyse | |
+| Role History (tab) | Functiehistorie | Stellenverlauf | |
+| Strong / Possible / Weak Fit (app score bands) | sterke / mogelijke / zwakke match | starke / mögliche / geringe Eignung | The app's own bands in the info modal — not the scorer's verdict bands, which stay English. |
 
 ## Things that stay English on purpose
 
@@ -62,8 +73,13 @@ in each language. When a term is missing, add it here with the key(s) that use i
   experience”, director / principal / lead / senior / junior, PhD / Master / Bachelor /
   diploma / certificate.
 - **Scorer output**, for now: the verdict bands (“Excellent / Good / Partial / Poor Match”),
-  “Recommendations” and “Why this score?” are produced by the scoring pipeline. Phase 3
-  translates them at display time only; the scorer keeps emitting stable codes.
+  and the content of “Recommendations” and “Why this score?” are produced by the scoring
+  pipeline. Phase 3 translates them at display time only; the scorer keeps emitting stable
+  codes. In the app the two headings are translated and carry an “(in English)” /
+  “(in het Engels)” / „(auf Englisch)“ note, and the blocks are marked `lang="en"`.
+- **Data exports**: the batch CSV and audit CSV headers and decision codes (Phase 3).
+- **Server diagnostics** shown verbatim: a Stripe card-decline message, a purge run's
+  error text, the engine version string.
 - **Language names** in the switcher are always native: English, Nederlands, Deutsch.
 - **Legal text**: Terms, Privacy Policy and the body of the EU AI Act page.
 

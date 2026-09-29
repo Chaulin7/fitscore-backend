@@ -366,13 +366,16 @@ describe('checkout resumes after signup instead of landing on the dashboard', ()
 
   test('an org already on that plan stays on the dashboard', () => {
     const fn = extractFunction(APP_HTML, 'resumeCheckoutIntent');
-    assert.match(fn, /if \(b && b\.plan === plan\) \{[^}]*return; \}/);
+    // The toast's text is a translation now ({ plan: name } holds a brace), so
+    // the body is matched up to its return rather than up to the first '}'.
+    assert.match(fn, /if \(b && b\.plan === plan\) \{[^\n]*?return; \}/);
   });
 
   test('non-owners get told to ask their owner rather than a 403', () => {
     const fn = extractFunction(APP_HTML, 'resumeCheckoutIntent');
     assert.match(fn, /role === 'owner'/);
-    assert.match(fn, /Ask your organization owner/);
+    assert.match(fn, /I18N\.t\('app\.billing\.askOwnerUpgrade'/);
+    assert.match(require('../../locales/en.json')['app.billing.askOwnerUpgrade'], /^Ask your organization owner/);
   });
 
   test('the intent is cleared once consumed, so a reload cannot replay it', () => {
@@ -421,8 +424,10 @@ describe('no served page hardcodes a price', () => {
     // one card. The price line beside it is the single statement.
     assert.doesNotMatch(INDEX_HTML, /cta-tax/);
     assert.match(INDEX_HTML, /if\(tier\.taxNote\)\{[\s\S]{0,120}el\('span',\{'class':'tax'\},tier\.taxNote\)/); // card price
-    assert.match(APP_HTML, /p\.taxNote\?' <span style="font-weight:400">'/); // settings compare
-    assert.match(APP_HTML, /tier\.taxNote\?' <span style="font-weight:400">'/); // detail modal
+    // The app builds these with h() now; the qualifier is still read from the
+    // payload at each site.
+    assert.match(APP_HTML, /p\.taxNote \? \[' ', h\('span', \{ style: 'font-weight:400' \}, p\.taxNote\)\]/); // settings compare
+    assert.match(APP_HTML, /tier\.taxNote \? \[' ', h\('span', \{ style: 'font-weight:400' \}, tier\.taxNote\)\]/); // detail modal
     assert.match(APP_HTML, /t\.taxNote\?' '\+t\.taxNote:''/);             // quota prompt
   });
 });

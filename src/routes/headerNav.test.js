@@ -70,7 +70,8 @@ describe('primary nav holds the five inline destinations', () => {
   });
 
   test('the bias link is relabelled but keeps its destination', () => {
-    assert.match(NAV[1], /<a class="nav-btn" href="\/bias-report\.html">Bias monitoring<\/a>/);
+    // [^>]* admits the data-i18n key the label is translated by.
+    assert.match(NAV[1], /<a class="nav-btn" href="\/bias-report\.html"[^>]*>Bias monitoring<\/a>/);
     // The label is what overflowed; the route was never the problem.
     assert.doesNotMatch(NAV[1], /How bias monitoring works/);
   });
@@ -360,7 +361,7 @@ describe('collapse breakpoint', () => {
     // cheapest ~65px to reclaim; the dot still carries the state and the title
     // attribute still names it.
     assert.match(APP_HTML, /@media\(max-width:640px\)\{[\s\S]{0,200}\.nav-status-pill \.conn-label\{display:none\}/);
-    assert.match(APP_HTML, /<span class="conn-label" id="navStatusLabel">/);
+    assert.match(APP_HTML, /<span class="conn-label" id="navStatusLabel"[^>]*>/);
   });
 
   test('the Pro label is NOT dropped at narrow widths', () => {

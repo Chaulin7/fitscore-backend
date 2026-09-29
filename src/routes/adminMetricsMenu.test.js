@@ -39,7 +39,8 @@ const { getDb, closeDb } = require('../services/db');
 const authService = require('../services/authService');
 const platformOwner = require('../config/platformOwner');
 const authRouter = require('./auth');
-const { extractFunction, extractLine } = require('../../test/helpers/pageSandbox');
+const { extractFunction, extractLine, i18nFor } = require('../../test/helpers/pageSandbox');
+const EN = require('../../locales/en.json');
 
 const APP_HTML = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'app.html'), 'utf8');
 const OWNER_EMAIL = 'jasperjoy99@gmail.com';
@@ -190,6 +191,8 @@ function menuSandbox({ sessionToken = 'tok', email = 'someone@example.test' } = 
     accountInitial: (e) => (e || '?')[0],
     // onAuthed's other collaborators, none of them under test here.
     hideAuthScreen() {}, initApp() {}, resumeCheckoutIntent() {},
+    // The avatar's accessible name is translated (English, from en.json).
+    I18N: i18nFor('en').I18N,
     console,
   };
   ctx.window = ctx;
@@ -294,6 +297,7 @@ function clickSandbox({ mint }) {
     api: async (p, opts) => { calls.push({ path: p, method: (opts || {}).method }); return mint(); },
     toast: (msg, kind) => toasts.push({ msg, kind }),
     handleApiError: (err, fallback) => toasts.push({ msg: (err && err.message) || fallback, kind: 'error', fallback }),
+    I18N: i18nFor('en').I18N,
     console,
   };
   ctx.window = {
@@ -351,7 +355,9 @@ describe('opening the metrics page', () => {
 
     assert.equal(toasts.length, 1, 'a failure must not be silent');
     assert.equal(toasts[0].kind, 'error');
-    assert.equal(toasts[0].fallback, 'Could not open metrics');
+    // The fallback is a translation key now; its English is the old sentence.
+    assert.equal(toasts[0].fallback, 'app.metrics.failed');
+    assert.equal(EN['app.metrics.failed'], 'Could not open metrics.');
     // about:blank was opened and then closed; nothing was ever navigated.
     assert.deepEqual(opened, ['about:blank']);
     assert.equal(opened.some((u) => u.includes('/admin/metrics')), false,
