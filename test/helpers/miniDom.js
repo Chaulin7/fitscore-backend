@@ -7,8 +7,9 @@
  * The pages build UI with createElement/textContent/setAttribute (never
  * innerHTML, since the translation layer) and the tests want to assert on the
  * markup that produces. This implements that surface — elements, text,
- * fragments, attributes in insertion order, dataset, cloneNode, closest and a
- * few simple selectors — and serializes it back with proper escaping, so a
+ * fragments, attributes in insertion order, dataset, classList, cloneNode,
+ * closest and a few simple selectors — and serializes it back with proper
+ * escaping, so a
  * test can hold `outerHTML` to a regex exactly as it used to hold the string
  * the old renderer returned.
  *
@@ -111,6 +112,20 @@ class Element extends Node {
   set id(v) { this.setAttribute('id', v); }
   get className() { return this.getAttribute('class') || ''; }
   set className(v) { this.setAttribute('class', v); }
+  get classList() {
+    const el = this;
+    const list = () => el.className.split(/\s+/).filter(Boolean);
+    return {
+      add(...c) { el.className = [...new Set([...list(), ...c])].join(' '); },
+      remove(...c) { el.className = list().filter((x) => !c.includes(x)).join(' '); },
+      contains(c) { return list().includes(c); },
+      toggle(c, force) {
+        const on = force === undefined ? !list().includes(c) : !!force;
+        if (on) this.add(c); else this.remove(c);
+        return on;
+      },
+    };
+  }
   get hidden() { return this.hasAttribute('hidden'); }
   set hidden(v) { if (v) this.setAttribute('hidden', ''); else this.removeAttribute('hidden'); }
   get textContent() { return this._raw !== null ? this._raw.replace(/<[^>]*>/g, '') : super.textContent; }

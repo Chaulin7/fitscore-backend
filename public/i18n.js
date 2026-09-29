@@ -65,7 +65,8 @@
     return SUPPORTED.indexOf(primary) >= 0 ? primary : null;
   }
 
-  function isRichKey(key) { return /_html$/.test(key); }
+  // A plural form of a rich key (`x_html.one`, `x_html.other`) is rich too.
+  function isRichKey(key) { return /_html(\.(zero|one|two|few|many|other))?$/.test(key); }
 
   function pluralCategory(lang, n) {
     try { return new Intl.PluralRules(INTL_LOCALES[lang] || INTL_LOCALES.en).select(n); }
@@ -450,26 +451,39 @@
 
   /**
    * The message to show for an API error: a translated one for a known code
-   * (most specific first: code.reason, code.field, code), else the server's
-   * own English message, else the translated fallback.
+   * (most specific first: code.field.reason, code.reason, code.field, code),
+   * else the server's own English message, else the translated fallback.
+   * The error's `params` (the values the server built its sentence from — a
+   * file name, a limit) fill the translation's placeholders; `vars` from the
+   * caller win over them.
    */
   // Codes that say only "the request failed": the caller's own sentence
   // (translated) is more useful than the server's generic English.
   var GENERIC_CODES = { INTERNAL_ERROR: true, BAD_REQUEST: true, NOT_FOUND: true };
 
+  function merged(a, b) {
+    var out = {};
+    [a, b].forEach(function (o) {
+      if (o && typeof o === 'object') Object.keys(o).forEach(function (k) { out[k] = o[k]; });
+    });
+    return out;
+  }
+
   function errorMessage(err, fallbackKey, vars) {
     var code = err && err.code;
+    var values = merged(err && err.params, vars);
     if (code && !GENERIC_CODES[code]) {
       var candidates = [];
+      if (err.field && err.reason) candidates.push('errors.' + code + '.' + err.field + '.' + err.reason);
       if (err.reason) candidates.push('errors.' + code + '.' + err.reason);
       if (err.field) candidates.push('errors.' + code + '.' + err.field);
       candidates.push('errors.' + code);
       for (var i = 0; i < candidates.length; i++) {
-        if (has(candidates[i])) return t(candidates[i], vars);
+        if (has(candidates[i])) return t(candidates[i], values);
       }
       if (err.message) return err.message;
     }
-    return t(fallbackKey || 'errors.generic', vars);
+    return t(fallbackKey || 'errors.generic', values);
   }
 
   // --- the switcher: open/close, keyboard, selection ---------------------------

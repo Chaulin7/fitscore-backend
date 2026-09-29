@@ -182,6 +182,23 @@ function loadI18n(ctx, lang = 'en') {
   return ctx.I18N;
 }
 
+/**
+ * A real I18N (public/i18n.js with the real dictionary for `lang`) for a
+ * sandbox whose DOM is too thin to host the runtime itself — a stub
+ * `document` with only getElementById, say. It runs in its own context over a
+ * miniDom document, so `I18N.rich()` builds miniDom nodes; that is also the
+ * `document` to hand the page code under test if it builds UI.
+ *
+ * English is the default: the shipped tests assert English copy, and with
+ * this they read it from en.json through the same t() the page uses.
+ */
+function i18nFor(lang = 'en') {
+  const document = createDocument();
+  const ctx = vm.createContext({ document, window: { document }, console });
+  const I18N = loadI18n(ctx, lang);
+  return { I18N, document };
+}
+
 module.exports = {
-  extractFunction, extractLine, scriptBlockContaining, makeDom, recordingFetch, loadI18n,
+  extractFunction, extractLine, scriptBlockContaining, makeDom, recordingFetch, loadI18n, i18nFor,
 };

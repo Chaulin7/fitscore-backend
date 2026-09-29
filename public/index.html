@@ -105,6 +105,13 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:6
 .btn-ghost{background:transparent;color:var(--ink)}
 .btn-ghost:hover{background:var(--ink);color:var(--paper)}
 .nav-cta{padding:8px 18px;font-size:14px}
+/* The nav buttons are <a>s inside .navlinks, whose link colour (0,1,1) outranks
+   .btn-primary / .btn-ghost (0,1,0): "Book a demo" rendered ink-soft on ink
+   (2.2:1) and the ghost buttons' hover went ink on ink. Restated at link
+   specificity: paper on ink and ink on paper are 16.3:1, paper on the
+   stamp-blue hover 7.8:1. */
+.navlinks a.btn-primary,.navlinks a.btn-primary:hover,.navlinks a.btn-ghost:hover{color:var(--paper)}
+.navlinks a.btn-ghost{color:var(--ink)}
 @media(max-width:860px){.navlinks > a{display:none}.nav-btns{margin-left:0}}
 /* Dutch and German labels are longer ("Registrieren", "Plan een demo"), so the
    in-page links give way earlier there; the buttons never wrap mid-label. */

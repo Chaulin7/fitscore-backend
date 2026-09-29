@@ -1321,18 +1321,19 @@ function retentionPurgeMode() {
 }
 
 // Shared retention validation — the API layer's enforcement point. Returns
-// { ok, days } or { ok:false, code, message }. Rejects below-floor values with
+// { ok, days } or { ok:false, code, message, reason?, params? } (reason and
+// params let the app phrase the refusal in the reader's language). Rejects below-floor values with
 // a message explaining the six-month regulatory floor.
 function validateRetentionDays(raw) {
   const days = Number(raw);
   if (!Number.isInteger(days)) {
-    return { ok: false, code: 'VALIDATION_ERROR', message: 'retentionDays must be a whole number of days.' };
+    return { ok: false, code: 'VALIDATION_ERROR', reason: 'NOT_WHOLE_DAYS', message: 'retentionDays must be a whole number of days.' };
   }
   if (days < RETENTION_FLOOR_DAYS) {
-    return { ok: false, code: 'RETENTION_BELOW_FLOOR', message: `Retention must be at least ${RETENTION_FLOOR_DAYS} days. The EU AI Act (Art. 19) requires automatically generated logs to be kept for at least six months, so retention cannot drop below that regulatory floor.` };
+    return { ok: false, code: 'RETENTION_BELOW_FLOOR', params: { min: RETENTION_FLOOR_DAYS }, message: `Retention must be at least ${RETENTION_FLOOR_DAYS} days. The EU AI Act (Art. 19) requires automatically generated logs to be kept for at least six months, so retention cannot drop below that regulatory floor.` };
   }
   if (days > RETENTION_MAX_DAYS) {
-    return { ok: false, code: 'VALIDATION_ERROR', message: `Retention cannot exceed ${RETENTION_MAX_DAYS} days.` };
+    return { ok: false, code: 'VALIDATION_ERROR', reason: 'TOO_LONG', params: { max: RETENTION_MAX_DAYS }, message: `Retention cannot exceed ${RETENTION_MAX_DAYS} days.` };
   }
   return { ok: true, days };
 }

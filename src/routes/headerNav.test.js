@@ -70,7 +70,8 @@ describe('primary nav holds the five inline destinations', () => {
   });
 
   test('the bias link is relabelled but keeps its destination', () => {
-    assert.match(NAV[1], /<a class="nav-btn" href="\/bias-report\.html">Bias monitoring<\/a>/);
+    // [^>]* admits the data-i18n key the label is translated by.
+    assert.match(NAV[1], /<a class="nav-btn" href="\/bias-report\.html"[^>]*>Bias monitoring<\/a>/);
     // The label is what overflowed; the route was never the problem.
     assert.doesNotMatch(NAV[1], /How bias monitoring works/);
   });
@@ -360,7 +361,7 @@ describe('collapse breakpoint', () => {
     // cheapest ~65px to reclaim; the dot still carries the state and the title
     // attribute still names it.
     assert.match(APP_HTML, /@media\(max-width:640px\)\{[\s\S]{0,200}\.nav-status-pill \.conn-label\{display:none\}/);
-    assert.match(APP_HTML, /<span class="conn-label" id="navStatusLabel">/);
+    assert.match(APP_HTML, /<span class="conn-label" id="navStatusLabel"[^>]*>/);
   });
 
   test('the Pro label is NOT dropped at narrow widths', () => {
@@ -382,4 +383,21 @@ describe('ids the existing render functions drive still exist', () => {
       assert.match(APP_HTML, new RegExp('id="' + id + '"'));
     });
   }
+});
+
+describe('the Settings panel has a width of its own', () => {
+  // position:fixed with only `right` set shrink-wraps to the widest row, and
+  // the flex:1 inputs made that ~1424px on a 1440px screen. Measured after the
+  // fix: 560px at 1440/1180/900, 343px at 375, no horizontal overflow.
+  const rule = /\.settings-panel\{([^}]*)\}/.exec(APP_HTML);
+  test('a fixed width, capped by the viewport less the gutters', () => {
+    assert.ok(rule, '.settings-panel rule not found');
+    assert.match(rule[1], /(^|;)width:560px(;|$)/);
+    assert.match(rule[1], /max-width:calc\(100vw - 32px\)/);
+    assert.match(rule[1], /box-sizing:border-box/, 'the padding must not push it past the cap');
+    assert.doesNotMatch(rule[1], /min-width:\s*3\d\dpx/, 'a min-width wider than a small phone overflows it');
+  });
+  test('the plan cards stack on a phone instead of squeezing three abreast', () => {
+    assert.match(APP_HTML, /@media\(max-width:480px\)\{\.plan-compare\{flex-direction:column\}\}/);
+  });
 });

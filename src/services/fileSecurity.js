@@ -24,8 +24,11 @@ const MAX_BATCH_FILES = intEnv('MAX_BATCH_FILES', 200);             // files / b
 const MAX_TOTAL_BYTES = intEnv('MAX_TOTAL_BYTES', 200 * 1024 * 1024); // aggregate / request
 const PROCESS_TIMEOUT_MS = intEnv('PROCESS_TIMEOUT_MS', 30 * 1000);  // per-file processing cap
 
-function err(message, field) {
-  return Object.assign(new Error(message), { statusCode: 400, code: 'INVALID_FILE', field });
+// `reason` is a stable sub-code under INVALID_FILE and `params` the values
+// its sentence is built from, so the app can say the same refusal in the
+// reader's language. `message` stays the English sentence it always was.
+function err(message, field, reason, params) {
+  return Object.assign(new Error(message), { statusCode: 400, code: 'INVALID_FILE', field, reason, params });
 }
 
 // Detect the real type from content. Returns 'pdf' | 'docx' | 'png' | 'jpeg' | null.
@@ -113,24 +116,26 @@ function imageDimensions(buffer, type) {
  * leaves as a data URI.
  */
 function validateLogoUpload(buffer, field = 'logo') {
-  if (!buffer || !buffer.length) throw err('No image was uploaded.', field);
+  if (!buffer || !buffer.length) throw err('No image was uploaded.', field, 'LOGO_MISSING');
   if (buffer.length > MAX_LOGO_BYTES) {
-    throw err(`Logo is larger than the ${Math.round(MAX_LOGO_BYTES / 1024)} KB limit.`, field);
+    throw err(`Logo is larger than the ${Math.round(MAX_LOGO_BYTES / 1024)} KB limit.`, field,
+      'LOGO_TOO_LARGE', { kb: Math.round(MAX_LOGO_BYTES / 1024) });
   }
   const type = sniffType(buffer);
   if (type !== 'png' && type !== 'jpeg') {
     // Named rather than generic: "I uploaded a PNG" is usually an SVG or a
     // renamed file, and saying so saves a support round trip.
-    throw err('Logo must be a PNG or JPEG image. SVG and other formats are not accepted.', field);
+    throw err('Logo must be a PNG or JPEG image. SVG and other formats are not accepted.', field, 'LOGO_TYPE');
   }
   const dims = imageDimensions(buffer, type);
   if (!dims || !dims.width || !dims.height) {
-    throw err('Logo could not be read — the image file appears to be incomplete or corrupt.', field);
+    throw err('Logo could not be read — the image file appears to be incomplete or corrupt.', field, 'LOGO_UNREADABLE');
   }
   if (dims.width > MAX_LOGO_DIMENSION || dims.height > MAX_LOGO_DIMENSION) {
     throw err(
       `Logo is ${dims.width}×${dims.height} pixels; the maximum is `
       + `${MAX_LOGO_DIMENSION}×${MAX_LOGO_DIMENSION}.`, field,
+      'LOGO_DIMENSIONS', { width: dims.width, height: dims.height, max: MAX_LOGO_DIMENSION },
     );
   }
   const mime = type === 'png' ? 'image/png' : 'image/jpeg';
@@ -141,7 +146,8 @@ function validateLogoUpload(buffer, field = 'logo') {
 // `field` is 'cv' or 'cvs'. Throws an INVALID_FILE error on any violation.
 function validateUploadedFile(file, field) {
   if (file.size > MAX_FILE_BYTES) {
-    throw err(`"${file.originalname}" exceeds the ${Math.round(MAX_FILE_BYTES / (1024 * 1024))} MB per-file limit.`, field);
+    throw err(`"${file.originalname}" exceeds the ${Math.round(MAX_FILE_BYTES / (1024 * 1024))} MB per-file limit.`, field,
+      'FILE_TOO_LARGE', { name: file.originalname, mb: Math.round(MAX_FILE_BYTES / (1024 * 1024)) });
   }
   let buffer;
   try {
@@ -151,11 +157,11 @@ function validateUploadedFile(file, field) {
     buffer = fs.readFileSync(fd);
     fs.closeSync(fd);
   } catch (_) {
-    throw err(`Could not read "${file.originalname}".`, field);
+    throw err(`Could not read "${file.originalname}".`, field, 'FILE_UNREADABLE', { name: file.originalname });
   }
   const type = sniffType(buffer);
   if (type !== 'pdf' && type !== 'docx') {
-    throw err(`"${file.originalname}" is not a valid PDF or DOCX file.`, field);
+    throw err(`"${file.originalname}" is not a valid PDF or DOCX file.`, field, 'FILE_TYPE', { name: file.originalname });
   }
   return type;
 }
@@ -163,11 +169,12 @@ function validateUploadedFile(file, field) {
 // Validate the whole batch request (count + aggregate size).
 function validateBatch(files, field) {
   if (files.length > MAX_BATCH_FILES) {
-    throw err(`Too many files: maximum ${MAX_BATCH_FILES} per batch.`, field);
+    throw err(`Too many files: maximum ${MAX_BATCH_FILES} per batch.`, field, 'TOO_MANY_FILES', { max: MAX_BATCH_FILES });
   }
   const total = files.reduce((sum, f) => sum + (f.size || 0), 0);
   if (total > MAX_TOTAL_BYTES) {
-    throw err(`Upload too large: the batch exceeds the ${Math.round(MAX_TOTAL_BYTES / (1024 * 1024))} MB total limit.`, field);
+    throw err(`Upload too large: the batch exceeds the ${Math.round(MAX_TOTAL_BYTES / (1024 * 1024))} MB total limit.`, field,
+      'BATCH_TOO_LARGE', { mb: Math.round(MAX_TOTAL_BYTES / (1024 * 1024)) });
   }
 }
 

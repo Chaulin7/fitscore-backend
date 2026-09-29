@@ -118,18 +118,16 @@ function extractFunction(name) {
   assert.ok(i > open, `could not brace-match function ${name}()`);
   return APP_HTML.slice(start, i + 1);
 }
-function extractConst(decl) {
-  const start = APP_HTML.indexOf('const ' + decl);
-  assert.notEqual(start, -1, `expected public/app.html to declare const ${decl}`);
-  const end = APP_HTML.indexOf('\n', start);
-  return APP_HTML.slice(start, end);
-}
 
 // Build a sandbox holding the real functions plus the minimum they touch.
-// `opened` records what openBiasReport would have handed to the browser.
-function makeAppSandbox(filterState = {}) {
+// `opened` records what openBiasReport would have handed to the browser. The
+// scope wording comes from the real translation runtime, English by default
+// (the assertions below are the English copy, read from en.json).
+const { i18nFor } = require('../../test/helpers/pageSandbox');
+function makeAppSandbox(filterState = {}, lang = 'en') {
   const opened = [];
   const ctx = {
+    I18N: i18nFor(lang).I18N,
     API: 'https://api.example',
     auditFilter: Object.assign(
       { from: '', to: '', search: '', actor: '', action: '', order: 'desc', limit: 50, offset: 0, total: null },
@@ -137,12 +135,10 @@ function makeAppSandbox(filterState = {}) {
     ),
     URLSearchParams,
     openWithDownloadToken: (url) => { opened.push(url); },
-    escHtml: (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
     opened,
   };
   vm.createContext(ctx);
   const src = [
-    extractConst('BIAS_MONTHS'),
     extractFunction('buildBiasReportQuery'),
     extractFunction('fmtDayLabel'),
     extractFunction('biasReportScope'),
@@ -330,6 +326,18 @@ describe('Audit tab generate action — the scope it states', () => {
 
   test('no unsupported filters means nothing to warn about', () => {
     assert.deepEqual([...makeAppSandbox({ from: '2026-03-01' }).biasReportScope().ignored], []);
+  });
+
+  // The ranges are words and dates in the reader's language; what is SENT is
+  // the same day strings in every language (the URL tests above build the
+  // query from auditFilter, never from these labels).
+  test('the scope reads in Dutch and German, dates formatted from the day string', () => {
+    const nl = makeAppSandbox({ from: '2026-03-01', to: '2026-03-31' }, 'nl').biasReportScope();
+    assert.equal(nl.range, '1 mrt 2026 t/m 31 mrt 2026');
+    const de = makeAppSandbox({ from: '2026-03-01' }, 'de').biasReportScope();
+    assert.equal(de.range, 'ab 1. März 2026');
+    assert.equal(makeAppSandbox({}, 'de').biasReportScope().range, 'alle Daten');
+    assert.equal(makeAppSandbox({ to: '2026-12-31' }, 'nl').biasReportScope().range, 'alles tot en met 31 dec 2026');
   });
 });
 
@@ -585,7 +593,8 @@ describe('the Audit tab markup wires the action up', () => {
   // matters has never changed — it points at the methodology page and it is not
   // the generator — so the assertion tracks those two facts, not its position.
   test('the explainer link points at the methodology page and is named for it', () => {
-    assert.match(APP_HTML, /<a class="nav-btn" href="\/bias-report\.html">Bias monitoring<\/a>/);
+    // [^>]* admits the data-i18n key the label is translated by.
+    assert.match(APP_HTML, /<a class="nav-btn" href="\/bias-report\.html"[^>]*>Bias monitoring<\/a>/);
   });
 
   test('it is a nav link, not the generator', () => {
@@ -598,7 +607,7 @@ describe('the Audit tab markup wires the action up', () => {
   test('the methodology links elsewhere in the app are untouched', () => {
     // The footer link and the in-app modal reference must keep pointing at the
     // static page — those are correct and out of scope for this change.
-    assert.match(APP_HTML, /<a class="footer-link" href="\/bias-report\.html">Bias &amp; monitoring<\/a>/);
+    assert.match(APP_HTML, /<a class="footer-link" href="\/bias-report\.html"[^>]*>Bias &amp; monitoring<\/a>/);
     assert.match(APP_HTML, /<a href="\/bias-report\.html" style="color:#0f2847">methodology page<\/a>/);
   });
 });

@@ -604,3 +604,83 @@ describe('plan-summary carries the state and actions end to end', () => {
     assert.equal(body.isOwner, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ?lang= — the panel's words in Dutch and German. Words and the price format
+// change; nothing a gate or a button reads may.
+// ---------------------------------------------------------------------------
+
+describe('plan-summary in another language', () => {
+  const ui = require('../i18n/ui');
+
+  async function summaryIn(lang) {
+    const q = lang === undefined ? '' : '?lang=' + encodeURIComponent(lang);
+    const res = await fetch(`${base}/api/billing/plan-summary${q}`, { headers: { Authorization: `Bearer ${token}` } });
+    return res.json();
+  }
+  // Everything except the words: what the client and the gates act on.
+  const machine = (b) => ({
+    state: b.state, plan: b.plan, isOwner: b.isOwner, comped: b.comped, usage: b.usage,
+    canUpgrade: b.canUpgrade, canManageBilling: b.canManageBilling, billingBlockReason: b.billingBlockReason,
+    actions: b.actions.map(({ label, ...rest }) => rest),
+    entitlements: b.entitlements.map(({ label, ...rest }) => rest),
+    upgrades: b.upgrades.map((u) => ({ id: u.id, plan: u.plan, gains: u.gains.map(({ label, ...rest }) => rest) })),
+  });
+
+  test('English is the payload exactly as before, however it is asked for', async () => {
+    actAs('user-a');
+    setPlan(ORG_A, { plan: 'free', comped: false, customerId: null });
+    const plain = await summaryIn(undefined);
+    for (const lang of ['en', 'EN', 'fr', '']) {
+      assert.deepEqual(await summaryIn(lang), plain, `?lang=${lang} must not change the English payload`);
+    }
+    assert.equal(plain.planName, 'Free');
+    assert.match(plain.actions[0].label, /^Upgrade to Pro — €49\/month$/);
+  });
+
+  test('Dutch: a Free owner reads the tiers, prices and actions in Dutch', async () => {
+    actAs('user-a');
+    setPlan(ORG_A, { plan: 'free', comped: false, customerId: null });
+    const en = await summaryIn(undefined);
+    const nl = await summaryIn('nl');
+    assert.deepEqual(machine(nl), machine(en), 'ids, kinds, anchors, limits and usage are language-free');
+    assert.equal(nl.planName, 'Gratis');
+    assert.equal(nl.per, '/maand');
+    const up = nl.actions.find((a) => a.id === 'upgrade_pro');
+    assert.match(up.label, /^Upgraden naar Pro — €\s49\/maand$/);
+    const pro = nl.upgrades.find((u) => u.id === 'pro');
+    assert.match(pro.priceLabel, /^€\s49$/);
+    assert.equal(pro.taxNote, 'excl. btw');
+    assert.equal(pro.tagline, ui.t('nl', 'plans.tier.pro.tagline'));
+    assert.ok(pro.gains.every((g) => !/[A-Z][a-z]+ CV analyses|Single user|White-label reports/.test(g.label)),
+      'gain labels are phrased in Dutch');
+    assert.ok(nl.entitlements.some((e) => e.label === ui.t('nl', 'plans.phrase.analysesCapped', { n: en.usage.analyses.limit })));
+  });
+
+  test('German: price after the amount, and the paused screen\'s three ways out', async () => {
+    actAs('user-a');
+    setPlan(ORG_A, { plan: 'pro', subscriptionStatus: 'paused', customerId: 'cus_a', comped: false });
+    const en = await summaryIn(undefined);
+    const de = await summaryIn('de');
+    assert.equal(de.state, 'paused');
+    assert.deepEqual(machine(de), machine(en));
+    assert.match(de.priceLabel, /^49\s€$/);
+    assert.deepEqual(de.actions.map((a) => a.label),
+      ['Mit Pro fortfahren', 'Mit Team fortfahren', 'Im kostenlosen Tarif fortfahren']);
+  });
+
+  test('every action label the server can emit has a translation, and English matches the key', () => {
+    const states = ['free', 'pro_active', 'team_active', 'paused', 'past_due', 'incomplete', 'cancel_scheduled'];
+    for (const state of states) {
+      for (const a of planActions(state, { isOwner: true, canCheckout: true, canPortal: true, plan: 'pro' })) {
+        if (a.id === 'upgrade_pro' || a.id === 'upgrade_team') {
+          const tier = PLANS.tiers.find((t) => t.id === a.plan);
+          assert.equal(ui.t('en', 'plans.action.upgrade', { name: tier.name, price: tier.priceLabel, per: tier.per }), a.label);
+        } else {
+          assert.ok(ui.hasKey('plans.action.' + a.id), `no translation key for action ${a.id}`);
+          assert.equal(ui.t('en', 'plans.action.' + a.id), a.label, `en.json drifted from planActions for ${a.id}`);
+        }
+      }
+    }
+  });
+});

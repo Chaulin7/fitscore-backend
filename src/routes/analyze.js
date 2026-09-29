@@ -141,6 +141,7 @@ function reserveQuota(req, res, requested) {
     res.status(402).json({
       error: 'Monthly analysis limit reached. Upgrade to continue.',
       code: 'QUOTA_EXCEEDED',
+      params: { limit },
       limit,
       used: r.used,
       plan,
@@ -150,9 +151,14 @@ function reserveQuota(req, res, requested) {
   return { reserved: requested, limit, used: r.used, plan };
 }
 
-function sendError(res, status, code, message, field) {
+// `detail` is the thrown error (or any { reason, params }): a stable sub-code
+// under `code` and the values its sentence is built from, so the app can show
+// the refusal translated. `error` stays the English message it always was.
+function sendError(res, status, code, message, field, detail) {
   const body = { error: message, code };
   if (field) body.field = field;
+  if (detail && detail.reason) body.reason = detail.reason;
+  if (detail && detail.params) body.params = detail.params;
   return res.status(status).json(body);
 }
 
@@ -195,7 +201,7 @@ function parseWeights(input) {
   let parsed;
   if (typeof input === 'string') {
     try { parsed = JSON.parse(input); }
-    catch (_) { throw Object.assign(new Error('weights must be valid JSON.'), { code: 'VALIDATION_ERROR', field: 'weights' }); }
+    catch (_) { throw Object.assign(new Error('weights must be valid JSON.'), { code: 'VALIDATION_ERROR', field: 'weights', reason: 'WEIGHTS_INVALID' }); }
   } else { parsed = input; }
   const kw = Number(parsed.kw) || 0;
   const sk = Number(parsed.sk) || 0;
@@ -204,7 +210,7 @@ function parseWeights(input) {
   const total = kw + sk + ex + ed;
   if (Math.abs(total - 100) > 0.5) {
     throw Object.assign(new Error('weights must sum to 100 (±0.5). Got: ' + total),
-      { code: 'VALIDATION_ERROR', field: 'weights' });
+      { code: 'VALIDATION_ERROR', field: 'weights', reason: 'WEIGHTS_SUM', params: { total } });
   }
   return { kw, sk, ex, ed };
 }
@@ -212,12 +218,12 @@ function parseWeights(input) {
 function validateJobDescription(jd) {
   if (!jd || typeof jd !== 'string') {
     throw Object.assign(new Error('jobDescription is required.'),
-      { code: 'VALIDATION_ERROR', field: 'jobDescription' });
+      { code: 'VALIDATION_ERROR', field: 'jobDescription', reason: 'REQUIRED' });
   }
   const trimmed = jd.trim();
   if (trimmed.length < 50) {
     throw Object.assign(new Error('jobDescription must be at least 50 characters.'),
-      { code: 'VALIDATION_ERROR', field: 'jobDescription' });
+      { code: 'VALIDATION_ERROR', field: 'jobDescription', reason: 'TOO_SHORT', params: { min: 50 } });
   }
   return trimmed;
 }
@@ -271,12 +277,12 @@ router.post('/', upload.single('cv'), async (req, res) => {
 
     let jobDescription;
     try { jobDescription = validateJobDescription(req.body.jobDescription); }
-    catch (e) { return sendError(res, 400, e.code || 'VALIDATION_ERROR', e.message, e.field); }
+    catch (e) { return sendError(res, 400, e.code || 'VALIDATION_ERROR', e.message, e.field, e); }
 
     let weights = { kw: 40, sk: 30, ex: 20, ed: 10 };
     if (req.body.weights) {
       try { weights = parseWeights(req.body.weights); }
-      catch (e) { return sendError(res, 400, e.code || 'VALIDATION_ERROR', e.message, e.field); }
+      catch (e) { return sendError(res, 400, e.code || 'VALIDATION_ERROR', e.message, e.field, e); }
     }
 
     const anonymize = req.body.anonymize === 'true' || req.body.anonymize === true;
@@ -293,7 +299,7 @@ router.post('/', upload.single('cv'), async (req, res) => {
     catch (e) {
       refundUsage(req.orgId, reserved); reserved = 0; // extraction failed: return the reservation
       if (e.code === 'FILE_REJECTED') console.warn('[security] upload rejected by AV scan', { org: req.orgId, file: req.file.originalname });
-      return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'cv');
+      return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'cv', e);
     }
     let cvText = extracted.text;
     if (anonymize) cvText = anonymizeText(cvText);
@@ -323,7 +329,7 @@ router.post('/', upload.single('cv'), async (req, res) => {
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
     // Don't leak internals on a 500; keep specific messages for handled statuses.
     const message = status === 500 ? 'Something went wrong. Please try again.' : (err.message || 'Request failed');
-    sendError(res, status, code, message, err.field);
+    sendError(res, status, code, message, err.field, status === 500 ? null : err);
   } finally {
     if (filePath) fs.unlink(filePath, () => {});
   }
@@ -338,16 +344,16 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     }
     // Authoritative count + aggregate-size caps (server-side).
     try { fileSec.validateBatch(req.files, 'cvs'); }
-    catch (e) { return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'cvs'); }
+    catch (e) { return sendError(res, e.statusCode || 400, e.code || 'INVALID_FILE', e.message, e.field || 'cvs', e); }
 
     let jobDescription;
     try { jobDescription = validateJobDescription(req.body.jobDescription); }
-    catch (e) { return sendError(res, 400, e.code || 'VALIDATION_ERROR', e.message, e.field); }
+    catch (e) { return sendError(res, 400, e.code || 'VALIDATION_ERROR', e.message, e.field, e); }
 
     let weights = { kw: 40, sk: 30, ex: 20, ed: 10 };
     if (req.body.weights) {
       try { weights = parseWeights(req.body.weights); }
-      catch (e) { return sendError(res, 400, e.code || 'VALIDATION_ERROR', e.message, e.field); }
+      catch (e) { return sendError(res, 400, e.code || 'VALIDATION_ERROR', e.message, e.field, e); }
     }
 
     const anonymize = req.body.anonymize === 'true' || req.body.anonymize === true;
@@ -379,7 +385,9 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
             candidateName: path.basename(file.originalname, path.extname(file.originalname)),
             fileName: file.originalname,
             error: ve.message,
-            code: ve.code || 'INVALID_FILE'
+            code: ve.code || 'INVALID_FILE',
+            ...(ve.reason ? { reason: ve.reason } : {}),
+            ...(ve.params ? { params: ve.params } : {}),
           });
           continue;
         }
@@ -436,7 +444,7 @@ router.post('/batch', upload.array('cvs', MAX_BATCH), async (req, res) => {
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
     // Don't leak internals on a 500; keep specific messages for handled statuses.
     const message = status === 500 ? 'Something went wrong. Please try again.' : (err.message || 'Request failed');
-    sendError(res, status, code, message, err.field);
+    sendError(res, status, code, message, err.field, status === 500 ? null : err);
   } finally {
     if (reserved) refundUsage(req.orgId, reserved); // catastrophic failure before settling: refund all reserved
     for (const fp of filePaths) fs.unlink(fp, () => {});
@@ -448,17 +456,19 @@ router.use((err, req, res, next) => {
   // already understands (field-aware). These fire before route handlers.
   if (err && err.code === 'LIMIT_FILE_SIZE') {
     const mb = Math.round(MAX_FILE_BYTES / (1024 * 1024));
-    return sendError(res, 400, 'INVALID_FILE', `A file exceeds the ${mb} MB per-file limit.`, err.field || 'cv');
+    return sendError(res, 400, 'INVALID_FILE', `A file exceeds the ${mb} MB per-file limit.`, err.field || 'cv',
+      { reason: 'UPLOAD_TOO_LARGE', params: { mb } });
   }
   if (err && (err.code === 'LIMIT_UNEXPECTED_FILE' || err.code === 'LIMIT_FILE_COUNT')) {
-    return sendError(res, 400, 'INVALID_FILE', `Too many files: maximum ${MAX_BATCH} per batch.`, err.field || 'cvs');
+    return sendError(res, 400, 'INVALID_FILE', `Too many files: maximum ${MAX_BATCH} per batch.`, err.field || 'cvs',
+      { reason: 'TOO_MANY_FILES', params: { max: MAX_BATCH } });
   }
   if (err) {
     const status = err.statusCode || 500;
     const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST');
     // Never leak internals on a 500.
     const message = status === 500 ? 'Something went wrong processing the upload.' : (err.message || 'Upload error');
-    return sendError(res, status, code, message, err.field);
+    return sendError(res, status, code, message, err.field, status === 500 ? null : err);
   }
   next();
 });

@@ -37,7 +37,7 @@ const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  extractFunction, scriptBlockContaining, makeDom, recordingFetch, loadI18n,
+  extractFunction, scriptBlockContaining, makeDom, recordingFetch, loadI18n, i18nFor,
 } = require('../../test/helpers/pageSandbox');
 
 const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'cvsprings-checkout-e2e-'));
@@ -182,6 +182,8 @@ function appSession(sessionToken, pendingPlan) {
     renderPlanChip: () => {},
     getSessionToken: () => sessionToken,
     API_BASE: BASE,
+    // The toasts are translated; the assertions read the English, from en.json.
+    I18N: i18nFor('en').I18N,
   });
   vm.runInContext([
     'const RETRY_SAFE_PATHS=[];',

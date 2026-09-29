@@ -48,7 +48,7 @@ const PAGE_CONFIG = Object.freeze({
   // Shell only (top bar, footer, title, copy buttons). The body is
   // regulatory prose and stays English, marked lang="en" in the markup.
   'compliance.html': { kind: 'marketing', path: '/compliance.html', namespaces: ['common', 'lang', 'compliance'] },
-  'app.html': { kind: 'app', namespaces: ['common', 'lang', 'auth', 'errors', 'settings'] },
+  'app.html': { kind: 'app', namespaces: ['common', 'lang', 'auth', 'errors', 'settings', 'app'] },
   'terms.html': { kind: 'english-only' },
   'privacy.html': { kind: 'english-only' },
 });

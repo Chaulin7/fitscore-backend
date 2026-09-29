@@ -49,20 +49,26 @@ const MARKUP = stripComments(APP_HTML);
 const SOURCE = stripComments(APP_HTML).replace(/^[ \t]*\/\/.*$/gm, '');
 
 // --- the shipped renderers, in a sandbox ------------------------------------
-const { extractLine } = require('../../test/helpers/pageSandbox');
+// The renderers build nodes (h() and friends) and read their words through
+// I18N.t — the real runtime with the real en.json, so the English assertions
+// below are assertions about the dictionary the page ships. A panel is read
+// back as HTML through miniDom's serializer.
+const { i18nFor } = require('../../test/helpers/pageSandbox');
 const { planPanelState, planActions } = require('../routes/billing');
 
-const sandbox = vm.createContext({});
-vm.runInContext([
-  extractFunction(APP_HTML, 'escHtml'),
-  extractLine(APP_HTML, 'const MEMBER_PLAN_NOTE ='),
-  extractFunction(APP_HTML, 'planActionBtn'),
-  extractFunction(APP_HTML, 'planActionsAt'),
-  extractFunction(APP_HTML, 'planMeter'),
-  extractFunction(APP_HTML, 'planRenewalLine'),
-  extractFunction(APP_HTML, 'planBlockNote'),
-  extractFunction(APP_HTML, 'renderPaidPanel'),
-].join('\n'), sandbox);
+const PANEL_FUNCTIONS = [
+  'h', 'appendKids', 'fill', 'memberPlanNote', 'planActionBtn', 'planActionsAt', 'planMeter',
+  'planRenewalLine', 'planBlockNote', 'planUsageValue', 'planPriceLine', 'renderPaidPanel',
+  'renderPlanPanelError',
+];
+function panelSandbox(lang) {
+  const { I18N, document } = i18nFor(lang);
+  const ctx = vm.createContext({ I18N, document });
+  vm.runInContext(PANEL_FUNCTIONS.map((n) => extractFunction(APP_HTML, n)).join('\n'), ctx);
+  ctx.__html = (node) => { const box = document.createElement('div'); box.appendChild(node); return box.innerHTML; };
+  return ctx;
+}
+const sandbox = panelSandbox('en');
 
 // Builds the actions the SERVER would send for this org, so the panel tests
 // render the real mapping instead of a fixture that can drift from it.
@@ -80,9 +86,9 @@ function primaryCount(html) {
   return (html.match(/class="btn btn-primary/g) || []).length;
 }
 
-function paidPanel(summary) {
-  sandbox.__s = summary;
-  return vm.runInContext('renderPaidPanel(__s)', sandbox);
+function paidPanel(summary, ctx = sandbox) {
+  ctx.__s = summary;
+  return vm.runInContext('__html(renderPaidPanel(__s))', ctx);
 }
 
 // A summary shaped exactly like GET /api/billing/plan-summary returns.
@@ -421,9 +427,7 @@ describe('the panel closes the way the account menu does', () => {
 });
 
 describe('the panel fails visibly, not silently', () => {
-  const errCtx = vm.createContext({});
-  vm.runInContext(extractFunction(APP_HTML, 'renderPlanPanelError'), errCtx);
-  const errorHtml = vm.runInContext('renderPlanPanelError()', errCtx);
+  const errorHtml = vm.runInContext('__html(renderPlanPanelError())', sandbox);
 
   test('the error state says something short and offers a retry', () => {
     assert.match(errorHtml, /Could not load your plan/);
@@ -457,5 +461,53 @@ describe('the panel fails visibly, not silently', () => {
     assert.match(retry, /loadPlanPanel/);
     const toggle = extractFunction(APP_HTML, 'togglePlanPanel');
     assert.match(toggle, /loadPlanPanel/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dutch and German. The panel's own words come from the page's dictionary; the
+// server-composed ones (tier, price, entitlements, action labels) from
+// plan-summary?lang=, reproduced here with the real localizePlanSummary.
+// ---------------------------------------------------------------------------
+describe('the panel in Dutch and German', () => {
+  const { localizePlanSummary } = require('../routes/billing');
+  const RAW_KEY = /\b(?:app|settings|errors|plans|common)\.[a-zA-Z_]+\.[a-zA-Z_.]+/;
+  const ENGLISH = /This month|Members|Included|Renews|Manage billing|Payment failed|Contact your organization owner|CV analyses|unlimited/;
+
+  // The server always sends `actions` (empty for a member); the fixtures above
+  // leave it out where a test does not care.
+  const noActions = (over) => summaryFor(Object.assign({ actions: [] }, over));
+  const cases = [
+    ['a Pro owner', withRealActions(summaryFor(), { plan: 'pro', subscriptionStatus: 'active' })],
+    ['a past_due owner', withRealActions(summaryFor({ subscriptionStatus: 'past_due' }), { plan: 'pro', subscriptionStatus: 'past_due' })],
+    ['a member', noActions({ isOwner: false, canManageBilling: false, billingBlockReason: 'NOT_OWNER' })],
+    ['a comped org', noActions({ comped: true, canManageBilling: false, billingBlockReason: 'COMPED' })],
+    ['a scheduled cancellation', noActions({ cancelAtPeriodEnd: true })],
+  ];
+  for (const lang of ['nl', 'de']) {
+    const ctx = panelSandbox(lang);
+    for (const [who, sum] of cases) {
+      test(`${lang}: ${who} — every word translated, no key left showing`, () => {
+        const html = paidPanel(localizePlanSummary(sum, lang), ctx);
+        assert.doesNotMatch(html, RAW_KEY, 'a missing key renders as the key itself');
+        assert.doesNotMatch(html.replace(/<[^>]+>/g, ' '), ENGLISH, 'English left in the ' + lang + ' panel');
+      });
+    }
+    test(`${lang}: the structure is the English panel's (classes, actions, one primary)`, () => {
+      const [, sum] = cases[1];
+      const shape = (html) => html.replace(/>[^<]*</g, '><');
+      assert.equal(shape(paidPanel(localizePlanSummary(sum, lang), ctx)), shape(paidPanel(sum)));
+    });
+    test(`${lang}: the error state and its Retry are translated`, () => {
+      const html = vm.runInContext('__html(renderPlanPanelError())', ctx);
+      assert.doesNotMatch(html, /Could not load|Retry/);
+      assert.match(html, /data-action="retryPlanPanel"/);
+    });
+  }
+  test('the renewal date is formatted for the language', () => {
+    const sum = noActions({ currentPeriodEnd: '2026-09-30T12:00:00.000Z' });
+    assert.match(paidPanel(sum), /Renews 30 Sept? 2026/);
+    assert.match(paidPanel(localizePlanSummary(sum, 'nl'), panelSandbox('nl')), /Wordt verlengd op 30 sep 2026/);
+    assert.match(paidPanel(localizePlanSummary(sum, 'de'), panelSandbox('de')), /Verlängert sich am 30\. Sept?\. 2026/);
   });
 });

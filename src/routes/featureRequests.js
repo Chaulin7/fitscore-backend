@@ -36,9 +36,14 @@ try { ({ Resend } = require('resend')); } catch (_) { /* SDK optional until conf
 const router = express.Router();
 
 // Same envelope every other router in this codebase produces.
-function sendError(res, status, code, message, field) {
+// `detail` ({ reason, params }): a stable sub-code under `code` and the values
+// its sentence is built from, so the app can show the error translated.
+// `error` stays the English message it always was.
+function sendError(res, status, code, message, field, detail) {
   const body = { error: message, code };
   if (field) body.field = field;
+  if (detail && detail.reason) body.reason = detail.reason;
+  if (detail && detail.params) body.params = detail.params;
   return res.status(status).json(body);
 }
 
@@ -193,21 +198,24 @@ router.post('/', requirePaidPlan, async (req, res) => {
 
     if (!FEATURE_REQUEST_CATEGORIES.includes(category)) {
       return sendError(res, 400, 'VALIDATION_ERROR',
-        `Category must be one of: ${FEATURE_REQUEST_CATEGORIES.join(', ')}.`, 'category');
+        `Category must be one of: ${FEATURE_REQUEST_CATEGORIES.join(', ')}.`, 'category',
+        { reason: 'NOT_ALLOWED' });
     }
     // Reject rather than silently strip: a legitimate title has no reason to
     // contain a newline or a bidi override, and stripping would hide the attempt
     // while leaving the inbox subject different from the stored row.
     if (CONTROL_OR_BIDI.test(title) || /[\r\n\t]/.test(title)) {
-      return sendError(res, 400, 'VALIDATION_ERROR', 'Title contains invalid characters.', 'title');
+      return sendError(res, 400, 'VALIDATION_ERROR', 'Title contains invalid characters.', 'title', { reason: 'INVALID_CHARACTERS' });
     }
     if (title.length < TITLE_MIN || title.length > TITLE_MAX) {
       return sendError(res, 400, 'VALIDATION_ERROR',
-        `Title must be between ${TITLE_MIN} and ${TITLE_MAX} characters.`, 'title');
+        `Title must be between ${TITLE_MIN} and ${TITLE_MAX} characters.`, 'title',
+        { reason: 'LENGTH', params: { min: TITLE_MIN, max: TITLE_MAX } });
     }
     if (body.length < BODY_MIN || body.length > BODY_MAX) {
       return sendError(res, 400, 'VALIDATION_ERROR',
-        `Description must be between ${BODY_MIN} and ${BODY_MAX} characters.`, 'body');
+        `Description must be between ${BODY_MIN} and ${BODY_MAX} characters.`, 'body',
+        { reason: 'LENGTH', params: { min: BODY_MIN, max: BODY_MAX } });
     }
 
     // Identity is server-derived. Anything the client sent for orgId, email or
@@ -227,6 +235,10 @@ router.post('/', requirePaidPlan, async (req, res) => {
       return res.status(429).json({
         error: `Your organization has reached the limit of ${FEATURE_REQUEST_MAX_PER_WINDOW} feature requests per 24 hours. Please try again later.`,
         code: 'RATE_LIMITED',
+        // Not the per-IP limiter's RATE_LIMITED: this one is a quota the org
+        // used up, and the app says so in words, with the number.
+        reason: 'FEATURE_REQUEST_QUOTA',
+        params: { max: FEATURE_REQUEST_MAX_PER_WINDOW },
         retryAfter: result.retryAfterSec,
       });
     }
