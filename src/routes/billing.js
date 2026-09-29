@@ -31,6 +31,8 @@ const trialInvites = require('../services/trialInvites');
 const { isFailedTrialFirstCharge } = require('../services/entitlements');
 const { tierById, PLANS, ENTITLEMENT_AXES, phraseForAxis, CURRENCY } = require('../config/plans');
 const { baseUrlFor } = require('../config/appUrl');
+const ui = require('../i18n/ui');
+const { priceFormatter } = require('./plans');
 
 const router = express.Router();
 
@@ -237,6 +239,72 @@ function planActions(state, { isOwner, canCheckout, canPortal, plan }) {
   }
 }
 
+/**
+ * The plan panel's words in the reader's language. ?lang=nl|de only — the
+ * panel asks for the language it is showing, so English (no lang, or an
+ * unsupported one) is the payload exactly as before.
+ *
+ * Words and the price FORMAT change (€ 49 in Dutch, 49 € in German); nothing a
+ * gate or a button reads does: plan ids, states, action ids, kinds, anchors,
+ * limits, usage and flags are the same values. Labels are keyed by the stable
+ * ids they were built from — the action id, the entitlement axis and value,
+ * the tier id — never by matching the English. The Stripe decline message in
+ * resumeError is Stripe's own text and stays as it arrived.
+ */
+function localizePlanSummary(summary, lang) {
+  if (!lang || lang === ui.DEFAULT_LANG) return summary;
+  const t = (key, vars, fallback) => (ui.hasKey(key) ? ui.t(lang, key, vars) : fallback);
+  const price = priceFormatter(lang);
+  const tierCopy = (id, english) => {
+    const source = tierById(id);
+    if (!source) return english;
+    const out = {
+      ...english,
+      name: t('plans.tier.' + id + '.name', undefined, english.name),
+      priceLabel: price(source.priceAmount),
+      per: t('plans.per', undefined, english.per),
+      taxNote: english.taxNote ? t('plans.taxNote', undefined, english.taxNote) : english.taxNote,
+    };
+    if (english.tagline !== undefined) out.tagline = t('plans.tier.' + id + '.tagline', undefined, english.tagline);
+    return out;
+  };
+  const phrase = (axis, value, english) => {
+    if (axis === 'analysesPerMonth') {
+      return value == null
+        ? t('plans.phrase.analysesUnlimited', undefined, english)
+        : t('plans.phrase.analysesCapped', { n: value }, english);
+    }
+    if (axis === 'seats') return t(value === 1 ? 'plans.phrase.seatsSingle' : 'plans.phrase.seatsMulti', undefined, english);
+    if (axis === 'customBranding') return value ? t('plans.phrase.whiteLabel', undefined, english) : english;
+    return english;
+  };
+  const actionLabel = (a) => {
+    const target = a.plan ? tierById(a.plan) : null;
+    if ((a.id === 'upgrade_pro' || a.id === 'upgrade_team') && target) {
+      const tc = tierCopy(target.id, { name: target.name, per: target.per });
+      return t('plans.action.upgrade', { name: tc.name, price: tc.priceLabel, per: tc.per || '' }, a.label);
+    }
+    return t('plans.action.' + a.id, undefined, a.label);
+  };
+
+  const own = tierCopy(summary.plan, {
+    name: summary.planName, per: summary.per, taxNote: summary.taxNote, priceLabel: summary.priceLabel,
+  });
+  return {
+    ...summary,
+    planName: own.name,
+    priceLabel: own.priceLabel,
+    per: own.per,
+    taxNote: own.taxNote,
+    actions: summary.actions.map((a) => ({ ...a, label: actionLabel(a) })),
+    entitlements: summary.entitlements.map((e) => ({ ...e, label: phrase(e.axis, e.value, e.label) })),
+    upgrades: summary.upgrades.map((u) => ({
+      ...tierCopy(u.id, u),
+      gains: u.gains.map((g) => ({ ...g, label: phrase(g.axis, g.to, g.label) })),
+    })),
+  };
+}
+
 // GET /api/billing/plan-summary — everything the plan panel renders (any member)
 //
 // Deliberately separate from /usage: that endpoint runs after every analysis
@@ -291,7 +359,7 @@ router.get('/plan-summary', requireSession, (req, res) => {
       plan: tier.id,
     });
 
-    res.json({
+    res.json(localizePlanSummary({
       state,
       actions,
       plan: tier.id,
@@ -325,7 +393,7 @@ router.get('/plan-summary', requireSession, (req, res) => {
         .map((axis) => ({ axis, value: axes[axis], label: phraseForAxis(axis, axes[axis]) }))
         .filter((e) => e.label),
       upgrades,
-    });
+    }, ui.normalizeLang(req.query && req.query.lang)));
   } catch (err) {
     sendError(res, 500, 'INTERNAL_ERROR', err.message);
   }
@@ -1449,3 +1517,4 @@ module.exports.planPanelState = planPanelState;
 module.exports.handlePaymentMethodAttached = handlePaymentMethodAttached;
 module.exports.handleInvoicePaid = handleInvoicePaid;
 module.exports.planActions = planActions;
+module.exports.localizePlanSummary = localizePlanSummary;
