@@ -570,7 +570,7 @@
   "app.account.settings": "Einstellungen",
   "app.account.metrics": "Kennzahlen",
   "app.account.logout": "Abmelden",
-  "app.mode.single": "Einzelner Lebenslauf",
+  "app.mode.single": "Einzel-Upload",
   "app.mode.batch": "Batch-Upload",
   "app.how.s1.title": "Lebensläufe hochladen",
   "app.how.s1.body": "Ziehen Sie eine oder mehrere PDF- oder DOCX-Dateien in das Upload-Feld",

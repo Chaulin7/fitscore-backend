@@ -150,9 +150,13 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   transition:box-shadow .2s
 }
 .card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.09)}
+/* Wraps: a card head holds its title and up to three actions, and in Dutch
+   and German ("Im Audit-Log speichern", "Alle im Audit-Log speichern") those
+   do not fit beside each other on a phone. The actions drop under the title
+   instead of running off-screen. */
 .card-head{
   padding:14px 20px;border-bottom:1px solid #f3f4f6;
-  display:flex;align-items:center;justify-content:space-between
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px
 }
 .card-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#0a1f3d}
 .card-body{padding:20px}
@@ -1561,7 +1565,7 @@ img, video, table { max-width: 100%; }
     <div class="card">
       <div class="card-head">
         <span class="card-title" id="resultName" data-i18n="app.results.title">Results</span>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" data-action="saveToAudit" data-i18n="app.results.saveToAudit">Save to Audit</button>
           <button class="btn btn-ghost btn-sm" data-action="openReport">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
