@@ -4541,27 +4541,32 @@ function renderRoleHistory(){
   const history=_roleHistory.history;
   if(!history.length){fill(content, h('div', { class: 'empty-state' }, I18N.t('app.roles.noRecords')));return;}
   const thr=getScoreThreshold();
-  const avg=Math.round(history.reduce((s,r)=>s+(r.overall||0),0)/history.length);
-  const top=history[0];const short=history.filter(r=>r.decision==='shortlist').length;
+  // Scored records only (the server already sends only those; this holds the
+  // line against an older one). "Top score" is the highest, not the latest:
+  // the history is newest first.
+  const scored=history.filter(r=>typeof r.overall==='number');
+  const avg=scored.length?Math.round(scored.reduce((s,r)=>s+r.overall,0)/scored.length):null;
+  const top=scored.length?Math.max(...scored.map(r=>r.overall)):null;
+  const short=scored.filter(r=>r.decision==='shortlist').length;
   const statC=(l,v,c)=>h('div', { style: 'background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:16px 20px;min-width:110px;flex:1;box-shadow:0 1px 4px rgba(0,0,0,0.05)' },
     h('div', { style: 'font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px' }, l),
-    h('div', { style: 'font-size:30px;font-weight:800;color:'+c }, I18N.formatNumber(v)));
+    h('div', { style: 'font-size:30px;font-weight:800;color:'+c }, v==null?'—':I18N.formatNumber(v)));
   const th=(key)=>h('th', null, I18N.t(key));
   const abbr=(key, full)=>h('th', null, h('abbr', { title: I18N.t(full) }, I18N.t(key)));
   const dash=function(v){ return v??'—'; };
   fill(content,
     h('div', { style: 'display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap' },
-      statC(I18N.t('app.roles.candidates'),history.length,'#0f2847'),
-      statC(I18N.t('app.batch.avg'),avg,avg>=thr?'#059669':avg>=50?'#d97706':'#dc2626'),
-      statC(I18N.t('app.roles.top'),top.overall||0,'#059669'),
+      statC(I18N.t('app.roles.candidates'),scored.length,'#0f2847'),
+      statC(I18N.t('app.batch.avg'),avg,avg==null?'#6b7280':avg>=thr?'#059669':avg>=50?'#d97706':'#dc2626'),
+      statC(I18N.t('app.roles.top'),top,'#059669'),
       statC(I18N.t('app.roles.shortlisted'),short,'#7c3aed')),
     h('div', { style: 'overflow-x:auto' }, h('table', { class: 'data-table' },
       h('thead', null, h('tr', null, h('th', null, '#'), th('app.table.candidate'), th('app.table.overall'),
         abbr('app.table.kw','common.dimension.keywords'), abbr('app.table.sk','common.dimension.skills'),
         abbr('app.table.ex','common.dimension.experience'), abbr('app.table.ed','common.dimension.education'),
         th('app.table.decision'))),
-      h('tbody', null, history.map((r,i)=>{
-        const s=r.overall||0;const pill=s>=thr?'pill-hi':s>=50?'pill-med':'pill-lo';
+      h('tbody', null, scored.map((r,i)=>{
+        const s=r.overall;const pill=s>=thr?'pill-hi':s>=50?'pill-med':'pill-lo';
         const dc=r.decision==='shortlist'?'#15803d':r.decision==='reject'?'#b91c1c':'#a16207';
         return h('tr', { style: 'animation:fadeUp .25s ease '+(i*.04)+'s both' },
           h('td', { style: 'color:#9ca3af;font-size:12px' }, i+1),

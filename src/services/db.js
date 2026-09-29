@@ -1059,22 +1059,29 @@ function getAuditChanges(auditId, orgId) {
   return getDb().prepare(sql).all(...params);
 }
 
-// Get list of distinct roles (org-scoped)
+// Get list of distinct roles (org-scoped). Counts scored records only — the
+// same rows getRoleHistory returns, so a tab's count matches its table. A
+// record without a score is a CV that could not be analysed, not a candidate
+// scored for the role (services/scoredRecord.js).
 function getRoles(orgId) {
   const sql = orgId
-    ? "SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE org_id = ? AND role != '' GROUP BY role ORDER BY role ASC"
-    : "SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE role != '' GROUP BY role ORDER BY role ASC";
+    ? "SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE org_id = ? AND role != '' AND overall IS NOT NULL GROUP BY role ORDER BY role ASC"
+    : "SELECT DISTINCT role, COUNT(*) as count FROM audit_log WHERE role != '' AND overall IS NOT NULL GROUP BY role ORDER BY role ASC";
   const rows = orgId
     ? getDb().prepare(sql).all(orgId)
     : getDb().prepare(sql).all();
   return rows;
 }
 
-// Get score history for a specific role (org-scoped)
+// Get score history for a specific role (org-scoped): the scored records, most
+// recent first, with the four sub-scores (the table's KW/SK/EX/ED columns,
+// which used to read "—" because only the overall was selected). Records
+// without a score are left out, like everywhere that ranks or averages.
 function getRoleHistory(role, orgId) {
+  const cols = 'id, candidate_name, overall, keywords_score, skills_score, experience_score, education_score, decision, created_at';
   const sql = orgId
-    ? 'SELECT id, candidate_name, overall, decision, created_at FROM audit_log WHERE role = ? AND org_id = ? ORDER BY created_at DESC LIMIT 100'
-    : 'SELECT id, candidate_name, overall, decision, created_at FROM audit_log WHERE role = ? ORDER BY created_at DESC LIMIT 100';
+    ? `SELECT ${cols} FROM audit_log WHERE role = ? AND org_id = ? AND overall IS NOT NULL ORDER BY created_at DESC LIMIT 100`
+    : `SELECT ${cols} FROM audit_log WHERE role = ? AND overall IS NOT NULL ORDER BY created_at DESC LIMIT 100`;
   const rows = orgId
     ? getDb().prepare(sql).all(role, orgId)
     : getDb().prepare(sql).all(role);
@@ -1082,6 +1089,12 @@ function getRoleHistory(role, orgId) {
     id: r.id,
     candidateName: r.candidate_name,
     overall: r.overall,
+    scores: {
+      keywords: r.keywords_score,
+      skills: r.skills_score,
+      experience: r.experience_score,
+      education: r.education_score,
+    },
     decision: r.decision,
     createdAt: r.created_at,
   }));

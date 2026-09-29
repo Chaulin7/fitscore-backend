@@ -36,6 +36,7 @@ const FUNCTIONS = [
   '_fmtWhen', 'renderTeam', 'renderBatchResults', 'updateBatchSummary',
   'renderSingleResult', 'ringBox', 'buildWhyNodes', 'renderPlanChip', 'renderFileList', 'fileKey',
   'isFailedResult', 'failedReason', 'apiErrorText', 'isNetworkError', 'exportBatchCsv', 'escCsv',
+  'renderRoleHistory',
 ];
 const CONSTANTS = ['const DECISION_KEYS =', 'const BIAS_FILTER_KEYS ='];
 
@@ -44,7 +45,7 @@ const IDS = [
   'teamBody', 'teamInviteRow', 'batchResults', 'singleResults', 'batchTitle', 'batchBody', 'batchSummary',
   'bsTotalCVs', 'bsAvgScore', 'bsShortlisted', 'bsSubThreshold', 'bsTopCandidate', 'resultName', 'scoreRow',
   'singleWhy', 'foundChips', 'missingChips', 'planChip', 'planChipLabel', 'fileList', 'fileListHead',
-  'batchFailedNote', 'bsFailedSub',
+  'batchFailedNote', 'bsFailedSub', 'roleHistoryContent',
 ];
 
 function appSandbox(lang, state = {}) {
@@ -73,6 +74,7 @@ function appSandbox(lang, state = {}) {
     selectedFiles: state.files || [],
     mode: 'batch',
     lastBatchResults: state.batch || [],
+    _roleHistory: state.roleHistory || null,
     download: (name, body) => { ctx.__downloaded = { name, body }; },
   });
   vm.runInContext([
@@ -349,6 +351,34 @@ describe('an audit record without a score', () => {
       assert.equal(row.querySelectorAll('[data-action="audit-report"]').length, 0);
     });
   }
+});
+
+describe('role history', () => {
+  // Newest first, as the server sends it; the newest is not the best.
+  const history = [
+    { candidateName: 'Newest', overall: 55, scores: { keywords: 50, skills: 60, experience: 55, education: 40 }, decision: 'hold' },
+    { candidateName: 'Best', overall: 91, scores: { keywords: 95, skills: 90, experience: 88, education: 80 }, decision: 'shortlist' },
+    { candidateName: 'Oldest', overall: 72, scores: { keywords: 70, skills: 75, experience: 70, education: 60 }, decision: null },
+  ];
+  const stats = (byId) => byId('roleHistoryContent').querySelector('div').childNodes.map((card) => text(card.childNodes[1]));
+  test('"Top score" is the highest score, not the first row', () => {
+    const { byId, run } = appSandbox('en', { roleHistory: { role: 'Controller', history } });
+    run('renderRoleHistory()');
+    assert.deepEqual(stats(byId), ['3', '73', '91', '1'], 'candidates, average, top, shortlisted');
+  });
+  test('the sub-score columns show the scores, not "—"', () => {
+    const { byId, run } = appSandbox('en', { roleHistory: { role: 'Controller', history } });
+    run('renderRoleHistory()');
+    const first = byId('roleHistoryContent').querySelector('tbody').querySelector('tr');
+    assert.deepEqual(first.querySelectorAll('td').map(text).slice(3, 7), ['50', '60', '55', '40']);
+  });
+  test('a record without a score (from an older server) is not counted, ranked or shown', () => {
+    const withUnscored = [{ candidateName: 'Unscored', overall: null, scores: {}, decision: 'shortlist' }, ...history];
+    const { byId, run } = appSandbox('de', { roleHistory: { role: 'Controller', history: withUnscored } });
+    run('renderRoleHistory()');
+    assert.deepEqual(stats(byId), ['3', '73', '91', '1']);
+    assert.doesNotMatch(text(byId('roleHistoryContent')), /Unscored/);
+  });
 });
 
 describe('the plan chip and the staged-file list', () => {
