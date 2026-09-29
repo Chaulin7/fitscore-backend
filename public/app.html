@@ -483,7 +483,13 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 /* Settings panel. The .settings-btn gear that used to open it from the bar is
    gone — Settings is an item in the account dropdown now — so its rules went
    with it. The panel itself is unchanged; only its trigger moved. */
-.settings-panel{display:none;position:fixed;top:54px;right:16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:9999;min-width:340px;max-height:calc(100vh - 70px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+/* Width: the panel is position:fixed with only `right` set, so it used to
+   shrink-to-fit its widest row — the flex:1 inputs and long paragraphs — and
+   came out ~1424px on a 1440px screen. 560px holds the three plan cards and
+   the longest German labels; on a phone it is the viewport less the 16px
+   gutters, never wider. */
+.settings-panel{display:none;position:fixed;top:54px;right:16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:9999;width:560px;max-width:calc(100vw - 32px);box-sizing:border-box;max-height:calc(100vh - 70px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:480px){.plan-compare{flex-direction:column}}
 .settings-panel.open{display:block}
 .settings-panel h3{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin:0 0 10px}
 .settings-row{display:flex;align-items:center;gap:8px}
