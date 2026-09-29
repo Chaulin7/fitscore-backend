@@ -35,6 +35,7 @@ const FUNCTIONS = [
   'retMonths', 'fmtDate', 'fmtDateTime', 'renderRetentionStats', 'renderPurgeRuns',
   '_fmtWhen', 'renderTeam', 'renderBatchResults', 'updateBatchSummary',
   'renderSingleResult', 'ringBox', 'buildWhyNodes', 'renderPlanChip', 'renderFileList', 'fileKey',
+  'isFailedResult', 'failedReason', 'apiErrorText', 'isNetworkError', 'exportBatchCsv', 'escCsv',
 ];
 const CONSTANTS = ['const DECISION_KEYS =', 'const BIAS_FILTER_KEYS ='];
 
@@ -43,6 +44,7 @@ const IDS = [
   'teamBody', 'teamInviteRow', 'batchResults', 'singleResults', 'batchTitle', 'batchBody', 'batchSummary',
   'bsTotalCVs', 'bsAvgScore', 'bsShortlisted', 'bsSubThreshold', 'bsTopCandidate', 'resultName', 'scoreRow',
   'singleWhy', 'foundChips', 'missingChips', 'planChip', 'planChipLabel', 'fileList', 'fileListHead',
+  'batchFailedNote', 'bsFailedSub',
 ];
 
 function appSandbox(lang, state = {}) {
@@ -70,6 +72,8 @@ function appSandbox(lang, state = {}) {
     _teamIsOwner: !!state.teamIsOwner,
     selectedFiles: state.files || [],
     mode: 'batch',
+    lastBatchResults: state.batch || [],
+    download: (name, body) => { ctx.__downloaded = { name, body }; },
   });
   vm.runInContext([
     ...CONSTANTS.map((c) => extractLine(APP_HTML, c)),
@@ -248,6 +252,103 @@ describe('analysis results', () => {
     assert.equal((APP_HTML.match(/class="en-note" data-i18n="app\.results\.inEnglish"/g) || []).length, 2);
     assert.match(APP_HTML, /html\[lang="en"\] \.en-note\{display:none\}/);
   });
+});
+
+describe('a batch with files that could not be analysed', () => {
+  // As the server returns it: scored first (ranked), failed after, in upload order.
+  const batch = [
+    { status: 'scored', candidateName: 'Jansen', fileName: 'jansen.pdf', overall: 82, scores: { keywords: 80, skills: 85, experience: 90, education: 60 }, analysisId: 'a1' },
+    { status: 'scored', candidateName: 'Visser', fileName: 'visser.pdf', overall: 40, scores: { keywords: 30, skills: 50, experience: 45, education: 20 }, analysisId: 'a2' },
+    { status: 'failed', fileName: 'scan.pdf', displayName: 'scan', code: 'IMAGE_ONLY_PDF', error: 'No text could be extracted — this PDF appears to be a scanned image.' },
+    { status: 'failed', fileName: 'notes.pdf', displayName: 'notes', code: 'INVALID_FILE', reason: 'FILE_TYPE', params: { name: 'notes.pdf' }, error: '"notes.pdf" is not a valid PDF or DOCX file.' },
+  ];
+  const FAILED_EN = /Not analysed|could not be analysed|Fix the file|scanned image|not a valid PDF/;
+  for (const lang of LANGS) {
+    test(`${lang}: a failed file is its own row — reason and fix, no rank, score, decision or save`, () => {
+      const { byId, run } = appSandbox(lang, { batch });
+      run('renderBatchResults(lastBatchResults, "Controller")');
+      const rows = byId('batchBody').querySelectorAll('tr');
+      assert.equal(rows.length, 4);
+      const failed = rows.filter((r) => r.getAttribute('data-failed') === '1');
+      assert.equal(failed.length, 2);
+      for (const r of failed) {
+        assert.equal(r.querySelectorAll('select').length, 0, 'no decision can be picked');
+        assert.equal(r.querySelectorAll('button').length, 0, 'no save');
+        assert.equal(r.querySelectorAll('textarea').length, 0, 'no notes');
+        assert.equal(r.querySelectorAll('.score-pill').length, 0, 'no score');
+        assert.equal(r.querySelectorAll('.rank-badge').length, 0, 'no rank');
+        assert.equal(r.hasAttribute('data-score'), false);
+      }
+      const failedText = failed.map(text).join(' ');
+      assert.doesNotMatch(failedText, RAW_KEY);
+      if (lang === 'en') assert.match(failedText, /Not analysed.*scanned image.*Fix the file and upload it again/);
+      else assert.doesNotMatch(failedText, FAILED_EN);
+      assert.match(failedText, /notes\.pdf/, 'the file name the reason is about');
+      // Ranks count scored candidates only.
+      assert.deepEqual(byId('batchBody').querySelectorAll('.rank-badge').map(text), ['1', '2']);
+      // The title counts candidates, the note counts the failures.
+      assert.match(text(byId('batchTitle')), /\b2\b/);
+      assert.equal(byId('batchFailedNote').hidden, false);
+      assert.doesNotMatch(text(byId('batchFailedNote')), RAW_KEY);
+      if (lang !== 'en') assert.doesNotMatch(text(byId('batchFailedNote')), FAILED_EN);
+    });
+    test(`${lang}: the summary figures ignore failed files`, () => {
+      const { byId, run } = appSandbox(lang, { batch });
+      run('renderBatchResults(lastBatchResults, "")');
+      assert.equal(text(byId('bsTotalCVs')), '2');
+      assert.equal(text(byId('bsAvgScore')), '61', 'the mean of 82 and 40, not of 82, 40, 0 and 0');
+      assert.equal(text(byId('bsShortlisted')), '1');
+      assert.equal(text(byId('bsTopCandidate')), 'Jansen');
+      assert.equal(byId('bsFailedSub').hidden, false);
+      assert.match(text(byId('bsFailedSub')), /\b2\b/);
+      assert.doesNotMatch(text(byId('bsFailedSub')), RAW_KEY);
+    });
+  }
+  test('a batch where every file failed shows no figures, not zeros', () => {
+    const { byId, run } = appSandbox('en', { batch: batch.slice(2) });
+    run('renderBatchResults(lastBatchResults, "")');
+    assert.equal(text(byId('bsTotalCVs')), '0');
+    assert.equal(text(byId('bsAvgScore')), '—');
+    assert.equal(text(byId('bsTopCandidate')), '—');
+  });
+  test('a batch with no failures shows no failure note', () => {
+    const { byId, run } = appSandbox('de', { batch: batch.slice(0, 2) });
+    run('renderBatchResults(lastBatchResults, "")');
+    assert.equal(byId('batchFailedNote').hidden, true);
+    assert.equal(byId('bsFailedSub').hidden, true);
+  });
+  test('an older server\'s error row (no status, no score) is still a failure, never a 0', () => {
+    const { byId, run } = appSandbox('en', { batch: [{ candidateName: 'broken', fileName: 'broken.pdf', error: 'Unexpected.' }] });
+    run('renderBatchResults(lastBatchResults, "")');
+    assert.equal(byId('batchBody').querySelectorAll('tr')[0].getAttribute('data-failed'), '1');
+    assert.equal(byId('batchBody').querySelectorAll('.score-pill').length, 0);
+  });
+  test('the CSV gives a failed file a status and its error, and empty score cells — never zeros', () => {
+    const { ctx, run } = appSandbox('en', { batch });
+    run('exportBatchCsv()');
+    const lines = ctx.__downloaded.body.split('\n');
+    assert.equal(lines[0], 'Rank,Candidate,Overall,Keywords,Skills,Experience,Education,Decision,Role,Status,Error');
+    assert.equal(lines[1], '1,"Jansen",82,80,85,90,60,"","",scored,');
+    assert.equal(lines[3], ',"scan",,,,,,,"",failed,"IMAGE_ONLY_PDF: No text could be extracted — this PDF appears to be a scanned image."');
+    assert.equal(lines[4], ',"notes",,,,,,,"",failed,"INVALID_FILE.FILE_TYPE: ""notes.pdf"" is not a valid PDF or DOCX file."');
+  });
+});
+
+describe('an audit record without a score', () => {
+  const rec = { id: 'u1', createdAt: '2026-03-15T09:30:00.000Z', candidateId: 'c9', candidateName: 'broken', role: 'Analyst', overall: null, scores: {}, decision: '', note: '', reviewedBy: '' };
+  for (const lang of LANGS) {
+    test(`${lang}: shows no 0, says "not scored", and offers no decision or report`, () => {
+      const { byId, run } = appSandbox(lang);
+      run('renderAuditTable([' + JSON.stringify(rec) + '])');
+      const row = byId('auditBody').querySelector('tr');
+      assert.doesNotMatch(text(row), /\b0\b/);
+      assert.equal(row.querySelector('.score-pill').textContent, '—');
+      assert.ok(row.querySelector('.unscored-badge'));
+      assert.doesNotMatch(text(row), RAW_KEY);
+      assert.equal(row.querySelector('select').disabled, true);
+      assert.equal(row.querySelectorAll('[data-action="audit-report"]').length, 0);
+    });
+  }
 });
 
 describe('the plan chip and the staged-file list', () => {
