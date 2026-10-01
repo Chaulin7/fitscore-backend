@@ -31,7 +31,7 @@ const { scan } = require(path.join(ROOT, 'src', 'i18n', 'prerender.js'));
 const { PAGE_CONFIG } = require(path.join(ROOT, 'src', 'i18n', 'pages.js'));
 
 const NAMESPACES = ['lang', 'common', 'landing', 'pricing', 'plans', 'bias', 'integrations',
-  'transcript', 'compliance', 'auth', 'errors', 'settings', 'app'];
+  'transcript', 'compliance', 'contact', 'auth', 'errors', 'settings', 'app'];
 const KEY_LITERAL = new RegExp(`['"]((?:${NAMESPACES.join('|')})\\.[A-Za-z0-9_.]+)['"]`, 'g');
 const TAG_LIKE = /<\/?[a-zA-Z][^>]*>/;
 // 'integrations.html', 'app.html' … are file names, not keys.

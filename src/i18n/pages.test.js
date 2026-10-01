@@ -79,7 +79,7 @@ const HTML_ROUTES = [
   '/demo-transcript', '/demo-transcript.html', '/terms.html', '/privacy.html',
   '/nl/', '/de/', '/nl/bias-report.html', '/de/bias-report.html', '/nl/integrations.html',
   '/de/integrations.html', '/nl/compliance.html', '/de/compliance.html', '/nl/demo-transcript',
-  '/de/demo-transcript.html',
+  '/de/demo-transcript.html', '/contact', '/contact.html', '/nl/contact', '/de/contact', '/nl/contact.html',
 ];
 const LANGUAGE_HINTS = {
   'no hints': {},
@@ -155,6 +155,7 @@ describe('SEO: canonical and hreflang on every marketing variant', () => {
     ['/integrations.html', '/nl/integrations.html', '/de/integrations.html'],
     ['/compliance.html', '/nl/compliance.html', '/de/compliance.html'],
     ['/demo-transcript', '/nl/demo-transcript', '/de/demo-transcript'],
+    ['/contact', '/nl/contact', '/de/contact'],
   ];
   for (const [en, nl, de] of PAGES) {
     test(en, async () => {

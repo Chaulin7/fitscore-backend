@@ -61,6 +61,7 @@ in each language. When a term is missing, add it here with the key(s) that use i
 | purge (retention job) | opschoning / opschoonrun | Löschlauf | |
 | dry run | proefdraaien | Probelauf | |
 | feature request | functieverzoek | Funktionswunsch | |
+| contact form | contactformulier | Kontaktformular | `contact.*` |
 | read-only (paused account) | alleen-lezen | schreibgeschützt | |
 | batch | batch | Batch | |
 | Analyzer (tab) | Analyse | Analyse | |

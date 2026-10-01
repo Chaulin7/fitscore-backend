@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/icon-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192">
+<link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title data-i18n="contact.meta.title">CVsprings · Contact</title>
+<meta name="description" content="Send CVsprings a message. We reply by email." data-i18n-attr="content:contact.meta.description">
+__I18N_HEAD__
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
+.topbar{background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);padding:0 32px;height:60px;display:flex;align-items:center;gap:20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);position:sticky;top:0;z-index:100}
+.topbar-brand{display:flex;align-items:center;gap:5px;margin-right:auto;text-decoration:none}
+/* Shared brand mark via CSS mask of /brandmark.svg (single source; colour from currentColor). */
+.brandmark{display:inline-block;flex-shrink:0;width:50px;height:50px;color:#fff;background-color:currentColor;-webkit-mask:url(/brandmark.svg) center/contain no-repeat;mask:url(/brandmark.svg) center/contain no-repeat}
+.brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.4px}
+.brand-name em{font-style:normal;color:#7dd3fc}
+.nav-btn{background:none;border:none;color:rgba(255,255,255,0.65);font:600 13px 'Inter',sans-serif;padding:7px 15px;border-radius:6px;cursor:pointer;letter-spacing:.03em;transition:all .18s;text-decoration:none}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,0.1)}
+.page{max-width:860px;margin:0 auto;padding:32px 20px 60px}
+.hero{background:linear-gradient(135deg,#0a1f3d,#153360);color:#fff;border-radius:14px;padding:34px 36px;margin-bottom:22px}
+.hero h1{font-size:24px;font-weight:800;letter-spacing:-.3px;margin-bottom:10px}
+.hero p{font-size:14px;line-height:1.65;color:rgba(255,255,255,.82);max-width:660px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:18px;box-shadow:0 1px 6px rgba(0,0,0,0.05);overflow:hidden}
+.card-head{padding:16px 24px;border-bottom:1px solid #f3f4f6}
+.card-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#0a1f3d}
+.card-body{padding:22px 24px;line-height:1.6;color:#374151}
+.form-note{font-size:12.5px;color:#6b7280;margin-bottom:16px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;font-weight:600;color:#0a1f3d;margin-bottom:6px}
+.field input,.field textarea{display:block;width:100%;font:400 14px 'Inter',sans-serif;color:#111827;background:#fff;border:1.5px solid #d1d5db;border-radius:8px;padding:10px 12px}
+.field textarea{resize:vertical;min-height:150px;line-height:1.55}
+.field input:focus,.field textarea:focus{outline:2px solid #7dd3fc;outline-offset:1px;border-color:#0f2847}
+/* Stays red while focused: showError() focuses the field it marks. */
+.field [aria-invalid="true"],.field [aria-invalid="true"]:focus{border-color:#b91c1c;outline-color:#fca5a5}
+.consent{display:flex;gap:10px;align-items:flex-start;margin:4px 0 18px;font-size:13px;line-height:1.55;color:#374151}
+.consent input{flex-shrink:0;width:16px;height:16px;margin-top:2px;accent-color:#0f2847}
+.consent input[aria-invalid="true"]{outline:2px solid #b91c1c;outline-offset:2px}
+.form-err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.5;margin-bottom:16px}
+.cta{display:inline-block;background:#0f2847;color:#fff;border:none;border-radius:8px;padding:11px 20px;font:600 13px 'Inter',sans-serif;cursor:pointer}
+.cta:hover{background:#1a3d6e}
+.cta[disabled]{opacity:.6;cursor:default}
+.sent{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:16px 18px;color:#14532d;line-height:1.6}
+.sent:focus{outline:none}
+.sent:focus-visible{outline:2px solid #15803d;outline-offset:2px}
+.sent strong{display:block;font-size:15px;margin-bottom:4px}
+/* Honeypot, as on the landing page's demo form: off-screen, out of the tab order. */
+.hp-field{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+.note{font-size:13px;color:#6b7280;line-height:1.6;padding:0 4px;margin-bottom:6px;overflow-wrap:anywhere}
+a{color:#0f2847}
+.site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
+.site-footer a{color:#93c5fd}
+@media(max-width:640px){.topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}.card-body{padding:18px 16px}}
+/* Phone: brand and language flag share the first row; the page links wrap
+   onto the rows below (same as integrations.html). */
+@media(max-width:640px){
+  .topbar{flex-wrap:wrap;height:auto;min-height:60px;padding:6px 14px;gap:2px 4px}
+  .topbar > .lang-switch{order:1}
+  .topbar::after{content:"";order:1;flex-basis:100%;height:0}
+  .topbar .nav-btn{order:2;padding:6px 10px}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="topbar-brand" href="/" aria-label="CVsprings home" data-i18n-attr="aria-label:common.homeLabel">
+    <span class="brandmark" aria-hidden="true"></span>
+    <span class="brand-name">CV<em>springs</em></span>
+  </a>
+  <a class="nav-btn" href="/login" data-i18n="common.nav.app">App</a>
+  <a class="nav-btn" href="/compliance.html" data-i18n="common.nav.euAiAct">EU AI Act</a>
+  <a class="nav-btn" href="/privacy.html" data-i18n="common.nav.privacy">Privacy</a>
+  <a class="nav-btn" href="/terms.html" data-i18n="common.nav.terms">Terms</a>
+  __LANG_SWITCHER_DARK__
+</div>
+
+<!-- TODO(i18n-legal): the consent sentence below is new copy, in en/nl/de, and
+     the Privacy Policy does not yet describe contact-form data (purpose,
+     delivery by Resend, kept only as an email in the receiving inbox). See the
+     PR for both. -->
+<div class="page">
+  <div class="hero">
+    <h1 data-i18n="contact.hero.title">Contact</h1>
+    <p data-i18n="contact.hero.lede">Questions about CVsprings, your account or this website? Send us a message and we will reply by email.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title" data-i18n="contact.form.title">Send a message</span></div>
+    <div class="card-body">
+      <form id="contactForm" data-action="submitContact" novalidate>
+        <input class="hp-field" type="text" id="c-website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <p class="form-note" data-i18n="contact.form.allRequired">All fields are required.</p>
+        <div class="field">
+          <label for="c-name" data-i18n="contact.form.name">Name</label>
+          <input id="c-name" name="name" type="text" autocomplete="name" maxlength="120" required>
+        </div>
+        <div class="field">
+          <label for="c-email" data-i18n="contact.form.email">Email address</label>
+          <input id="c-email" name="email" type="email" autocomplete="email" maxlength="254" required>
+        </div>
+        <div class="field">
+          <label for="c-message" data-i18n="contact.form.message">Message</label>
+          <textarea id="c-message" name="message" rows="7" maxlength="5000" required></textarea>
+        </div>
+        <div class="consent">
+          <input id="c-consent" name="consent" type="checkbox" required>
+          <label for="c-consent" data-i18n-html="contact.form.consent_html">I agree that my name, email address and message are used to answer this enquiry. See the <a href="/privacy.html" target="_blank" rel="noopener">privacy policy</a>.</label>
+        </div>
+        <div class="form-err" id="contactError" role="alert" hidden></div>
+        <button class="cta" type="submit" id="contactSubmit" data-i18n="contact.form.submit">Send message</button>
+      </form>
+      <div class="sent" id="contactSent" tabindex="-1" role="status" hidden>
+        <strong data-i18n="contact.sent.title">Message sent</strong>
+        <span id="contactSentText"></span>
+      </div>
+    </div>
+  </div>
+
+  <p class="note" data-i18n-html="contact.direct_html" data-i18n-vars='{"email":"__CONTACT_EMAIL__"}'>You can also email us directly at <a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__</a>.</p>
+  <p class="note" data-i18n-html="contact.demo_html">Want to see the product run? <a href="/#demo">Request a demo</a> instead.</p>
+</div>
+
+<footer class="site-footer">
+  CVsprings &mdash; <span data-i18n="common.footerTagline">Deterministic CV screening · Made in the Netherlands</span>
+  <br><a href="/login" data-i18n="common.footer.backToApp">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/compliance.html" data-i18n="common.footer.compliance">EU AI Act compliance</a> &nbsp;&middot;&nbsp; <a href="/privacy.html" data-i18n="common.footer.privacyPolicy">Privacy Policy</a> &nbsp;&middot;&nbsp; <a href="/terms.html" data-i18n="common.nav.terms">Terms</a>
+  <br>__LEGAL_FOOTER__
+</footer>
+
+<script nonce="__CSP_NONCE__">
+/* The contact form. No inline handlers (helmet sets script-src-attr 'none'):
+   the form carries data-action and is wired by the delegated listener at the
+   bottom, the same shape as compliance.html. Same-origin POST, like the
+   landing page's demo form. */
+(function(){
+  'use strict';
+  var EMAIL = '__CONTACT_EMAIL__';
+  var form = document.getElementById('contactForm');
+  var errLine = document.getElementById('contactError');
+  var submit = document.getElementById('contactSubmit');
+  var sent = document.getElementById('contactSent');
+  var fields = {
+    name: document.getElementById('c-name'),
+    email: document.getElementById('c-email'),
+    message: document.getElementById('c-message'),
+    consent: document.getElementById('c-consent'),
+  };
+
+  function clearError(){
+    errLine.hidden = true;
+    errLine.textContent = '';
+    Object.keys(fields).forEach(function(k){
+      fields[k].removeAttribute('aria-invalid');
+      fields[k].removeAttribute('aria-describedby');
+    });
+  }
+
+  function showError(field, text){
+    errLine.textContent = text;
+    errLine.hidden = false;
+    var el = field && fields[field];
+    if (el) {
+      el.setAttribute('aria-invalid', 'true');
+      el.setAttribute('aria-describedby', 'contactError');
+      el.focus();
+    }
+  }
+
+  // The server's rules, checked here first so the common slips never cost a
+  // request: every request counts against the 5-an-hour limit. The messages
+  // are the server's own error keys, so both say the same thing.
+  function firstProblem(v){
+    if (!v.name) return ['name', 'errors.VALIDATION_ERROR.NAME_REQUIRED'];
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) return ['email', 'errors.VALIDATION_ERROR.email'];
+    if (!v.message) return ['message', 'errors.VALIDATION_ERROR.message.REQUIRED'];
+    if (!v.consent) return ['consent', 'errors.VALIDATION_ERROR.consent.REQUIRED'];
+    return null;
+  }
+
+  function submitContact(el, ev){
+    ev.preventDefault();
+    if (submit.disabled) return;
+    clearError();
+    var v = {
+      name: fields.name.value.trim(),
+      email: fields.email.value.trim(),
+      message: fields.message.value.trim(),
+      consent: fields.consent.checked,
+    };
+    var problem = firstProblem(v);
+    if (problem) { showError(problem[0], I18N.t(problem[1])); return; }
+
+    var label = submit.textContent;
+    submit.disabled = true;
+    submit.textContent = I18N.t('contact.form.sending');
+    fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        name: v.name,
+        email: v.email,
+        message: v.message,
+        consent: true,
+        lang: I18N.lang,
+        website: document.getElementById('c-website').value,
+      }),
+    }).then(function(r){
+      return r.json().catch(function(){ return null; }).then(function(body){ return { ok: r.ok, body: body }; });
+    }).then(function(res){
+      if (res.ok) {
+        form.hidden = true;
+        I18N.setText(document.getElementById('contactSentText'), 'contact.sent.body', { email: v.email });
+        sent.hidden = false;
+        sent.focus();
+        return;
+      }
+      var body = res.body || {};
+      showError(body.field, I18N.errorMessage(body, 'contact.form.failed', { email: EMAIL }));
+    }).catch(function(){
+      showError(null, I18N.t('contact.form.failed', { email: EMAIL }));
+    }).then(function(){
+      submit.disabled = false;
+      submit.textContent = label;
+    });
+  }
+
+  var delegatedHandlers = {
+    submit: { submitContact: submitContact },
+  };
+  Object.keys(delegatedHandlers).forEach(function(eventType){
+    var map = delegatedHandlers[eventType];
+    document.addEventListener(eventType, function(e){
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var fn = map[el.dataset.action];
+      if (typeof fn === 'function') fn(el, e);
+    });
+  });
+})();
+</script>
+</body>
+</html>

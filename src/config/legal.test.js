@@ -24,7 +24,7 @@ const fs = require('node:fs');
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE } = require('./legal');
+const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE, CONTACT_EMAIL } = require('./legal');
 
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 
@@ -34,6 +34,7 @@ const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 const SERVED_PAGES = [
   'index.html', 'app.html', 'compliance.html', 'integrations.html',
   'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html',
+  'contact.html',
 ];
 
 const FOOTER_TOKEN = '__LEGAL_FOOTER__';
@@ -54,6 +55,10 @@ describe('the legal entity constants', () => {
     // the width here so a future edit to a shorter number fails loudly.
     assert.match(KVK, /^\d{8}$/);
     assert.match(BTW_ID, /^NL\d{9}B\d{2}$/);
+  });
+
+  test('the contact address is the one the Impressum publishes', () => {
+    assert.equal(CONTACT_EMAIL, 'jasper@cvsprings.com');
   });
 
   test('render as one canonical line', () => {
@@ -84,10 +89,10 @@ describe('the values live in exactly one place', () => {
   for (const page of SERVED_PAGES) {
     test(`${page} does not hardcode them`, () => {
       const html = read(page);
-      for (const [label, value] of [['KvK number', KVK], ['BTW-id', BTW_ID], ['legal name', LEGAL_NAME]]) {
+      for (const [label, value] of [['KvK number', KVK], ['BTW-id', BTW_ID], ['legal name', LEGAL_NAME], ['contact email', CONTACT_EMAIL]]) {
         assert.ok(
           !html.includes(value),
-          `${page} spells out the ${label} instead of using ${FOOTER_TOKEN} / ${NAME_TOKEN}. `
+          `${page} spells out the ${label} instead of using its placeholder (${FOOTER_TOKEN}, ${NAME_TOKEN}, __CONTACT_EMAIL__). `
           + 'Two copies of a registry number is one copy too many.',
         );
       }
