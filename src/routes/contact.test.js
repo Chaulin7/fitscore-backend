@@ -344,3 +344,28 @@ describe('nothing is persisted', () => {
     });
   });
 });
+
+describe('the Privacy Policy describes the contact form', () => {
+  const privacy = fs.readFileSync(path.join(REPO_ROOT, 'public', 'privacy.html'), 'utf8');
+  const section = (/<!-- =+ SECTION C — CONTACT FORM =+ -->([\s\S]*?)<\/div>\s*<\/div>/.exec(privacy) || [])[1] || '';
+
+  test('in its own section: purpose, data, legal basis, delivery, retention, rights', () => {
+    assert.ok(section, 'privacy.html has no contact-form section');
+    for (const phrase of [
+      'only to answer your enquiry',
+      'Your name, your email address and your message',
+      'Art. 6(1)(f) GDPR', 'Art. 6(1)(b) GDPR',
+      'only delivered to us as an email via Resend', 'not stored in our database',
+      'within 12 months of your enquiry being resolved',
+      'href="#privacyContactLine"',
+    ]) assert.ok(section.includes(phrase), `missing: ${phrase}`);
+    assert.match(privacy, /id="privacyContactLine"/, 'the rights section it points to exists');
+  });
+
+  test('the Resend subprocessor row includes contact-form messages', () => {
+    // Comments stripped: the TODO beside the row quotes the old wording.
+    const row = /<td>Resend \(optional\)<\/td>[\s\S]*?<\/tr>/.exec(privacy)[0].replace(/<!--[\s\S]*?-->/g, '');
+    assert.doesNotMatch(row, /recruiter email addresses only/);
+    assert.match(row, /contact-form messages/);
+  });
+});
