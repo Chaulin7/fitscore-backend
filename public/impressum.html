@@ -73,10 +73,10 @@ a{color:#0f2847}
 <!-- Imprint / Colofon / Impressum: § 5 DDG and art. 3:15d BW.
      Only the labels are translated. The values are the registered facts and
      read the same in every language (translate="no" keeps browser translation
-     off them). They are exactly the facts supplied for this page: nothing is
+     off them), except the register line, worded per language as specified. They are exactly the facts supplied for this page: nothing is
      to be added here — no phone number, no EU ODR link (the platform closed in
      July 2025), no liability, copyright or dispute-resolution statements —
-     without a decision. KvK, BTW-id and the email come from
+     without a decision. The legal name, KvK, BTW-id and the email come from
      src/config/legal.js as placeholders, like the footer.
      TODO(i18n-legal): open questions for this page are listed in the PR. -->
 <div class="page">
@@ -88,19 +88,23 @@ a{color:#0f2847}
   <div class="card">
     <dl class="imprint">
       <dt data-i18n="imprint.label.company">Company</dt>
-      <dd translate="no">Joyaco B.V. (besloten vennootschap / private limited company)</dd>
+      <dd translate="no">__LEGAL_NAME__ (besloten vennootschap / private limited company)</dd>
       <dt data-i18n="imprint.label.tradeName">Trade name</dt>
       <dd translate="no">CVsprings</dd>
       <dt data-i18n="imprint.label.address">Address</dt>
       <dd translate="no">Leidsegracht 34, 1016 CM Amsterdam, Netherlands</dd>
+      <dt data-i18n="imprint.label.seat">Statutory seat</dt>
+      <dd translate="no">Amsterdam</dd>
       <dt data-i18n="imprint.label.representedBy">Represented by</dt>
       <dd translate="no">Jasper Joy, director (bestuurder / Geschäftsführer)</dd>
       <dt data-i18n="imprint.label.email">Email</dt>
       <dd translate="no"><a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__</a></dd>
       <dt data-i18n="imprint.label.contactForm">Contact form</dt>
       <dd><a href="/contact" data-i18n="imprint.contactFormLink">Open the contact form</a></dd>
-      <dt data-i18n="imprint.label.kvk">Chamber of Commerce (KvK)</dt>
-      <dd translate="no">__LEGAL_KVK__</dd>
+      <!-- The register line is the one value that is worded per language: de reads
+           "Handelsregister: Kamer van Koophandel (KvK), Niederlande, Nr. …". -->
+      <dt data-i18n="imprint.label.kvk">Dutch Chamber of Commerce (KvK)</dt>
+      <dd translate="no" data-i18n="imprint.value.kvk" data-i18n-vars='{"number":"__LEGAL_KVK__"}'>__LEGAL_KVK__</dd>
       <dt data-i18n="imprint.label.vat">VAT ID</dt>
       <dd translate="no">__LEGAL_BTW__</dd>
       <dt data-i18n="imprint.label.responsible">Responsible for content</dt>

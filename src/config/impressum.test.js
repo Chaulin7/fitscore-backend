@@ -32,15 +32,17 @@ const html = raw
 const { variants, problems } = buildVariants({ 'impressum.html': html });
 
 // Exactly the supplied values, in page order. `null` is the contact-form row,
-// whose value is a link (checked separately).
+// whose value is a link (checked separately). An object is a value worded per
+// language; everything else reads the same in every language.
 const FACTS = [
-  ['imprint.label.company', 'Joyaco B.V. (besloten vennootschap / private limited company)'],
+  ['imprint.label.company', `${LEGAL_NAME} (besloten vennootschap / private limited company)`],
   ['imprint.label.tradeName', 'CVsprings'],
   ['imprint.label.address', 'Leidsegracht 34, 1016 CM Amsterdam, Netherlands'],
+  ['imprint.label.seat', 'Amsterdam'],
   ['imprint.label.representedBy', 'Jasper Joy, director (bestuurder / Geschäftsführer)'],
   ['imprint.label.email', 'jasper@cvsprings.com'],
   ['imprint.label.contactForm', null],
-  ['imprint.label.kvk', '42135911'],
+  ['imprint.label.kvk', { en: '42135911', nl: '42135911', de: 'Kamer van Koophandel (KvK), Niederlande, Nr. 42135911' }],
   ['imprint.label.vat', 'NL005523705B04'],
   ['imprint.label.responsible', 'Jasper Joy'],
 ];
@@ -73,15 +75,28 @@ for (const lang of ['en', 'nl', 'de']) {
       assert.equal(found.length, FACTS.length, found.map((r) => r.dt).join(' | '));
       FACTS.forEach(([labelKey, value], i) => {
         assert.equal(found[i].dt, messages[labelKey], `row ${i + 1} label`);
-        if (value !== null) assert.equal(found[i].dd, value, `row ${i + 1} (${found[i].dt}) value`);
+        const expected = value && typeof value === 'object' ? value[lang] : value;
+        if (expected !== null) assert.equal(found[i].dd, expected, `row ${i + 1} (${found[i].dt}) value`);
       });
     });
 
     test('the email is a mailto link and the contact form row links the same-language form', () => {
-      const found = rows(page);
-      assert.match(found[4].ddHtml, /^<a href="mailto:jasper@cvsprings\.com">jasper@cvsprings\.com<\/a>$/);
-      assert.match(found[5].ddHtml, new RegExp(`<a href="${variantPath('contact.html', lang)}"`));
-      assert.equal(found[5].dd, messages['imprint.contactFormLink']);
+      const row = (key) => rows(page).find((r) => r.dt === messages[key]);
+      assert.match(row('imprint.label.email').ddHtml, /^<a href="mailto:jasper@cvsprings\.com">jasper@cvsprings\.com<\/a>$/);
+      assert.match(row('imprint.label.contactForm').ddHtml, new RegExp(`<a href="${variantPath('contact.html', lang)}"`));
+      assert.equal(row('imprint.label.contactForm').dd, messages['imprint.contactFormLink']);
+    });
+
+    test('the statutory seat and the register line read as specified', () => {
+      const line = (key) => { const r = rows(page).find((x) => x.dt === messages[key]); return `${r.dt}: ${r.dd}`; };
+      assert.equal(line('imprint.label.seat'), {
+        en: 'Statutory seat: Amsterdam', nl: 'Statutaire zetel: Amsterdam', de: 'Satzungsmäßiger Sitz: Amsterdam',
+      }[lang]);
+      assert.equal(line('imprint.label.kvk'), {
+        en: 'Dutch Chamber of Commerce (KvK): 42135911',
+        nl: 'Kamer van Koophandel (KvK): 42135911',
+        de: 'Handelsregister: Kamer van Koophandel (KvK), Niederlande, Nr. 42135911',
+      }[lang]);
     });
 
     test('says nothing it was not asked to say', () => {
@@ -93,7 +108,7 @@ for (const lang of ['en', 'nl', 'de']) {
   });
 }
 
-test('the registry numbers come from src/config/legal.js, not the page', () => {
-  assert.ok(raw.includes('__LEGAL_KVK__') && raw.includes('__LEGAL_BTW__') && raw.includes('__CONTACT_EMAIL__'));
-  for (const v of [KVK, BTW_ID, CONTACT_EMAIL]) assert.ok(!raw.includes(v), `public/impressum.html hardcodes ${v}`);
+test('the legal name, registry numbers and email come from src/config/legal.js, not the page', () => {
+  for (const p of ['__LEGAL_NAME__', '__LEGAL_KVK__', '__LEGAL_BTW__', '__CONTACT_EMAIL__']) assert.ok(raw.includes(p), p);
+  for (const v of [LEGAL_NAME, KVK, BTW_ID, CONTACT_EMAIL]) assert.ok(!raw.includes(v), `public/impressum.html hardcodes ${v}`);
 });

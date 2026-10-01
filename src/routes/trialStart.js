@@ -338,7 +338,7 @@ router.get('/', async (req, res) => {
 
       // The invoice legal entity is the Stripe ACCOUNT's, and this session names
       // no other one — no on_behalf_of, no transfer_data, no Connect account.
-      // That is what keeps every invoice from this flow issued by Joyaco BV
+      // That is what keeps every invoice from this flow issued by Joyaco B.V.
       // (src/config/legal.js), identically to the paid path. It is stated as an
       // absence on purpose: the way this constraint would break is by somebody
       // adding one of those parameters, not by removing something.

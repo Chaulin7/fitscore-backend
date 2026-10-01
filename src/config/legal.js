@@ -25,7 +25,7 @@
  */
 
 /** Registered name of the operating entity (the trader, not the product brand). */
-const LEGAL_NAME = 'Joyaco BV';
+const LEGAL_NAME = 'Joyaco B.V.';
 
 /** Kamer van Koophandel registration number. Eight digits. */
 const KVK = '42135911';

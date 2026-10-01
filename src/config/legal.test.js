@@ -44,7 +44,7 @@ const footerBlocks = (html) => html.match(/<footer[\s\S]*?<\/footer>/gi) || [];
 
 describe('the legal entity constants', () => {
   test('are the registered values', () => {
-    assert.equal(LEGAL_NAME, 'Joyaco BV');
+    assert.equal(LEGAL_NAME, 'Joyaco B.V.');
     assert.equal(KVK, '42135911');
     assert.equal(BTW_ID, 'NL005523705B04');
   });
@@ -62,7 +62,7 @@ describe('the legal entity constants', () => {
   });
 
   test('render as one canonical line', () => {
-    assert.equal(FOOTER_LINE, 'Joyaco BV · KvK 42135911 · BTW NL005523705B04');
+    assert.equal(FOOTER_LINE, 'Joyaco B.V. · KvK 42135911 · BTW NL005523705B04');
   });
 
   test('contain nothing that HTML injection would have to escape', () => {
@@ -104,4 +104,40 @@ describe('the values live in exactly one place', () => {
       assert.ok(!/KvK\s*0{7,}/i.test(html), `${page} still shows the placeholder KvK number`);
     });
   }
+});
+
+describe('the legal name is spelled in one place: LEGAL_NAME', () => {
+  // Not just the exact string: "Joyaco BV", "Joyaco B.V.", "JOYACO B. V." are
+  // all the same name typed by hand, and any one of them on a page is a copy
+  // that will not follow the next rename. Pages and the dictionaries they are
+  // rendered from may only reach the name through __LEGAL_NAME__ or
+  // __LEGAL_FOOTER__.
+  const bare = LEGAL_NAME.replace(/\s+B\.?\s*V\.?$/i, '').trim();
+  const VARIANT = new RegExp(`\\b${bare.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+  const LOCALES = ['en', 'nl', 'de'].map((l) => [`locales/${l}.json`, fs.readFileSync(path.join(__dirname, '..', '..', 'locales', l + '.json'), 'utf8')]);
+
+  test('the detector catches the spellings a person would type (guards a vacuous pass)', () => {
+    for (const s of [LEGAL_NAME, `${bare} BV`, `${bare} B.V.`, `${bare} B. V.`, bare.toUpperCase()]) assert.match(`x ${s} y`, VARIANT, s);
+    assert.doesNotMatch('__LEGAL_NAME__ · __LEGAL_FOOTER__', VARIANT);
+  });
+
+  for (const page of SERVED_PAGES) {
+    test(`${page} names the entity only through the placeholders`, () => {
+      const m = VARIANT.exec(read(page));
+      assert.equal(m, null, `${page} hard-codes "${m && m[0]}"; use __LEGAL_NAME__`);
+    });
+  }
+
+  for (const [file, src] of LOCALES) {
+    test(`${file} does not spell it either`, () => {
+      const m = VARIANT.exec(src);
+      assert.equal(m, null, `${file} hard-codes "${m && m[0]}"`);
+    });
+  }
+
+  test('the Imprint, Terms, Privacy and the app reach it through __LEGAL_NAME__', () => {
+    for (const page of ['impressum.html', 'terms.html', 'privacy.html', 'app.html']) {
+      assert.ok(read(page).includes(NAME_TOKEN), `${page} has no ${NAME_TOKEN}`);
+    }
+  });
 });

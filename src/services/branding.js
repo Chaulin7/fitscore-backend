@@ -55,7 +55,9 @@ const BRAND_COLOR_FALLBACK = '#0f2847';
 // restated here, so a rename cannot leave this guard watching a name nobody
 // uses while the new one walks into a report header.
 const LEGAL_ENTITY_BARE = LEGAL_NAME.replace(/\s+B\.?\s*V\.?$/i, '').trim();
-const CURRENT_LEGAL_NAMES = [LEGAL_NAME, LEGAL_ENTITY_BARE, `${LEGAL_ENTITY_BARE} B.V.`];
+// Both spellings of the suffix, whichever one LEGAL_NAME uses: the match below
+// is exact, and "Joyaco BV" is as much the entity as "Joyaco B.V.".
+const CURRENT_LEGAL_NAMES = [...new Set([LEGAL_NAME, LEGAL_ENTITY_BARE, `${LEGAL_ENTITY_BARE} B.V.`, `${LEGAL_ENTITY_BARE} BV`])];
 
 /**
  * Entity names this operation has RETIRED. APPEND-ONLY — never prune it.
