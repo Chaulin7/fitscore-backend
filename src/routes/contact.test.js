@@ -415,6 +415,12 @@ describe('the Privacy Policy describes the contact form', () => {
     assert.match(privacy, /id="privacyContactLine"/, 'the rights section it points to exists');
   });
 
+  test('the International transfers bullet covers contact-form messages under the same safeguard note', () => {
+    const bullet = /<li><strong>Email \(if enabled\):<\/strong>[\s\S]*?<\/li>/.exec(privacy)[0];
+    assert.match(bullet, /would process recruiter email addresses and contact-form messages \(name, email address and message\)\./);
+    assert.ok(bullet.includes('<span class="todo">TODO &mdash; operator: if enabled, verify Resend&rsquo;s transfer safeguard.</span>'), 'the safeguard note is unchanged');
+  });
+
   test('the Resend subprocessor row includes contact-form messages', () => {
     // Comments stripped: the TODO beside the row quotes the old wording.
     const row = /<td>Resend \(optional\)<\/td>[\s\S]*?<\/tr>/.exec(privacy)[0].replace(/<!--[\s\S]*?-->/g, '');
