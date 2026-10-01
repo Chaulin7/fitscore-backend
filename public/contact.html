@@ -40,13 +40,11 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .field input:focus,.field textarea:focus{outline:2px solid #7dd3fc;outline-offset:1px;border-color:#0f2847}
 /* Stays red while focused: showError() focuses the field it marks. */
 .field [aria-invalid="true"],.field [aria-invalid="true"]:focus{border-color:#b91c1c;outline-color:#fca5a5}
-.consent{display:flex;gap:10px;align-items:flex-start;margin:4px 0 18px;font-size:13px;line-height:1.55;color:#374151}
-.consent input{flex-shrink:0;width:16px;height:16px;margin-top:2px;accent-color:#0f2847}
-.consent input[aria-invalid="true"]{outline:2px solid #b91c1c;outline-offset:2px}
 .form-err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.5;margin-bottom:16px}
 .cta{display:inline-block;background:#0f2847;color:#fff;border:none;border-radius:8px;padding:11px 20px;font:600 13px 'Inter',sans-serif;cursor:pointer}
 .cta:hover{background:#1a3d6e}
 .cta[disabled]{opacity:.6;cursor:default}
+.form-fine{margin-top:12px;font-size:12.5px;line-height:1.55;color:#6b7280}
 .sent{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:16px 18px;color:#14532d;line-height:1.6}
 .sent:focus{outline:none}
 .sent:focus-visible{outline:2px solid #15803d;outline-offset:2px}
@@ -81,10 +79,6 @@ a{color:#0f2847}
   __LANG_SWITCHER_DARK__
 </div>
 
-<!-- TODO(i18n-legal): the consent sentence below is new copy, in en/nl/de, and
-     the Privacy Policy does not yet describe contact-form data (purpose,
-     delivery by Resend, kept only as an email in the receiving inbox). See the
-     PR for both. -->
 <div class="page">
   <div class="hero">
     <h1 data-i18n="contact.hero.title">Contact</h1>
@@ -109,12 +103,12 @@ a{color:#0f2847}
           <label for="c-message" data-i18n="contact.form.message">Message</label>
           <textarea id="c-message" name="message" rows="7" maxlength="5000" required></textarea>
         </div>
-        <div class="consent">
-          <input id="c-consent" name="consent" type="checkbox" required>
-          <label for="c-consent" data-i18n-html="contact.form.consent_html">I agree that my name, email address and message are used to answer this enquiry. See the <a href="/privacy.html" target="_blank" rel="noopener">privacy policy</a>.</label>
-        </div>
         <div class="form-err" id="contactError" role="alert" hidden></div>
         <button class="cta" type="submit" id="contactSubmit" data-i18n="contact.form.submit">Send message</button>
+        <!-- TODO(i18n-legal): counsel review — this notice replaces the consent checkbox
+             (2 October 2026); new copy in en/nl/de. The legal basis is in Privacy
+             section C, not consent. Opens in a new tab so a half-typed message survives. -->
+        <p class="form-fine" data-i18n-html="contact.form.notice_html">We use your details only to answer your enquiry. See our <a href="/privacy.html" target="_blank" rel="noopener">privacy policy</a>.</p>
       </form>
       <div class="sent" id="contactSent" tabindex="-1" role="status" hidden>
         <strong data-i18n="contact.sent.title">Message sent</strong>
@@ -149,7 +143,6 @@ a{color:#0f2847}
     name: document.getElementById('c-name'),
     email: document.getElementById('c-email'),
     message: document.getElementById('c-message'),
-    consent: document.getElementById('c-consent'),
   };
 
   function clearError(){
@@ -179,7 +172,6 @@ a{color:#0f2847}
     if (!v.name) return ['name', 'errors.VALIDATION_ERROR.NAME_REQUIRED'];
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) return ['email', 'errors.VALIDATION_ERROR.email'];
     if (!v.message) return ['message', 'errors.VALIDATION_ERROR.message.REQUIRED'];
-    if (!v.consent) return ['consent', 'errors.VALIDATION_ERROR.consent.REQUIRED'];
     return null;
   }
 
@@ -191,7 +183,6 @@ a{color:#0f2847}
       name: fields.name.value.trim(),
       email: fields.email.value.trim(),
       message: fields.message.value.trim(),
-      consent: fields.consent.checked,
     };
     var problem = firstProblem(v);
     if (problem) { showError(problem[0], I18N.t(problem[1])); return; }
@@ -206,7 +197,6 @@ a{color:#0f2847}
         name: v.name,
         email: v.email,
         message: v.message,
-        consent: true,
         lang: I18N.lang,
         website: document.getElementById('c-website').value,
       }),

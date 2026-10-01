@@ -4,7 +4,8 @@
  * src/routes/contact.test.js — POST /api/contact, the general contact form.
  *
  * Covers: delivery to CONTACT_EMAIL with the sender as Reply-To; validation
- * (each field, trimming, the strict email rule, consent as a real boolean);
+ * (each field, trimming, the strict email rule; no consent field, and an old
+ * page's `consent` accepted and ignored);
  * the honeypot (normal success body, nothing sent, nothing logged); the
  * 5-an-hour per-IP limit (honeypot hits count; other addresses unaffected);
  * a failed delivery surfacing as 503 rather than a quiet 200; and — the
@@ -84,7 +85,6 @@ const VALID = Object.freeze({
   name: 'Sanne de Vries',
   email: 'sanne@agency.example',
   message: 'Do you support Dutch-language job descriptions?',
-  consent: true,
   lang: 'nl',
 });
 
@@ -155,9 +155,24 @@ describe('validation', () => {
     assert.deepEqual(body.params, { max: MESSAGE_MAX });
   });
 
-  test('consent: only a real `true` counts', async () => {
-    for (const consent of [undefined, false, 'true', 'on', 1, null]) {
-      await rejects({ ...VALID, consent }, 'consent', 'REQUIRED');
+  test('consent is not required, and an old page that still sends it gets through', async () => {
+    assert.equal((await post(VALID)).status, 200, 'no consent field');
+    for (const consent of [true, false, 'on', null]) {
+      const r = await post({ ...VALID, consent });
+      assert.equal(r.status, 200, `consent: ${JSON.stringify(consent)}`);
+    }
+    assert.equal(sent.length, 5);
+    assert.ok(sent.every((m) => !/consent/i.test(m.text)), 'the field is ignored, not forwarded');
+  });
+
+  test('the page has no consent checkbox, and its notice line links the Privacy Policy', () => {
+    const page = fs.readFileSync(path.join(REPO_ROOT, 'public', 'contact.html'), 'utf8');
+    assert.doesNotMatch(page, /type="checkbox"|c-consent|consent_html/);
+    assert.match(page, /<p class="form-fine" data-i18n-html="contact\.form\.notice_html">We use your details only to answer your enquiry\. See our <a href="\/privacy\.html"[^>]*>privacy policy<\/a>\.<\/p>/);
+    for (const lang of ['en', 'nl', 'de']) {
+      const dict = require(`../../locales/${lang}.json`);
+      assert.equal(dict['errors.VALIDATION_ERROR.consent.REQUIRED'], undefined, `${lang}: stale consent error`);
+      assert.equal(dict['contact.form.consent_html'], undefined, `${lang}: stale checkbox label`);
     }
   });
 
@@ -167,7 +182,7 @@ describe('validation', () => {
       for (const key of [
         'errors.VALIDATION_ERROR.NAME_REQUIRED', 'errors.VALIDATION_ERROR.NAME_TOO_LONG',
         'errors.VALIDATION_ERROR.email', 'errors.VALIDATION_ERROR.message.REQUIRED',
-        'errors.VALIDATION_ERROR.message.TOO_LONG', 'errors.VALIDATION_ERROR.consent.REQUIRED',
+        'errors.VALIDATION_ERROR.message.TOO_LONG',
         'errors.RATE_LIMITED.CONTACT_LIMIT', 'errors.CONTACT_UNAVAILABLE',
       ]) assert.ok(dict[key], `${lang}: ${key}`);
     }
@@ -352,7 +367,7 @@ describe('nothing is persisted', () => {
       const res = await fetch(base + '/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Name ' + marker, email: marker + '@example.com', message: 'Body ' + marker, consent: true, lang: 'de' }),
+        body: JSON.stringify({ name: 'Name ' + marker, email: marker + '@example.com', message: 'Body ' + marker, lang: 'de' }),
       });
       assert.equal(res.status, 200);
       assert.deepEqual(await res.json(), { ok: true });

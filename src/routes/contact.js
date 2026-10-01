@@ -4,7 +4,12 @@
  * src/routes/contact.js — the general contact form on /contact.
  *
  * POST /api/contact  (public — no session; anyone may write to us)
- *   { name, email, message, consent: true, lang, website }
+ *   { name, email, message, lang, website }
+ *
+ * There is no consent field: the legal basis is legitimate interest or
+ * contract (Privacy Policy, section C), and the form says so in a notice line.
+ * Pages served before that change send `consent: true`; it is ignored, so a
+ * visitor with such a page still gets through.
  *
  * The Impressum's second contact channel, next to the email address it
  * publishes, so it delivers to that same inbox: CONTACT_EMAIL in
@@ -173,10 +178,6 @@ router.post('/', contactLimiter, async (req, res) => {
       return sendError(res, 400, 'VALIDATION_ERROR', `Your message is too long (max ${MESSAGE_MAX} characters).`, 'message',
         { reason: 'TOO_LONG', params: { max: MESSAGE_MAX } });
     }
-    if (b.consent !== true) {
-      return sendError(res, 400, 'VALIDATION_ERROR', 'Please confirm that we may use your details to answer you.', 'consent', { reason: 'REQUIRED' });
-    }
-
     try {
       await sendContactEmail({ name, email, message, lang, receivedAt: new Date().toISOString() });
     } catch (err) {
