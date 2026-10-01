@@ -756,6 +756,10 @@ html[lang="en"] .en-note{display:none}
 .auth-back:hover{color:#fff}
 .auth-back:focus-visible{outline:2px solid #7dd3fc;outline-offset:2px;color:#fff}
 .auth-back svg{flex-shrink:0}
+.auth-legal{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 18px;width:100%;max-width:380px;margin-top:-6px}
+.auth-legal a{color:rgba(255,255,255,0.55);font:500 12px 'Inter',sans-serif;text-decoration:none;padding:2px;border-radius:4px}
+.auth-legal a:hover{color:#fff;text-decoration:underline}
+.auth-legal a:focus-visible{outline:2px solid #7dd3fc;outline-offset:2px;color:#fff}
 .auth-card{background:#fff;border-radius:14px;padding:28px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.35)}
 .auth-card h2{font-size:18px;font-weight:800;color:#0a1f3d;margin:0 0 4px}
 .auth-card form{display:flex;flex-direction:column;gap:12px}
@@ -1191,6 +1195,14 @@ img, video, table { max-width: 100%; }
       <div class="auth-links"><button type="button" class="auth-link" id="acceptToLogin" data-i18n="auth.backToLogin">Back to sign in</button></div>
     </form>
   </div>
+  <!-- The overlay covers the dashboard footer, so /login and /signup carry their
+       own legal links: the Imprint must be one click away from every page. -->
+  <footer class="auth-legal">
+    <a href="/privacy.html" data-i18n="common.footer.privacyPolicy">Privacy Policy</a>
+    <a href="/terms.html" data-i18n="common.nav.terms">Terms</a>
+    <a href="/impressum" data-i18n="common.footer.imprint">Imprint / Impressum</a>
+    <a href="/contact" data-i18n="common.footer.contact">Contact</a>
+  </footer>
 </div>
 <!-- Loading -->
 <div class="loading-overlay" id="loadingOverlay" style="display:none">
@@ -5543,7 +5555,7 @@ function toggleBatchWhy(btn, idx){
     </div>
   </div>
   <div class="footer-bottom">
-    <span>CVsprings &mdash; <span data-i18n="common.footerTagline">Deterministic CV screening · Made in the Netherlands</span><br><button class="footer-link" data-action="openInfoModal" data-index="1" data-i18n="app.info.aboutTab">About &amp; Contact</button> &nbsp;|&nbsp; <a class="footer-link" href="/terms.html" data-i18n="common.nav.terms">Terms</a> &nbsp;|&nbsp; <a class="footer-link" href="/privacy.html" data-i18n="common.footer.privacyPolicy">Privacy Policy</a> &nbsp;|&nbsp; <a class="footer-link" href="/compliance.html" data-i18n="common.footer.compliance">EU AI Act compliance</a> &nbsp;|&nbsp; <a class="footer-link" href="/bias-report.html" data-i18n="common.footer.bias">Bias &amp; monitoring</a> &nbsp;|&nbsp; <a class="footer-link" href="/integrations.html" data-i18n="app.footer.integrations">Integrations &amp; API</a><br>__LEGAL_FOOTER__</span>
+    <span>CVsprings &mdash; <span data-i18n="common.footerTagline">Deterministic CV screening · Made in the Netherlands</span><br><button class="footer-link" data-action="openInfoModal" data-index="1" data-i18n="app.info.aboutTab">About &amp; Contact</button> &nbsp;|&nbsp; <a class="footer-link" href="/terms.html" data-i18n="common.nav.terms">Terms</a> &nbsp;|&nbsp; <a class="footer-link" href="/privacy.html" data-i18n="common.footer.privacyPolicy">Privacy Policy</a> &nbsp;|&nbsp; <a class="footer-link" href="/compliance.html" data-i18n="common.footer.compliance">EU AI Act compliance</a> &nbsp;|&nbsp; <a class="footer-link" href="/bias-report.html" data-i18n="common.footer.bias">Bias &amp; monitoring</a> &nbsp;|&nbsp; <a class="footer-link" href="/integrations.html" data-i18n="app.footer.integrations">Integrations &amp; API</a> &nbsp;|&nbsp; <a class="footer-link" href="/impressum" data-i18n="common.footer.imprint">Imprint / Impressum</a> &nbsp;|&nbsp; <a class="footer-link" href="/contact" data-i18n="common.footer.contact">Contact</a><br>__LEGAL_FOOTER__</span>
     <span data-i18n="app.footer.decisionAid">Scores come from a deterministic rules engine and are a decision aid, not a final verdict.</span>
   </div>
 </footer>
