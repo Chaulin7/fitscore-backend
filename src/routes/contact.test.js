@@ -390,6 +390,8 @@ describe('the Privacy Policy describes the contact form', () => {
     for (const phrase of [
       'only to answer your enquiry',
       'Your name, your email address and your message',
+      'With your message we also receive the language of the page you used and the time it was sent.',
+      'To prevent abuse, your IP address is held in memory for up to one hour for rate limiting; it is not stored.',
       'Art. 6(1)(f) GDPR', 'Art. 6(1)(b) GDPR',
       'only delivered to us as an email via Resend', 'not stored in our database',
       'within 12 months of your enquiry being resolved',
