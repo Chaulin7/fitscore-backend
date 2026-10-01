@@ -36,6 +36,11 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .card-body h4{font-size:13px;font-weight:700;color:#0a1f3d;margin:16px 0 8px}
 .card-body h4:first-child{margin-top:0}
 table{width:100%;border-collapse:collapse;font-size:13px}
+/* A wide table scrolls inside its own box instead of widening the page. The
+   min-width keeps the four columns readable on a phone rather than crushed. */
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px}
+.table-scroll table{min-width:560px}
+.table-scroll:focus-visible{outline:2px solid #0f2847;outline-offset:2px}
 th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6;vertical-align:top}
 td{padding:12px 14px;border-bottom:1px solid #f3f4f6;color:#374151;vertical-align:top;line-height:1.55}
 tr:last-child td{border-bottom:none}
@@ -46,6 +51,13 @@ a{color:#0f2847}
 .site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
 .site-footer a{color:#93c5fd}
 @media(max-width:640px){.topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}td:first-child{white-space:normal}}
+/* Phone: the brand gets the first row and the page links wrap onto the rows
+   below. As one fixed-height row the bar ran off-screen at 375px. */
+@media(max-width:640px){
+  .topbar{flex-wrap:wrap;height:auto;min-height:60px;padding:6px 14px;gap:2px 4px}
+  .topbar::after{content:"";order:1;flex-basis:100%;height:0}
+  .topbar .nav-btn{order:2;padding:6px 10px}
+}
 </style>
 </head>
 <body>
@@ -106,7 +118,8 @@ a{color:#0f2847}
       </ul>
 
       <h4>Subprocessors and third parties</h4>
-      <table style="margin-bottom:12px">
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Subprocessors and third parties">
+      <table>
         <thead><tr><th>Name</th><th>Purpose</th><th>Location / region</th><th>Terms</th></tr></thead>
         <tbody>
           <tr>
@@ -136,6 +149,7 @@ a{color:#0f2847}
           </tr>
         </tbody>
       </table>
+      </div>
       <p><strong>No AI subprocessor:</strong> CVsprings&rsquo; scoring is a deterministic matching engine that runs inside the backend. CV content is not sent to any external AI/LLM provider.</p>
 
       <h4>International transfers</h4>
