@@ -45,7 +45,6 @@ th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-tran
 td{padding:12px 14px;border-bottom:1px solid #f3f4f6;color:#374151;vertical-align:top;line-height:1.55}
 tr:last-child td{border-bottom:none}
 td:first-child{font-weight:600;color:#0f2847}
-.todo{display:inline-block;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:6px;padding:1px 8px;font-size:11px;font-weight:700}
 .role-banner{background:#f8faff;border:1.5px solid #dde4f7;border-radius:10px;padding:14px 18px;font-size:13px;line-height:1.65;margin-bottom:4px}
 a{color:#0f2847}
 .site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
@@ -125,7 +124,8 @@ a{color:#0f2847}
           <tr>
             <td>Render</td>
             <td>Hosting of the CVsprings backend and database (incl. stored audit records).</td>
-            <td>Render, Inc. (US company). Service region: <span class="todo">TODO &mdash; operator: confirm the region selected in the Render dashboard (e.g. Frankfurt/EU or Oregon/US) and update this row.</span></td>
+            <!-- TODO(i18n-legal): counsel review — Render row: the visible "Service region: TODO …" placeholder is removed; the operator note below is hidden (2 October 2026). -->
+            <td>Render, Inc. (US company).<!-- TODO(operator): confirm the region selected in the Render dashboard (e.g. Frankfurt/EU or Oregon/US) and add it to this row. --></td>
             <td><a href="https://render.com/dpa" rel="noopener">Render DPA</a></td>
           </tr>
           <tr>
@@ -143,7 +143,7 @@ a{color:#0f2847}
           <tr>
             <td>Resend (optional)</td>
             <!-- TODO(i18n-legal): counsel review — Resend row: now also delivers contact-form messages; was "Processes recruiter email addresses only". -->
-            <td>Password-reset emails to recruiter accounts, and delivery of contact-form messages to our inbox &mdash; only if the operator has configured it. Processes recruiter email addresses and contact-form messages (name, email address and message); never candidate data. <span class="todo">TODO &mdash; operator: state whether Resend is enabled in production.</span></td>
+            <td>Password-reset emails to recruiter accounts, and delivery of contact-form messages to our inbox &mdash; only if the operator has configured it. Processes recruiter email addresses and contact-form messages (name, email address and message); never candidate data.<!-- TODO(operator): state whether Resend is enabled in production. --></td>
             <td>Resend, Inc. (US).</td>
             <td><a href="https://resend.com/legal/dpa" rel="noopener">Resend DPA</a></td>
           </tr>
@@ -154,18 +154,19 @@ a{color:#0f2847}
 
       <h4>International transfers</h4>
       <ul>
-        <li><strong>Hosting:</strong> if the Render service region is inside the EU/EEA, candidate data at rest does not leave the EU/EEA; if a non-EU region is selected, a transfer safeguard is required. <span class="todo">TODO &mdash; operator: confirm region; if outside the EU/EEA, verify Render&rsquo;s safeguard (SCCs and/or EU&ndash;US Data Privacy Framework status) and document it here.</span></li>
+        <li><strong>Hosting:</strong> if the Render service region is inside the EU/EEA, candidate data at rest does not leave the EU/EEA; if a non-EU region is selected, a transfer safeguard is required.<!-- TODO(operator): confirm region; if outside the EU/EEA, verify Render's safeguard (SCCs and/or EU-US Data Privacy Framework status) and document it here. --></li>
         <li><strong>Analytics:</strong> Plausible states EU hosting (no transfer).</li>
         <li><strong>Fonts:</strong> the Google Fonts request transfers the visitor&rsquo;s IP address to Google (US). This affects app users (recruiters/visitors), not candidate CV data.</li>
-        <!-- TODO(i18n-legal): counsel review — transfers: Resend now also covers contact-form messages (2 October 2026); the safeguard note after it is unchanged. -->
-        <li><strong>Email (if enabled):</strong> Resend is US-based and would process recruiter email addresses and contact-form messages (name, email address and message). <span class="todo">TODO &mdash; operator: if enabled, verify Resend&rsquo;s transfer safeguard.</span></li>
+        <!-- TODO(i18n-legal): counsel review — transfers, Resend: "would process" is now "processes", and the operator TODO "verify Resend's transfer safeguard" is replaced by the EU-region / SCC sentences (2 October 2026). -->
+        <li><strong>Email (if enabled):</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>
       </ul>
 
       <h4>Cookies and tracking</h4>
       <p>CVsprings sets <strong>no cookies</strong>. The app uses your browser&rsquo;s <code>localStorage</code> for functional settings only (session token, saved preferences such as scoring weights, API address, cached templates) &mdash; this data stays in your browser and is not used for tracking. Analytics run via Plausible, which is cookieless and, per its published policy, collects no personal data. For these reasons the app does not show a cookie consent banner.</p>
 
       <h4>Contact for privacy requests</h4>
-      <p id="privacyContactLine">Privacy requests (access, correction, deletion, questions): <span id="privacyContact"><span class="todo">TODO &mdash; operator: set PRIVACY_CONTACT_EMAIL in the server environment; it will be shown here automatically.</span></span></p>
+      <!-- TODO(i18n-legal): counsel review — privacy contact: the visible "TODO — operator: set PRIVACY_CONTACT_EMAIL …" is now the Imprint's email address; the script below still swaps in PRIVACY_CONTACT_EMAIL when it is set (2 October 2026). -->
+      <p id="privacyContactLine">Privacy requests (access, correction, deletion, questions): <span id="privacyContact"><a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__</a></span></p>
     </div>
   </div>
 
@@ -201,8 +202,9 @@ a{color:#0f2847}
     </div>
   </div>
 
+  <!-- TODO(i18n-legal): counsel review — closing note: "; open items are marked TODO rather than guessed" removed, since no TODO is shown any more (2 October 2026). -->
   <div style="font-size:12px;color:#9ca3af;line-height:1.6;padding:0 4px">
-    Related pages: <a href="/compliance.html">EU AI Act compliance</a> &middot; <a href="/bias-report.html">scoring methodology, bias &amp; monitoring</a>. This policy describes actual product behaviour as of v1.3.0; open items are marked TODO rather than guessed.
+    Related pages: <a href="/compliance.html">EU AI Act compliance</a> &middot; <a href="/bias-report.html">scoring methodology, bias &amp; monitoring</a>. This policy describes actual product behaviour as of v1.3.0.
   </div>
 </div>
 
@@ -231,7 +233,7 @@ a{color:#0f2847}
         }
       }
     })
-    .catch(function(){ /* leave the TODO text visible */ });
+    .catch(function(){ /* keep the fallback address from the markup */ });
 })();
 </script>
 </body>

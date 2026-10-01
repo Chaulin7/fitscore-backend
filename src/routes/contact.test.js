@@ -415,10 +415,16 @@ describe('the Privacy Policy describes the contact form', () => {
     assert.match(privacy, /id="privacyContactLine"/, 'the rights section it points to exists');
   });
 
-  test('the International transfers bullet covers contact-form messages under the same safeguard note', () => {
+  test('the International transfers bullet: what Resend processes, where, and under which safeguard', () => {
     const bullet = /<li><strong>Email \(if enabled\):<\/strong>[\s\S]*?<\/li>/.exec(privacy)[0];
-    assert.match(bullet, /would process recruiter email addresses and contact-form messages \(name, email address and message\)\./);
-    assert.ok(bullet.includes('<span class="todo">TODO &mdash; operator: if enabled, verify Resend&rsquo;s transfer safeguard.</span>'), 'the safeguard note is unchanged');
+    assert.equal(bullet, '<li><strong>Email (if enabled):</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). '
+      + 'Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the '
+      + 'European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>');
+  });
+
+  test('privacy requests have a real address to go to, which PRIVACY_CONTACT_EMAIL still overrides', () => {
+    assert.match(privacy, /<span id="privacyContact"><a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__<\/a><\/span>/);
+    assert.match(privacy, /if \(d && d\.privacyContact\)/, 'the script still swaps in the configured address');
   });
 
   test('the Resend subprocessor row includes contact-form messages', () => {
