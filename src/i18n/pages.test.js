@@ -185,6 +185,41 @@ describe('SEO: canonical and hreflang on every marketing variant', () => {
   });
 });
 
+describe('the Imprint is linked everywhere but not indexed', () => {
+  const ROBOTS = 'noindex, follow';
+  const META = '<meta name="robots" content="noindex, follow">';
+
+  for (const p of ['/impressum', '/nl/impressum', '/de/impressum', '/impressum.html', '/de/impressum.html']) {
+    test(`${p}: X-Robots-Tag header and robots meta tag`, async () => {
+      for (const headers of [{}, { Cookie: 'lang=de' }, { 'Accept-Language': 'nl' }]) {
+        const res = await get(p, headers);
+        assert.equal(res.status, 200);
+        assert.equal(res.headers.get('x-robots-tag'), ROBOTS, `${p} ${JSON.stringify(headers)}`);
+        const html = await res.text();
+        assert.equal(html.split(META).length - 1, 1, `${p}: exactly one robots meta tag`);
+      }
+    });
+  }
+
+  test('no other page is noindexed', async () => {
+    for (const p of ['/', '/nl/', '/contact', '/de/contact', '/compliance.html', '/login', '/terms.html', '/privacy.html']) {
+      const res = await get(p);
+      assert.equal(res.headers.get('x-robots-tag'), null, p);
+      assert.doesNotMatch(await res.text(), /<meta name="robots"/, p);
+    }
+  });
+
+  test('no sitemap lists it (today none is served at all)', async () => {
+    for (const p of ['/sitemap.xml', '/sitemap_index.xml', '/robots.txt']) {
+      const res = await get(p);
+      if (res.status === 404) continue;
+      assert.doesNotMatch(await res.text(), /impressum/i, `${p} names the Impressum`);
+    }
+    const files = require('node:fs').readdirSync(path.join(REPO_ROOT, 'public')).filter((f) => /sitemap|robots/i.test(f));
+    for (const f of files) assert.doesNotMatch(require('node:fs').readFileSync(path.join(REPO_ROOT, 'public', f), 'utf8'), /impressum/i, f);
+  });
+});
+
 describe('/locales/{lang}.json', () => {
   test('serves each supported dictionary, complete', async () => {
     for (const lang of ['en', 'nl', 'de']) {
