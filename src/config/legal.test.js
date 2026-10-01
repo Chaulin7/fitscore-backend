@@ -34,7 +34,7 @@ const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 const SERVED_PAGES = [
   'index.html', 'app.html', 'compliance.html', 'integrations.html',
   'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html',
-  'contact.html',
+  'contact.html', 'impressum.html',
 ];
 
 const FOOTER_TOKEN = '__LEGAL_FOOTER__';
@@ -92,7 +92,7 @@ describe('the values live in exactly one place', () => {
       for (const [label, value] of [['KvK number', KVK], ['BTW-id', BTW_ID], ['legal name', LEGAL_NAME], ['contact email', CONTACT_EMAIL]]) {
         assert.ok(
           !html.includes(value),
-          `${page} spells out the ${label} instead of using its placeholder (${FOOTER_TOKEN}, ${NAME_TOKEN}, __CONTACT_EMAIL__). `
+          `${page} spells out the ${label} instead of using its placeholder (${FOOTER_TOKEN}, ${NAME_TOKEN}, __LEGAL_KVK__, __LEGAL_BTW__, __CONTACT_EMAIL__). `
           + 'Two copies of a registry number is one copy too many.',
         );
       }

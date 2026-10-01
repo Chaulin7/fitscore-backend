@@ -200,7 +200,7 @@ app.get('/eu-ai-act-checklist.pdf', (req, res) => {
 // routes are registered BEFORE express.static, and static gets index:false,
 // so the raw placeholder files are never reachable (neither via / nor
 // /index.html).
-const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html', 'contact.html'];
+const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html', 'contact.html', 'impressum.html'];
 // Pricing structured data is substituted ONCE at startup, not per request: the
 // tier table is static per deploy (same reasoning as the cached PAYLOAD in
 // routes/plans.js). It is built from src/config/plans.js, so the prices a
@@ -218,7 +218,8 @@ const pricingJsonLd = JSON.stringify(productJsonLd(configuredBaseUrl()))
 // still sees them. Every page in HTML_PAGES carries both placeholders in its
 // footer — src/config/legal.test.js fails the build if one stops doing so.
 // __CONTACT_EMAIL__ (the address the contact form delivers to) is the same kind
-// of per-deploy constant and is substituted alongside them.
+// of per-deploy constant and is substituted alongside them, as are __LEGAL_KVK__
+// and __LEGAL_BTW__ for the Impressum, which states the numbers on their own.
 // VideoObject structured data for the demo recording, built in this same
 // startup pass and for the same reason as the pricing block above: contentUrl
 // and thumbnailUrl have to carry the content hash that config/mediaAssets.js
@@ -269,6 +270,8 @@ for (const page of HTML_PAGES) {
     .replaceAll('__LEGAL_FOOTER__', LEGAL_FOOTER_LINE)
     .replaceAll('__LEGAL_NAME__', LEGAL_NAME)
     .replaceAll('__CONTACT_EMAIL__', CONTACT_EMAIL)
+    .replaceAll('__LEGAL_KVK__', KVK)
+    .replaceAll('__LEGAL_BTW__', BTW_ID)
     .replaceAll('__VIDEO_JSONLD__', videoJsonLd);
   // Content-hashed URLs for the demo video and poster (src/config/mediaAssets.js).
   // Substituted here, at startup, for the same reason as the two above: the
@@ -324,6 +327,9 @@ app.get('/demo-transcript', serveNoncedHtml('demo-transcript.html'));
 // General contact form — the Impressum's second contact channel. Clean URL for
 // the same reason; /contact.html works via the loop below.
 app.get('/contact', serveNoncedHtml('contact.html'));
+// Imprint / Colofon / Impressum (§ 5 DDG, art. 3:15d BW), linked from every
+// footer. /impressum.html works via the loop below.
+app.get('/impressum', serveNoncedHtml('impressum.html'));
 for (const page of HTML_PAGES) {
   app.get('/' + page, serveNoncedHtml(page));
 }

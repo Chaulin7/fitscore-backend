@@ -28,7 +28,7 @@ const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 const SERVED_PAGES = [
   'index.html', 'app.html', 'compliance.html', 'integrations.html',
   'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html',
-  'contact.html',
+  'contact.html', 'impressum.html',
 ];
 
 // Strip <script>…</script> and <!-- … --> before scanning, so JS assignments

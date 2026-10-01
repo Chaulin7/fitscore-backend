@@ -50,6 +50,9 @@ const PAGE_CONFIG = Object.freeze({
   'compliance.html': { kind: 'marketing', path: '/compliance.html', namespaces: ['common', 'lang', 'compliance'] },
   // `errors` because the form shows the API's error codes translated.
   'contact.html': { kind: 'marketing', path: '/contact', aliases: ['/contact.html'], namespaces: ['common', 'lang', 'contact', 'errors'] },
+  // Labels translated; the values (company, address, registry numbers) are the
+  // same facts in every language and carry no i18n markup.
+  'impressum.html': { kind: 'marketing', path: '/impressum', aliases: ['/impressum.html'], namespaces: ['common', 'lang', 'imprint'] },
   'app.html': { kind: 'app', namespaces: ['common', 'lang', 'auth', 'errors', 'settings', 'app'] },
   'terms.html': { kind: 'english-only' },
   'privacy.html': { kind: 'english-only' },
