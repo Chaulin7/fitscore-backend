@@ -24,7 +24,7 @@ const assert = require('node:assert/strict');
 
 const express = require('express');
 const contactRouter = require('./contact');
-const { buildContactEmail, NAME_MAX, MESSAGE_MAX } = require('./contact');
+const { buildContactEmail, configWarning, NAME_MAX, MESSAGE_MAX } = require('./contact');
 const { CONTACT_EMAIL } = require('../config/legal');
 
 const REPO_ROOT = path.join(__dirname, '..', '..');
@@ -254,6 +254,33 @@ describe('delivery failure', () => {
   });
 });
 
+describe('the boot-time configuration warning', () => {
+  test('silent when both RESEND_API_KEY and CONTACT_FROM_EMAIL are set', () => {
+    assert.equal(configWarning({ RESEND_API_KEY: 're_x', CONTACT_FROM_EMAIL: 'contact@cvsprings.com' }), null);
+  });
+
+  test('names a missing API key and says what it means, per environment', () => {
+    const prod = configWarning({ NODE_ENV: 'production', CONTACT_FROM_EMAIL: 'contact@cvsprings.com' });
+    assert.match(prod, /^\[contact\] contact form not fully configured: RESEND_API_KEY not set — every message is refused with 503/);
+    assert.match(configWarning({ CONTACT_FROM_EMAIL: 'a@b.example' }), /messages are logged as metadata, not sent/);
+  });
+
+  test('names a missing sender and the default it falls back to', () => {
+    assert.match(configWarning({ RESEND_API_KEY: 're_x' }), /CONTACT_FROM_EMAIL not set — sending from the default contact@cvsprings\.com, which must be a Resend-verified sender/);
+  });
+
+  test('both missing: still one line', () => {
+    const w = configWarning({});
+    assert.match(w, /RESEND_API_KEY and CONTACT_FROM_EMAIL not set/);
+    assert.doesNotMatch(w, /\n/);
+  });
+
+  test('never prints a secret', () => {
+    const w = configWarning({ RESEND_API_KEY: 're_SECRET_value_123', NODE_ENV: 'production' });
+    assert.ok(!w.includes('re_SECRET_value_123'), w);
+  });
+});
+
 describe('the email cannot be forged from the form', () => {
   test('a name with CRLF or bidi controls stays a one-line subject', () => {
     const { subject, text } = buildContactEmail({
@@ -295,6 +322,7 @@ describe('nothing is persisted', () => {
       base = 'http://127.0.0.1:' + port;
       const env = { ...process.env, PORT: String(port), DATABASE_PATH: DB_PATH, RETENTION_PURGE_MODE: 'dryrun', LOG_LEVEL: 'info', NODE_ENV: 'test' };
       delete env.RESEND_API_KEY; // the dev path: delivery is logged as metadata, not sent
+      delete env.CONTACT_FROM_EMAIL;
       child = spawn(process.execPath, ['src/index.js'], { cwd: REPO_ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
       child.stdout.on('data', (d) => { output += d; });
       child.stderr.on('data', (d) => { output += d; });
@@ -309,6 +337,14 @@ describe('nothing is persisted', () => {
     after(() => {
       if (child) child.kill('SIGKILL');
       try { fs.rmSync(TMP_DIR, { recursive: true, force: true }); } catch (_) {}
+    });
+
+    test('boot logs exactly one configuration warning, at warn level, without values', () => {
+      const lines = output.split('\n').filter((l) => l.includes('contact form not fully configured'));
+      assert.equal(lines.length, 1, output);
+      const entry = JSON.parse(lines[0]);
+      assert.equal(entry.level, 40, 'pino warn, not error');
+      assert.match(entry.msg, /RESEND_API_KEY and CONTACT_FROM_EMAIL not set/);
     });
 
     test('a delivered message leaves no trace in the database, its files or the logs', async () => {

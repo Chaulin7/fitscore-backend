@@ -46,6 +46,7 @@ function sendError(res, status, code, message, field, detail) {
 
 const NAME_MAX = 120;
 const MESSAGE_MAX = 5000;
+const DEFAULT_FROM = 'contact@cvsprings.com';
 
 // Same shape as the demo limiter: 5 submissions an hour per IP, honeypot hits
 // and invalid submissions included, so a bot cannot probe the form for free.
@@ -101,7 +102,7 @@ async function sendContactEmail(payload) {
   return router.deliver({
     // Its own sender, like feature requests: this route mails text a stranger
     // wrote, and a spam complaint should not land on the password-reset sender.
-    from: process.env.CONTACT_FROM_EMAIL || 'contact@cvsprings.com',
+    from: process.env.CONTACT_FROM_EMAIL || DEFAULT_FROM,
     to: CONTACT_EMAIL,
     subject,
     text,
@@ -109,6 +110,29 @@ async function sendContactEmail(payload) {
     // turn the address into a list. Validation below guarantees it is set.
     replyTo: [replyTo],
   });
+}
+
+/**
+ * The one boot-log line src/index.js prints when the contact form cannot
+ * deliver as configured, or null when it can. A misconfigured deploy must be
+ * obvious in the Render logs before the first visitor finds out. It names the
+ * missing variables and what that means; it never prints a value.
+ */
+function configWarning(env = process.env) {
+  const missing = [];
+  const effects = [];
+  if (!env.RESEND_API_KEY) {
+    missing.push('RESEND_API_KEY');
+    effects.push(env.NODE_ENV === 'production'
+      ? 'every message is refused with 503 CONTACT_UNAVAILABLE'
+      : 'messages are logged as metadata, not sent');
+  }
+  if (!env.CONTACT_FROM_EMAIL) {
+    missing.push('CONTACT_FROM_EMAIL');
+    effects.push(`sending from the default ${DEFAULT_FROM}, which must be a Resend-verified sender`);
+  }
+  if (!missing.length) return null;
+  return `[contact] contact form not fully configured: ${missing.join(' and ')} not set — ${effects.join('; ')}.`;
 }
 
 // POST /api/contact
@@ -173,5 +197,6 @@ router.deliver = deliverViaResend;
 
 module.exports = router;
 module.exports.buildContactEmail = buildContactEmail;
+module.exports.configWarning = configWarning;
 module.exports.NAME_MAX = NAME_MAX;
 module.exports.MESSAGE_MAX = MESSAGE_MAX;

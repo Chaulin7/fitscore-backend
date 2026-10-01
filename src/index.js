@@ -507,6 +507,12 @@ warnDeprecatedAliases(logger
   ? { warn: (m) => logger.warn(m) }
   : console);
 
+// Same idea for the contact form: one warning line if it cannot deliver as
+// configured (no RESEND_API_KEY, or no CONTACT_FROM_EMAIL), naming the missing
+// variables and never a value. A warning, not an error: the server is fine.
+const contactConfigWarning = contactRouter.configWarning(process.env);
+if (contactConfigWarning) (logger ? logger.warn(contactConfigWarning) : console.warn(contactConfigWarning));
+
 const server = app.listen(PORT, () => {
   const log = logger ? logger.info.bind(logger) : console.log;
   log('CVsprings API listening on http://localhost:' + PORT);
