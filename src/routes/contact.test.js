@@ -422,9 +422,8 @@ describe('the Privacy Policy describes the contact form', () => {
       + 'European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>');
   });
 
-  test('privacy requests have a real address to go to, which PRIVACY_CONTACT_EMAIL still overrides', () => {
-    assert.match(privacy, /<span id="privacyContact"><a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__<\/a><\/span>/);
-    assert.match(privacy, /if \(d && d\.privacyContact\)/, 'the script still swaps in the configured address');
+  test('privacy requests have a real address, written in by the server (see src/config/privacyContact.test.js)', () => {
+    assert.match(privacy, /<span id="privacyContact"><a href="mailto:__PRIVACY_CONTACT_EMAIL__">__PRIVACY_CONTACT_EMAIL__<\/a><\/span>/);
   });
 
   test('the Resend subprocessor row includes contact-form messages', () => {

@@ -166,8 +166,8 @@ a{color:#0f2847}
       <p>CVsprings sets <strong>no cookies</strong>. The app uses your browser&rsquo;s <code>localStorage</code> for functional settings only (session token, saved preferences such as scoring weights, API address, cached templates) &mdash; this data stays in your browser and is not used for tracking. Analytics run via Plausible, which is cookieless and, per its published policy, collects no personal data. For these reasons the app does not show a cookie consent banner.</p>
 
       <h4>Contact for privacy requests</h4>
-      <!-- TODO(i18n-legal): counsel review — privacy contact: the visible "TODO — operator: set PRIVACY_CONTACT_EMAIL …" is now the Imprint's email address; the script below still swaps in PRIVACY_CONTACT_EMAIL when it is set (2 October 2026). -->
-      <p id="privacyContactLine">Privacy requests (access, correction, deletion, questions): <span id="privacyContact"><a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__</a></span></p>
+      <!-- TODO(i18n-legal): counsel review — privacy contact: PRIVACY_CONTACT_EMAIL when set, else the Imprint's address; written into the page by the server, so it is the same with or without JavaScript (2 October 2026). -->
+      <p id="privacyContactLine">Privacy requests (access, correction, deletion, questions): <span id="privacyContact"><a href="mailto:__PRIVACY_CONTACT_EMAIL__">__PRIVACY_CONTACT_EMAIL__</a></span></p>
     </div>
   </div>
 
@@ -231,27 +231,5 @@ a{color:#0f2847}
   <br>__LEGAL_FOOTER__
 </footer>
 
-<script nonce="__CSP_NONCE__">
-(function(){
-  'use strict';
-  var API = '';
-  try { API = (localStorage.getItem('cvsprings_api_url') || 'https://cvsprings7.onrender.com').replace(/\/+$/, ''); } catch (_) {}
-  fetch(API + '/api/meta', { headers: { 'Accept': 'application/json' } })
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){
-      if (d && d.privacyContact) {
-        var host = document.getElementById('privacyContact');
-        if (host) {
-          var a = document.createElement('a');
-          a.href = 'mailto:' + d.privacyContact;
-          a.textContent = d.privacyContact;
-          host.innerHTML = '';
-          host.appendChild(a);
-        }
-      }
-    })
-    .catch(function(){ /* keep the fallback address from the markup */ });
-})();
-</script>
 </body>
 </html>

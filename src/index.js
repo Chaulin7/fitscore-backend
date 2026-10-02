@@ -26,6 +26,7 @@ const { productJsonLd } = require('./config/plans');
 const { MEDIA_PLACEHOLDERS, URL_PREFIX: MEDIA_URL_PREFIX, assetUrl, logMediaAssets, DEMO_VIDEO_UPLOAD_DATE } = require('./config/mediaAssets');
 const { configuredBaseUrl, warnDeprecatedAliases } = require('./config/appUrl');
 const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE: LEGAL_FOOTER_LINE, CONTACT_EMAIL } = require('./config/legal');
+const { resolvePrivacyContact } = require('./config/privacyContact');
 const { migrateLegacyData } = require('./services/authService');
 const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { startProvenanceSweep } = require('./services/provenanceCache');
@@ -263,12 +264,18 @@ function buildVideoJsonLd() {
 }
 const videoJsonLd = buildVideoJsonLd();
 
+// The Privacy Policy's address for privacy requests: PRIVACY_CONTACT_EMAIL, or
+// the Imprint's address. Substituted here like the legal details, so the page
+// a visitor without JavaScript gets says the same as everyone else's.
+const privacyContact = resolvePrivacyContact(process.env);
+
 const htmlTemplates = {};
 for (const page of HTML_PAGES) {
   let html = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8')
     .replaceAll('__PRICING_JSONLD__', pricingJsonLd)
     .replaceAll('__LEGAL_FOOTER__', LEGAL_FOOTER_LINE)
     .replaceAll('__LEGAL_NAME__', LEGAL_NAME)
+    .replaceAll('__PRIVACY_CONTACT_EMAIL__', privacyContact.email)
     .replaceAll('__CONTACT_EMAIL__', CONTACT_EMAIL)
     .replaceAll('__LEGAL_KVK__', KVK)
     .replaceAll('__LEGAL_BTW__', BTW_ID)
@@ -390,7 +397,8 @@ app.use('/api/plans', generalLimiter, plansRouter);
 // from env so the operator sets real values without code edits).
 app.get('/api/meta', generalLimiter, (req, res) => {
   res.json({
-    privacyContact: process.env.PRIVACY_CONTACT_EMAIL || null,
+    // The same address the Privacy Policy prints (src/config/privacyContact.js).
+    privacyContact: privacyContact.email,
     supportEmail: process.env.SUPPORT_EMAIL || null,
     company: {
       // From src/config/legal.js, not COMPANY_LEGAL_NAME. That variable is
@@ -510,6 +518,8 @@ warnDeprecatedAliases(logger
 // Same idea for the contact form: one warning line if it cannot deliver as
 // configured (no RESEND_API_KEY, or no CONTACT_FROM_EMAIL), naming the missing
 // variables and never a value. A warning, not an error: the server is fine.
+if (privacyContact.warning) (logger ? logger.warn(privacyContact.warning) : console.warn(privacyContact.warning));
+
 const contactConfigWarning = contactRouter.configWarning(process.env);
 if (contactConfigWarning) (logger ? logger.warn(contactConfigWarning) : console.warn(contactConfigWarning));
 
