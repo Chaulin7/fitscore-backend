@@ -15,6 +15,7 @@ const orgRouter = require('./routes/org');
 const billingRouter = require('./routes/billing');
 const teamRouter = require('./routes/team');
 const demoRouter = require('./routes/demo');
+const contactRouter = require('./routes/contact');
 const mediaAssetsRouter = require('./routes/mediaAssets');
 const featureRequestsRouter = require('./routes/featureRequests');
 const plansRouter = require('./routes/plans');
@@ -24,7 +25,7 @@ const trialStartRouter = require('./routes/trialStart');
 const { productJsonLd } = require('./config/plans');
 const { MEDIA_PLACEHOLDERS, URL_PREFIX: MEDIA_URL_PREFIX, assetUrl, logMediaAssets, DEMO_VIDEO_UPLOAD_DATE } = require('./config/mediaAssets');
 const { configuredBaseUrl, warnDeprecatedAliases } = require('./config/appUrl');
-const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE: LEGAL_FOOTER_LINE } = require('./config/legal');
+const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE: LEGAL_FOOTER_LINE, CONTACT_EMAIL } = require('./config/legal');
 const { migrateLegacyData } = require('./services/authService');
 const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { startProvenanceSweep } = require('./services/provenanceCache');
@@ -199,7 +200,7 @@ app.get('/eu-ai-act-checklist.pdf', (req, res) => {
 // routes are registered BEFORE express.static, and static gets index:false,
 // so the raw placeholder files are never reachable (neither via / nor
 // /index.html).
-const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html'];
+const HTML_PAGES = ['index.html', 'app.html', 'compliance.html', 'integrations.html', 'terms.html', 'privacy.html', 'bias-report.html', 'demo-transcript.html', 'contact.html', 'impressum.html'];
 // Pricing structured data is substituted ONCE at startup, not per request: the
 // tier table is static per deploy (same reasoning as the cached PAYLOAD in
 // routes/plans.js). It is built from src/config/plans.js, so the prices a
@@ -216,6 +217,9 @@ const pricingJsonLd = JSON.stringify(productJsonLd(configuredBaseUrl()))
 // the server sends rather than fetched afterwards, so a visitor without JS
 // still sees them. Every page in HTML_PAGES carries both placeholders in its
 // footer — src/config/legal.test.js fails the build if one stops doing so.
+// __CONTACT_EMAIL__ (the address the contact form delivers to) is the same kind
+// of per-deploy constant and is substituted alongside them, as are __LEGAL_KVK__
+// and __LEGAL_BTW__ for the Impressum, which states the numbers on their own.
 // VideoObject structured data for the demo recording, built in this same
 // startup pass and for the same reason as the pricing block above: contentUrl
 // and thumbnailUrl have to carry the content hash that config/mediaAssets.js
@@ -265,6 +269,9 @@ for (const page of HTML_PAGES) {
     .replaceAll('__PRICING_JSONLD__', pricingJsonLd)
     .replaceAll('__LEGAL_FOOTER__', LEGAL_FOOTER_LINE)
     .replaceAll('__LEGAL_NAME__', LEGAL_NAME)
+    .replaceAll('__CONTACT_EMAIL__', CONTACT_EMAIL)
+    .replaceAll('__LEGAL_KVK__', KVK)
+    .replaceAll('__LEGAL_BTW__', BTW_ID)
     .replaceAll('__VIDEO_JSONLD__', videoJsonLd);
   // Content-hashed URLs for the demo video and poster (src/config/mediaAssets.js).
   // Substituted here, at startup, for the same reason as the two above: the
@@ -317,6 +324,12 @@ app.get('/dashboard', serveNoncedHtml('app.html'));
 // on the landing page. Clean URL because it is a page a visitor may be sent
 // directly to; /demo-transcript.html keeps working via the HTML_PAGES loop.
 app.get('/demo-transcript', serveNoncedHtml('demo-transcript.html'));
+// General contact form — the Impressum's second contact channel. Clean URL for
+// the same reason; /contact.html works via the loop below.
+app.get('/contact', serveNoncedHtml('contact.html'));
+// Imprint / Colofon / Impressum (§ 5 DDG, art. 3:15d BW), linked from every
+// footer. /impressum.html works via the loop below.
+app.get('/impressum', serveNoncedHtml('impressum.html'));
 for (const page of HTML_PAGES) {
   app.get('/' + page, serveNoncedHtml(page));
 }
@@ -366,6 +379,9 @@ app.use('/api/team', generalLimiter, teamRouter);
 // Demo requests from the landing page: public (no session), with its own
 // stricter per-IP limiter inside the router (5/hour).
 app.use('/api/demo-request', generalLimiter, demoRouter);
+// The general contact form on /contact: public, its own 5/hour per-IP limiter,
+// and nothing stored — a message exists only as the email it becomes.
+app.use('/api/contact', generalLimiter, contactRouter);
 // Tier table for the pricing page and in-product Settings. Public and
 // cacheable — it is the same copy a logged-out visitor sees on /.
 app.use('/api/plans', generalLimiter, plansRouter);
@@ -491,6 +507,12 @@ warnDeprecatedAliases(logger
   ? { warn: (m) => logger.warn(m) }
   : console);
 
+// Same idea for the contact form: one warning line if it cannot deliver as
+// configured (no RESEND_API_KEY, or no CONTACT_FROM_EMAIL), naming the missing
+// variables and never a value. A warning, not an error: the server is fine.
+const contactConfigWarning = contactRouter.configWarning(process.env);
+if (contactConfigWarning) (logger ? logger.warn(contactConfigWarning) : console.warn(contactConfigWarning));
+
 const server = app.listen(PORT, () => {
   const log = logger ? logger.info.bind(logger) : console.log;
   log('CVsprings API listening on http://localhost:' + PORT);
@@ -518,6 +540,7 @@ const server = app.listen(PORT, () => {
   log(' GET  /api/stats/overview     - Dashboard summary metrics (auth required)');
   log(' GET  /api/templates          - Templates CRUD (auth required)');
   log(' POST /api/feature-requests   - Submit a feature request (Pro/Team, auth required)');
+  log(' POST /api/contact            - Contact form message, emailed, never stored (public)');
   log(' GET  /admin/metrics          - Internal operator metrics (owner only)');
   log(' POST /admin/trial-invites    - Mint 30-day no-card trial tokens (owner only)');
   log(' GET  /admin/abandoned-trials  - Dry-run sweep of expired, unredeemed trial orgs (owner only)');

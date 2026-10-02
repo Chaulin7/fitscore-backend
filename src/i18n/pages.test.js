@@ -79,7 +79,8 @@ const HTML_ROUTES = [
   '/demo-transcript', '/demo-transcript.html', '/terms.html', '/privacy.html',
   '/nl/', '/de/', '/nl/bias-report.html', '/de/bias-report.html', '/nl/integrations.html',
   '/de/integrations.html', '/nl/compliance.html', '/de/compliance.html', '/nl/demo-transcript',
-  '/de/demo-transcript.html',
+  '/de/demo-transcript.html', '/contact', '/contact.html', '/nl/contact', '/de/contact', '/nl/contact.html',
+  '/impressum', '/impressum.html', '/nl/impressum', '/de/impressum', '/de/impressum.html',
 ];
 const LANGUAGE_HINTS = {
   'no hints': {},
@@ -155,6 +156,8 @@ describe('SEO: canonical and hreflang on every marketing variant', () => {
     ['/integrations.html', '/nl/integrations.html', '/de/integrations.html'],
     ['/compliance.html', '/nl/compliance.html', '/de/compliance.html'],
     ['/demo-transcript', '/nl/demo-transcript', '/de/demo-transcript'],
+    ['/contact', '/nl/contact', '/de/contact'],
+    ['/impressum', '/nl/impressum', '/de/impressum'],
   ];
   for (const [en, nl, de] of PAGES) {
     test(en, async () => {
@@ -179,6 +182,41 @@ describe('SEO: canonical and hreflang on every marketing variant', () => {
     for (const p of ['/login', '/terms.html', '/privacy.html']) {
       assert.doesNotMatch(await (await get(p)).text(), /hreflang=/, p);
     }
+  });
+});
+
+describe('the Imprint is linked everywhere but not indexed', () => {
+  const ROBOTS = 'noindex, follow';
+  const META = '<meta name="robots" content="noindex, follow">';
+
+  for (const p of ['/impressum', '/nl/impressum', '/de/impressum', '/impressum.html', '/de/impressum.html']) {
+    test(`${p}: X-Robots-Tag header and robots meta tag`, async () => {
+      for (const headers of [{}, { Cookie: 'lang=de' }, { 'Accept-Language': 'nl' }]) {
+        const res = await get(p, headers);
+        assert.equal(res.status, 200);
+        assert.equal(res.headers.get('x-robots-tag'), ROBOTS, `${p} ${JSON.stringify(headers)}`);
+        const html = await res.text();
+        assert.equal(html.split(META).length - 1, 1, `${p}: exactly one robots meta tag`);
+      }
+    });
+  }
+
+  test('no other page is noindexed', async () => {
+    for (const p of ['/', '/nl/', '/contact', '/de/contact', '/compliance.html', '/login', '/terms.html', '/privacy.html']) {
+      const res = await get(p);
+      assert.equal(res.headers.get('x-robots-tag'), null, p);
+      assert.doesNotMatch(await res.text(), /<meta name="robots"/, p);
+    }
+  });
+
+  test('no sitemap lists it (today none is served at all)', async () => {
+    for (const p of ['/sitemap.xml', '/sitemap_index.xml', '/robots.txt']) {
+      const res = await get(p);
+      if (res.status === 404) continue;
+      assert.doesNotMatch(await res.text(), /impressum/i, `${p} names the Impressum`);
+    }
+    const files = require('node:fs').readdirSync(path.join(REPO_ROOT, 'public')).filter((f) => /sitemap|robots/i.test(f));
+    for (const f of files) assert.doesNotMatch(require('node:fs').readFileSync(path.join(REPO_ROOT, 'public', f), 'utf8'), /impressum/i, f);
   });
 });
 

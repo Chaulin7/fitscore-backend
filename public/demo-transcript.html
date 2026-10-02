@@ -64,6 +64,10 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,4vw,42px);lin
 footer{border-top:1px solid var(--rule);padding:40px 0;margin-top:32px}
 .foot-brand{font-family:var(--display);font-weight:700;font-size:16px;margin-bottom:8px}
 .foot-meta{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-bottom:4px}
+/* Same look as the landing page's footer links. */
+.foot-links{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:13px;margin-top:14px}
+.foot-links a{color:var(--ink-soft);text-decoration:none}
+.foot-links a:hover{color:var(--ink);text-decoration:underline}
 
 /* ---- scaffold only: remove with the placeholder block below ---- */
 .placeholder{border:1px dashed var(--stamp);background:#2440B30D;padding:24px 28px;font-family:var(--mono);font-size:13px;line-height:1.8;color:var(--ink-soft)}
@@ -121,6 +125,11 @@ footer{border-top:1px solid var(--rule);padding:40px 0;margin-top:32px}
     <div class="foot-meta" data-i18n="common.footerTagline">Deterministic CV screening · Made in the Netherlands</div>
     <div class="foot-meta">__LEGAL_FOOTER__</div>
     <div class="foot-meta">© 2026 CVsprings</div>
+    <nav class="foot-links" aria-label="Footer" data-i18n-attr="aria-label:common.footerNav">
+      <a href="/privacy.html" data-i18n="common.footer.privacyPolicy">Privacy Policy</a>
+      <a href="/impressum" data-i18n="common.footer.imprint">Imprint / Impressum</a>
+      <a href="/contact" data-i18n="common.footer.contact">Contact</a>
+    </nav>
   </div>
 </footer>
 

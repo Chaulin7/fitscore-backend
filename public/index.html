@@ -527,9 +527,12 @@ footer nav a:hover{color:var(--ink);text-decoration:underline}
       <div class="foot-meta">© 2026 CVsprings</div>
     </div>
     <nav aria-label="Footer" data-i18n-attr="aria-label:common.footerNav">
-      <a href="#" data-i18n="landing.footer.privacy">Privacy policy</a>
-      <a href="#" data-i18n="landing.footer.dpa">Data processing agreement</a>
-      <a href="#" data-i18n="landing.footer.imprint">Imprint / Impressum</a>
+      <a href="/privacy.html" data-i18n="landing.footer.privacy">Privacy policy</a>
+      <!-- No DPA is published (docs/privacy/dpa-template.md is an unsigned draft),
+           so this asks for one rather than linking a document that is not there. -->
+      <a href="mailto:__CONTACT_EMAIL__?subject=DPA%20request" data-i18n="landing.footer.dpa">DPA available on request</a>
+      <a href="/impressum" data-i18n="common.footer.imprint">Imprint / Impressum</a>
+      <a href="/contact" data-i18n="common.footer.contact">Contact</a>
       <a href="/login" data-i18n="common.login">Log in</a>
       <a href="/signup" data-i18n="common.signup">Sign up</a>
     </nav>

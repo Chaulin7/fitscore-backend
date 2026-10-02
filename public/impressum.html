@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/icon-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192">
+<link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title data-i18n="imprint.meta.title">CVsprings · Imprint</title>
+<meta name="description" content="Legal and contact details of the company behind CVsprings." data-i18n-attr="content:imprint.meta.description">
+<!-- Reachable from every footer, but kept out of search results. The server
+     sends the same directive as an X-Robots-Tag header (src/i18n/pages.js). -->
+<meta name="robots" content="noindex, follow">
+__I18N_HEAD__
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
+.topbar{background:linear-gradient(135deg,#0a1f3d 0%,#0f2847 60%,#153360 100%);padding:0 32px;height:60px;display:flex;align-items:center;gap:20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);position:sticky;top:0;z-index:100}
+.topbar-brand{display:flex;align-items:center;gap:5px;margin-right:auto;text-decoration:none}
+/* Shared brand mark via CSS mask of /brandmark.svg (single source; colour from currentColor). */
+.brandmark{display:inline-block;flex-shrink:0;width:50px;height:50px;color:#fff;background-color:currentColor;-webkit-mask:url(/brandmark.svg) center/contain no-repeat;mask:url(/brandmark.svg) center/contain no-repeat}
+.brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:-.4px}
+.brand-name em{font-style:normal;color:#7dd3fc}
+.nav-btn{background:none;border:none;color:rgba(255,255,255,0.65);font:600 13px 'Inter',sans-serif;padding:7px 15px;border-radius:6px;cursor:pointer;letter-spacing:.03em;transition:all .18s;text-decoration:none}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,0.1)}
+.page{max-width:860px;margin:0 auto;padding:32px 20px 60px}
+.hero{background:linear-gradient(135deg,#0a1f3d,#153360);color:#fff;border-radius:14px;padding:34px 36px;margin-bottom:22px}
+.hero h1{font-size:24px;font-weight:800;letter-spacing:-.3px;margin-bottom:10px}
+.hero p{font-size:14px;line-height:1.65;color:rgba(255,255,255,.82);max-width:660px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:18px;box-shadow:0 1px 6px rgba(0,0,0,0.05);overflow:hidden}
+/* Label / value rows, the same look as the tables on the Privacy Policy. */
+.imprint{display:grid;grid-template-columns:minmax(150px,240px) 1fr}
+.imprint dt,.imprint dd{padding:13px 24px;border-bottom:1px solid #f3f4f6;line-height:1.55}
+.imprint dt{font-size:13px;font-weight:600;color:#0f2847}
+.imprint dd{color:#374151;overflow-wrap:anywhere}
+.imprint dt:last-of-type,.imprint dd:last-of-type{border-bottom:none}
+a{color:#0f2847}
+.site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
+.site-footer a{color:#93c5fd}
+@media(max-width:640px){
+  .topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}
+  /* One column: each label sits above its value. */
+  .imprint{grid-template-columns:1fr}
+  .imprint dt{padding:12px 16px 2px;border-bottom:none}
+  .imprint dd{padding:0 16px 12px}
+  .imprint dd:last-of-type{padding-bottom:14px}
+}
+/* Phone: brand and language flag share the first row; the page links wrap
+   onto the rows below (same as integrations.html). */
+@media(max-width:640px){
+  .topbar{flex-wrap:wrap;height:auto;min-height:60px;padding:6px 14px;gap:2px 4px}
+  .topbar > .lang-switch{order:1}
+  .topbar::after{content:"";order:1;flex-basis:100%;height:0}
+  .topbar .nav-btn{order:2;padding:6px 10px}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="topbar-brand" href="/" aria-label="CVsprings home" data-i18n-attr="aria-label:common.homeLabel">
+    <span class="brandmark" aria-hidden="true"></span>
+    <span class="brand-name">CV<em>springs</em></span>
+  </a>
+  <a class="nav-btn" href="/login" data-i18n="common.nav.app">App</a>
+  <a class="nav-btn" href="/privacy.html" data-i18n="common.nav.privacy">Privacy</a>
+  <a class="nav-btn" href="/terms.html" data-i18n="common.nav.terms">Terms</a>
+  __LANG_SWITCHER_DARK__
+</div>
+
+<!-- Imprint / Colofon / Impressum: § 5 DDG and art. 3:15d BW.
+     Only the labels are translated. The values are the registered facts and
+     read the same in every language (translate="no" keeps browser translation
+     off them), except the register line, worded per language as specified. They are exactly the facts supplied for this page: nothing is
+     to be added here — no phone number, no EU ODR link (the platform closed in
+     July 2025), no liability, copyright or dispute-resolution statements —
+     without a decision. The legal name, KvK, BTW-id and the email come from
+     src/config/legal.js as placeholders, like the footer.
+     TODO(i18n-legal): open questions for this page are listed in the PR. -->
+<div class="page">
+  <div class="hero">
+    <h1 data-i18n="imprint.title">Imprint</h1>
+    <p data-i18n="imprint.lede">The company behind CVsprings.</p>
+  </div>
+
+  <div class="card">
+    <dl class="imprint">
+      <dt data-i18n="imprint.label.company">Company</dt>
+      <dd translate="no">__LEGAL_NAME__ (besloten vennootschap / private limited company)</dd>
+      <dt data-i18n="imprint.label.tradeName">Trade name</dt>
+      <dd translate="no">CVsprings</dd>
+      <dt data-i18n="imprint.label.address">Address</dt>
+      <dd translate="no">Leidsegracht 34, 1016 CM Amsterdam, Netherlands</dd>
+      <dt data-i18n="imprint.label.seat">Statutory seat</dt>
+      <dd translate="no">Amsterdam</dd>
+      <dt data-i18n="imprint.label.representedBy">Represented by</dt>
+      <dd translate="no">Jasper Joy, director (bestuurder / Geschäftsführer)</dd>
+      <dt data-i18n="imprint.label.email">Email</dt>
+      <dd translate="no"><a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__</a></dd>
+      <dt data-i18n="imprint.label.contactForm">Contact form</dt>
+      <dd><a href="/contact" data-i18n="imprint.contactFormLink">Open the contact form</a></dd>
+      <!-- The register line is the one value that is worded per language: de reads
+           "Handelsregister: Kamer van Koophandel (KvK), Niederlande, Nr. …". -->
+      <dt data-i18n="imprint.label.kvk">Dutch Chamber of Commerce (KvK)</dt>
+      <dd translate="no" data-i18n="imprint.value.kvk" data-i18n-vars='{"number":"__LEGAL_KVK__"}'>__LEGAL_KVK__</dd>
+      <dt data-i18n="imprint.label.vat">VAT ID</dt>
+      <dd translate="no">__LEGAL_BTW__</dd>
+      <dt data-i18n="imprint.label.responsible">Responsible for content</dt>
+      <dd translate="no">Jasper Joy</dd>
+    </dl>
+  </div>
+</div>
+
+<footer class="site-footer">
+  CVsprings &mdash; <span data-i18n="common.footerTagline">Deterministic CV screening · Made in the Netherlands</span>
+  <br><a href="/login" data-i18n="common.footer.backToApp">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/compliance.html" data-i18n="common.footer.compliance">EU AI Act compliance</a> &nbsp;&middot;&nbsp; <a href="/privacy.html" data-i18n="common.footer.privacyPolicy">Privacy Policy</a> &nbsp;&middot;&nbsp; <a href="/terms.html" data-i18n="common.nav.terms">Terms</a> &nbsp;&middot;&nbsp; <a href="/impressum" data-i18n="common.footer.imprint">Imprint / Impressum</a> &nbsp;&middot;&nbsp; <a href="/contact" data-i18n="common.footer.contact">Contact</a>
+  <br>__LEGAL_FOOTER__
+</footer>
+</body>
+</html>

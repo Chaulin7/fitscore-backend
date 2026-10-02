@@ -48,6 +48,14 @@ const PAGE_CONFIG = Object.freeze({
   // Shell only (top bar, footer, title, copy buttons). The body is
   // regulatory prose and stays English, marked lang="en" in the markup.
   'compliance.html': { kind: 'marketing', path: '/compliance.html', namespaces: ['common', 'lang', 'compliance'] },
+  // `errors` because the form shows the API's error codes translated.
+  'contact.html': { kind: 'marketing', path: '/contact', aliases: ['/contact.html'], namespaces: ['common', 'lang', 'contact', 'errors'] },
+  // Labels translated; the values (company, address, registry numbers) are the
+  // same facts in every language and carry no i18n markup.
+  // `robots`: sent as X-Robots-Tag on every route that serves the page; the
+  // page carries the same <meta name="robots">. Linked from every footer, kept
+  // out of search results.
+  'impressum.html': { kind: 'marketing', path: '/impressum', aliases: ['/impressum.html'], namespaces: ['common', 'lang', 'imprint'], robots: 'noindex, follow' },
   'app.html': { kind: 'app', namespaces: ['common', 'lang', 'auth', 'errors', 'settings', 'app'] },
   'terms.html': { kind: 'english-only' },
   'privacy.html': { kind: 'english-only' },
@@ -189,7 +197,7 @@ function buildVariants(templates) {
   return { variants, problems };
 }
 
-function setHtmlHeaders(res, lang) {
+function setHtmlHeaders(res, lang, cfg) {
   res.set('Content-Type', 'text/html; charset=utf-8');
   // Never a shared cache: the body depends on the cookie and Accept-Language
   // (and carries a per-request CSP nonce besides).
@@ -197,6 +205,7 @@ function setHtmlHeaders(res, lang) {
   res.vary('Cookie');
   res.vary('Accept-Language');
   res.set('Content-Language', lang);
+  if (cfg && cfg.robots) res.set('X-Robots-Tag', cfg.robots);
 }
 
 /**
@@ -219,7 +228,7 @@ function createPages(templates, opts = {}) {
         ? DEFAULT_LANG
         : ui.resolveRequestLanguage(req, { fixed: fixedLang }).lang;
       const html = (variants[page] && (variants[page][lang] || variants[page][DEFAULT_LANG])) || '';
-      setHtmlHeaders(res, lang);
+      setHtmlHeaders(res, lang, cfg);
       res.send(html.replaceAll('__CSP_NONCE__', res.locals.cspNonce));
     };
   }

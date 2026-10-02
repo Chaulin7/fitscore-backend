@@ -39,6 +39,13 @@ a{color:#0f2847}
 .site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
 .site-footer a{color:#93c5fd}
 @media(max-width:640px){.topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}}
+/* Phone: the brand gets the first row and the page links wrap onto the rows
+   below. As one fixed-height row the bar ran off-screen at 375px. */
+@media(max-width:640px){
+  .topbar{flex-wrap:wrap;height:auto;min-height:60px;padding:6px 14px;gap:2px 4px}
+  .topbar::after{content:"";order:1;flex-basis:100%;height:0}
+  .topbar .nav-btn{order:2;padding:6px 10px}
+}
 </style>
 </head>
 <body>
@@ -61,7 +68,7 @@ a{color:#0f2847}
 <div class="page">
   <div class="hero">
     <h1>Terms of Service</h1>
-    <p>These terms govern use of CVsprings, operated by <span id="companyName">__LEGAL_NAME__</span>. By creating an account or using the service you agree to them. Last updated 29 September 2026.</p>
+    <p>These terms govern use of CVsprings, operated by <span id="companyName">__LEGAL_NAME__</span>. By creating an account or using the service you agree to them. Last updated 1 October 2026.</p>
   </div>
 
   <div class="draft">DRAFT — review by legal counsel before relying on these terms. Items marked <span class="legal-flag">LEGAL REVIEW</span> must be set by counsel for your jurisdiction.</div>
@@ -99,7 +106,8 @@ a{color:#0f2847}
   <div class="card">
     <div class="card-head"><span class="card-title">4 &middot; Customer data &amp; data-protection roles</span></div>
     <div class="card-body">
-      <p>For candidate data processed through CVsprings, <strong>you (the client) are the data controller</strong> and <strong>__LEGAL_NAME__ is the data processor</strong>, acting on your instructions. You are responsible for having a lawful basis to process candidate data and for informing candidates that an AI-based tool supports your screening. Processing details are in the <a href="/privacy.html">Privacy Policy</a>, and a Data Processing Agreement is available to clients.</p>
+      <!-- TODO(i18n-legal): counsel review — §4 said "informing candidates that an AI-based tool supports your screening"; now "an automated, rules-based screening tool". Rest of the sentence unchanged. -->
+      <p>For candidate data processed through CVsprings, <strong>you (the client) are the data controller</strong> and <strong>__LEGAL_NAME__ is the data processor</strong>, acting on your instructions. You are responsible for having a lawful basis to process candidate data and for informing candidates that an automated, rules-based screening tool supports your screening. Processing details are in the <a href="/privacy.html">Privacy Policy</a>, and a Data Processing Agreement is available to clients.</p>
     </div>
   </div>
 
@@ -165,7 +173,8 @@ a{color:#0f2847}
 </div>
 
 <footer class="site-footer">
-  CVsprings &mdash; deterministic, rules-based CV screening &nbsp;&middot;&nbsp; <a href="/login">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/privacy.html">Privacy</a> &nbsp;&middot;&nbsp; <a href="/compliance.html">EU AI Act</a> &nbsp;&middot;&nbsp; <a href="/integrations.html">Integrations</a>
+  CVsprings &mdash; Deterministic CV screening &middot; Made in the Netherlands
+  <br><a href="/login">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/privacy.html">Privacy</a> &nbsp;&middot;&nbsp; <a href="/compliance.html">EU AI Act</a> &nbsp;&middot;&nbsp; <a href="/integrations.html">Integrations</a> &nbsp;&middot;&nbsp; <a href="/impressum">Imprint / Impressum</a> &nbsp;&middot;&nbsp; <a href="/contact">Contact</a>
   <br>__LEGAL_FOOTER__
 </footer>
 

@@ -36,16 +36,27 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .card-body h4{font-size:13px;font-weight:700;color:#0a1f3d;margin:16px 0 8px}
 .card-body h4:first-child{margin-top:0}
 table{width:100%;border-collapse:collapse;font-size:13px}
+/* A wide table scrolls inside its own box instead of widening the page. The
+   min-width keeps the four columns readable on a phone rather than crushed. */
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px}
+.table-scroll table{min-width:560px}
+.table-scroll:focus-visible{outline:2px solid #0f2847;outline-offset:2px}
 th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6;vertical-align:top}
 td{padding:12px 14px;border-bottom:1px solid #f3f4f6;color:#374151;vertical-align:top;line-height:1.55}
 tr:last-child td{border-bottom:none}
 td:first-child{font-weight:600;color:#0f2847}
-.todo{display:inline-block;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:6px;padding:1px 8px;font-size:11px;font-weight:700}
 .role-banner{background:#f8faff;border:1.5px solid #dde4f7;border-radius:10px;padding:14px 18px;font-size:13px;line-height:1.65;margin-bottom:4px}
 a{color:#0f2847}
 .site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
 .site-footer a{color:#93c5fd}
 @media(max-width:640px){.topbar{padding:0 14px}.hero{padding:24px 20px}.page{padding:20px 12px 40px}td:first-child{white-space:normal}}
+/* Phone: the brand gets the first row and the page links wrap onto the rows
+   below. As one fixed-height row the bar ran off-screen at 375px. */
+@media(max-width:640px){
+  .topbar{flex-wrap:wrap;height:auto;min-height:60px;padding:6px 14px;gap:2px 4px}
+  .topbar::after{content:"";order:1;flex-basis:100%;height:0}
+  .topbar .nav-btn{order:2;padding:6px 10px}
+}
 </style>
 </head>
 <body>
@@ -69,7 +80,7 @@ a{color:#0f2847}
 <div class="page">
   <div class="hero">
     <h1>Privacy Policy</h1>
-    <p>This page explains, in plain language, what data CVsprings processes and stores, for how long, who it is shared with, and how to exercise your rights. Last updated 12 June 2026 (v1.3.0).</p>
+    <p>This page explains, in plain language, what data CVsprings processes and stores, for how long, who it is shared with, and how to exercise your rights. Last updated 2 October 2026 (v1.3.0).</p>
   </div>
 
   <div class="role-banner" style="margin-bottom:22px">
@@ -106,13 +117,15 @@ a{color:#0f2847}
       </ul>
 
       <h4>Subprocessors and third parties</h4>
-      <table style="margin-bottom:12px">
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Subprocessors and third parties">
+      <table>
         <thead><tr><th>Name</th><th>Purpose</th><th>Location / region</th><th>Terms</th></tr></thead>
         <tbody>
           <tr>
             <td>Render</td>
             <td>Hosting of the CVsprings backend and database (incl. stored audit records).</td>
-            <td>Render, Inc. (US company). Service region: <span class="todo">TODO &mdash; operator: confirm the region selected in the Render dashboard (e.g. Frankfurt/EU or Oregon/US) and update this row.</span></td>
+            <!-- TODO(i18n-legal): counsel review — Render row: service region (Frankfurt, EU) and the SCC safeguard stated; the answered operator note is removed (2 October 2026). -->
+            <td>Render, Inc. (US company). Service region: Frankfurt, Germany (EU). Because Render, Inc. is a US company, any transfer of data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement.</td>
             <td><a href="https://render.com/dpa" rel="noopener">Render DPA</a></td>
           </tr>
           <tr>
@@ -128,28 +141,33 @@ a{color:#0f2847}
             <td><a href="https://policies.google.com/privacy" rel="noopener">Google privacy policy</a></td>
           </tr>
           <tr>
-            <td>Resend (optional)</td>
-            <td>Password-reset emails to recruiter accounts &mdash; only if the operator has configured it. Processes recruiter email addresses only; never candidate data. <span class="todo">TODO &mdash; operator: state whether Resend is enabled in production.</span></td>
+            <!-- TODO(i18n-legal): counsel review — Resend row: "(optional)" and "only if the operator has configured it" removed — Resend is used in production; the answered operator note is removed (2 October 2026). Contact-form messages were added earlier the same day. -->
+            <td>Resend</td>
+            <td>Password-reset emails to recruiter accounts, and delivery of contact-form messages to our inbox. Processes recruiter email addresses and contact-form messages (name, email address and message); never candidate data.</td>
             <td>Resend, Inc. (US).</td>
             <td><a href="https://resend.com/legal/dpa" rel="noopener">Resend DPA</a></td>
           </tr>
         </tbody>
       </table>
+      </div>
       <p><strong>No AI subprocessor:</strong> CVsprings&rsquo; scoring is a deterministic matching engine that runs inside the backend. CV content is not sent to any external AI/LLM provider.</p>
 
       <h4>International transfers</h4>
       <ul>
-        <li><strong>Hosting:</strong> if the Render service region is inside the EU/EEA, candidate data at rest does not leave the EU/EEA; if a non-EU region is selected, a transfer safeguard is required. <span class="todo">TODO &mdash; operator: confirm region; if outside the EU/EEA, verify Render&rsquo;s safeguard (SCCs and/or EU&ndash;US Data Privacy Framework status) and document it here.</span></li>
+        <!-- TODO(i18n-legal): counsel review — transfers, Hosting: the conditional ("if the Render service region is inside the EU/EEA … if a non-EU region is selected …") is replaced by the actual region and safeguard, matching the Render row; the answered operator note is removed (2 October 2026). -->
+        <li><strong>Hosting:</strong> the CVsprings backend and its database (including stored audit records) run in Render&rsquo;s Frankfurt (EU Central) region, so candidate data at rest does not leave the EU/EEA. Because Render, Inc. is a US company, any transfer of data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement.</li>
         <li><strong>Analytics:</strong> Plausible states EU hosting (no transfer).</li>
         <li><strong>Fonts:</strong> the Google Fonts request transfers the visitor&rsquo;s IP address to Google (US). This affects app users (recruiters/visitors), not candidate CV data.</li>
-        <li><strong>Email (if enabled):</strong> Resend is US-based and would process recruiter email addresses. <span class="todo">TODO &mdash; operator: if enabled, verify Resend&rsquo;s transfer safeguard.</span></li>
+        <!-- TODO(i18n-legal): counsel review — transfers, Resend: "would process" is now "processes", the operator TODO "verify Resend's transfer safeguard" is replaced by the EU-region / SCC sentences, and the label "Email (if enabled)" is now "Email" (2 October 2026). -->
+        <li><strong>Email:</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>
       </ul>
 
       <h4>Cookies and tracking</h4>
       <p>CVsprings sets <strong>no cookies</strong>. The app uses your browser&rsquo;s <code>localStorage</code> for functional settings only (session token, saved preferences such as scoring weights, API address, cached templates) &mdash; this data stays in your browser and is not used for tracking. Analytics run via Plausible, which is cookieless and, per its published policy, collects no personal data. For these reasons the app does not show a cookie consent banner.</p>
 
       <h4>Contact for privacy requests</h4>
-      <p id="privacyContactLine">Privacy requests (access, correction, deletion, questions): <span id="privacyContact"><span class="todo">TODO &mdash; operator: set PRIVACY_CONTACT_EMAIL in the server environment; it will be shown here automatically.</span></span></p>
+      <!-- TODO(i18n-legal): counsel review — privacy contact: the visible "TODO — operator: set PRIVACY_CONTACT_EMAIL …" is now the Imprint's email address; the script below still swaps in PRIVACY_CONTACT_EMAIL when it is set (2 October 2026). -->
+      <p id="privacyContactLine">Privacy requests (access, correction, deletion, questions): <span id="privacyContact"><a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__</a></span></p>
     </div>
   </div>
 
@@ -168,13 +186,32 @@ a{color:#0f2847}
     </div>
   </div>
 
+  <!-- ===================== SECTION C — CONTACT FORM ===================== -->
+  <!-- TODO(i18n-legal): counsel review — new section (1 October 2026): the contact form on /contact. -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">C &middot; If you use our contact form</span></div>
+    <div class="card-body">
+      <ul>
+        <li><strong>Purpose.</strong> We use what you send through the contact form only to answer your enquiry.</li>
+        <!-- TODO(i18n-legal): counsel review — "Data collected" now also names the page language, the time sent and the in-memory IP address (2 October 2026). -->
+        <li><strong>Data collected.</strong> Your name, your email address and your message. With your message we also receive the language of the page you used and the time it was sent. To prevent abuse, your IP address is held in memory for up to one hour for rate limiting; it is not stored.</li>
+        <li><strong>Legal basis.</strong> Our legitimate interest in answering enquiries (Art. 6(1)(f) GDPR), or, where your enquiry relates to a contract, Art. 6(1)(b) GDPR.</li>
+        <li><strong>Delivered, not stored.</strong> Your message is only delivered to us as an email via Resend. It is not stored in our database.</li>
+        <li><strong>Retention.</strong> We delete the email from our mailbox within 12 months of your enquiry being resolved, unless we need it for an ongoing customer relationship.</li>
+        <li><strong>Your rights.</strong> The data-subject rights described in this policy apply to this data as well; see <a href="#privacyContactLine">Contact for privacy requests</a>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- TODO(i18n-legal): counsel review — closing note: "; open items are marked TODO rather than guessed" removed, since no TODO is shown any more (2 October 2026). -->
   <div style="font-size:12px;color:#9ca3af;line-height:1.6;padding:0 4px">
-    Related pages: <a href="/compliance.html">EU AI Act compliance</a> &middot; <a href="/bias-report.html">scoring methodology, bias &amp; monitoring</a>. This policy describes actual product behaviour as of v1.3.0; open items are marked TODO rather than guessed.
+    Related pages: <a href="/compliance.html">EU AI Act compliance</a> &middot; <a href="/bias-report.html">scoring methodology, bias &amp; monitoring</a>. This policy describes actual product behaviour as of v1.3.0.
   </div>
 </div>
 
 <footer class="site-footer">
-  CVsprings &mdash; deterministic, rules-based CV screening &nbsp;&middot;&nbsp; <a href="/login">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/terms.html">Terms</a> &nbsp;&middot;&nbsp; <a href="/compliance.html">EU AI Act compliance</a> &nbsp;&middot;&nbsp; <a href="/bias-report.html">Bias &amp; monitoring</a> &nbsp;&middot;&nbsp; <a href="/integrations.html">Integrations</a>
+  CVsprings &mdash; Deterministic CV screening &middot; Made in the Netherlands
+  <br><a href="/login">Back to the app</a> &nbsp;&middot;&nbsp; <a href="/terms.html">Terms</a> &nbsp;&middot;&nbsp; <a href="/compliance.html">EU AI Act compliance</a> &nbsp;&middot;&nbsp; <a href="/bias-report.html">Bias &amp; monitoring</a> &nbsp;&middot;&nbsp; <a href="/integrations.html">Integrations</a> &nbsp;&middot;&nbsp; <a href="/impressum">Imprint / Impressum</a> &nbsp;&middot;&nbsp; <a href="/contact">Contact</a>
   <br>__LEGAL_FOOTER__
 </footer>
 
@@ -197,7 +234,7 @@ a{color:#0f2847}
         }
       }
     })
-    .catch(function(){ /* leave the TODO text visible */ });
+    .catch(function(){ /* keep the fallback address from the markup */ });
 })();
 </script>
 </body>

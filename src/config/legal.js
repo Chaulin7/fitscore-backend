@@ -25,7 +25,7 @@
  */
 
 /** Registered name of the operating entity (the trader, not the product brand). */
-const LEGAL_NAME = 'Joyaco BV';
+const LEGAL_NAME = 'Joyaco B.V.';
 
 /** Kamer van Koophandel registration number. Eight digits. */
 const KVK = '42135911';
@@ -40,4 +40,12 @@ const BTW_ID = 'NL005523705B04';
  */
 const FOOTER_LINE = `${LEGAL_NAME} · KvK ${KVK} · BTW ${BTW_ID}`;
 
-module.exports = { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE };
+/**
+ * The address the Impressum publishes (§ 5 DDG asks for a way to reach the
+ * trader quickly by email), and where the contact form delivers. One constant,
+ * so the page and the inbox the form writes to cannot drift apart. Substituted
+ * into pages as __CONTACT_EMAIL__ (src/index.js).
+ */
+const CONTACT_EMAIL = 'jasper@cvsprings.com';
+
+module.exports = { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE, CONTACT_EMAIL };

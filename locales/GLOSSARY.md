@@ -61,6 +61,8 @@ in each language. When a term is missing, add it here with the key(s) that use i
 | purge (retention job) | opschoning / opschoonrun | Löschlauf | |
 | dry run | proefdraaien | Probelauf | |
 | feature request | functieverzoek | Funktionswunsch | |
+| contact form | contactformulier | Kontaktformular | `contact.*` |
+| imprint (legal notice page) | colofon | Impressum | `imprint.*`. Only the labels are translated; the company facts on the page read the same in every language. |
 | read-only (paused account) | alleen-lezen | schreibgeschützt | |
 | batch | batch | Batch | |
 | Analyzer (tab) | Analyse | Analyse | |

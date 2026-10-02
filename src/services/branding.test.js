@@ -394,6 +394,13 @@ describe('the legal entity can never appear as a brand', () => {
     assert.ok(!isLegalEntityName('Chaulin Holdings'));
   });
 
+  test('both spellings of the entity are blocked, whichever one LEGAL_NAME uses', () => {
+    for (const name of [`${LEGAL_BARE} B.V.`, `${LEGAL_BARE} BV`, LEGAL_BARE, `${LEGAL_BARE.toUpperCase()} bv`]) {
+      const b = resolveBranding({ ...CUSTOM, brandDisplayName: name }, PRO);
+      assert.equal(b.displayName, BRAND_NAME_FALLBACK, name);
+    }
+  });
+
   test('an org cannot white-label itself as the legal entity either', () => {
     const b = resolveBranding({ ...CUSTOM, brandDisplayName: LEGAL_NAME }, PRO);
     assert.equal(b.displayName, BRAND_NAME_FALLBACK);
