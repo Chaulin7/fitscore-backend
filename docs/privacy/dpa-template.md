@@ -1,20 +1,21 @@
 # Data Processing Agreement (DPA) — CVsprings
 
 > **DRAFT — for legal review before signature.**
-> Template v1.3.0, 2026-06-12. Square-bracketed items and TODO markers must be
+> Template v1.3.0, 2026-10-02. Square-bracketed items and TODO markers must be
 > completed before use. This draft follows the structure of GDPR Article 28(3).
 
 **Between:**
 
 - **[Client legal name]** — the recruiter's organization, acting as data
   **Controller** ("Client"); and
-- **Joyaco BV (KvK 42135911, BTW NL005523705B04) [TODO: registered address]**,
+- **Joyaco B.V. (KvK 42135911, BTW NL005523705B04) [TODO: registered address]**,
   operator of CVsprings, acting as data **Processor** ("Processor").
 
 ## 1. Subject matter and duration
 
-The Processor provides the CVsprings service: AI-assisted advisory candidate-fit
-scoring of CVs against job descriptions, with an organization-scoped audit log.
+The Processor provides the CVsprings service: advisory candidate-fit scoring of
+CVs against job descriptions by an automated, rules-based screening tool, with an
+organization-scoped audit log.
 This DPA applies for as long as the Client holds a CVsprings account and until
 all personal data has been deleted or returned per clause 9.
 
@@ -94,16 +95,18 @@ main service agreement, governing law and jurisdiction.]
 
 ## Annex I — Authorised subprocessors
 
-| Subprocessor | Purpose | Location / region | Safeguard |
-|---|---|---|---|
-| Render, Inc. | Hosting of backend and database (stored audit records) | US company; service region [TODO: confirm in Render dashboard] | Render DPA; [TODO: SCCs/DPF status if non-EU region] |
-| Plausible Insights OÜ | Cookieless aggregate analytics (app pages; no candidate data) | Estonia (EU); EU hosting per its data policy | EU-based; no transfer |
-| Resend, Inc. *(only if enabled)* | Password-reset emails to recruiter users (no candidate data) | US | [TODO: confirm enabled? If yes: Resend DPA + transfer safeguard] |
+*Word for word from the CVsprings Privacy Policy: its subprocessor table (first four
+columns) and its International transfers section (last column). Change them together.*
+
+| Subprocessor | Purpose | Location / region | Terms | International transfers |
+|---|---|---|---|---|
+| Render | Hosting of the CVsprings backend and database (incl. stored audit records). | Render, Inc. (US company). Service region: Frankfurt, Germany (EU). Because Render, Inc. is a US company, any transfer of data to the US is covered by the European Commission’s Standard Contractual Clauses included in Render’s Data Processing Agreement. | [Render DPA](https://render.com/dpa) | the CVsprings backend and its database (including stored audit records) run in Render’s Frankfurt (EU Central) region, so candidate data at rest does not leave the EU/EEA. Because Render, Inc. is a US company, any transfer of data to the US is covered by the European Commission’s Standard Contractual Clauses included in Render’s Data Processing Agreement. |
+| Plausible Analytics | Cookieless, aggregate usage analytics on the app pages. According to Plausible’s published policy, no personal data or persistent identifiers are stored. | Plausible Insights OÜ (Estonia, EU); states that data is hosted in the EU. | [Plausible data policy](https://plausible.io/data-policy) | Plausible states EU hosting (no transfer). |
+| Google Fonts | The Inter typeface is loaded by your browser from Google’s CDN; that request exposes your IP address to Google. No candidate data is involved. | Google LLC (US). | [Google privacy policy](https://policies.google.com/privacy) | the Google Fonts request transfers the visitor’s IP address to Google (US). This affects app users (recruiters/visitors), not candidate CV data. |
+| Resend | Sends our emails: password resets and trial notices to recruiter accounts (trial notices go to the organization’s owner, or to the address the trial was offered to); invitations to invited team members; confirmations to demo requesters; and contact-form messages, demo requests and feature requests to our own inbox. Processes the recipients’ email addresses and what these emails contain (such as names, organization names and the text people send us); never candidate data. | Resend, Inc. (US). | [Resend DPA](https://resend.com/legal/dpa) | Resend is US-based and processes the emails described in the Resend row above: to recruiter accounts, invited team members and demo requesters, and the contact-form messages, demo requests and feature requests sent to our inbox. Emails are sent from Resend’s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the European Commission’s Standard Contractual Clauses included in Resend’s Data Processing Agreement. |
 
 *Not a subprocessor:* no AI/LLM provider — scoring runs inside the Processor's
-backend. Google Fonts is loaded by end-user browsers on the web pages (IP
-exposure to Google LLC, US) but does not process candidate data on the
-Processor's behalf.
+backend.
 
 ## Annex II — Technical and organizational measures
 

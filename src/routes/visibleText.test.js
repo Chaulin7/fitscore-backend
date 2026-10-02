@@ -82,3 +82,21 @@ test('no dictionary string says "TODO" (page scripts render them at runtime)', (
     assert.deepEqual(hits, [], `locales/${lang}.json`);
   }
 });
+
+describe('no shipped client document shows "TODO" (except declared drafts)', () => {
+  const { SHIPPED, OPEN_ITEMS_VISIBLE } = require('../../test/helpers/clientDocs');
+  const docText = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/<!--[\s\S]*?-->/g, ' ');
+
+  for (const file of SHIPPED) {
+    if (OPEN_ITEMS_VISIBLE[file]) {
+      test(`${file} is a declared draft, and still says so`, () => {
+        assert.ok(docText(file).includes(OPEN_ITEMS_VISIBLE[file]), `${file} no longer declares its open items`);
+      });
+      continue;
+    }
+    test(file, () => {
+      const hits = [...docText(file).replace(/\s+/g, ' ').matchAll(/.{0,50}\bTODO\b.{0,50}/gi)].map((m) => m[0]);
+      assert.deepEqual(hits, [], `${file} shows a TODO to the client`);
+    });
+  }
+});

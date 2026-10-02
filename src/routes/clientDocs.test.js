@@ -1,0 +1,98 @@
+'use strict';
+
+/**
+ * src/routes/clientDocs.test.js — the docs/ files clients receive agree with
+ * the site.
+ *
+ *   - Which docs are shipped is pinned against the compliance pack cover's own
+ *     list, so the two cannot drift.
+ *   - The legal name is spelled as LEGAL_NAME everywhere in docs/.
+ *   - The DPA template stays a draft, its §1 describes the tool as the site
+ *     does, and its Annex I is the Privacy Policy's subprocessor table and
+ *     International transfers section, word for word.
+ */
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { test, describe } = require('node:test');
+const assert = require('node:assert/strict');
+
+const { SHIPPED, OPEN_ITEMS_VISIBLE } = require('../../test/helpers/clientDocs');
+const { LEGAL_NAME } = require('../config/legal');
+
+const ROOT = path.join(__dirname, '..', '..');
+const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+
+function docsFiles(dir = 'docs') {
+  return fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
+    const rel = `${dir}/${e.name}`;
+    return e.isDirectory() ? docsFiles(rel) : (/\.(md|html)$/.test(e.name) ? [rel] : []);
+  });
+}
+
+describe('which docs are shipped', () => {
+  test('the compliance pack is exactly what its cover lists, plus the cover and the DPA', () => {
+    const cover = read('docs/compliance/compliance-pack-cover.md');
+    const listed = [...(/## Documents in this pack([\s\S]*?)\n## /.exec(cover)[1]).matchAll(/`([\w-]+\.md)`/g)]
+      .map((m) => `docs/compliance/${m[1]}`);
+    assert.deepEqual(
+      [...listed, 'docs/compliance/compliance-pack-cover.md', 'docs/privacy/dpa-template.md'].sort(),
+      [...SHIPPED].sort(),
+    );
+  });
+
+  test('every declared draft is a shipped doc', () => {
+    for (const f of Object.keys(OPEN_ITEMS_VISIBLE)) assert.ok(SHIPPED.includes(f), f);
+  });
+});
+
+describe('legal name', () => {
+  for (const file of docsFiles()) {
+    test(file, () => {
+      const spellings = [...read(file).matchAll(/\bJoyaco\b(?:\s*B\.?\s*V\.?)?/gi)].map((m) => m[0]);
+      for (const s of spellings) assert.equal(s, LEGAL_NAME, `${file} spells the entity "${s}"`);
+    });
+  }
+});
+
+describe('the DPA template', () => {
+  const dpa = read('docs/privacy/dpa-template.md');
+
+  test('is still a draft for legal review', () => {
+    assert.match(dpa, /\*\*DRAFT — for legal review before signature\.\*\*/);
+    assert.match(dpa, /Square-bracketed items and TODO markers must be\s*>?\s*completed before use\./);
+  });
+
+  test('§1 describes the service the way the site does', () => {
+    const s1 = /## 1\. Subject matter and duration([\s\S]*?)\n## /.exec(dpa)[1].replace(/\s+/g, ' ');
+    assert.match(s1, /advisory candidate-fit scoring of CVs against job descriptions by an automated, rules-based screening tool/);
+  });
+
+  test('Annex I is the Privacy Policy\'s subprocessors and transfers, word for word', () => {
+    const html = read('public/privacy.html').replace(/<!--[\s\S]*?-->/g, '');
+    const ent = { rsquo: '’', Uuml: 'Ü', amp: '&', mdash: '—', ndash: '–', nbsp: ' ' };
+    const text = (s) => s.replace(/<[^>]+>/g, '').replace(/&([a-z]+);/gi, (m, n) => ent[n] ?? m).replace(/\s+/g, ' ').trim();
+    const tbody = /<h4>Subprocessors and third parties<\/h4>[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/.exec(html)[1];
+    const policyRows = [...tbody.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((m) => [...m[1].matchAll(/<td>([\s\S]*?)<\/td>/g)].map((c) => c[1]));
+    const transfers = Object.fromEntries([...(/<h4>International transfers<\/h4>\s*<ul>([\s\S]*?)<\/ul>/.exec(html)[1])
+      .matchAll(/<li><strong>([^<]+):<\/strong>([\s\S]*?)<\/li>/g)].map((m) => [m[1], text(m[2])]));
+    const TRANSFER_FOR = { Render: 'Hosting', 'Plausible Analytics': 'Analytics', 'Google Fonts': 'Fonts', Resend: 'Email' };
+
+    const annex = /## Annex I — Authorised subprocessors([\s\S]*?)\n## Annex II/.exec(dpa)[1];
+    const dpaRows = annex.split('\n').filter((l) => /^\| (?!Subprocessor |---)/.test(l))
+      .map((l) => l.slice(2, -2).split(' | '));
+
+    assert.deepEqual(dpaRows.map((r) => r[0]), policyRows.map((r) => text(r[0])), 'same subprocessors, same order');
+    policyRows.forEach(([name, purpose, loc, terms], i) => {
+      const [dName, dPurpose, dLoc, dTerms, dTransfer] = dpaRows[i];
+      assert.equal(dPurpose, text(purpose), `${dName}: purpose`);
+      assert.equal(dLoc, text(loc), `${dName}: location / region`);
+      assert.equal(dTerms, `[${text(terms)}](${/href="([^"]+)"/.exec(terms)[1]})`, `${dName}: terms`);
+      assert.equal(dTransfer, transfers[TRANSFER_FOR[text(name)]], `${dName}: international transfers`);
+    });
+    // The two facts that were open before: where, and under what.
+    assert.match(annex, /Service region: Frankfurt, Germany \(EU\)/);
+    assert.match(annex, /Emails are sent from Resend’s EU region \(Ireland\)/);
+    assert.equal((annex.match(/Standard Contractual Clauses/g) || []).length, 3, 'Render (twice) and Resend');
+  });
+});

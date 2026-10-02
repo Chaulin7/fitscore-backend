@@ -1,10 +1,10 @@
 # CVsprings — EU AI Act Compliance Pack
 
-*Client-facing summary. Version 1.3.0 — 2026-06-12. Suitable for export to branded PDF/DOCX.*
+*Client-facing summary. Version 1.3.0 — 2026-10-02. Suitable for export to branded PDF/DOCX.*
 
 ## What CVsprings is
 
-CVsprings is an AI-powered candidate-fit analyzer. Recruiters upload CVs (PDF/DOCX)
+CVsprings is an automated, rules-based screening tool for candidate fit. Recruiters upload CVs (PDF/DOCX)
 and a job description; the system produces an advisory fit score (0–100) with four
 transparent sub-scores (keywords, skills, experience, education). Scoring is
 performed by a deterministic, rule-based engine — identical rules for every CV,
@@ -40,7 +40,7 @@ recruiters; the system never decides.**
    mitigations, residual risks, review dates.
 3. **Technical documentation outline** (`technical-documentation-outline.md`) —
    Annex IV working document: architecture, scoring pipeline, logging design;
-   open items explicitly marked TODO.
+   open items explicitly flagged.
 4. **Candidate notice** (`candidate-notice.md`) — ready-to-paste applicant
    transparency text, English and Dutch.
 5. **This cover document.**
