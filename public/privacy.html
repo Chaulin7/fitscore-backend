@@ -124,8 +124,8 @@ a{color:#0f2847}
           <tr>
             <td>Render</td>
             <td>Hosting of the CVsprings backend and database (incl. stored audit records).</td>
-            <!-- TODO(i18n-legal): counsel review — Render row: the visible "Service region: TODO …" placeholder is removed; the operator note below is hidden (2 October 2026). -->
-            <td>Render, Inc. (US company).<!-- TODO(operator): confirm the region selected in the Render dashboard (e.g. Frankfurt/EU or Oregon/US) and add it to this row. --></td>
+            <!-- TODO(i18n-legal): counsel review — Render row: service region (Frankfurt, EU) and the SCC safeguard stated; the answered operator note is removed (2 October 2026). -->
+            <td>Render, Inc. (US company). Service region: Frankfurt, Germany (EU). Because Render, Inc. is a US company, any transfer of data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement.</td>
             <td><a href="https://render.com/dpa" rel="noopener">Render DPA</a></td>
           </tr>
           <tr>
@@ -141,9 +141,9 @@ a{color:#0f2847}
             <td><a href="https://policies.google.com/privacy" rel="noopener">Google privacy policy</a></td>
           </tr>
           <tr>
-            <td>Resend (optional)</td>
-            <!-- TODO(i18n-legal): counsel review — Resend row: now also delivers contact-form messages; was "Processes recruiter email addresses only". -->
-            <td>Password-reset emails to recruiter accounts, and delivery of contact-form messages to our inbox &mdash; only if the operator has configured it. Processes recruiter email addresses and contact-form messages (name, email address and message); never candidate data.<!-- TODO(operator): state whether Resend is enabled in production. --></td>
+            <!-- TODO(i18n-legal): counsel review — Resend row: "(optional)" and "only if the operator has configured it" removed — Resend is used in production; the answered operator note is removed (2 October 2026). Contact-form messages were added earlier the same day. -->
+            <td>Resend</td>
+            <td>Password-reset emails to recruiter accounts, and delivery of contact-form messages to our inbox. Processes recruiter email addresses and contact-form messages (name, email address and message); never candidate data.</td>
             <td>Resend, Inc. (US).</td>
             <td><a href="https://resend.com/legal/dpa" rel="noopener">Resend DPA</a></td>
           </tr>
@@ -154,11 +154,12 @@ a{color:#0f2847}
 
       <h4>International transfers</h4>
       <ul>
-        <li><strong>Hosting:</strong> if the Render service region is inside the EU/EEA, candidate data at rest does not leave the EU/EEA; if a non-EU region is selected, a transfer safeguard is required.<!-- TODO(operator): confirm region; if outside the EU/EEA, verify Render's safeguard (SCCs and/or EU-US Data Privacy Framework status) and document it here. --></li>
+        <!-- TODO(i18n-legal): counsel review — transfers, Hosting: the conditional ("if the Render service region is inside the EU/EEA … if a non-EU region is selected …") is replaced by the actual region and safeguard, matching the Render row; the answered operator note is removed (2 October 2026). -->
+        <li><strong>Hosting:</strong> the CVsprings backend and its database (including stored audit records) run in Render&rsquo;s Frankfurt (EU Central) region, so candidate data at rest does not leave the EU/EEA. Because Render, Inc. is a US company, any transfer of data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement.</li>
         <li><strong>Analytics:</strong> Plausible states EU hosting (no transfer).</li>
         <li><strong>Fonts:</strong> the Google Fonts request transfers the visitor&rsquo;s IP address to Google (US). This affects app users (recruiters/visitors), not candidate CV data.</li>
-        <!-- TODO(i18n-legal): counsel review — transfers, Resend: "would process" is now "processes", and the operator TODO "verify Resend's transfer safeguard" is replaced by the EU-region / SCC sentences (2 October 2026). -->
-        <li><strong>Email (if enabled):</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>
+        <!-- TODO(i18n-legal): counsel review — transfers, Resend: "would process" is now "processes", the operator TODO "verify Resend's transfer safeguard" is replaced by the EU-region / SCC sentences, and the label "Email (if enabled)" is now "Email" (2 October 2026). -->
+        <li><strong>Email:</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>
       </ul>
 
       <h4>Cookies and tracking</h4>

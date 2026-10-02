@@ -416,8 +416,8 @@ describe('the Privacy Policy describes the contact form', () => {
   });
 
   test('the International transfers bullet: what Resend processes, where, and under which safeguard', () => {
-    const bullet = /<li><strong>Email \(if enabled\):<\/strong>[\s\S]*?<\/li>/.exec(privacy)[0];
-    assert.equal(bullet, '<li><strong>Email (if enabled):</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). '
+    const bullet = /<li><strong>Email:<\/strong>[\s\S]*?<\/li>/.exec(privacy)[0];
+    assert.equal(bullet, '<li><strong>Email:</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). '
       + 'Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the '
       + 'European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>');
   });
@@ -429,8 +429,24 @@ describe('the Privacy Policy describes the contact form', () => {
 
   test('the Resend subprocessor row includes contact-form messages', () => {
     // Comments stripped: the TODO beside the row quotes the old wording.
-    const row = /<td>Resend \(optional\)<\/td>[\s\S]*?<\/tr>/.exec(privacy)[0].replace(/<!--[\s\S]*?-->/g, '');
+    const row = /<td>Resend<\/td>[\s\S]*?<\/tr>/.exec(privacy)[0].replace(/<!--[\s\S]*?-->/g, '');
     assert.doesNotMatch(row, /recruiter email addresses only/);
     assert.match(row, /contact-form messages/);
+  });
+
+  test('Resend is described as in use, not optional', () => {
+    const visible = privacy.replace(/<!--[\s\S]*?-->/g, '');
+    assert.doesNotMatch(visible, /Resend \(optional\)|Email \(if enabled\)|only if the operator has configured it/);
+    assert.doesNotMatch(privacy, /TODO\(operator\): state whether Resend is enabled/);
+  });
+
+  test('Render: Frankfurt (EU) and the SCC safeguard, in the row and in the Hosting bullet', () => {
+    const row = /<td>Render<\/td>[\s\S]*?<\/tr>/.exec(privacy)[0];
+    assert.ok(row.includes('<td>Render, Inc. (US company). Service region: Frankfurt, Germany (EU). Because Render, Inc. is a US company, any transfer of data to the US is covered by the '
+      + 'European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement.</td>'), row);
+    const hosting = /<li><strong>Hosting:<\/strong>[\s\S]*?<\/li>/.exec(privacy)[0];
+    assert.match(hosting, /Render&rsquo;s Frankfurt \(EU Central\) region, so candidate data at rest does not leave the EU\/EEA\./);
+    assert.match(hosting, /covered by the European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement\./);
+    assert.doesNotMatch(privacy, /TODO\(operator\): confirm (the )?region/);
   });
 });
