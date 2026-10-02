@@ -417,7 +417,7 @@ describe('the Privacy Policy describes the contact form', () => {
 
   test('the International transfers bullet: what Resend processes, where, and under which safeguard', () => {
     const bullet = /<li><strong>Email:<\/strong>[\s\S]*?<\/li>/.exec(privacy)[0];
-    assert.equal(bullet, '<li><strong>Email:</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). '
+    assert.equal(bullet, '<li><strong>Email:</strong> Resend is US-based and processes the emails described in the Resend row above: to recruiter accounts, invited team members and demo requesters, and the contact-form messages, demo requests and feature requests sent to our inbox. '
       + 'Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the '
       + 'European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>');
   });
