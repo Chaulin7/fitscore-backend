@@ -87,6 +87,12 @@ const FEATURE_REQUEST_WINDOW_MS = 24 * 60 * 60 * 1000;
 // another.
 const FEATURE_REQUEST_RETENTION_DAYS = 365;
 
+// How long a demo request is kept: 12 calendar months from the day we received
+// it (Privacy Policy, section D). A requester who has since become a customer —
+// a CVsprings account exists with the same email address — is kept: the data is
+// then part of the customer relationship. THE one place this number lives.
+const DEMO_REQUEST_RETENTION_MONTHS = 12;
+
 function getDb() {
   if (!db) {
     assertNotTheRealDatabase();
@@ -1510,7 +1516,9 @@ function startRetentionSchedule() {
   console.log(`[retention] schedule started — mode=${mode}` +
     (mode === 'live' ? ' (LIVE deletions enabled)' : ' (dry run: no deletions; set RETENTION_PURGE_MODE=live to enable)'));
   const tick = () => {
-    try { if (retentionPurgeDue()) runRetentionPurge(); }
+    // Demo requests ride the same daily, mode-gated run (they are not org data,
+    // so they have no purge_runs row of their own; the counts go to the log).
+    try { if (retentionPurgeDue()) { runRetentionPurge(); purgeStaleDemoRequests(); } }
     catch (err) { console.error('[retention] schedule tick failed:', err && err.message); }
   };
   retentionTimer = setInterval(tick, RETENTION_CHECK_INTERVAL_MS);
@@ -1742,6 +1750,41 @@ function insertDemoRequest({ name, email, agency, note, ipHash }) {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(id, name || null, email, agency || null, note || null, createdAt, ipHash || null);
   return { id, createdAt };
+}
+
+// The cutoff for demo requests: `months` calendar months before `now`, as ISO —
+// the same format insertDemoRequest writes, so `created_at < cutoff` compares
+// correctly as text (see purgeOrgFeatureRequestsBatched for why that matters).
+function demoRequestCutoffIso(now = Date.now(), months = DEMO_REQUEST_RETENTION_MONTHS) {
+  const d = new Date(now);
+  d.setUTCMonth(d.getUTCMonth() - months);
+  return d.toISOString();
+}
+
+/**
+ * Daily purge of demo requests received more than 12 months ago, unless the
+ * requester has since become a customer (an account with that email exists;
+ * compared case-insensitively — demo emails are stored as typed, account
+ * emails normalized). Runs on the retention schedule and honours the same
+ * RETENTION_PURGE_MODE: 'live' deletes in batches, anything else only counts.
+ * Logs and returns counts only — never a name, an address or a note.
+ */
+function purgeStaleDemoRequests({ now = Date.now(), mode = retentionPurgeMode() } = {}) {
+  const db = getDb();
+  const cutoffIso = demoRequestCutoffIso(now);
+  const isCustomer = 'EXISTS (SELECT 1 FROM users u WHERE lower(u.email) = lower(trim(d.email)))';
+  const keptAsCustomers = db.prepare(`SELECT COUNT(*) AS n FROM demo_requests d WHERE d.created_at < ? AND ${isCustomer}`).get(cutoffIso).n;
+  let affected;
+  if (mode === 'live') {
+    const del = db.prepare(`DELETE FROM demo_requests WHERE id IN (SELECT d.id FROM demo_requests d WHERE d.created_at < ? AND NOT ${isCustomer} ORDER BY d.created_at LIMIT ?)`);
+    affected = 0;
+    let changed;
+    do { changed = del.run(cutoffIso, PURGE_BATCH_SIZE).changes; affected += changed; } while (changed === PURGE_BATCH_SIZE);
+  } else {
+    affected = db.prepare(`SELECT COUNT(*) AS n FROM demo_requests d WHERE d.created_at < ? AND NOT ${isCustomer}`).get(cutoffIso).n;
+  }
+  console.log(`[retention] demo requests (mode=${mode}): ${affected} older than ${DEMO_REQUEST_RETENTION_MONTHS} months ${mode === 'live' ? 'deleted' : 'would be deleted'}, ${keptAsCustomers} kept (requester is a customer)`);
+  return { mode, cutoffDate: cutoffIso, rowsDeleted: mode === 'live' ? affected : 0, rowsAffected: affected, keptAsCustomers };
 }
 
 // --- Feature requests ("Suggest an improvement") -----------------------------
@@ -2426,6 +2469,9 @@ module.exports = {
   getFreeTierSince,
   refundUsage,
   insertDemoRequest,
+  purgeStaleDemoRequests,
+  demoRequestCutoffIso,
+  DEMO_REQUEST_RETENTION_MONTHS,
   countRecentFeatureRequests,
   createFeatureRequestIfUnderQuota,
   FEATURE_REQUEST_CATEGORIES,

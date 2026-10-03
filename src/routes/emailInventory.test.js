@@ -114,7 +114,8 @@ describe('the Privacy Policy describes every recipient', () => {
       'one-way hash of your IP address (never the IP address itself)',
       'Art. 6(1)(f) GDPR', 'Art. 6(1)(b) GDPR',
       'stored in our database', 'confirmation email via Resend',
-      'There is no automatic deletion',
+      'Demo requests are deleted 12 months after we receive them, unless the requester becomes a customer, in which case the data becomes part of the customer relationship.',
+      'The same 12-month period applies to the notification email in our inbox.',
       'href="#privacyContactLine"',
     ]) assert.ok(section.includes(phrase), `missing: ${phrase}`);
   });
