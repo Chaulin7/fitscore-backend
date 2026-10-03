@@ -68,7 +68,8 @@ app.use((req, res, next) => {
 // allowed via a per-request nonce (no 'unsafe-inline' for scripts); styles
 // still need 'unsafe-inline' (inline styles are a separate cleanup). We lock
 // everything else down (object-src none, frame-ancestors none) and allow only
-// the fonts/analytics/Stripe origins actually used. HSTS is enabled only once
+// the analytics/Stripe origins actually used. Fonts are self-hosted
+// (public/assets/fonts/), so styles and fonts come from this origin only. HSTS is enabled only once
 // served over HTTPS (Render/custom domain).
 app.use(helmet({
   contentSecurityPolicy: {
@@ -89,8 +90,8 @@ app.use(helmet({
       // are wired via data-action + delegated listeners), so attribute handlers
       // are blocked by design.
       scriptSrcAttr: ["'none'"],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      fontSrc: ["'self'"],
       imgSrc: ["'self'", 'data:'],
       // Pinned independently of default-src, not as documentation of it. The
       // demo video would load anyway by falling back to default-src 'self';
