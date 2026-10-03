@@ -120,5 +120,7 @@ describe('the DPA template', () => {
     assert.match(annex, /Service region: Frankfurt, Germany \(EU\)/);
     assert.match(annex, /Emails are sent from Resend’s EU region \(Ireland\)/);
     assert.equal((annex.match(/Standard Contractual Clauses/g) || []).length, 3, 'Render (twice) and Resend');
+    assert.equal((annex.match(/covered by Render’s certification under the EU-US Data Privacy Framework, with the European Commission’s Standard Contractual Clauses in Render’s Data Processing Agreement as a fallback\./g) || []).length, 2, 'Render: DPF first, SCCs as fallback, in both cells');
+    assert.match(annex, /covered by the European Commission’s Standard Contractual Clauses included in Resend’s Data Processing Agreement\./, 'Resend unchanged');
   });
 });
