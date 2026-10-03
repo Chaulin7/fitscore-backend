@@ -40,6 +40,7 @@ const INVENTORY = {
     { what: 'trial welcome', to: 'checkout email and/or trial offer address', contains: 'company name, plan, end date, signup link' },
     { what: 'trial ended (paused)', to: 'trial offer address / org owner / Stripe customer email', contains: 'company name, plan, portal and app links' },
   ],
+  // Both demo emails go through one sendOne() helper: one send site, two emails.
   'src/routes/demo.js': [
     { what: 'demo request notification', to: 'our inbox (DEMO_NOTIFY_EMAIL)', contains: 'name, email, agency, note, time' },
     { what: 'demo request confirmation', to: 'demo requester', contains: 'fixed text, EU AI Act checklist PDF' },
@@ -77,9 +78,12 @@ describe('inventory: every Resend send site is accounted for', () => {
   });
 
   test('each file sends exactly the emails listed for it', () => {
-    // trialEmail.js has one send per message kind; demo.js sends two.
+    // trialEmail.js has one send site per message kind; demo.js routes its two
+    // emails through a single helper.
+    const SITES = { 'src/routes/demo.js': 1 };
     for (const [file, emails] of Object.entries(INVENTORY)) {
-      assert.equal(found[file], emails.length, `${file}: ${found[file]} send site(s), inventory lists ${emails.length}`);
+      const expected = SITES[file] || emails.length;
+      assert.equal(found[file], expected, `${file}: ${found[file]} send site(s), expected ${expected}`);
     }
   });
 });

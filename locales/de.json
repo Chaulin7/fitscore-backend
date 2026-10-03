@@ -111,6 +111,7 @@
   "landing.footer.dpa": "Auftragsverarbeitungsvertrag auf Anfrage",
   "landing.demo.form.invalidEmail": "Bitte geben Sie eine gültige geschäftliche E-Mail-Adresse ein.",
   "landing.demo.form.failed": "Etwas ist schiefgelaufen – schreiben Sie uns stattdessen an {email}.",
+  "landing.demo.form.emailFailed": "Wir haben Ihre Anfrage gespeichert, aber unsere E-Mail konnte nicht gesendet werden – möglicherweise erhalten Sie keine Bestätigung. Wir antworten trotzdem innerhalb eines Werktags.",
   "pricing.included": "In jedem Tarif enthalten",
   "pricing.badge.pro": "Beliebt bei Agenturen",
   "pricing.cta.get": "{name} wählen — {price}",

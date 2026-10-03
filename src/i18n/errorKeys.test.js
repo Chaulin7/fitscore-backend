@@ -26,6 +26,7 @@ const NOT_SHOWN = new Set([
   'BAD_SIGNATURE', 'WEBHOOK_HANDLER_ERROR', // Stripe webhooks
   'CORS_DENIED', // a misconfigured origin, not a user
   'ACCOUNT_LOCKED', // the sign-in screen words it itself (auth.login.locked*)
+  'DEMO_EMAIL_FAILED', // the landing page words it itself (landing.demo.form.emailFailed)
 ]);
 // Admin-only routes (the operator console), not the app.
 const ADMIN_FILES = /adminTrialInvites|adminMetrics|adminAuth|trialStart/;

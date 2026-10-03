@@ -111,6 +111,7 @@
   "landing.footer.dpa": "Verwerkersovereenkomst op aanvraag",
   "landing.demo.form.invalidEmail": "Vul een geldig zakelijk e-mailadres in.",
   "landing.demo.form.failed": "Er ging iets mis — mail ons in plaats daarvan op {email}.",
+  "landing.demo.form.emailFailed": "We hebben je aanvraag opgeslagen, maar onze e-mail kon niet worden verstuurd, dus misschien krijg je geen bevestiging. We antwoorden nog steeds binnen één werkdag.",
   "pricing.included": "Inbegrepen bij elk abonnement",
   "pricing.badge.pro": "Meest gekozen door bureaus",
   "pricing.cta.get": "Kies {name} — {price}",
