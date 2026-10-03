@@ -8,8 +8,9 @@
  *     list, so the two cannot drift.
  *   - The legal name is spelled as LEGAL_NAME everywhere in docs/.
  *   - The DPA template stays a draft, its §1 describes the tool as the site
- *     does, and its Annex I is the Privacy Policy's subprocessor table and
- *     International transfers section, word for word.
+ *     does, and its Annex I lists only the subprocessors that process client
+ *     personal data (Render, Resend), each row word for word the Privacy
+ *     Policy's row and International transfers entry for it.
  */
 
 const fs = require('node:fs');
@@ -68,7 +69,7 @@ describe('the DPA template', () => {
     assert.match(s1, /advisory candidate-fit scoring of CVs against job descriptions by an automated, rules-based screening tool/);
   });
 
-  test('Annex I is the Privacy Policy\'s subprocessors and transfers, word for word', () => {
+  test('Annex I: Render and Resend only, each word for word the Privacy Policy\'s row and transfers entry', () => {
     const html = read('public/privacy.html').replace(/<!--[\s\S]*?-->/g, '');
     const ent = { rsquo: '’', Uuml: 'Ü', amp: '&', mdash: '—', ndash: '–', nbsp: ' ' };
     const text = (s) => s.replace(/<[^>]+>/g, '').replace(/&([a-z]+);/gi, (m, n) => ent[n] ?? m).replace(/\s+/g, ' ').trim();
@@ -76,15 +77,21 @@ describe('the DPA template', () => {
     const policyRows = [...tbody.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((m) => [...m[1].matchAll(/<td>([\s\S]*?)<\/td>/g)].map((c) => c[1]));
     const transfers = Object.fromEntries([...(/<h4>International transfers<\/h4>\s*<ul>([\s\S]*?)<\/ul>/.exec(html)[1])
       .matchAll(/<li><strong>([^<]+):<\/strong>([\s\S]*?)<\/li>/g)].map((m) => [m[1], text(m[2])]));
-    const TRANSFER_FOR = { Render: 'Hosting', 'Plausible Analytics': 'Analytics', 'Google Fonts': 'Fonts', Resend: 'Email' };
+    // The subprocessors that process the Client's personal data. Plausible stays
+    // in the Privacy Policy only: it handles no client personal data.
+    const DPA_SUBPROCESSORS = ['Render', 'Resend'];
+    const TRANSFER_FOR = { Render: 'Hosting', Resend: 'Email' };
 
     const annex = /## Annex I — Authorised subprocessors([\s\S]*?)\n## Annex II/.exec(dpa)[1];
     const dpaRows = annex.split('\n').filter((l) => /^\| (?!Subprocessor |---)/.test(l))
       .map((l) => l.slice(2, -2).split(' | '));
 
-    assert.deepEqual(dpaRows.map((r) => r[0]), policyRows.map((r) => text(r[0])), 'same subprocessors, same order');
-    policyRows.forEach(([name, purpose, loc, terms], i) => {
-      const [dName, dPurpose, dLoc, dTerms, dTransfer] = dpaRows[i];
+    const policyNames = policyRows.map((r) => text(r[0]));
+    const dpaNames = dpaRows.map((r) => r[0]);
+    for (const n of dpaNames) assert.ok(policyNames.includes(n), `the DPA lists ${n}, which the Privacy Policy does not`);
+    assert.deepEqual(dpaNames, DPA_SUBPROCESSORS, 'Annex I lists exactly the subprocessors of client personal data');
+    dpaRows.forEach(([dName, dPurpose, dLoc, dTerms, dTransfer]) => {
+      const [name, purpose, loc, terms] = policyRows[policyNames.indexOf(dName)];
       assert.equal(dPurpose, text(purpose), `${dName}: purpose`);
       assert.equal(dLoc, text(loc), `${dName}: location / region`);
       assert.equal(dTerms, `[${text(terms)}](${/href="([^"]+)"/.exec(terms)[1]})`, `${dName}: terms`);
