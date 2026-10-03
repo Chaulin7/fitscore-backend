@@ -64,6 +64,25 @@ describe('the DPA template', () => {
     assert.match(dpa, /Square-bracketed items and TODO markers must be\s*>?\s*completed before use\./);
   });
 
+  test('the placeholders left are exactly the three still open', () => {
+    const placeholders = [...dpa.replace(/<!--[\s\S]*?-->/g, '').matchAll(/\[[^\]]*\](?!\()/g)]
+      .map((m) => m[0].replace(/\s+/g, ' '));
+    assert.deepEqual(placeholders, [
+      '[Client legal name]',
+      '[TODO: confirm backup deletion window — see retention-policy.md backup section.]',
+      '[TODO: legal review — liability allocation, term/termination alignment with the main service agreement, governing law and jurisdiction.]',
+    ]);
+  });
+
+  test('the filled-in facts: address, §5, encryption at rest, organisational measures', () => {
+    const flat = dpa.replace(/\s+/g, ' ');
+    assert.ok(flat.includes('**Joyaco B.V. (KvK 42135911, BTW NL005523705B04), Leidsegracht 34, 1016 CM Amsterdam, Netherlands**'));
+    assert.match(dpa, /## 5\. International transfers\n\nPersonal data is processed in the hosting region listed in Annex I\.\n\n## 6\./);
+    assert.ok(flat.includes('Data at rest, including backups, is stored on encrypted disks provided by Render; data in transit is protected with TLS.'));
+    assert.ok(dpa.includes('<!-- Source: https://render.com/docs/disks — "All disks are encrypted at rest, and so are their automatic daily snapshots." -->'));
+    assert.ok(flat.includes('Access to production systems is limited to the founder; two-factor authentication is enforced on all service accounts (hosting, email, billing, DNS, code repository); credentials are stored in a password manager; work devices use full-disk encryption.'));
+  });
+
   test('§1 describes the service the way the site does', () => {
     const s1 = /## 1\. Subject matter and duration([\s\S]*?)\n## /.exec(dpa)[1].replace(/\s+/g, ' ');
     assert.match(s1, /advisory candidate-fit scoring of CVs against job descriptions by an automated, rules-based screening tool/);

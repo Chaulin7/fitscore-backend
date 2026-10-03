@@ -8,7 +8,7 @@
 
 - **[Client legal name]** — the recruiter's organization, acting as data
   **Controller** ("Client"); and
-- **Joyaco B.V. (KvK 42135911, BTW NL005523705B04) [TODO: registered address]**,
+- **Joyaco B.V. (KvK 42135911, BTW NL005523705B04), Leidsegracht 34, 1016 CM Amsterdam, Netherlands**,
   operator of CVsprings, acting as data **Processor** ("Processor").
 
 ## 1. Subject matter and duration
@@ -82,9 +82,6 @@ The Processor shall:
 ## 5. International transfers
 
 Personal data is processed in the hosting region listed in Annex I.
-[TODO: confirm Render service region; if data is processed outside the EU/EEA,
-identify the transfer mechanism (SCCs / EU–US Data Privacy Framework) for each
-affected subprocessor and reference it here.]
 
 ## 6. Liability, term, governing law
 
@@ -125,6 +122,10 @@ backend.
   typed confirmation).
 - **Record integrity:** scoring data immutable after creation; append-only
   change history with reviewer attribution.
-- [TODO: encryption at rest — confirm hosting disk encryption details.]
-- [TODO: organisational measures — access control to production, incident
-  response procedure, personnel confidentiality agreements.]
+<!-- Source: https://render.com/docs/disks — "All disks are encrypted at rest, and so are their automatic daily snapshots." -->
+- **Encryption at rest:** Data at rest, including backups, is stored on encrypted disks
+  provided by Render; data in transit is protected with TLS.
+- **Organisational measures:** Access to production systems is limited to the founder;
+  two-factor authentication is enforced on all service accounts (hosting, email,
+  billing, DNS, code repository); credentials are stored in a password manager; work
+  devices use full-disk encryption.
