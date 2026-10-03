@@ -93,6 +93,12 @@ const FEATURE_REQUEST_RETENTION_DAYS = 365;
 // then part of the customer relationship. THE one place this number lives.
 const DEMO_REQUEST_RETENTION_MONTHS = 12;
 
+// How long a trial offer nobody took up is kept after it expired: 12 calendar
+// months (Privacy Policy, section F). An offer that was taken up — checkout
+// completed, an account created, a subscription or data attached — is part of
+// the customer relationship and is never touched by the purge.
+const TRIAL_OFFER_RETENTION_MONTHS = 12;
+
 function getDb() {
   if (!db) {
     assertNotTheRealDatabase();
@@ -1518,7 +1524,7 @@ function startRetentionSchedule() {
   const tick = () => {
     // Demo requests ride the same daily, mode-gated run (they are not org data,
     // so they have no purge_runs row of their own; the counts go to the log).
-    try { if (retentionPurgeDue()) { runRetentionPurge(); purgeStaleDemoRequests(); } }
+    try { if (retentionPurgeDue()) { runRetentionPurge(); purgeStaleDemoRequests(); purgeExpiredTrialOffers(); } }
     catch (err) { console.error('[retention] schedule tick failed:', err && err.message); }
   };
   retentionTimer = setInterval(tick, RETENTION_CHECK_INTERVAL_MS);
@@ -1755,10 +1761,13 @@ function insertDemoRequest({ name, email, agency, note, ipHash }) {
 // The cutoff for demo requests: `months` calendar months before `now`, as ISO —
 // the same format insertDemoRequest writes, so `created_at < cutoff` compares
 // correctly as text (see purgeOrgFeatureRequestsBatched for why that matters).
-function demoRequestCutoffIso(now = Date.now(), months = DEMO_REQUEST_RETENTION_MONTHS) {
+function monthsBeforeIso(now, months) {
   const d = new Date(now);
   d.setUTCMonth(d.getUTCMonth() - months);
   return d.toISOString();
+}
+function demoRequestCutoffIso(now = Date.now(), months = DEMO_REQUEST_RETENTION_MONTHS) {
+  return monthsBeforeIso(now, months);
 }
 
 /**
@@ -2416,6 +2425,35 @@ function sweepAbandonedTrialInvites({ now = Date.now(), apply = false, limit = 5
   return { scanned: candidates.length, deleted, skipped, applied: !!apply };
 }
 
+/**
+ * Daily purge of trial offers nobody took up, 12 months after they expired.
+ * Two kinds, because sweepAbandonedTrialInvites only sees one of them:
+ *   - never started: the offer was never clicked, so no trial organization
+ *     exists (org_id IS NULL). Only the invite row holds personal data — the
+ *     address and company name — and it is deleted outright.
+ *   - started, then abandoned before checkout: the existing sweep, run with
+ *     its expiry cutoff moved back 12 months. It deletes the invite, its
+ *     trial_emails rows and the empty org, and refuses anything with a
+ *     subscription or data (those were taken up: customer relationship).
+ * Runs on the retention schedule and honours RETENTION_PURGE_MODE like the
+ * other purges. Logs counts only. The admin sweep endpoint is unchanged and
+ * can still remove abandoned offers sooner, by hand.
+ */
+function purgeExpiredTrialOffers({ now = Date.now(), mode = retentionPurgeMode() } = {}) {
+  const db = getDb();
+  const isLive = mode === 'live';
+  const cutoffIso = monthsBeforeIso(now, TRIAL_OFFER_RETENTION_MONTHS);
+  const neverStartedWhere = 'org_id IS NULL AND redeemed_at IS NULL AND consumed_at IS NULL AND expires_at <= ?';
+  const neverStarted = isLive
+    ? db.prepare(`DELETE FROM trial_invites WHERE ${neverStartedWhere}`).run(cutoffIso).changes
+    : db.prepare(`SELECT COUNT(*) AS n FROM trial_invites WHERE ${neverStartedWhere}`).get(cutoffIso).n;
+  const sweep = sweepAbandonedTrialInvites({ now: Date.parse(cutoffIso), apply: isLive });
+  const abandoned = sweep.deleted.length;
+  const kept = sweep.skipped.length;
+  console.log(`[retention] trial offers (mode=${mode}): ${neverStarted} never started and ${abandoned} abandoned, expired over ${TRIAL_OFFER_RETENTION_MONTHS} months ago, ${isLive ? 'deleted' : 'would be deleted'}; ${kept} kept (taken up)`);
+  return { mode, cutoffDate: cutoffIso, neverStarted, abandoned, kept, rowsDeleted: isLive ? neverStarted + abandoned : 0 };
+}
+
 // Statuses on an abandoned trial org that do NOT protect it from the sweep.
 // NULL is the ordinary case (the trial never started). The terminal ones mean a
 // subscription existed and is finished, which is not a reason to keep an
@@ -2470,6 +2508,8 @@ module.exports = {
   refundUsage,
   insertDemoRequest,
   purgeStaleDemoRequests,
+  purgeExpiredTrialOffers,
+  TRIAL_OFFER_RETENTION_MONTHS,
   demoRequestCutoffIso,
   DEMO_REQUEST_RETENTION_MONTHS,
   countRecentFeatureRequests,

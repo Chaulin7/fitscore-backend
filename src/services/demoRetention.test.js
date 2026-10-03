@@ -136,5 +136,5 @@ describe('dry run (anything but RETENTION_PURGE_MODE=live)', () => {
 test('the daily retention schedule runs the demo purge', () => {
   const src = fs.readFileSync(path.join(__dirname, 'db.js'), 'utf8');
   const start = /function startRetentionSchedule\(\) \{([\s\S]*?)\n\}/.exec(src)[1];
-  assert.match(start, /if \(retentionPurgeDue\(\)\) \{ runRetentionPurge\(\); purgeStaleDemoRequests\(\); \}/);
+  assert.match(start, /if \(retentionPurgeDue\(\)\) \{ runRetentionPurge\(\); purgeStaleDemoRequests\(\); purgeExpiredTrialOffers\(\); \}/);
 });
