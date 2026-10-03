@@ -11,8 +11,11 @@
  * no row, no email, no log line that could reveal the discard.
  *
  * Leads are stored first, then two Resend emails go out (notification +
- * prospect confirmation). Email failure never fails the request — the lead
- * is already in the DB and the error is logged server-side.
+ * prospect confirmation). The lead is never lost: it is in the DB before any
+ * email is attempted. But a failed send IS a failure: it is logged, and the
+ * visitor gets 502 DEMO_EMAIL_FAILED, which the landing page words as "we saved
+ * your request, but you may not receive a confirmation". Resend's SDK resolves
+ * { error } instead of throwing, so both sends check it.
  */
 
 const express = require('express');
@@ -63,7 +66,17 @@ function ipHash(ip) {
   return crypto.createHash('sha256').update(salt + '|' + (ip || '')).digest('hex');
 }
 
-async function sendDemoEmails({ name, email, agency, note, createdAt }) {
+function resendClient() {
+  const key = process.env.RESEND_API_KEY;
+  return key && Resend ? new Resend(key) : null;
+}
+
+async function sendOne(client, mail) {
+  const { error } = await client.emails.send(mail);
+  if (error) throw new Error(`Resend responded: ${error.name || 'error'} — ${error.message || 'unknown'}`);
+}
+
+async function sendDemoEmails({ name, email, agency, note, createdAt }, client = router.resendClient()) {
   const from = process.env.DEMO_FROM_EMAIL || 'demo@cvsprings.com';
   const notify = process.env.DEMO_NOTIFY_EMAIL || null;
   // Prospects are invited to reply with their anonymised CVs, so replies must
@@ -97,26 +110,29 @@ async function sendDemoEmails({ name, email, agency, note, createdAt }) {
     '— CVsprings',
   ].join('\n');
 
-  const key = process.env.RESEND_API_KEY;
-  if (!key || !Resend) {
-    // Local dev: no provider configured — log the would-be emails instead.
-    console.log('[demo] RESEND_API_KEY unset — would send notification:', { to: notify, subject: subjectA });
-    console.log(bodyA);
-    console.log('[demo] would send confirmation:', { to: email, subject: subjectB, replyTo, attachment: !!checklistPdf });
+  if (!client) {
+    // No provider: in production nothing would reach anyone, so say so.
+    if (process.env.NODE_ENV === 'production') throw new Error('RESEND_API_KEY is not set');
+    // Local dev: metadata only — never the lead's name, address or note.
+    console.log('[demo] RESEND_API_KEY unset — would send notification + confirmation', { notify: !!notify, attachment: !!checklistPdf });
     return;
   }
-  const resend = new Resend(key);
-  if (notify) {
-    await resend.emails.send({ from, to: notify, subject: subjectA, text: bodyA });
-  }
-  await resend.emails.send({
-    from,
-    to: email,
-    subject: subjectB,
-    text: bodyB,
-    ...(replyTo ? { replyTo } : {}),
-    ...(checklistPdf ? { attachments: [{ filename: 'CVsprings-EU-AI-Act-checklist.pdf', content: checklistPdf }] } : {}),
-  });
+  // Both are attempted even if one fails, so a notification outage does not
+  // also cost the prospect their confirmation (or the other way round).
+  const sends = [
+    notify ? ['notification', sendOne(client, { from, to: notify, subject: subjectA, text: bodyA })] : null,
+    ['confirmation', sendOne(client, {
+      from,
+      to: email,
+      subject: subjectB,
+      text: bodyB,
+      ...(replyTo ? { replyTo } : {}),
+      ...(checklistPdf ? { attachments: [{ filename: 'CVsprings-EU-AI-Act-checklist.pdf', content: checklistPdf }] } : {}),
+    })],
+  ].filter(Boolean);
+  const results = await Promise.allSettled(sends.map(([, p]) => p));
+  const failed = results.map((r, i) => (r.status === 'rejected' ? `${sends[i][0]}: ${r.reason && r.reason.message}` : null)).filter(Boolean);
+  if (failed.length) throw new Error(failed.join('; '));
 }
 
 // POST /api/demo-request
@@ -147,9 +163,11 @@ router.post('/', demoLimiter, async (req, res) => {
     const record = insertDemoRequest({ name, email, agency, note, ipHash: ipHash(req.ip) });
 
     try {
-      await sendDemoEmails({ name, email, agency, note, createdAt: record.createdAt });
+      await router.sendDemoEmails({ name, email, agency, note, createdAt: record.createdAt });
     } catch (err) {
+      // The lead is stored; the visitor still has to hear that an email failed.
       console.error('[demo] email delivery failed (lead stored):', err.message);
+      return sendError(res, 502, 'DEMO_EMAIL_FAILED', 'We saved your request, but an email could not be sent.');
     }
 
     res.json({ ok: true });
@@ -158,5 +176,9 @@ router.post('/', demoLimiter, async (req, res) => {
     sendError(res, 500, 'INTERNAL_ERROR', 'Could not submit the request.');
   }
 });
+
+// Seams for tests: swap the client (or the whole send) without a network or key.
+router.resendClient = resendClient;
+router.sendDemoEmails = sendDemoEmails;
 
 module.exports = router;

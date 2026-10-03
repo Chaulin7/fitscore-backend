@@ -108,8 +108,14 @@ async function deliverResetLink(email, resetLink) {
     if (!resp.ok) throw new Error(`Resend API responded ${resp.status}`);
     return;
   }
-  // No email provider configured — dev fallback. Log the link (never the password).
-  console.log(`[auth] Password reset link for ${email}: ${resetLink}`);
+  // No email provider configured. Only a development machine may see the link:
+  // printed anywhere else — production, tests, an unset NODE_ENV — it would put
+  // a working reset credential and the account's address into a log stream.
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[auth] Password reset link for ${email}: ${resetLink}`);
+    return;
+  }
+  console.warn('[auth] RESEND_API_KEY unset — password reset email not sent');
 }
 
 // --- POST /api/auth/signup ------------------------------------------------------
@@ -418,3 +424,4 @@ router.post('/download-token', requireSession, (req, res) => {
 });
 
 module.exports = router;
+module.exports.deliverResetLink = deliverResetLink;

@@ -220,6 +220,27 @@ describe('the Imprint is linked everywhere but not indexed', () => {
   });
 });
 
+describe('fonts come from this origin only', () => {
+  test('the CSP admits no Google font domain: font-src and style-src are self', async () => {
+    const csp = (await get('/')).headers.get('content-security-policy') || '';
+    assert.doesNotMatch(csp, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
+    assert.match(csp, /font-src 'self'(;|$)/);
+    assert.match(csp, /style-src 'self' 'unsafe-inline'(;|$)/);
+  });
+
+  test('the stylesheets and a font file are served from /assets/fonts/', async () => {
+    for (const p of ['/assets/fonts/inter.css', '/assets/fonts/landing.css']) {
+      const res = await get(p);
+      assert.equal(res.status, 200, p);
+      assert.match(res.headers.get('content-type') || '', /^text\/css/, p);
+    }
+    const font = await get('/assets/fonts/inter/inter-latin.woff2');
+    assert.equal(font.status, 200);
+    assert.match(font.headers.get('content-type') || '', /font\/woff2/);
+    assert.equal(Buffer.from(await font.arrayBuffer()).subarray(0, 4).toString('latin1'), 'wOF2');
+  });
+});
+
 describe('/locales/{lang}.json', () => {
   test('serves each supported dictionary, complete', async () => {
     for (const lang of ['en', 'nl', 'de']) {

@@ -26,6 +26,7 @@ const { productJsonLd } = require('./config/plans');
 const { MEDIA_PLACEHOLDERS, URL_PREFIX: MEDIA_URL_PREFIX, assetUrl, logMediaAssets, DEMO_VIDEO_UPLOAD_DATE } = require('./config/mediaAssets');
 const { configuredBaseUrl, warnDeprecatedAliases } = require('./config/appUrl');
 const { LEGAL_NAME, KVK, BTW_ID, FOOTER_LINE: LEGAL_FOOTER_LINE, CONTACT_EMAIL } = require('./config/legal');
+const { resolvePrivacyContact } = require('./config/privacyContact');
 const { migrateLegacyData } = require('./services/authService');
 const { getDb, startRetentionSchedule, startWalCheckpointing, registerGracefulShutdown } = require('./services/db');
 const { startProvenanceSweep } = require('./services/provenanceCache');
@@ -67,7 +68,8 @@ app.use((req, res, next) => {
 // allowed via a per-request nonce (no 'unsafe-inline' for scripts); styles
 // still need 'unsafe-inline' (inline styles are a separate cleanup). We lock
 // everything else down (object-src none, frame-ancestors none) and allow only
-// the fonts/analytics/Stripe origins actually used. HSTS is enabled only once
+// the analytics/Stripe origins actually used. Fonts are self-hosted
+// (public/assets/fonts/), so styles and fonts come from this origin only. HSTS is enabled only once
 // served over HTTPS (Render/custom domain).
 app.use(helmet({
   contentSecurityPolicy: {
@@ -88,8 +90,8 @@ app.use(helmet({
       // are wired via data-action + delegated listeners), so attribute handlers
       // are blocked by design.
       scriptSrcAttr: ["'none'"],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      fontSrc: ["'self'"],
       imgSrc: ["'self'", 'data:'],
       // Pinned independently of default-src, not as documentation of it. The
       // demo video would load anyway by falling back to default-src 'self';
@@ -263,12 +265,18 @@ function buildVideoJsonLd() {
 }
 const videoJsonLd = buildVideoJsonLd();
 
+// The Privacy Policy's address for privacy requests: PRIVACY_CONTACT_EMAIL, or
+// the Imprint's address. Substituted here like the legal details, so the page
+// a visitor without JavaScript gets says the same as everyone else's.
+const privacyContact = resolvePrivacyContact(process.env);
+
 const htmlTemplates = {};
 for (const page of HTML_PAGES) {
   let html = fs.readFileSync(path.join(PUBLIC_DIR, page), 'utf8')
     .replaceAll('__PRICING_JSONLD__', pricingJsonLd)
     .replaceAll('__LEGAL_FOOTER__', LEGAL_FOOTER_LINE)
     .replaceAll('__LEGAL_NAME__', LEGAL_NAME)
+    .replaceAll('__PRIVACY_CONTACT_EMAIL__', privacyContact.email)
     .replaceAll('__CONTACT_EMAIL__', CONTACT_EMAIL)
     .replaceAll('__LEGAL_KVK__', KVK)
     .replaceAll('__LEGAL_BTW__', BTW_ID)
@@ -390,7 +398,8 @@ app.use('/api/plans', generalLimiter, plansRouter);
 // from env so the operator sets real values without code edits).
 app.get('/api/meta', generalLimiter, (req, res) => {
   res.json({
-    privacyContact: process.env.PRIVACY_CONTACT_EMAIL || null,
+    // The same address the Privacy Policy prints (src/config/privacyContact.js).
+    privacyContact: privacyContact.email,
     supportEmail: process.env.SUPPORT_EMAIL || null,
     company: {
       // From src/config/legal.js, not COMPANY_LEGAL_NAME. That variable is
@@ -510,6 +519,8 @@ warnDeprecatedAliases(logger
 // Same idea for the contact form: one warning line if it cannot deliver as
 // configured (no RESEND_API_KEY, or no CONTACT_FROM_EMAIL), naming the missing
 // variables and never a value. A warning, not an error: the server is fine.
+if (privacyContact.warning) (logger ? logger.warn(privacyContact.warning) : console.warn(privacyContact.warning));
+
 const contactConfigWarning = contactRouter.configWarning(process.env);
 if (contactConfigWarning) (logger ? logger.warn(contactConfigWarning) : console.warn(contactConfigWarning));
 

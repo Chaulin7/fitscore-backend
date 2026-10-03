@@ -1,10 +1,10 @@
 # CVsprings — Records of Processing Activities (GDPR Art. 30(2), processor)
 
-*v1.3.0 — 2026-06-12. Maintained by the operator (Joyaco BV) as processor.*
+*v1.3.0 — 2026-06-12. Maintained by the operator (Joyaco B.V.) as processor.*
 
 ## Processor
 
-- **Name / contact:** Joyaco BV (KvK 42135911, BTW NL005523705B04) [TODO: registered address].
+- **Name / contact:** Joyaco B.V. (KvK 42135911, BTW NL005523705B04) [TODO: registered address].
 - **Privacy contact:** value of `PRIVACY_CONTACT_EMAIL` [TODO: set in production
   environment and record here].
 - **Representative / DPO:** [TODO: confirm whether either is required and
@@ -40,16 +40,18 @@
 | Data subjects | Client recruiter users |
 | Personal data | Email, bcrypt password hash, role, session metadata (hashed tokens, expiry, last login, failed-attempt counters), password-reset tokens (hashed, 30-min TTL) |
 | Retention | While the account exists; sessions 30 days; reset tokens 30 minutes/single-use |
-| Transfers | Hosting platform; if Resend is enabled, recruiter emails are processed by Resend, Inc. (US) for reset emails [TODO: confirm enabled + safeguard] |
+| Transfers | Hosting platform; Resend, Inc. sends the password-reset, team-invitation and trial emails to recruiter users (EU region, Ireland; SCCs in Resend's DPA — see below) |
 
 ## Categories of recipients
 
 - Render, Inc. (hosting/subprocessor).
 - Plausible Insights OÜ (aggregate, cookieless analytics — no personal data per
   its published policy; no candidate data sent).
-- Resend, Inc. (optional, recruiter reset emails only) [TODO: enabled?].
-- Google LLC (Google Fonts CDN: end-user browser IP exposure on page load; not
-  a processor of candidate data).
+- Resend, Inc. — sends every email the app sends: password resets, team
+  invitations and trial emails to recruiter users and trial recipients;
+  confirmations to demo requesters; and contact-form messages, demo requests
+  and feature requests to our own inbox. Never candidate data. The full list,
+  with recipients and contents, is pinned in src/routes/emailInventory.test.js.
 
 ## International transfers and safeguards (Art. 30(2)(c))
 
@@ -57,8 +59,9 @@
   of stored data. If non-EU: document Render's safeguard — SCCs and/or EU–US
   Data Privacy Framework certification status].
 - Plausible: EU hosting per its data policy — no transfer.
-- Resend (if enabled): US — [TODO: safeguard].
-- Google Fonts: visitor IP to Google (US) on page load.
+- Resend: emails are sent from Resend's EU region (Ireland); any transfer to
+  the US (Resend, Inc. is a US company) is covered by the Standard Contractual
+  Clauses in Resend's DPA.
 
 ## General description of security measures (Art. 30(2)(d))
 

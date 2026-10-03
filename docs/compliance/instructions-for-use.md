@@ -1,9 +1,9 @@
 # CVsprings — Instructions for Use
 
-*Deployer-facing instructions per EU AI Act Article 13. Version 1.3.0 — last updated 2026-06-12.*
+*Deployer-facing instructions per EU AI Act Article 13. Version 1.3.0 — last updated 2026-10-02.*
 
-> CVsprings is an AI system used for recruitment / candidate filtering and is therefore
-> classified as **high-risk** under Annex III, point 4 of the EU AI Act. Provider
+> CVsprings is an automated, rules-based screening tool used for recruitment / candidate
+> filtering, a use classified as **high-risk** under Annex III, point 4 of the EU AI Act. Provider
 > obligations apply from **2 December 2027**. This document tells you, the deployer,
 > what the system is for, how to operate it correctly, and what duties remain yours.
 
@@ -90,7 +90,7 @@ automatically**. To deploy it lawfully and responsibly you must:
 
 ## 7. What you (the deployer) must do
 
-- **Inform candidates** that an AI-based tool supports screening. A ready-to-use
+- **Inform candidates** that an automated, rules-based screening tool supports screening. A ready-to-use
   notice (EN + NL) is provided in `candidate-notice.md` and on the in-app
   compliance page.
 - **Keep humans in the loop** for all decisions (section 5).
