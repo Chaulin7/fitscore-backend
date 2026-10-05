@@ -79,7 +79,7 @@ describe('the DPA template', () => {
     assert.match(dpa, /## 5\. International transfers\n\nPersonal data is processed in the hosting region listed in Annex I\.\n\n## 6\./);
     assert.ok(flat.includes('Data at rest, including backups, is stored on encrypted disks provided by Render; data in transit is protected with TLS.'));
     assert.ok(dpa.includes('<!-- Source: https://render.com/docs/disks — "All disks are encrypted at rest, and so are their automatic daily snapshots." -->'));
-    assert.ok(flat.includes('Access to production systems is limited to the founder; two-factor authentication is enforced on all service accounts (hosting, email, billing, DNS, code repository); credentials are stored in a password manager; work devices use full-disk encryption.'));
+    assert.ok(flat.includes('Access to production systems is limited to the founder; two-factor authentication is enforced on all service accounts (hosting, email, billing, DNS, code repository); credentials are stored in a password manager; work devices use full-disk encryption. Personal data breaches are notified to the client without undue delay after we become aware of them. No other personnel currently have access to personal data; any future personnel or contractors will be bound by confidentiality obligations before being given access.'));
   });
 
   test('backups: Render snapshots kept at least seven days, manual backups deleted within 30 days', () => {

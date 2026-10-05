@@ -130,4 +130,7 @@ backend.
 - **Organisational measures:** Access to production systems is limited to the founder;
   two-factor authentication is enforced on all service accounts (hosting, email,
   billing, DNS, code repository); credentials are stored in a password manager; work
-  devices use full-disk encryption.
+  devices use full-disk encryption. Personal data breaches are notified to the client
+  without undue delay after we become aware of them. No other personnel currently
+  have access to personal data; any future personnel or contractors will be bound by
+  confidentiality obligations before being given access.
