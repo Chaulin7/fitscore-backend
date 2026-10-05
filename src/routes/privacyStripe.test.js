@@ -57,10 +57,19 @@ describe('Stripe in the Privacy Policy', () => {
       'Payment details are handled by Stripe and are not stored by us',
       'Performance of our contract with you (Art. 6(1)(b) GDPR), and our legal obligation to keep tax records (Art. 6(1)(c) GDPR)',
       'Stripe Payments Europe, Limited (Ireland)',
-      'Invoices and billing records are kept for 7 years, as required by Dutch tax law.',
+      'Stripe keeps invoices and payment records under its own legal obligations. We keep our billing references (the Stripe references, your plan, and your subscription&rsquo;s status and dates) for as long as your account exists, and delete them when your account is deleted.',
       'href="#privacyContactLine"',
     ]) assert.ok(g.includes(phrase), phrase);
   });
+});
+
+test('section G claims no retention period that no code enforces', () => {
+  // Nothing in the code keeps billing data on a 7-year clock. The 7 years that
+  // IS stated ("Deleting your account", section A) is the company's own
+  // accounting obligation, outside the app — not a claim about section G's data.
+  assert.doesNotMatch(sectionG.replace(/<!--[\s\S]*?-->/g, ''), /7 years|seven years|Dutch tax law/i);
+  assert.ok(sectionG.includes('for as long as your account exists, and delete them when your account is deleted.'));
+  assert.doesNotMatch(DB_SRC, /BILLING_RETENTION|7 \* 365|2555/, 'if a billing retention job is ever added, section G should say so');
 });
 
 describe('"We store only …" matches the code', () => {

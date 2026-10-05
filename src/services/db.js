@@ -2533,6 +2533,7 @@ module.exports = {
   deleteOrganizationIfEmpty,
   clearProvisional,
   orgScopedTables,
+  AUDIT_CHANGES_NO_DELETE_TRIGGER, // services/orgDeletion.js restores it, like the purge does
   PROVISIONAL_ORG_TTL_MS,
   setTrialInviteTarget,
   findTrialInviteByOrg,

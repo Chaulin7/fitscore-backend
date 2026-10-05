@@ -342,6 +342,22 @@ rm -- /path/to/backup.db /path/to/backup.db-wal /path/to/backup.db-shm
 Never point `rm` at `$DATABASE_PATH` itself, or at its `-wal` / `-shm`: those are
 the live database. `list-backups.js` never lists them.
 
+### Deleting an organization on request
+
+The Privacy Policy lets a customer ask (by email) for their account to be
+deleted; we delete it, and everything linked to it, within 30 days, after the
+Stripe subscription has ended. From the Render shell:
+
+```bash
+node scripts/delete-org.js <orgId> --dry-run   # what would be deleted; changes nothing
+node scripts/delete-org.js <orgId>             # same, then type the organization name to confirm
+```
+
+It refuses while the subscription has not ended (cancel it in Stripe and wait
+until it shows as canceled), deletes in one transaction, prints counts only,
+and never touches Stripe. Deleted data can persist in backups until they
+expire (see above).
+
 ### Logging
 
 `pino` + `pino-http` write structured JSON logs. Sensitive fields (`authorization`, `cookie`, CV body, JD body) are redacted by the logger's `redact` config. If `pino` is not installed at runtime, the app falls back to `console.log`.
