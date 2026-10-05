@@ -417,14 +417,13 @@ describe('the Privacy Policy describes the contact form', () => {
 
   test('the International transfers bullet: what Resend processes, where, and under which safeguard', () => {
     const bullet = /<li><strong>Email:<\/strong>[\s\S]*?<\/li>/.exec(privacy)[0];
-    assert.equal(bullet, '<li><strong>Email:</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). '
+    assert.equal(bullet, '<li><strong>Email:</strong> Resend is US-based and processes the emails described in the Resend row above: to recruiter accounts, invited team members and demo requesters, and the contact-form messages, demo requests and feature requests sent to our inbox. '
       + 'Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the '
       + 'European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>');
   });
 
-  test('privacy requests have a real address to go to, which PRIVACY_CONTACT_EMAIL still overrides', () => {
-    assert.match(privacy, /<span id="privacyContact"><a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__<\/a><\/span>/);
-    assert.match(privacy, /if \(d && d\.privacyContact\)/, 'the script still swaps in the configured address');
+  test('privacy requests have a real address, written in by the server (see src/config/privacyContact.test.js)', () => {
+    assert.match(privacy, /<span id="privacyContact"><a href="mailto:__PRIVACY_CONTACT_EMAIL__">__PRIVACY_CONTACT_EMAIL__<\/a><\/span>/);
   });
 
   test('the Resend subprocessor row includes contact-form messages', () => {
@@ -440,13 +439,14 @@ describe('the Privacy Policy describes the contact form', () => {
     assert.doesNotMatch(privacy, /TODO\(operator\): state whether Resend is enabled/);
   });
 
-  test('Render: Frankfurt (EU) and the SCC safeguard, in the row and in the Hosting bullet', () => {
+  test('Render: Frankfurt (EU); the EU-US Data Privacy Framework first, SCCs as fallback; in the row and the Hosting bullet', () => {
     const row = /<td>Render<\/td>[\s\S]*?<\/tr>/.exec(privacy)[0];
-    assert.ok(row.includes('<td>Render, Inc. (US company). Service region: Frankfurt, Germany (EU). Because Render, Inc. is a US company, any transfer of data to the US is covered by the '
-      + 'European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement.</td>'), row);
+    assert.ok(row.includes('<td>Render, Inc. (US company). Service region: Frankfurt, Germany (EU). Because Render, Inc. is a US company, any transfer of data to the US is covered by '
+      + 'Render&rsquo;s certification under the EU-US Data Privacy Framework, with the European Commission&rsquo;s Standard Contractual Clauses in Render&rsquo;s Data Processing Agreement as a fallback.</td>'), row);
     const hosting = /<li><strong>Hosting:<\/strong>[\s\S]*?<\/li>/.exec(privacy)[0];
     assert.match(hosting, /Render&rsquo;s Frankfurt \(EU Central\) region, so candidate data at rest does not leave the EU\/EEA\./);
-    assert.match(hosting, /covered by the European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement\./);
+    assert.match(hosting, /covered by Render&rsquo;s certification under the EU-US Data Privacy Framework, with the European Commission&rsquo;s Standard Contractual Clauses in Render&rsquo;s Data Processing Agreement as a fallback\./);
+    assert.doesNotMatch(privacy, /Standard Contractual Clauses included in Render/, 'the old SCC-only Render sentence is gone');
     assert.doesNotMatch(privacy, /TODO\(operator\): confirm (the )?region/);
   });
 });

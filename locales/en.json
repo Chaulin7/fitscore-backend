@@ -111,6 +111,7 @@
   "landing.footer.dpa": "DPA available on request",
   "landing.demo.form.invalidEmail": "Enter a valid work email address.",
   "landing.demo.form.failed": "Something went wrong — email us at {email} instead.",
+  "landing.demo.form.emailFailed": "We saved your request, but our email could not be sent, so you may not receive a confirmation. We will still reply within one working day.",
   "pricing.included": "Included on every plan",
   "pricing.badge.pro": "Most agencies",
   "pricing.cta.get": "Get {name} — {price}",

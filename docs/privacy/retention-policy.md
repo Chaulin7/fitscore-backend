@@ -1,6 +1,6 @@
 # CVsprings — Data Retention Policy (internal)
 
-*v1.3.0 — 2026-06-12. One-pager: what is stored where, for how long, and how it is deleted.*
+*v1.3.0 — 2026-10-05. One-pager: what is stored where, for how long, and how it is deleted.*
 
 ## What is stored where
 
@@ -17,9 +17,10 @@
 
 ## Retention defaults and configuration
 
-- **Audit records + change history:** default **365 days** per organization.
-  Org owners can set **30–1095 days** or **0 = keep until manually deleted**
+- **Audit records + change history:** default **730 days** per organization.
+  Org owners can set **between 180 and 3,650 days**
   (Settings → Data Retention; stored on the organization record server-side).
+  The 180-day floor is enforced at the API and again inside the purge job.
 - **Templates, accounts, sessions:** kept while the account exists; sessions
   expire after 30 days; password-reset tokens after 30 minutes (single-use).
 - **CV files / extracted text:** zero retention (see table).
@@ -41,18 +42,26 @@
    audit records (incl. change history) and templates — used for portability
    and offboarding before deletion.
 
-## Backups — open item
+## Backups
 
-> **TODO (operator):** the SQLite database lives on a Render persistent disk.
-> Determine whether disk snapshots/backups are enabled for the service, their
-> retention period, and whether they can be purged on request. **Until
-> confirmed, assume deleted data may persist in platform snapshots for the
-> platform's snapshot-retention window and document that window here.** This
-> matters for erasure-request responses: state the backup expiry alongside the
-> live deletion.
+Production data is backed up through automatic daily snapshots of the encrypted
+disk, managed by Render and retained for at least seven days.
+Manual backups taken before maintenance are stored on the same encrypted disk
+and deleted within 30 days.
+
+- **Render snapshots:** automatic, daily, of the encrypted persistent disk;
+  Render keeps them for at least seven days. Deleted data can persist in them
+  for that long — state this alongside the live deletion when answering an
+  erasure request.
+- **Manual backups** (before a deploy, a migration or go-live): taken with
+  SQLite's `.backup` onto the same disk (README, "Backing up the production
+  database"), and deleted within 30 days — so deleted data can also persist
+  in one for up to 30 days. `node scripts/list-backups.js`
+  lists every backup file on the disk, read-only, and flags any older than
+  30 days.
 
 ## Review
 
-Owner: operator (Joyaco BV). Review this policy when the data model, hosting, or
+Owner: operator (Joyaco B.V.). Review this policy when the data model, hosting, or
 retention features change, and at least every 12 months. Next review:
 **2027-06-12** or on change, whichever is first.

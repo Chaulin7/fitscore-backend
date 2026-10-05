@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CVsprings · Privacy Policy</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/fonts/inter.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
@@ -80,7 +80,7 @@ a{color:#0f2847}
 <div class="page">
   <div class="hero">
     <h1>Privacy Policy</h1>
-    <p>This page explains, in plain language, what data CVsprings processes and stores, for how long, who it is shared with, and how to exercise your rights. Last updated 2 October 2026 (v1.3.0).</p>
+    <p>This page explains, in plain language, what data CVsprings processes and stores, for how long, who it is shared with, and how to exercise your rights. Last updated 5 October 2026 (v1.3.0).</p>
   </div>
 
   <div class="role-banner" style="margin-bottom:22px">
@@ -109,11 +109,14 @@ a{color:#0f2847}
 
       <h4>Retention &mdash; defaults and controls</h4>
       <ul>
-        <li><strong>Default: 365 days.</strong> A daily job permanently deletes audit records (and their change history) older than your organization&rsquo;s retention setting.</li>
-        <li>Org owners can set retention between <strong>30 and 1095 days</strong>, or <strong>0</strong> to keep records until manually deleted (Settings &rarr; Data Retention).</li>
+        <!-- TODO(i18n-legal): counsel review — audit retention numbers corrected to the code (5 October 2026): default 365 → 730 days; range 30–1095 days or 0 → 180–3,650 days; the "0 = keep until manually deleted" option no longer exists (the code rejects anything under 180). Counsel: confirm the 730-day default. -->
+        <li><strong>Default: 730 days.</strong> A daily job permanently deletes audit records (and their change history) older than your organization&rsquo;s retention setting.</li>
+        <li>Org owners can set retention between <strong>180 and 3,650 days</strong> (Settings &rarr; Data Retention).</li>
         <li><strong>Per-candidate erasure:</strong> any record can be found by candidate-name search and individually deleted &mdash; this is the mechanism for honouring a candidate erasure request.</li>
         <li><strong>Org-wide controls (owners):</strong> export all audit records and templates as JSON (data portability / offboarding), or permanently delete all audit data with typed-name confirmation.</li>
         <li>Account/session data is kept for as long as the account exists.</li>
+        <!-- TODO(i18n-legal): counsel review — new bullet (5 October 2026): backups — Render's daily disk snapshots (at least seven days) and manual backups (deleted within 30 days). Same wording as the DPA §4.8. -->
+        <li><strong>Backups:</strong> Production data is backed up through automatic daily snapshots of the encrypted disk, managed by Render and retained for at least seven days. Manual backups taken before maintenance are stored on the same encrypted disk and deleted within 30 days.</li>
       </ul>
 
       <h4>Subprocessors and third parties</h4>
@@ -124,8 +127,8 @@ a{color:#0f2847}
           <tr>
             <td>Render</td>
             <td>Hosting of the CVsprings backend and database (incl. stored audit records).</td>
-            <!-- TODO(i18n-legal): counsel review — Render row: service region (Frankfurt, EU) and the SCC safeguard stated; the answered operator note is removed (2 October 2026). -->
-            <td>Render, Inc. (US company). Service region: Frankfurt, Germany (EU). Because Render, Inc. is a US company, any transfer of data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement.</td>
+            <!-- TODO(i18n-legal): counsel review — Render row: service region (Frankfurt, EU) stated (2 October 2026); safeguard corrected to the EU-US Data Privacy Framework first, SCCs as fallback, per Render DPA §6.2 (3 October 2026). -->
+            <td>Render, Inc. (US company). Service region: Frankfurt, Germany (EU). Because Render, Inc. is a US company, any transfer of data to the US is covered by Render&rsquo;s certification under the EU-US Data Privacy Framework, with the European Commission&rsquo;s Standard Contractual Clauses in Render&rsquo;s Data Processing Agreement as a fallback.</td>
             <td><a href="https://render.com/dpa" rel="noopener">Render DPA</a></td>
           </tr>
           <tr>
@@ -134,18 +137,24 @@ a{color:#0f2847}
             <td>Plausible Insights O&Uuml; (Estonia, EU); states that data is hosted in the EU.</td>
             <td><a href="https://plausible.io/data-policy" rel="noopener">Plausible data policy</a></td>
           </tr>
+          <!-- TODO(i18n-legal): counsel review — the Google Fonts row is removed: the fonts are served from our own domain, so no request goes to Google (3 October 2026). -->
           <tr>
-            <td>Google Fonts</td>
-            <td>The Inter typeface is loaded by your browser from Google&rsquo;s CDN; that request exposes your IP address to Google. No candidate data is involved.</td>
-            <td>Google LLC (US).</td>
-            <td><a href="https://policies.google.com/privacy" rel="noopener">Google privacy policy</a></td>
-          </tr>
-          <tr>
-            <!-- TODO(i18n-legal): counsel review — Resend row: "(optional)" and "only if the operator has configured it" removed — Resend is used in production; the answered operator note is removed (2 October 2026). Contact-form messages were added earlier the same day. -->
+            <!-- TODO(i18n-legal): counsel review — Resend row: now names every email Resend sends and every recipient category — recruiter accounts (password resets, trial notices), invited team members, demo requesters, and our own inbox (contact-form messages, demo requests, feature requests) (2 October 2026). -->
             <td>Resend</td>
-            <td>Password-reset emails to recruiter accounts, and delivery of contact-form messages to our inbox. Processes recruiter email addresses and contact-form messages (name, email address and message); never candidate data.</td>
+            <td>Sends our emails: password resets and trial notices to recruiter accounts (trial notices go to the organization&rsquo;s owner, or to the address the trial was offered to); invitations to invited team members; confirmations to demo requesters; and contact-form messages, demo requests and feature requests to our own inbox. Processes the recipients&rsquo; email addresses and what these emails contain (such as names, organization names and the text people send us); never candidate data.</td>
             <td>Resend, Inc. (US).</td>
             <td><a href="https://resend.com/legal/dpa" rel="noopener">Resend DPA</a></td>
+          </tr>
+          <tr>
+            <!-- TODO(i18n-legal): counsel review — new row (5 October 2026): Stripe, for billing. Contracting entity and transfer safeguard as Stripe's own documents state them (sources below). -->
+            <!-- Stripe sources, read 5 October 2026 (quoted, not paraphrased):
+                 - https://stripe.com/legal/ssa (Stripe Services Agreement, updated 28 September 2026): for the European Economic Area, Netherlands included, the Stripe contracting entity is "Stripe Payments Europe, Limited".
+                 - https://stripe.com/legal/dpa (Data Processing Agreement, updated 28 September 2026), §6.1: "User acknowledges that in order for Stripe to provide the Services, User transfers Personal Data to Stripe, LLC in the United States." … "the Data Transfers Addendum, which is incorporated into this DPA, will apply."
+                 - https://stripe.com/legal/dta (Data Transfers Addendum, updated 18 November 2025), clause 2: order of precedence "(a) the Data Privacy Framework; (b) the EEA SCCs or the UK International Data Transfer Addendum"; clause 3: "Stripe, LLC is self-certified under the Data Privacy Framework." The SCC data importer is Stripe, LLC (Modules 1, 2 and 3). -->
+            <td>Stripe</td>
+            <td>Payment processing, billing and invoicing for paid plans and trials. Stripe collects and holds the billing name, email address, company, address, VAT ID and payment details; we do not receive or store payment details.</td>
+            <td>Stripe Payments Europe, Limited (Ireland). Stripe may transfer data to Stripe, LLC in the US; any such transfer is covered by Stripe, LLC&rsquo;s certification under the EU-US Data Privacy Framework, with the European Commission&rsquo;s Standard Contractual Clauses in Stripe&rsquo;s Data Transfers Addendum as a fallback.</td>
+            <td><a href="https://stripe.com/legal/dpa" rel="noopener">Stripe DPA</a></td>
           </tr>
         </tbody>
       </table>
@@ -154,20 +163,22 @@ a{color:#0f2847}
 
       <h4>International transfers</h4>
       <ul>
-        <!-- TODO(i18n-legal): counsel review — transfers, Hosting: the conditional ("if the Render service region is inside the EU/EEA … if a non-EU region is selected …") is replaced by the actual region and safeguard, matching the Render row; the answered operator note is removed (2 October 2026). -->
-        <li><strong>Hosting:</strong> the CVsprings backend and its database (including stored audit records) run in Render&rsquo;s Frankfurt (EU Central) region, so candidate data at rest does not leave the EU/EEA. Because Render, Inc. is a US company, any transfer of data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Render&rsquo;s Data Processing Agreement.</li>
+        <!-- TODO(i18n-legal): counsel review — transfers, Hosting: the conditional ("if the Render service region is inside the EU/EEA … if a non-EU region is selected …") is replaced by the actual region and safeguard, matching the Render row; the answered operator note is removed (2 October 2026). Safeguard corrected to the EU-US Data Privacy Framework first, SCCs as fallback, per Render DPA §6.2 (3 October 2026). -->
+        <li><strong>Hosting:</strong> the CVsprings backend and its database (including stored audit records) run in Render&rsquo;s Frankfurt (EU Central) region, so candidate data at rest does not leave the EU/EEA. Because Render, Inc. is a US company, any transfer of data to the US is covered by Render&rsquo;s certification under the EU-US Data Privacy Framework, with the European Commission&rsquo;s Standard Contractual Clauses in Render&rsquo;s Data Processing Agreement as a fallback.</li>
         <li><strong>Analytics:</strong> Plausible states EU hosting (no transfer).</li>
-        <li><strong>Fonts:</strong> the Google Fonts request transfers the visitor&rsquo;s IP address to Google (US). This affects app users (recruiters/visitors), not candidate CV data.</li>
-        <!-- TODO(i18n-legal): counsel review — transfers, Resend: "would process" is now "processes", the operator TODO "verify Resend's transfer safeguard" is replaced by the EU-region / SCC sentences, and the label "Email (if enabled)" is now "Email" (2 October 2026). -->
-        <li><strong>Email:</strong> Resend is US-based and processes recruiter email addresses and contact-form messages (name, email address and message). Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>
+        <!-- TODO(i18n-legal): counsel review — the "Fonts" transfer bullet is removed: fonts are self-hosted, so there is no transfer to Google (3 October 2026). -->
+        <!-- TODO(i18n-legal): counsel review — transfers, Email: what Resend processes now points to the Resend row and names every recipient category; the region and SCC sentences are unchanged (2 October 2026). -->
+        <li><strong>Email:</strong> Resend is US-based and processes the emails described in the Resend row above: to recruiter accounts, invited team members and demo requesters, and the contact-form messages, demo requests and feature requests sent to our inbox. Emails are sent from Resend&rsquo;s EU region (Ireland). Because Resend, Inc. is a US company, any transfer of this data to the US is covered by the European Commission&rsquo;s Standard Contractual Clauses included in Resend&rsquo;s Data Processing Agreement.</li>
+        <!-- TODO(i18n-legal): counsel review — new bullet (5 October 2026): Stripe transfers, per the sources cited in the Stripe row. -->
+        <li><strong>Payments:</strong> billing data is processed by Stripe Payments Europe, Limited (Ireland). Stripe may transfer data to Stripe, LLC in the US; any such transfer is covered by Stripe, LLC&rsquo;s certification under the EU-US Data Privacy Framework, with the European Commission&rsquo;s Standard Contractual Clauses in Stripe&rsquo;s Data Transfers Addendum as a fallback.</li>
       </ul>
 
       <h4>Cookies and tracking</h4>
       <p>CVsprings sets <strong>no cookies</strong>. The app uses your browser&rsquo;s <code>localStorage</code> for functional settings only (session token, saved preferences such as scoring weights, API address, cached templates) &mdash; this data stays in your browser and is not used for tracking. Analytics run via Plausible, which is cookieless and, per its published policy, collects no personal data. For these reasons the app does not show a cookie consent banner.</p>
 
       <h4>Contact for privacy requests</h4>
-      <!-- TODO(i18n-legal): counsel review — privacy contact: the visible "TODO — operator: set PRIVACY_CONTACT_EMAIL …" is now the Imprint's email address; the script below still swaps in PRIVACY_CONTACT_EMAIL when it is set (2 October 2026). -->
-      <p id="privacyContactLine">Privacy requests (access, correction, deletion, questions): <span id="privacyContact"><a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__</a></span></p>
+      <!-- TODO(i18n-legal): counsel review — privacy contact: PRIVACY_CONTACT_EMAIL when set, else the Imprint's address; written into the page by the server, so it is the same with or without JavaScript (2 October 2026). -->
+      <p id="privacyContactLine">Privacy requests (access, correction, deletion, questions): <span id="privacyContact"><a href="mailto:__PRIVACY_CONTACT_EMAIL__">__PRIVACY_CONTACT_EMAIL__</a></span></p>
     </div>
   </div>
 
@@ -203,6 +214,71 @@ a{color:#0f2847}
     </div>
   </div>
 
+  <!-- ===================== SECTION D — DEMO REQUESTS ===================== -->
+  <!-- TODO(i18n-legal): counsel review — new section (2 October 2026): demo requests from the home page. -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">D &middot; If you request a demo</span></div>
+    <div class="card-body">
+      <ul>
+        <li><strong>Purpose.</strong> We use your demo request only to schedule and run the demo you asked for, and to reply to you.</li>
+        <li><strong>Data collected.</strong> Your work email address and, if you give them, your name, your agency and your note. We store the time of the request and a one-way hash of your IP address (never the IP address itself), to investigate abuse. To prevent abuse, your IP address is also held in memory for up to one hour for rate limiting.</li>
+        <li><strong>Legal basis.</strong> Our legitimate interest in answering demo requests (Art. 6(1)(f) GDPR), or, where your request relates to a contract, Art. 6(1)(b) GDPR.</li>
+        <li><strong>Stored and emailed.</strong> Your request is stored in our database. It is also delivered to our inbox as an email via Resend, and you receive a confirmation email via Resend.</li>
+        <!-- TODO(i18n-legal): counsel review — section D, Retention: was "There is no automatic deletion: your request stays in our database and in our mailbox until we delete it."; now 12 months from receipt, enforced by the daily purge (3 October 2026). -->
+        <li><strong>Retention.</strong> Demo requests are deleted 12 months after we receive them, unless the requester becomes a customer, in which case the data becomes part of the customer relationship. The same 12-month period applies to the notification email in our inbox.</li>
+        <li><strong>Your rights.</strong> The data-subject rights described in this policy apply to this data as well; see <a href="#privacyContactLine">Contact for privacy requests</a>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===================== SECTION E — FEATURE REQUESTS ===================== -->
+  <!-- TODO(i18n-legal): counsel review — new section (3 October 2026): feature requests sent from the app. Retention is the code's FEATURE_REQUEST_RETENTION_DAYS (365) and the org-wide deletion; the inbox copy follows the same 365 days (5 October 2026). -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">E &middot; If you send us a feature request</span></div>
+    <div class="card-body">
+      <ul>
+        <li><strong>Purpose.</strong> On the Pro and Team plans you can send us a feature request from the app (&ldquo;Suggest an improvement&rdquo;). We use it only to consider your suggestion and to reply to you.</li>
+        <li><strong>Data collected.</strong> The category, title and description you write, your account email address, your organization and its plan, and the time you sent it.</li>
+        <li><strong>Legal basis.</strong> Our legitimate interest in improving CVsprings and answering you (Art. 6(1)(f) GDPR), or, where your request relates to your contract with us, Art. 6(1)(b) GDPR.</li>
+        <li><strong>Stored and emailed.</strong> Your request is stored in our database, linked to your organization, and delivered to our inbox as an email via Resend.</li>
+        <li><strong>Retention.</strong> Feature requests are deleted from our database 365 days after you send them, or earlier if your organization deletes all its data. The same 365-day period applies to the notification email in our inbox.</li>
+        <li><strong>Your rights.</strong> The data-subject rights described in this policy apply to this data as well; see <a href="#privacyContactLine">Contact for privacy requests</a>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===================== SECTION F — TRIAL OFFERS ===================== -->
+  <!-- TODO(i18n-legal): counsel review — new section (3 October 2026): trial offers. Retention as decided: offers not taken up are deleted 12 months after they expired (daily purge); taken-up offers become part of the customer relationship. -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">F &middot; If we offer you a trial</span></div>
+    <div class="card-body">
+      <ul>
+        <li><strong>Purpose.</strong> We use the details of a trial offer only to let you take it up, to set up your trial account, and to send you the emails about it (welcome, trial ending soon, trial ended).</li>
+        <li><strong>Data collected.</strong> The email address we sent the offer to and your company name; the plan offered and an internal label for the offer; when the offer was made, when it expires and whether you took it up; once you start the trial, the customer reference our payment provider (Stripe) gives your billing account; and a record of each trial email we sent (address, type, time and whether it was delivered).</li>
+        <li><strong>Legal basis.</strong> Our legitimate interest in offering and running trials (Art. 6(1)(f) GDPR), or, once you take up the trial, Art. 6(1)(b) GDPR.</li>
+        <li><strong>Stored and emailed.</strong> The offer and the record of trial emails are stored in our database; the trial emails are sent via Resend.</li>
+        <li><strong>Retention.</strong> If you do not take up the trial, the offer and the record of emails we sent about it are deleted 12 months after the offer expired. If you take it up, they become part of the customer relationship.</li>
+        <li><strong>Your rights.</strong> The data-subject rights described in this policy apply to this data as well; see <a href="#privacyContactLine">Contact for privacy requests</a>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===================== SECTION G — BILLING ===================== -->
+  <!-- TODO(i18n-legal): counsel review — new section (5 October 2026): billing through Stripe. "We store only …" lists exactly the billing columns on the organization record in src/services/db.js; nothing else billing-related is stored by us. -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">G &middot; If you pay for CVsprings</span></div>
+    <div class="card-body">
+      <ul>
+        <li><strong>Purpose.</strong> We use billing data only for billing and invoicing your plan.</li>
+        <li><strong>Data collected.</strong> When you subscribe or start a trial, Stripe collects your billing name, email address, company, address, VAT ID and payment details. Payment details are handled by Stripe and are not stored by us. We store only: the references Stripe gives your customer account and your subscription; your plan, and whether it is complimentary; the status of your subscription, when your plan last changed, when your current billing period ends and whether your subscription is set to end then, and when you moved to the free plan; and technical markers that keep these in step with Stripe (the time of the last billing event we applied, the end of a checkout that has not been completed, and the reason a paused subscription could not be resumed).</li>
+        <li><strong>Legal basis.</strong> Performance of our contract with you (Art. 6(1)(b) GDPR), and our legal obligation to keep tax records (Art. 6(1)(c) GDPR).</li>
+        <li><strong>Processed by Stripe.</strong> For EU accounts, Stripe Payments Europe, Limited (Ireland) handles billing and payments; see the Stripe row above, including transfers to the US.</li>
+        <li><strong>Retention.</strong> Invoices and billing records are kept for 7 years, as required by Dutch tax law.</li>
+        <li><strong>Your rights.</strong> The data-subject rights described in this policy apply to this data as well; see <a href="#privacyContactLine">Contact for privacy requests</a>.</li>
+      </ul>
+    </div>
+  </div>
+
   <!-- TODO(i18n-legal): counsel review — closing note: "; open items are marked TODO rather than guessed" removed, since no TODO is shown any more (2 October 2026). -->
   <div style="font-size:12px;color:#9ca3af;line-height:1.6;padding:0 4px">
     Related pages: <a href="/compliance.html">EU AI Act compliance</a> &middot; <a href="/bias-report.html">scoring methodology, bias &amp; monitoring</a>. This policy describes actual product behaviour as of v1.3.0.
@@ -215,27 +291,5 @@ a{color:#0f2847}
   <br>__LEGAL_FOOTER__
 </footer>
 
-<script nonce="__CSP_NONCE__">
-(function(){
-  'use strict';
-  var API = '';
-  try { API = (localStorage.getItem('cvsprings_api_url') || 'https://cvsprings7.onrender.com').replace(/\/+$/, ''); } catch (_) {}
-  fetch(API + '/api/meta', { headers: { 'Accept': 'application/json' } })
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){
-      if (d && d.privacyContact) {
-        var host = document.getElementById('privacyContact');
-        if (host) {
-          var a = document.createElement('a');
-          a.href = 'mailto:' + d.privacyContact;
-          a.textContent = d.privacyContact;
-          host.innerHTML = '';
-          host.appendChild(a);
-        }
-      }
-    })
-    .catch(function(){ /* keep the fallback address from the markup */ });
-})();
-</script>
 </body>
 </html>

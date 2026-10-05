@@ -358,6 +358,13 @@ double-count a campaign.
 >
 > The trial migrations are additive and lose nothing (see the migration notes
 > above), so the backup is insurance against the deploy, not against the schema.
+>
+> **Delete that backup within 30 days** — the Privacy Policy and the DPA promise
+> it. `node scripts/list-backups.js` lists every backup on the disk (read-only)
+> and flags any older than 30 days; delete with
+> `rm -- "$DATABASE_PATH.backup-<date>"` (the README's
+> [Backing up the production database](../../README.md#backing-up-the-production-database)
+> has the details, including `cp`-style backups).
 
 1. Recreate the products/prices in **live mode**; set the `price_...` env vars to
    the live IDs.

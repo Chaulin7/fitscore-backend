@@ -2,21 +2,21 @@
 
 *For deployers to paste into job postings, application forms, or applicant emails.
 Also available with copy buttons on the in-app compliance page (`/compliance.html`).
-Version 1.3.0 — 2026-06-12.*
+Version 1.3.0 — 2026-10-02.*
 
 ## English
 
 > As part of our selection process, applications may be assessed with the support
-> of an AI-based tool (CVsprings) that compares CV content against the job
-> requirements. The tool produces an advisory score only; all decisions are made
+> of an automated, rules-based screening tool (CVsprings) that compares CV content
+> against the job requirements. The tool produces an advisory score only; all decisions are made
 > by our recruiters. You may request information about this process or ask for a
 > human-only review by contacting us.
 
 ## Nederlands
 
 > Als onderdeel van onze selectieprocedure kunnen sollicitaties worden beoordeeld
-> met ondersteuning van een AI-tool (CVsprings) die de inhoud van het cv vergelijkt
-> met de functie-eisen. De tool geeft uitsluitend een adviserende score; alle
+> met ondersteuning van een geautomatiseerd, op regels gebaseerd screeningsinstrument
+> (CVsprings) dat de inhoud van het cv vergelijkt met de functie-eisen. De tool geeft uitsluitend een adviserende score; alle
 > beslissingen worden genomen door onze recruiters. U kunt informatie over dit
 > proces opvragen of verzoeken om een beoordeling door uitsluitend een mens door
 > contact met ons op te nemen.
@@ -31,5 +31,5 @@ Version 1.3.0 — 2026-06-12.*
   your own — this text will no longer be accurate and your transparency duties
   change accordingly.
 - Translations into other languages should preserve the three elements: (1) an
-  AI-based tool supports assessment, (2) it is advisory and humans decide,
+  automated, rules-based screening tool supports assessment, (2) it is advisory and humans decide,
   (3) candidates can ask about the process or request a human-only review.
