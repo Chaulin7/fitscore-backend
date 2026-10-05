@@ -41,6 +41,12 @@
 4. **Org export** (owner-only): `GET /api/org/export` produces a full JSON of
    audit records (incl. change history) and templates — used for portability
    and offboarding before deletion.
+5. **Account deletion on request** (operator, `node scripts/delete-org.js
+   <orgId>` in the Render shell): within 30 days of the request, after the
+   Stripe subscription has ended. Deletes the organization and everything
+   linked to it in one transaction (src/services/orgDeletion.js lists every
+   table; a test fails if a new org-linked table is not listed). Refuses while
+   the subscription has not ended; never touches Stripe.
 
 ## Backups
 

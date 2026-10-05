@@ -73,7 +73,12 @@ The Processor shall:
 8. **Deletion/return on termination** — on termination of the service, at the
    Client's choice, delete or return all personal data (in-product: org-wide
    JSON export, then org-wide deletion), and delete remaining copies unless
-   EU/Member State law requires storage. Production data is backed up through
+   EU/Member State law requires storage. On the Client's request, by email to
+   jasper@cvsprings.com, the Processor deletes the Client's account and all
+   associated data within 30 days, after the Client's subscription has ended.
+   Invoices and payment records remain with Stripe, and Joyaco B.V. keeps its
+   own accounting records for 7 years as required by Dutch tax law. Production
+   data is backed up through
    automatic daily snapshots of the encrypted disk, managed by Render and
    retained for at least seven days. Manual backups taken before maintenance are
    stored on the same encrypted disk and deleted within 30 days.
