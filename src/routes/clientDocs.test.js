@@ -123,6 +123,11 @@ describe('the DPA template', () => {
     const dpaNames = dpaRows.map((r) => r[0]);
     for (const n of dpaNames) assert.ok(policyNames.includes(n), `the DPA lists ${n}, which the Privacy Policy does not`);
     assert.deepEqual(dpaNames, DPA_SUBPROCESSORS, 'Annex I lists exactly the subprocessors of client personal data');
+    // Stripe processes our customers' billing data as OUR processor — not
+    // candidate or client personal data on the client's behalf — so it is in
+    // the policy and deliberately not in Annex I.
+    assert.ok(policyNames.includes('Stripe'), 'the policy lists Stripe');
+    assert.ok(!dpaNames.includes('Stripe'), 'Annex I must not list Stripe');
     dpaRows.forEach(([dName, dPurpose, dLoc, dTerms, dTransfer]) => {
       const [name, purpose, loc, terms] = policyRows[policyNames.indexOf(dName)];
       assert.equal(dPurpose, text(purpose), `${dName}: purpose`);
