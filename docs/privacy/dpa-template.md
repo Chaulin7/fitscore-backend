@@ -1,7 +1,7 @@
 # Data Processing Agreement (DPA) — CVsprings
 
 > **DRAFT — for legal review before signature.**
-> Template v1.3.0, 2026-10-03. Square-bracketed items and TODO markers must be
+> Template v1.3.0, 2026-10-05. Square-bracketed items and TODO markers must be
 > completed before use. This draft follows the structure of GDPR Article 28(3).
 
 **Between:**
@@ -73,8 +73,10 @@ The Processor shall:
 8. **Deletion/return on termination** — on termination of the service, at the
    Client's choice, delete or return all personal data (in-product: org-wide
    JSON export, then org-wide deletion), and delete remaining copies unless
-   EU/Member State law requires storage. [TODO: confirm backup deletion window
-   — see retention-policy.md backup section.]
+   EU/Member State law requires storage. Production data is backed up through
+   automatic daily snapshots of the encrypted disk, managed by Render and
+   retained for at least seven days. Manual backups taken before maintenance are
+   stored on the same encrypted disk and deleted within 30 days.
 9. **Audit rights** — make available information necessary to demonstrate
    compliance with Art. 28 and allow for and contribute to audits/inspections
    conducted by the Client or its mandated auditor, on reasonable notice.

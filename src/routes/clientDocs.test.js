@@ -64,12 +64,11 @@ describe('the DPA template', () => {
     assert.match(dpa, /Square-bracketed items and TODO markers must be\s*>?\s*completed before use\./);
   });
 
-  test('the placeholders left are exactly the three still open', () => {
+  test('the placeholders left are exactly the two still open', () => {
     const placeholders = [...dpa.replace(/<!--[\s\S]*?-->/g, '').matchAll(/\[[^\]]*\](?!\()/g)]
       .map((m) => m[0].replace(/\s+/g, ' '));
     assert.deepEqual(placeholders, [
       '[Client legal name]',
-      '[TODO: confirm backup deletion window — see retention-policy.md backup section.]',
       '[TODO: legal review — liability allocation, term/termination alignment with the main service agreement, governing law and jurisdiction.]',
     ]);
   });
@@ -81,6 +80,21 @@ describe('the DPA template', () => {
     assert.ok(flat.includes('Data at rest, including backups, is stored on encrypted disks provided by Render; data in transit is protected with TLS.'));
     assert.ok(dpa.includes('<!-- Source: https://render.com/docs/disks — "All disks are encrypted at rest, and so are their automatic daily snapshots." -->'));
     assert.ok(flat.includes('Access to production systems is limited to the founder; two-factor authentication is enforced on all service accounts (hosting, email, billing, DNS, code repository); credentials are stored in a password manager; work devices use full-disk encryption.'));
+  });
+
+  test('backups: Render snapshots kept at least seven days, manual backups deleted within 30 days', () => {
+    const SENTENCES = 'Production data is backed up through automatic daily snapshots of the encrypted disk, managed by Render and retained for at least seven days. Manual backups taken before maintenance are stored on the same encrypted disk and deleted within 30 days.';
+    const flat = (s) => s.replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ');
+    assert.ok(flat(dpa).includes(SENTENCES), 'DPA §4.8');
+    assert.ok(flat(read('public/privacy.html')).includes(`<strong>Backups:</strong> ${SENTENCES}`), 'Privacy Policy');
+    assert.ok(flat(read('docs/privacy/retention-policy.md')).includes(SENTENCES), 'retention policy');
+    assert.doesNotMatch(read('docs/privacy/retention-policy.md'), /TODO \(operator\)/);
+    for (const f of ['README.md', 'docs/billing/README.md']) {
+      const s = flat(read(f));
+      assert.match(s, /Delete (every manual backup|that backup) within 30 days/, f);
+      assert.ok(s.includes('node scripts/list-backups.js'), f);
+      assert.match(s, /rm -- "\$DATABASE_PATH\.backup-/, f);
+    }
   });
 
   test('§1 describes the service the way the site does', () => {

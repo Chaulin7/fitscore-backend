@@ -318,6 +318,30 @@ A clean shutdown also checkpoints the WAL back into the main file and removes bo
 sidecars, so a backup taken while the service is stopped is safe to `cp` — but
 `.backup` is safe either way and needs no downtime.
 
+**Delete every manual backup within 30 days.** The Privacy Policy and the DPA
+promise it: a backup is a copy of every customer's data, including records they
+have since deleted. List what is on the disk (read-only — it never opens or
+deletes a file, and flags anything older than 30 days):
+
+```bash
+node scripts/list-backups.js
+```
+
+Then delete a backup you no longer need, at the latest 30 days after taking it:
+
+```bash
+rm -- "$DATABASE_PATH.backup-2026-10-05"   # the dated file `.backup` wrote
+```
+
+A `cp`-style backup is up to three files; delete them together:
+
+```bash
+rm -- /path/to/backup.db /path/to/backup.db-wal /path/to/backup.db-shm
+```
+
+Never point `rm` at `$DATABASE_PATH` itself, or at its `-wal` / `-shm`: those are
+the live database. `list-backups.js` never lists them.
+
 ### Logging
 
 `pino` + `pino-http` write structured JSON logs. Sensitive fields (`authorization`, `cookie`, CV body, JD body) are redacted by the logger's `redact` config. If `pino` is not installed at runtime, the app falls back to `console.log`.
