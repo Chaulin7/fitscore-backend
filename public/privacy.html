@@ -109,8 +109,9 @@ a{color:#0f2847}
 
       <h4>Retention &mdash; defaults and controls</h4>
       <ul>
-        <li><strong>Default: 365 days.</strong> A daily job permanently deletes audit records (and their change history) older than your organization&rsquo;s retention setting.</li>
-        <li>Org owners can set retention between <strong>30 and 1095 days</strong>, or <strong>0</strong> to keep records until manually deleted (Settings &rarr; Data Retention).</li>
+        <!-- TODO(i18n-legal): counsel review — audit retention numbers corrected to the code (5 October 2026): default 365 → 730 days; range 30–1095 days or 0 → 180–3,650 days; the "0 = keep until manually deleted" option no longer exists (the code rejects anything under 180). Counsel: confirm the 730-day default. -->
+        <li><strong>Default: 730 days.</strong> A daily job permanently deletes audit records (and their change history) older than your organization&rsquo;s retention setting.</li>
+        <li>Org owners can set retention between <strong>180 and 3,650 days</strong> (Settings &rarr; Data Retention).</li>
         <li><strong>Per-candidate erasure:</strong> any record can be found by candidate-name search and individually deleted &mdash; this is the mechanism for honouring a candidate erasure request.</li>
         <li><strong>Org-wide controls (owners):</strong> export all audit records and templates as JSON (data portability / offboarding), or permanently delete all audit data with typed-name confirmation.</li>
         <li>Account/session data is kept for as long as the account exists.</li>

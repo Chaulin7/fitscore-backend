@@ -1,6 +1,6 @@
 # CVsprings — Data Retention Policy (internal)
 
-*v1.3.0 — 2026-06-12. One-pager: what is stored where, for how long, and how it is deleted.*
+*v1.3.0 — 2026-10-05. One-pager: what is stored where, for how long, and how it is deleted.*
 
 ## What is stored where
 
@@ -17,9 +17,10 @@
 
 ## Retention defaults and configuration
 
-- **Audit records + change history:** default **365 days** per organization.
-  Org owners can set **30–1095 days** or **0 = keep until manually deleted**
+- **Audit records + change history:** default **730 days** per organization.
+  Org owners can set **between 180 and 3,650 days**
   (Settings → Data Retention; stored on the organization record server-side).
+  The 180-day floor is enforced at the API and again inside the purge job.
 - **Templates, accounts, sessions:** kept while the account exists; sessions
   expire after 30 days; password-reset tokens after 30 minutes (single-use).
 - **CV files / extracted text:** zero retention (see table).

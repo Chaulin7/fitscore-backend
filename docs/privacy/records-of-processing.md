@@ -1,6 +1,6 @@
 # CVsprings — Records of Processing Activities (GDPR Art. 30(2), processor)
 
-*v1.3.0 — 2026-06-12. Maintained by the operator (Joyaco B.V.) as processor.*
+*v1.3.0 — 2026-10-05. Maintained by the operator (Joyaco B.V.) as processor.*
 
 ## Processor
 
@@ -29,7 +29,7 @@
 | Categories of processing | Storage, display, update (decision/note only), export, deletion of saved screening records; append-only change history |
 | Data subjects | Job applicants; client recruiter users (reviewer attribution) |
 | Personal data | Candidate name or anonymized label, file name, scores, weights, verdict, decision, recruiter notes, 300-char JD snippet, role tag, provenance metadata, reviewer email |
-| Retention | Org-configurable: default 365 days, 30–1095 or keep-until-deleted; daily hard-delete job incl. change history; per-record and org-wide deletion on demand |
+| Retention | Org-configurable: default 730 days, between 180 and 3,650 days; daily hard-delete job incl. change history; per-record and org-wide deletion on demand |
 | Transfers | Stored on hosting platform — see transfers section |
 
 ## Processing activity 3 — Recruiter accounts and sessions

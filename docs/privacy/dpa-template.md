@@ -118,8 +118,8 @@ backend.
   CV text never persisted; audit records store summary data only; HTTP logs
   strip query strings and never contain request bodies, CV text, or candidate
   names.
-- **Retention controls:** org-configurable retention (default 365 days,
-  30–1095 or keep-until-deleted) enforced by a daily hard-delete job including
+- **Retention controls:** org-configurable retention (default 730 days, between
+  180 and 3,650 days) enforced by a daily hard-delete job including
   change history; per-record deletion; org-wide export and deletion (owner-only,
   typed confirmation).
 - **Record integrity:** scoring data immutable after creation; append-only
