@@ -470,7 +470,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .how-text span{font-size:12px;color:#6b7280;line-height:1.4}
 
 /* ── Sort controls ───────────────────────────────────────────── */
-.batch-controls{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.batch-controls{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;padding:0 20px}
 .batch-controls label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af}
 .sort-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
 .sort-btn:hover,.sort-btn.active{background:#0f2847;color:#fff;border-color:#0f2847}
@@ -517,7 +517,9 @@ html[lang="en"] .en-note{display:none}
 .err-retry-btn:hover{background:#b91c1c}
 
 /* Batch summary */
-.batch-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.batch-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;padding:18px 20px 0}
+/* Everything above the batch table is inset to line up with the card title; the table itself stays edge to edge */
+.batch-hint{padding:0 20px}
 .bs-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;text-align:center}
 .bs-val{font-size:26px;font-weight:800;color:#0a1f3d;line-height:1}
 .bs-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-top:4px}
@@ -946,6 +948,7 @@ img, video, table { max-width: 100%; }
   .config-bar > * { flex: 1 1 auto; min-width: 0; }
   .main { padding: 14px; }
   .card-head, .card-body { padding: 12px 14px; }
+  .batch-summary, .batch-controls, .batch-hint { padding-left: 14px; padding-right: 14px; }
   .score-row { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
   .weights-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
   .batch-summary { grid-template-columns: repeat(2, 1fr) !important; }
@@ -970,6 +973,7 @@ img, video, table { max-width: 100%; }
   .main { padding: 10px; }
   .card { border-radius: 10px; margin-bottom: 12px; }
   .card-head, .card-body { padding: 10px 12px; }
+  .batch-summary, .batch-controls, .batch-hint { padding-left: 12px; padding-right: 12px; }
   .score-row { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
   .weights-grid { grid-template-columns: 1fr 1fr !important; gap: 8px; }
   .weight-card { padding: 10px; }
@@ -1654,7 +1658,7 @@ img, video, table { max-width: 100%; }
 
   <!-- Batch results -->
   <div class="results-section" id="batchResults" style="margin-top:10px">
-    <div class="card">
+    <div class="card" style="padding-bottom:16px">
       <div class="card-head">
         <span class="card-title" id="batchTitle" data-i18n="app.batch.title">Batch Results</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
@@ -1676,7 +1680,7 @@ img, video, table { max-width: 100%; }
           <button class="sort-btn active" id="sortScore" data-action="sortBatch" data-sort="score"><span data-i18n="app.batch.sortScore">Score</span> <span class="sort-arrow" id="arrowScore">&#9660;</span></button>
           <button class="sort-btn" id="sortName" data-action="sortBatch" data-sort="name"><span data-i18n="app.batch.sortName">Name</span> <span class="sort-arrow" id="arrowName">&#9660;</span></button>
         </div>
-        <div class="oversight-hint" style="margin-bottom:10px" data-i18n="app.decision.oversight">Decisions are made by you, not by the scoring engine. Scores are a decision aid.</div>
+        <div class="oversight-hint batch-hint" style="margin-bottom:10px" data-i18n="app.decision.oversight">Decisions are made by you, not by the scoring engine. Scores are a decision aid.</div>
         <table class="lb" id="batchTable">
           <thead><tr>
             <th style="width:44px">#</th><th data-i18n="app.table.candidate">Candidate</th><th data-i18n="app.table.overall">Overall</th>
