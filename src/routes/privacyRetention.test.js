@@ -27,12 +27,12 @@ const section = (letter) => {
 describe('the numbers match the code', () => {
   test('D · demo requests: DEMO_REQUEST_RETENTION_MONTHS', () => {
     assert.equal(constant('DEMO_REQUEST_RETENTION_MONTHS'), 12);
-    assert.ok(section('D').includes('Demo requests are deleted 12 months after we receive them, unless the requester becomes a customer, in which case the data becomes part of the customer relationship.'));
+    assert.ok(section('D').includes('Demo requests are deleted 12 months after we receive them, unless the requester becomes a customer, in which case the data becomes part of the customer relationship. The same 12-month period applies to the notification email in our inbox.'));
   });
 
   test('E · feature requests: FEATURE_REQUEST_RETENTION_DAYS', () => {
     const days = constant('FEATURE_REQUEST_RETENTION_DAYS');
-    assert.ok(section('E').includes(`Feature requests are deleted from our database ${days} days after you send them, or earlier if your organization deletes all its data.`));
+    assert.ok(section('E').includes(`Feature requests are deleted from our database ${days} days after you send them, or earlier if your organization deletes all its data. The same ${days}-day period applies to the notification email in our inbox.`));
   });
 
   test('F · trial offers: TRIAL_OFFER_RETENTION_MONTHS', () => {
