@@ -67,3 +67,22 @@ test('the internal records of processing: Resend sends every email, not just res
   }
   assert.doesNotMatch(ropa, /Google Fonts/, 'fonts are self-hosted');
 });
+
+test('the records of processing include Stripe, as the Privacy Policy describes it', () => {
+  const ropa = fs.readFileSync(path.join(ROOT, 'docs/privacy/records-of-processing.md'), 'utf8');
+  const flat = ropa.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\s+/g, ' ');
+  const activity = /## Processing activity 4 — Billing through Stripe([\s\S]*?)## Categories of recipients/.exec(ropa);
+  assert.ok(activity, 'no Stripe processing activity');
+  const a = activity[1].replace(/\s+/g, ' ');
+  for (const phrase of ['| Purpose | Billing and invoicing', 'Billing name, email address, company, address, VAT ID, payment details',
+    'Stripe customer and subscription references', 'Art. 6(1)(b) GDPR', 'Art. 6(1)(c) GDPR',
+    'Stripe Payments Europe, Limited (Ireland)', 'for as long as the account exists']) assert.ok(a.includes(phrase), phrase);
+  assert.doesNotMatch(a, /7 years/);
+  // Same safeguard, word for word, as the policy's Stripe row (apostrophes aside).
+  const policySafeguard = 'Stripe may transfer data to Stripe, LLC in the US; any such transfer is covered by Stripe, LLC\'s certification under the EU-US Data Privacy Framework, with the European Commission\'s Standard Contractual Clauses in Stripe\'s Data Transfers Addendum as a fallback';
+  const policy = fs.readFileSync(path.join(ROOT, 'public/privacy.html'), 'utf8').replace(/&rsquo;/g, "'");
+  assert.ok(policy.includes(policySafeguard), 'the policy still states the safeguard this mirrors');
+  assert.ok(a.includes(policySafeguard), 'activity 4 transfers');
+  assert.ok(flat.includes(policySafeguard.replace(/\s+/g, ' ')), 'transfers section');
+  assert.match(flat, /- Stripe Payments Europe, Limited \(Ireland\) — billing and payments/, 'categories of recipients');
+});

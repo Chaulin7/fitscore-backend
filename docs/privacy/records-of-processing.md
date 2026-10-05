@@ -42,6 +42,24 @@
 | Retention | While the account exists; sessions 30 days; reset tokens 30 minutes/single-use |
 | Transfers | Hosting platform; Resend, Inc. sends the password-reset, team-invitation and trial emails to recruiter users (EU region, Ireland; SCCs in Resend's DPA — see below) |
 
+## Processing activity 4 — Billing through Stripe (operator as controller, Art. 30(1))
+
+<!-- TODO(i18n-legal): counsel review — added 5 October 2026. This document is the processor record (Art. 30(2)); billing is processing
+     for which the operator is the controller and Stripe its processor. Kept here so the billing chain is recorded at all;
+     counsel may prefer a separate controller record. Mirrors Privacy Policy section G and its Stripe row. -->
+
+| Item | Detail |
+|---|---|
+| Role | Operator is the controller; Stripe Payments Europe, Limited (Ireland) is its processor for billing and payments |
+| Purpose | Billing and invoicing customers for paid plans and trials |
+| Data subjects | Customers' billing contacts (organization owners and whoever completes Stripe Checkout) |
+| Personal data — held by Stripe | Billing name, email address, company, address, VAT ID, payment details (payment details are never received or stored by the operator) |
+| Personal data — stored by the operator | On the organization record only: Stripe customer and subscription references; plan and whether it is complimentary; subscription status, when the plan last changed, current billing-period end, whether it ends then, when the account moved to the free plan; technical markers (last billing event applied, an uncompleted checkout's end, the reason a paused subscription could not be resumed) |
+| Legal basis | Performance of the contract (Art. 6(1)(b) GDPR); legal obligation to keep tax records (Art. 6(1)(c) GDPR) |
+| Recipients | Stripe Payments Europe, Limited (Ireland), and Stripe, LLC (US) — see transfers |
+| Retention | Stripe keeps invoices and payment records under its own legal obligations. The operator keeps its billing references for as long as the account exists. There is no account-deletion path in the product, so no deletion rule applies yet [open — see the PR that added this activity] |
+| Transfers | Stripe may transfer data to Stripe, LLC in the US; any such transfer is covered by Stripe, LLC's certification under the EU-US Data Privacy Framework, with the European Commission's Standard Contractual Clauses in Stripe's Data Transfers Addendum as a fallback (Stripe DPA §6.1; Data Transfers Addendum clauses 2–3) |
+
 ## Categories of recipients
 
 - Render, Inc. (hosting/subprocessor).
@@ -52,6 +70,9 @@
   confirmations to demo requesters; and contact-form messages, demo requests
   and feature requests to our own inbox. Never candidate data. The full list,
   with recipients and contents, is pinned in src/routes/emailInventory.test.js.
+- Stripe Payments Europe, Limited (Ireland) — billing and payments for paid
+  plans and trials (activity 4); the operator's processor. Never candidate
+  data.
 
 ## International transfers and safeguards (Art. 30(2)(c))
 
@@ -62,6 +83,13 @@
 - Resend: emails are sent from Resend's EU region (Ireland); any transfer to
   the US (Resend, Inc. is a US company) is covered by the Standard Contractual
   Clauses in Resend's DPA.
+- Stripe: billing data is processed by Stripe Payments Europe, Limited
+  (Ireland). Stripe may transfer data to Stripe, LLC in the US; any such
+  transfer is covered by Stripe, LLC's certification under the EU-US Data
+  Privacy Framework, with the European Commission's Standard Contractual
+  Clauses in Stripe's Data Transfers Addendum as a fallback.
+  Sources: https://stripe.com/legal/dpa §6.1 (updated 28 September 2026) and
+  https://stripe.com/legal/dta clauses 2–3 (updated 18 November 2025).
 
 ## General description of security measures (Art. 30(2)(d))
 
