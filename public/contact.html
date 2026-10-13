@@ -13,6 +13,9 @@
 __I18N_HEAD__
 <link rel="stylesheet" href="/assets/fonts/inter.css">
 <style>
+/* Muted and inactive text. Both hold WCAG AA (4.5:1) down to the #f0f2f5 page
+   background, the darkest surface they sit on: muted 5.15:1, inactive 4.62:1. */
+:root{--text-muted:#5f6673;--text-inactive:#676d7b}
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none!important}
 body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:14px;min-height:100vh}
@@ -32,7 +35,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .card-head{padding:16px 24px;border-bottom:1px solid #f3f4f6}
 .card-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#0a1f3d}
 .card-body{padding:22px 24px;line-height:1.6;color:#374151}
-.form-note{font-size:12.5px;color:#6b7280;margin-bottom:16px}
+.form-note{font-size:12.5px;color:var(--text-muted);margin-bottom:16px}
 .field{margin-bottom:16px}
 .field label{display:block;font-size:13px;font-weight:600;color:#0a1f3d;margin-bottom:6px}
 .field input,.field textarea{display:block;width:100%;font:400 14px 'Inter',sans-serif;color:#111827;background:#fff;border:1.5px solid #d1d5db;border-radius:8px;padding:10px 12px}
@@ -44,14 +47,14 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .cta{display:inline-block;background:#0f2847;color:#fff;border:none;border-radius:8px;padding:11px 20px;font:600 13px 'Inter',sans-serif;cursor:pointer}
 .cta:hover{background:#1a3d6e}
 .cta[disabled]{opacity:.6;cursor:default}
-.form-fine{margin-top:12px;font-size:12.5px;line-height:1.55;color:#6b7280}
+.form-fine{margin-top:12px;font-size:12.5px;line-height:1.55;color:var(--text-muted)}
 .sent{background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:16px 18px;color:#14532d;line-height:1.6}
 .sent:focus{outline:none}
 .sent:focus-visible{outline:2px solid #15803d;outline-offset:2px}
 .sent strong{display:block;font-size:15px;margin-bottom:4px}
 /* Honeypot, as on the landing page's demo form: off-screen, out of the tab order. */
 .hp-field{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
-.note{font-size:13px;color:#6b7280;line-height:1.6;padding:0 4px;margin-bottom:6px;overflow-wrap:anywhere}
+.note{font-size:13px;color:var(--text-muted);line-height:1.6;padding:0 4px;margin-bottom:6px;overflow-wrap:anywhere}
 a{color:#0f2847}
 .site-footer{background:#0a1f3d;color:rgba(255,255,255,.6);font-size:12px;padding:24px 32px;text-align:center;line-height:1.7}
 .site-footer a{color:#93c5fd}

@@ -528,13 +528,13 @@ function reliabilityBannerHtml(level) {
 }
 
 function sectionTitle(text) {
-  return '<div style="font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px;">' + esc(text) + '</div>';
+  return '<div style="font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px;">' + esc(text) + '</div>';
 }
 
 function tableRow(cells, header) {
   const tag = header ? 'th' : 'td';
   const style = header
-    ? 'padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6b7280; border-bottom: 2px solid #e5e7eb;'
+    ? 'padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); border-bottom: 2px solid #e5e7eb;'
     : 'padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #f3f4f6;';
   return '<tr>' + cells.map((c) => '<' + tag + ' style="' + style + '">' + esc(String(c == null ? '' : c)) + '</' + tag + '>').join('') + '</tr>';
 }
@@ -579,6 +579,8 @@ function renderBiasReportHtml(report, branding) {
   let html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' +
     '<title>CVsprings Bias Monitoring Report</title>' +
     '<style>' +
+    // Muted and inactive text; same tokens and values as the static pages.
+    ':root { --text-muted: #5f6673; --text-inactive: #676d7b; }' +
     '* { box-sizing: border-box; margin: 0; padding: 0; }' +
     'body { font-family: "Segoe UI", Arial, sans-serif; background: #f0f2f5; color: #1a202c; font-size: 14px; }' +
     '.page { max-width: 860px; margin: 32px auto; background: #fff; border-radius: 8px; border: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,.08); }' +
@@ -614,11 +616,11 @@ function renderBiasReportHtml(report, branding) {
     '.body { padding: 28px 36px; }' +
     '.section { margin-bottom: 32px; }' +
     'table { width: 100%; border-collapse: collapse; }' +
-    '.footer { padding: 16px 36px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; border-radius: 0 0 8px 8px; }' +
+    '.footer { padding: 16px 36px; border-top: 1px solid #e5e7eb; font-size: 11px; color: var(--text-inactive); border-radius: 0 0 8px 8px; }' +
     // Provenance: quiet, monospaced for the fingerprint's sake, and wrapping
     // rather than overflowing on narrow paper. An audit artifact, not marketing.
-    '.prov-line { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9.5px; line-height: 1.6; color: #6b7280; word-break: break-word; }' +
-    '.prov-note { font-size: 10px; line-height: 1.5; color: #9ca3af; margin-top: 6px; }' +
+    '.prov-line { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9.5px; line-height: 1.6; color: var(--text-muted); word-break: break-word; }' +
+    '.prov-note { font-size: 10px; line-height: 1.5; color: var(--text-inactive); margin-top: 6px; }' +
     '.caveat { background: #fff7ed; border: 2px solid #ea580c; border-radius: 6px; padding: 16px 18px; margin-bottom: 24px; font-size: 13px; line-height: 1.5; color: #7c2d12; }' +
     '.caveat strong { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }' +
     '.lim-list { margin: 0; padding-left: 18px; }' +
@@ -685,11 +687,11 @@ function renderBiasReportHtml(report, branding) {
     '</table>';
 
   if (!comp.reliable) {
-    html += '<div style="background: #f3f4f6; border-radius: 6px; padding: 12px 14px; font-size: 13px; color: #6b7280;">' + esc(comp.note) + '</div>';
+    html += '<div style="background: #f3f4f6; border-radius: 6px; padding: 12px 14px; font-size: 13px; color: var(--text-muted);">' + esc(comp.note) + '</div>';
   } else {
     html += '<div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 16px; font-size: 13px; line-height: 1.6;">' +
       '<strong>Interpretation: </strong>' + esc(comp.interpretation) +
-      (comp.pValueShortlist != null ? '<br><span style="color: #6b7280; font-size: 12px;">Shortlist rate p-value: ' + comp.pValueShortlist + (comp.pValueScore != null ? ' &nbsp;|&nbsp; Mean score p-value: ' + comp.pValueScore : '') + '</span>' : '') +
+      (comp.pValueShortlist != null ? '<br><span style="color: var(--text-muted); font-size: 12px;">Shortlist rate p-value: ' + comp.pValueShortlist + (comp.pValueScore != null ? ' &nbsp;|&nbsp; Mean score p-value: ' + comp.pValueScore : '') + '</span>' : '') +
       '</div>';
   }
   html += '</div>';
