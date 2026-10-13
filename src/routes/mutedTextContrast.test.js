@@ -80,8 +80,17 @@ describe('muted and inactive text tokens', () => {
     }
   }
 
+  // Two lighter one-off greys, used only as text on white (2.00:1 and 2.44:1):
+  // the template panel footer and the change-history timestamps and notes.
+  test('public/app.html has no #b0b8c4 or #9aa6c0 left', () => {
+    const hits = read('public/app.html').match(/#(b0b8c4|9aa6c0)\b/gi);
+    assert.equal(hits, null, `use var(--text-inactive) instead: ${hits}`);
+  });
+
   test('the old values fail where the new ones pass (guards a vacuous pass)', () => {
     assert.ok(contrast('#6b7280', '#f0f2f5') < 4.5);
     assert.ok(contrast('#9ca3af', '#ffffff') < 4.5);
+    assert.ok(contrast('#b0b8c4', '#ffffff') < 4.5);
+    assert.ok(contrast('#9aa6c0', '#ffffff') < 4.5);
   });
 });

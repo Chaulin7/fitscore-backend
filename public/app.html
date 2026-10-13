@@ -228,7 +228,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 }
 .w-input:focus{border-color:#0f2847}
 .w-sum{font-size:12px;font-weight:600;color:var(--text-inactive)}
-.w-sum.ok{color:#059669}.w-sum.err{color:#dc2626;font-weight:700}
+.w-sum.ok{color:#047857}.w-sum.err{color:#dc2626;font-weight:700}
 
 /* ==================== Textarea ==================== */
 .textarea{
@@ -308,7 +308,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   width:26px;height:26px;border-radius:50%;font-size:11px;font-weight:700
 }
 .r1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,0.4)}
-.r2{background:linear-gradient(135deg,#9ca3af,#6b7280);color:#fff}
+.r2{background:linear-gradient(135deg,#6b7280,#4b5563);color:#fff}
 .r3{background:linear-gradient(135deg,#d97706,#92400e);color:#fff}
 .rn{background:#f3f4f6;color:var(--text-muted);font-size:12px}
 
@@ -484,7 +484,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .footer-inner{max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .footer-section h4{font-size:13px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
 .footer-section p{margin:0;color:rgba(255,255,255,.6)}
-.footer-bottom{max-width:900px;margin:20px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.4)}
+.footer-bottom{max-width:900px;margin:20px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.5)}
 @media(max-width:600px){.how-banner{flex-direction:column}.how-step:not(:last-child)::after{display:none}.footer-inner{grid-template-columns:1fr}}
 
 /* Settings panel. The .settings-btn gear that used to open it from the bar is
@@ -553,7 +553,7 @@ html[lang="en"] .en-note{display:none}
 .tpl-chip-name:hover{background:#f0f4ff}
 .tpl-chip-del{padding:9px 11px;color:#d1d5db;font-size:13px;cursor:pointer;transition:all .15s;background:none;border:none;border-left:1.5px solid #f3f4f6;line-height:1}
 .tpl-chip-del:hover{color:#dc2626;background:#fff5f5}
-.tpl-panel-footer{padding:10px 16px;border-top:1px solid #f3f4f6;font-size:11px;color:#b0b8c4;font-style:italic}
+.tpl-panel-footer{padding:10px 16px;border-top:1px solid #f3f4f6;font-size:11px;color:var(--text-inactive);font-style:italic}
 .tpl-wrap{position:relative;display:inline-block}
 /* Print */
 .print-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
@@ -1036,7 +1036,7 @@ img, video, table { max-width: 100%; }
 .history-list li:last-child { border-bottom: 0; }
 .history-list .hi-field { font-weight: 600; color: #0c1730; font-size: 13px; }
 .history-list .hi-from-to { font-size: 13px; color: #5c6a8a; margin-top: 2px; }
-.history-list .hi-when { font-size: 12px; color: #9aa6c0; margin-top: 4px; }
+.history-list .hi-when { font-size: 12px; color: var(--text-inactive); margin-top: 4px; }
 .history-list .hi-by { font-size: 12px; color: #5c6a8a; margin-top: 2px; }
 @media (max-width: 768px) { .col-reviewer { display: none; } }
 .audit-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 4px; font-size: 13px; color: #5c6a8a; }
@@ -3521,13 +3521,13 @@ async function openChangeHistory(auditId) {
   const list = document.getElementById('history-list');
   if (!overlay || !list) return;
   const note = (text, color) => h('li', { style: 'padding:16px 20px;color:' + color + ';' }, text);
-  fill(list, note(I18N.t('common.loading'), '#9aa6c0'));
+  fill(list, note(I18N.t('common.loading'), 'var(--text-inactive)'));
   overlay.classList.add('open');
   renderScoringInputs((typeof lastAuditRecords !== 'undefined' ? lastAuditRecords : []).find(r => r && r.id === auditId));
   try {
     const rows = await api('/api/audit/' + encodeURIComponent(auditId) + '/changes');
     if (!Array.isArray(rows) || !rows.length) {
-      fill(list, note(I18N.t('app.history.none'), '#9aa6c0'));
+      fill(list, note(I18N.t('app.history.none'), 'var(--text-inactive)'));
       return;
     }
     fill(list, rows.map(r => h('li', null,
