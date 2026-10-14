@@ -12,6 +12,9 @@
 __I18N_HEAD__
 <link rel="stylesheet" href="/assets/fonts/inter.css">
 <style>
+/* Muted and inactive text. Both hold WCAG AA (4.5:1) down to the #f0f2f5 page
+   background, the darkest surface they sit on: muted 5.15:1, inactive 4.62:1. */
+:root{--text-muted:#5f6673;--text-inactive:#676d7b}
 *{box-sizing:border-box;margin:0;padding:0}
 @media(max-width:768px){input,textarea,select{font-size:16px!important}}
 html{scroll-behavior:smooth}
@@ -87,7 +90,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   padding:10px 32px;display:flex;align-items:center;gap:10px;
   box-shadow:0 1px 4px rgba(0,0,0,0.04)
 }
-.config-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;white-space:nowrap}
+.config-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-inactive);white-space:nowrap}
 
 /* ==================== Buttons ==================== */
 .btn{
@@ -130,7 +133,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .mode-btn{
   padding:8px 22px;background:none;border:none;
   font:600 12px 'Inter',sans-serif;cursor:pointer;
-  color:#9ca3af;letter-spacing:.06em;text-transform:uppercase;transition:all .18s
+  color:var(--text-inactive);letter-spacing:.06em;text-transform:uppercase;transition:all .18s
 }
 .mode-btn.active{
   background:linear-gradient(135deg,#0f2847,#1a3d6e);
@@ -179,7 +182,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   display:flex;align-items:center;justify-content:center;margin:0 auto 14px
 }
 .dz-label{font-size:15px;font-weight:700;color:#111827;margin-bottom:4px}
-.dz-sub{font-size:12px;color:#9ca3af}
+.dz-sub{font-size:12px;color:var(--text-inactive)}
 .file-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .file-chip{
   background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;
@@ -191,7 +194,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 
 /* ==================== Options row ==================== */
 .options-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
-.opt-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;white-space:nowrap}
+.opt-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-inactive);white-space:nowrap}
 
 /* ==================== Toggle ==================== */
 .toggle-wrap{display:flex;align-items:center;gap:8px}
@@ -208,7 +211,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 }
 .toggle input:checked+.tog-slider{background:#0f2847;border-color:#0f2847}
 .toggle input:checked+.tog-slider:before{transform:translateX(18px);background:#fff}
-.tog-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af}
+.tog-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-inactive)}
 
 /* ==================== Weights ==================== */
 .weights-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
@@ -217,15 +220,15 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   border-radius:8px;padding:14px;transition:border .18s,box-shadow .18s
 }
 .w-card:focus-within{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.07)}
-.w-name{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px}
+.w-name{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-inactive);margin-bottom:8px}
 .w-input{
   width:100%;height:42px;background:#fff;border:1.5px solid #e5e7eb;
   border-radius:7px;text-align:center;
   font:800 22px 'Inter',sans-serif;color:#0f2847;outline:none;transition:border .18s
 }
 .w-input:focus{border-color:#0f2847}
-.w-sum{font-size:12px;font-weight:600;color:#9ca3af}
-.w-sum.ok{color:#059669}.w-sum.err{color:#dc2626;font-weight:700}
+.w-sum{font-size:12px;font-weight:600;color:var(--text-inactive)}
+.w-sum.ok{color:#047857}.w-sum.err{color:#dc2626;font-weight:700}
 
 /* ==================== Textarea ==================== */
 .textarea{
@@ -256,7 +259,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   width:80px;height:80px;border-radius:50%;
   background:rgba(255,255,255,0.04)
 }
-.s-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px}
+.s-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-inactive);margin-bottom:8px}
 .score-box.overall .s-label{color:rgba(255,255,255,0.55)}
 .ring-svg{overflow:visible}
 .ring-bg{fill:none;stroke:#f3f4f6;stroke-width:5}
@@ -270,7 +273,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .pill-lo{background:#fee2e2;color:#b91c1c}
 
 /* ==================== Chips ==================== */
-.section-sub{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:9px}
+.section-sub{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-inactive);margin-bottom:9px}
 .chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
 .chip{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;transition:transform .15s,box-shadow .15s}
 .chip:hover{transform:scale(1.04);box-shadow:0 2px 8px rgba(0,0,0,0.1)}
@@ -281,7 +284,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .data-table{width:100%;border-collapse:collapse;font-size:13px}
 .data-table th{
   text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;
-  text-transform:uppercase;color:#9ca3af;
+  text-transform:uppercase;color:var(--text-inactive);
   padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6
 }
 .data-table td{padding:10px 14px;border-bottom:1px solid #f9fafb;color:#374151;vertical-align:middle}
@@ -293,7 +296,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .lb{width:100%;border-collapse:collapse;font-size:13px}
 .lb th{
   text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;
-  text-transform:uppercase;color:#9ca3af;
+  text-transform:uppercase;color:var(--text-inactive);
   padding:10px 14px;background:#f9fafb;border-bottom:1.5px solid #f3f4f6
 }
 .lb td{padding:10px 14px;border-bottom:1px solid #f9fafb;vertical-align:middle}
@@ -305,9 +308,9 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   width:26px;height:26px;border-radius:50%;font-size:11px;font-weight:700
 }
 .r1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,0.4)}
-.r2{background:linear-gradient(135deg,#9ca3af,#6b7280);color:#fff}
+.r2{background:linear-gradient(135deg,#6b7280,#4b5563);color:#fff}
 .r3{background:linear-gradient(135deg,#d97706,#92400e);color:#fff}
-.rn{background:#f3f4f6;color:#6b7280;font-size:12px}
+.rn{background:#f3f4f6;color:var(--text-muted);font-size:12px}
 
 /* ==================== Badges ==================== */
 .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
@@ -334,7 +337,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .rtab{
   padding:7px 16px;border-radius:7px;
   font:600 12px 'Inter',sans-serif;cursor:pointer;
-  background:#fff;color:#6b7280;border:1.5px solid #e5e7eb;
+  background:#fff;color:var(--text-muted);border:1.5px solid #e5e7eb;
   letter-spacing:.04em;transition:all .18s;
   box-shadow:0 1px 3px rgba(0,0,0,0.05)
 }
@@ -376,7 +379,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .loading-card .logo-spinner{--ls-size:64px;margin:0 auto 16px}
 @media (prefers-reduced-motion: reduce){.logo-spinner svg{animation-duration:6s}}
 .load-title{font-size:15px;font-weight:700;color:#0f2847;margin-bottom:4px}
-.load-sub{font-size:12px;color:#9ca3af;margin-bottom:14px}
+.load-sub{font-size:12px;color:var(--text-inactive);margin-bottom:14px}
 .prog-track{background:#f3f4f6;border-radius:4px;height:4px;overflow:hidden}
 .prog-fill{height:4px;background:linear-gradient(90deg,#0f2847,#3b82f6);border-radius:4px;transition:width .3s}
 
@@ -384,31 +387,31 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .results-section{display:none}
 
 /* ==================== Misc ==================== */
-.empty-state{text-align:center;padding:48px 20px;color:#9ca3af;font-size:13px}
-.empty-state-rich{display:flex;flex-direction:column;align-items:center;gap:8px;padding:64px 20px;color:#9ca3af}
+.empty-state{text-align:center;padding:48px 20px;color:var(--text-inactive);font-size:13px}
+.empty-state-rich{display:flex;flex-direction:column;align-items:center;gap:8px;padding:64px 20px;color:var(--text-inactive)}
 .empty-state-rich .empty-icon{width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:rgba(255,255,255,0.06);color:#9ca3af}
 .empty-state-rich .empty-icon svg{width:32px;height:32px;stroke:currentColor;fill:none;stroke-width:1.6}
 .empty-state-rich .empty-title{font-size:15px;font-weight:600;color:#111827;margin-top:4px}
-.empty-state-rich .empty-sub{font-size:13px;color:#6b7280;max-width:340px;text-align:center;line-height:1.45}
+.empty-state-rich .empty-sub{font-size:13px;color:var(--text-muted);max-width:340px;text-align:center;line-height:1.45}
 .audit-tb-stack{display:flex;flex-direction:column;gap:10px;align-items:stretch;margin-bottom:14px}
 .audit-tb-stack .audit-tb-row{width:100%}
 .audit-tb-stack .audit-tb-actions{display:flex;gap:8px}
 .audit-tb-stack .audit-tb-actions .btn{flex:0 0 auto}
 .audit-flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.audit-sep{color:#9ca3af;font-size:12px}
+.audit-sep{color:var(--text-inactive);font-size:12px}
 .audit-presets{display:flex;gap:4px;flex-wrap:wrap}
 .audit-preset.active{background:#0f2847;color:#fff;border-color:#0f2847;font-weight:700;box-shadow:0 0 0 2px rgba(15,40,71,0.25)}
-.audit-tz-label{font-size:11px;color:#6b7280;font-style:italic}
+.audit-tz-label{font-size:11px;color:var(--text-muted);font-style:italic}
 .history-scoring{padding:12px 20px;border-bottom:1px solid #eef1f6;font-size:12px;color:#374151;line-height:1.6}
-.history-scoring .hs-k{color:#6b7280;font-weight:600}
+.history-scoring .hs-k{color:var(--text-muted);font-weight:600}
 .history-scoring .hs-missing{color:#b45309;font-style:italic}
 .ret-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px}
 .ret-preset.active{background:#0f2847;color:#fff;border-color:#0f2847}
 .ret-stats{font-size:12px;color:#374151;margin-top:10px;padding:10px 12px;background:#f8fafc;border:1px solid #e7ebf3;border-radius:8px;line-height:1.7}
-.ret-stats .ret-k{color:#6b7280}
+.ret-stats .ret-k{color:var(--text-muted)}
 .ret-stats .ret-warn{color:#b45309;font-weight:600}
 .ret-runs{width:100%;border-collapse:collapse;font-size:11px}
-.ret-runs th{text-align:left;color:#6b7280;font-weight:600;padding:4px 8px;border-bottom:1px solid #e7ebf3;white-space:nowrap}
+.ret-runs th{text-align:left;color:var(--text-muted);font-weight:600;padding:4px 8px;border-bottom:1px solid #e7ebf3;white-space:nowrap}
 .ret-runs td{padding:4px 8px;border-bottom:1px solid #f1f4f9;color:#374151;white-space:nowrap}
 .ret-runs .st-success{color:#166534}
 .ret-runs .st-error{color:#b91c1c;font-weight:600}
@@ -429,7 +432,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .bias-gen-scope{font-size:12.5px;color:#334155;margin-top:9px;line-height:1.5}
 .bias-gen-scope strong{color:#0f2847;font-weight:700}
 .bias-gen-unsupported{display:block;color:#92400e;margin-top:3px}
-.bias-gen-note{font-size:11px;color:#6b7280;margin-top:6px;line-height:1.5}
+.bias-gen-note{font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.5}
 /* margin-left:auto is the single gap in the bar: it holds all the free space,
    so the brand and nav sit hard left and this pill starts the right-hand
    cluster. It lives here rather than on .topbar-nav because the nav is
@@ -455,7 +458,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 
 /* Anonymize tooltip */
 .anon-tooltip-wrap{position:relative;display:inline-flex;align-items:center;margin-left:4px;cursor:default}
-.anon-tooltip-icon{width:15px;height:15px;border-radius:50%;border:1.5px solid #9ca3af;color:#9ca3af;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;user-select:none;transition:border-color .15s,color .15s}
+.anon-tooltip-icon{width:15px;height:15px;border-radius:50%;border:1.5px solid #9ca3af;color:var(--text-inactive);font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;user-select:none;transition:border-color .15s,color .15s}
 .anon-tooltip-wrap:hover .anon-tooltip-icon{border-color:#6366f1;color:#6366f1}
 .anon-tooltip-box{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1e1b4b;color:#e0e7ff;font-size:12px;line-height:1.55;padding:10px 13px;border-radius:9px;width:240px;box-shadow:0 6px 24px rgba(0,0,0,.22);z-index:9999;pointer-events:none;text-align:left;white-space:normal}
 .anon-tooltip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#1e1b4b}
@@ -467,11 +470,11 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .how-step:not(:last-child)::after{content:'';position:absolute;right:0;top:20%;height:60%;width:1px;background:#e5e7eb}
 .how-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#0a1f3d,#0f2847);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .how-text strong{display:block;font-size:13px;font-weight:700;color:#0f2847;margin-bottom:2px}
-.how-text span{font-size:12px;color:#6b7280;line-height:1.4}
+.how-text span{font-size:12px;color:var(--text-muted);line-height:1.4}
 
 /* ── Sort controls ───────────────────────────────────────────── */
 .batch-controls{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;padding:0 20px}
-.batch-controls label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af}
+.batch-controls label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-inactive)}
 .sort-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
 .sort-btn:hover,.sort-btn.active{background:#0f2847;color:#fff;border-color:#0f2847}
 .sort-arrow{font-size:10px;opacity:.7}
@@ -481,7 +484,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .footer-inner{max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .footer-section h4{font-size:13px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
 .footer-section p{margin:0;color:rgba(255,255,255,.6)}
-.footer-bottom{max-width:900px;margin:20px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.4)}
+.footer-bottom{max-width:900px;margin:20px auto 0;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.5)}
 @media(max-width:600px){.how-banner{flex-direction:column}.how-step:not(:last-child)::after{display:none}.footer-inner{grid-template-columns:1fr}}
 
 /* Settings panel. The .settings-btn gear that used to open it from the bar is
@@ -495,10 +498,10 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .settings-panel{display:none;position:fixed;top:54px;right:16px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:9999;width:560px;max-width:calc(100vw - 32px);box-sizing:border-box;max-height:calc(100vh - 70px);overflow-y:auto;-webkit-overflow-scrolling:touch}
 @media(max-width:480px){.plan-compare{flex-direction:column}}
 .settings-panel.open{display:block}
-.settings-panel h3{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;margin:0 0 10px}
+.settings-panel h3{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:0 0 10px}
 .settings-row{display:flex;align-items:center;gap:8px}
 .settings-row .text-input{flex:1}
-.settings-close{position:absolute;top:10px;right:12px;background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1}
+.settings-close{position:absolute;top:10px;right:12px;background:none;border:none;font-size:18px;color:var(--text-inactive);cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1}
 .settings-close:hover{color:#374151;background:#f3f4f6}
 .settings-overlay{display:none;position:fixed;inset:0;z-index:9998}
 .plan-compare{display:flex;gap:8px;margin:10px 0}
@@ -507,7 +510,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
    translates it. In Dutch and German a short note says so beside the heading,
    so the mixed language reads as deliberate. i18n.js sets <html lang>, so a
    live switch shows or hides it without a re-render. */
-.en-note{font-size:11px;font-weight:500;color:#9ca3af;margin-left:6px;text-transform:none;letter-spacing:0}
+.en-note{font-size:11px;font-weight:500;color:var(--text-inactive);margin-left:6px;text-transform:none;letter-spacing:0}
 html[lang="en"] .en-note{display:none}
 .tool-section{padding:32px 24px}
 .err-retry-card{background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:14px;margin-top:12px}
@@ -522,10 +525,10 @@ html[lang="en"] .en-note{display:none}
 .batch-hint{padding:0 20px}
 .bs-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;text-align:center}
 .bs-val{font-size:26px;font-weight:800;color:#0a1f3d;line-height:1}
-.bs-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-top:4px}
-.bs-sub{font-size:11px;color:#6b7280;margin-top:2px}
+.bs-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-inactive);margin-top:4px}
+.bs-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
 /* Why score */
-.why-toggle{background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:#6b7280;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.why-toggle{background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
 .why-toggle:hover{border-color:#0f2847;color:#0f2847}
 .why-arrow{font-size:9px;transition:transform .2s;display:inline-block}
 .why-toggle.open .why-arrow{transform:rotate(180deg)}
@@ -539,18 +542,18 @@ html[lang="en"] .en-note{display:none}
 .tpl-panel{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 8px 32px rgba(10,31,61,.13);z-index:999;width:300px;padding:0;overflow:hidden}
 .tpl-panel.open{display:block}
 .tpl-panel-head{padding:14px 16px 10px;border-bottom:1px solid #f3f4f6;display:flex;justify-content:space-between;align-items:center}
-.tpl-panel-head span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af}
+.tpl-panel-head span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-inactive)}
 .tpl-save-btn{background:#0a1f3d;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;transition:opacity .15s}
 .tpl-save-btn:hover{opacity:.85}
 .tpl-chips{padding:10px 12px;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
-.tpl-empty{padding:20px 16px;text-align:center;color:#9ca3af;font-size:12px}
+.tpl-empty{padding:20px 16px;text-align:center;color:var(--text-inactive);font-size:12px}
 .tpl-chip{display:flex;align-items:center;border:1.5px solid #e5e7eb;border-radius:9px;overflow:hidden;transition:border-color .15s}
 .tpl-chip:hover{border-color:#c7d6f5}
 .tpl-chip-name{flex:1;padding:9px 13px;font-size:13px;font-weight:600;color:#0f2847;cursor:pointer;transition:background .15s;background:none;border:none;text-align:left}
 .tpl-chip-name:hover{background:#f0f4ff}
 .tpl-chip-del{padding:9px 11px;color:#d1d5db;font-size:13px;cursor:pointer;transition:all .15s;background:none;border:none;border-left:1.5px solid #f3f4f6;line-height:1}
 .tpl-chip-del:hover{color:#dc2626;background:#fff5f5}
-.tpl-panel-footer{padding:10px 16px;border-top:1px solid #f3f4f6;font-size:11px;color:#b0b8c4;font-style:italic}
+.tpl-panel-footer{padding:10px 16px;border-top:1px solid #f3f4f6;font-size:11px;color:var(--text-inactive);font-style:italic}
 .tpl-wrap{position:relative;display:inline-block}
 /* Print */
 .print-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
@@ -566,7 +569,7 @@ html[lang="en"] .en-note{display:none}
 .modal-backdrop.open .modal-box{transform:translateY(0)}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid #e5e7eb}
 .modal-head h3{margin:0;font-size:17px;font-weight:700;color:#0a1f3d}
-.modal-close{background:none;border:none;font-size:22px;color:#6b7280;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}
+.modal-close{background:none;border:none;font-size:22px;color:var(--text-muted);cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px}
 .modal-close:hover{background:#f3f4f6;color:#0a1f3d}
 .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
 /* A .nav-btn-fr rule pair lived here, swapping "Suggest an improvement" for
@@ -584,15 +587,15 @@ html[lang="en"] .en-note{display:none}
 .fr-field .text-input{width:100%}
 .fr-field select.text-input{width:100%;height:38px;background:#fff}
 .fr-field textarea.text-input{width:100%;min-height:140px;padding:10px 12px;resize:vertical;font-family:inherit;line-height:1.5}
-.fr-count{font-size:11px;color:#9ca3af;text-align:right;margin-top:4px}
+.fr-count{font-size:11px;color:var(--text-inactive);text-align:right;margin-top:4px}
 .fr-msg{display:none;font-size:13px;border-radius:8px;padding:9px 12px;margin-bottom:12px}
 .fr-msg.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
 .fr-msg.warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
 .fr-upsell{text-align:center;padding:8px 4px 4px}
 .fr-upsell h4{margin:0 0 8px;font-size:16px;color:#0a1f3d}
-.fr-upsell p{margin:0 auto 4px;font-size:13.5px;color:#6b7280;max-width:44ch;line-height:1.55}
+.fr-upsell p{margin:0 auto 4px;font-size:13.5px;color:var(--text-muted);max-width:44ch;line-height:1.55}
 .modal-tabs{display:flex;gap:0;border-bottom:1px solid #e5e7eb;padding:0 24px;flex-shrink:0}
-.modal-tab{background:none;border:none;padding:12px 18px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;letter-spacing:.03em}
+.modal-tab{background:none;border:none;padding:12px 18px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;letter-spacing:.03em}
 .modal-tab.active{color:#0a1f3d;border-bottom-color:#0f2847}
 .modal-body{padding:24px;overflow-y:auto;line-height:1.65;font-size:14px;color:#374151}
 .modal-body h4{font-size:13px;font-weight:700;color:#0a1f3d;text-transform:uppercase;letter-spacing:.06em;margin:18px 0 6px}
@@ -605,7 +608,7 @@ html[lang="en"] .en-note{display:none}
 .about-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
 .about-card{background:#f8faff;border:1px solid #e5e7eb;border-radius:10px;padding:16px}
 .about-card h5{margin:0 0 6px;font-size:13px;font-weight:700;color:#0a1f3d}
-.about-card p{margin:0;font-size:13px;color:#6b7280}
+.about-card p{margin:0;font-size:13px;color:var(--text-muted)}
 .contact-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f3f4f6}
 .contact-row:last-child{border:none}
 .contact-row strong{min-width:80px;font-size:13px;color:#0a1f3d}
@@ -630,7 +633,7 @@ html[lang="en"] .en-note{display:none}
 .batch-failed-note{display:block;margin:0 20px 12px}
 .batch-failed-note[hidden],.bs-failed[hidden]{display:none}
 .bs-failed{color:#b45309;font-weight:600}
-.score-pill.pill-na{background:#f3f4f6;color:#6b7280}
+.score-pill.pill-na{background:#f3f4f6;color:var(--text-muted)}
 .unscored-badge{display:inline-block;margin-left:4px;padding:0 6px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700}
 /* ── Score text colour in single result ── */
 .score-hi-text{color:#15803d!important;font-weight:800}
@@ -713,9 +716,9 @@ html[lang="en"] .en-note{display:none}
 .row-notes::placeholder{color:#d1d5db}
 
 /* ── Keyboard hint ── */
-.kbd-hint{font-size:11px;color:#9ca3af;margin-left:10px}
+.kbd-hint{font-size:11px;color:var(--text-inactive);margin-left:10px}
 /* ── Human-oversight hint (EU AI Act Art. 14) ── */
-.oversight-hint{font-size:11px;color:#9ca3af;font-style:italic;line-height:1.4}
+.oversight-hint{font-size:11px;color:var(--text-inactive);font-style:italic;line-height:1.4}
 
 /* ── First-run onboarding: sample button + nudge ── */
 .sample-row{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
@@ -772,14 +775,14 @@ html[lang="en"] .en-note{display:none}
 .pw-wrap .text-input{padding-right:40px} /* room for the toggle; input stays 42px tall */
 .pw-toggle{position:absolute;top:50%;right:6px;transform:translateY(-50%);height:30px;width:30px;
   display:flex;align-items:center;justify-content:center;background:none;border:none;padding:0;
-  cursor:pointer;color:#6b7280;border-radius:6px;transition:color .15s}
+  cursor:pointer;color:var(--text-muted);border-radius:6px;transition:color .15s}
 .pw-toggle:hover{color:#0f2847}
 .pw-toggle:focus-visible{outline:2px solid #0f2847;outline-offset:2px;color:#0f2847}
 .pw-toggle svg[hidden]{display:none} /* guarantee the hidden icon stays hidden */
 .auth-links{display:flex;justify-content:space-between;gap:8px;margin-top:2px;flex-wrap:wrap}
 .auth-link{background:none;border:none;color:#0f2847;font:600 12px 'Inter',sans-serif;cursor:pointer;padding:0;text-decoration:underline}
 .auth-link:hover{color:#1a3d6e}
-.auth-note{font-size:12px;color:#6b7280;margin:0}
+.auth-note{font-size:12px;color:var(--text-muted);margin:0}
 #authError{margin-bottom:14px}
 
 /* ── Branding panel: locked state ──
@@ -789,7 +792,7 @@ html[lang="en"] .en-note{display:none}
 .branding-lock{margin-top:8px;padding:9px 11px;border:1px solid #fde68a;background:#fffbeb;border-radius:7px;font-size:11px;line-height:1.5;color:#78350f}
 .branding-lock strong{display:block;margin-bottom:2px;font-size:11.5px}
 .branding-lock a{color:#0f2847;font-weight:600;text-decoration:underline;margin-left:4px}
-#brandingSection.is-locked .text-input:disabled{background:#f9fafb;color:#9ca3af;cursor:not-allowed}
+#brandingSection.is-locked .text-input:disabled{background:#f9fafb;color:var(--text-inactive);cursor:not-allowed}
 #brandingSection.is-locked .btn:disabled{opacity:.5;cursor:not-allowed}
 #brandingSection.is-locked .logo-actions label{opacity:.5;pointer-events:none}
 /* Logo upload: preview beside actions. The preview box shows the uploaded
@@ -798,10 +801,10 @@ html[lang="en"] .en-note{display:none}
 .logo-row{display:flex;gap:12px;align-items:flex-start}
 .logo-preview{width:120px;height:56px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
 .logo-preview img{max-width:112px;max-height:48px;width:auto;height:auto;object-fit:contain}
-.logo-empty{font-size:10px;color:#9ca3af}
+.logo-empty{font-size:10px;color:var(--text-inactive)}
 .logo-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .logo-actions label.btn{margin:0}
-.logo-hint{font-size:10.5px;color:#6b7280}
+.logo-hint{font-size:10.5px;color:var(--text-muted)}
 
 /* ── Topbar account menu (avatar trigger + dropdown) ──
    Replaces the old email-address chip. The avatar is fixed-width, so the bar's
@@ -858,10 +861,10 @@ html[lang="en"] .en-note{display:none}
 .pp-tier{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .pp-name{font-size:15px;font-weight:700;color:#0f2847}
 .pp-price{font-size:15px;font-weight:800;color:#0f2847}
-.pp-price small{font-size:11px;font-weight:600;color:#6b7280}
-.pp-sub{font-size:11px;color:#6b7280;margin-top:2px}
+.pp-price small{font-size:11px;font-weight:600;color:var(--text-muted)}
+.pp-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
 .pp-sec{margin-top:12px}
-.pp-sec-h{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:5px}
+.pp-sec-h{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px}
 .pp-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#374151;padding:3px 0}
 .pp-row b{font-weight:600;color:#111827}
 .pp-meter{height:5px;border-radius:3px;background:#eef2f7;overflow:hidden;margin-top:4px}
@@ -879,7 +882,7 @@ html[lang="en"] .en-note{display:none}
 .pp-alert{background:#fef3c7;border:1px solid #fcd34d;border-radius:7px;padding:9px 10px;margin-bottom:11px}
 .pp-alert-t{font-size:12px;font-weight:700;color:#92400e}
 .pp-alert-b{font-size:11px;color:#a16207;margin-top:2px;line-height:1.45}
-.pp-note{font-size:11px;color:#6b7280;line-height:1.5}
+.pp-note{font-size:11px;color:var(--text-muted);line-height:1.5}
 /* Upgrade teaser inside the paid panel (Pro -> Team). Team gets no upgrades
    from the server, so this block is simply never rendered for it. */
 .pp-up{border-top:1px solid #f1f4f9;margin-top:12px;padding-top:11px}
@@ -898,8 +901,8 @@ html[lang="en"] .en-note{display:none}
 .pf-card.featured{border-color:#0f2847;box-shadow:0 0 0 1px #0f2847 inset}
 .pf-name{font-size:13px;font-weight:700;color:#0f2847}
 .pf-price{font-size:20px;font-weight:800;color:#0f2847;margin:2px 0 1px}
-.pf-price small{font-size:11px;font-weight:600;color:#6b7280}
-.pf-tag{font-size:11px;color:#6b7280;margin-bottom:8px;line-height:1.4}
+.pf-price small{font-size:11px;font-weight:600;color:var(--text-muted)}
+.pf-tag{font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.4}
 .pf-gains{list-style:none;margin:0 0 11px;padding:0;flex:1}
 .pf-gains li{font-size:11.5px;color:#374151;padding:3px 0 3px 15px;position:relative;line-height:1.4}
 .pf-gains li::before{content:"+";position:absolute;left:0;color:#0f2847;font-weight:800}
@@ -1033,7 +1036,7 @@ img, video, table { max-width: 100%; }
 .history-list li:last-child { border-bottom: 0; }
 .history-list .hi-field { font-weight: 600; color: #0c1730; font-size: 13px; }
 .history-list .hi-from-to { font-size: 13px; color: #5c6a8a; margin-top: 2px; }
-.history-list .hi-when { font-size: 12px; color: #9aa6c0; margin-top: 4px; }
+.history-list .hi-when { font-size: 12px; color: var(--text-inactive); margin-top: 4px; }
 .history-list .hi-by { font-size: 12px; color: #5c6a8a; margin-top: 2px; }
 @media (max-width: 768px) { .col-reviewer { display: none; } }
 .audit-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 4px; font-size: 13px; color: #5c6a8a; }
@@ -1316,10 +1319,10 @@ img, video, table { max-width: 100%; }
     <button class="btn btn-primary btn-sm" id="upgradeTeamBtn" data-action="startCheckout" data-plan="team" data-i18n="settings.plan.upgradeTeam">Upgrade to Team</button>
     <button class="btn btn-ghost btn-sm" id="manageBillingBtn" data-action="openBillingPortal" style="display:none" data-i18n="settings.plan.manage">Manage billing</button>
   </div>
-  <div class="plan-status-line" id="planMemberNote" style="display:none;color:#9ca3af" data-i18n="settings.plan.memberNote">Your plan is managed by your organization&rsquo;s owner.</div>
+  <div class="plan-status-line" id="planMemberNote" style="display:none;color:var(--text-inactive)" data-i18n="settings.plan.memberNote">Your plan is managed by your organization&rsquo;s owner.</div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3 data-i18n="settings.team.title">Team</h3>
-  <div id="teamBody" style="font-size:13px;color:#6b7280" data-i18n="common.loading">Loading&hellip;</div>
+  <div id="teamBody" style="font-size:13px;color:var(--text-muted)" data-i18n="common.loading">Loading&hellip;</div>
   <!-- owner-only invite controls (hidden for members / non-team) -->
   <div id="teamInviteRow" class="settings-row" style="display:none;gap:8px;margin-top:10px">
     <input class="text-input" type="email" id="inviteEmail" placeholder="colleague@company.com" style="flex:1" aria-label="Invite email" data-i18n-attr="placeholder:settings.team.invitePlaceholder;aria-label:settings.team.inviteEmail">
@@ -1330,7 +1333,7 @@ img, video, table { max-width: 100%; }
       <input class="text-input" type="text" id="inviteLink" readonly style="flex:1" aria-label="Invite link" data-i18n-attr="aria-label:settings.team.inviteLink">
       <button class="btn btn-ghost btn-sm" id="copyInviteBtn" data-action="copyInviteLink" data-i18n="settings.team.copyLink">Copy link</button>
     </div>
-    <div id="inviteLinkNote" style="font-size:11px;color:#6b7280;margin-top:4px" data-i18n="settings.team.linkNote">Send this link to your colleague.</div>
+    <div id="inviteLinkNote" style="font-size:11px;color:var(--text-muted);margin-top:4px" data-i18n="settings.team.linkNote">Send this link to your colleague.</div>
   </div>
   <div id="brandingSection" style="display:none">
     <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
@@ -1365,7 +1368,7 @@ img, video, table { max-width: 100%; }
       Your reports already carry a professional CVsprings mark — upgrade to replace it with your own.
       <a href="#" data-action="openPlansFromBranding">See plans</a>
     </div>
-    <div style="font-size:11px;color:#6b7280;margin-top:4px" data-i18n="settings.branding.note">Replaces the CVsprings mark on your candidate PDF and bias reports. With no logo uploaded, reports carry the CVsprings mark. Every report also carries a provenance footer, which cannot be removed.</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px" data-i18n="settings.branding.note">Replaces the CVsprings mark on your candidate PDF and bias reports. With no logo uploaded, reports carry the CVsprings mark. Every report also carries a provenance footer, which cannot be removed.</div>
   </div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3 style="margin-top:0" data-i18n="settings.prefs.title">Preferences</h3>
@@ -1382,12 +1385,12 @@ img, video, table { max-width: 100%; }
       <option value="de" lang="de">Deutsch</option>
     </select>
   </div>
-  <div style="font-size:11px;color:#6b7280;margin:0 0 10px" data-i18n="settings.language.hint">Changes the interface language right away and is saved to your account.</div>
+  <div style="font-size:11px;color:var(--text-muted);margin:0 0 10px" data-i18n="settings.language.hint">Changes the interface language right away and is saved to your account.</div>
   <label class="settings-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#374151">
     <input type="checkbox" id="autosaveBatchToggle" data-action="setAutosaveBatch">
     <span data-i18n="settings.prefs.autosave">Auto-save batch results to audit log</span>
   </label>
-  <div style="font-size:11px;color:#6b7280;margin-top:4px;margin-left:24px" data-i18n="settings.prefs.autosaveHint">When enabled, every CV in a batch is saved to the audit log automatically once analysis completes.</div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:4px;margin-left:24px" data-i18n="settings.prefs.autosaveHint">When enabled, every CV in a batch is saved to the audit log automatically once analysis completes.</div>
   <h3 style="margin-top:18px" data-i18n="settings.weights.title">Default Scoring Weights</h3>
   <div class="settings-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
     <span style="min-width:70px;font-size:13px;color:#374151" data-i18n="common.dimension.keywords">Keywords</span>
@@ -1401,7 +1404,7 @@ img, video, table { max-width: 100%; }
     <span style="min-width:55px;font-size:13px;color:#374151" data-i18n="common.dimension.education">Education</span>
     <input class="text-input" type="number" id="setWEd" min="0" max="100" style="width:70px" aria-label="Default education weight" data-i18n-attr="aria-label:settings.weights.edLabel">
   </div>
-  <div style="font-size:11px;color:#6b7280;margin-top:4px" data-i18n="settings.weights.hint">Must sum to 100. Applied to the main weight sliders.</div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:4px" data-i18n="settings.weights.hint">Must sum to 100. Applied to the main weight sliders.</div>
   <h3 style="margin-top:18px" data-i18n="settings.defaults.title">Defaults</h3>
   <label class="settings-row" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#374151;margin-top:6px">
     <input type="checkbox" id="setAnonymizeDefault">
@@ -1429,10 +1432,10 @@ img, video, table { max-width: 100%; }
   <div class="settings-row" style="margin-top:10px">
     <button class="btn btn-primary btn-sm" id="cpSaveBtn" data-action="changePassword" data-i18n="settings.password.submit">Update Password</button>
   </div>
-  <div style="font-size:11px;color:#6b7280;margin-top:4px" data-i18n="settings.password.note">Updating your password signs you out on all other devices.</div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:4px" data-i18n="settings.password.note">Updating your password signs you out on all other devices.</div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3 data-i18n="settings.retention.title">Data Retention</h3>
-  <p style="font-size:12px;color:#6b7280;margin:4px 0 8px" data-i18n-html="settings.retention.intro_html">
+  <p style="font-size:12px;color:var(--text-muted);margin:4px 0 8px" data-i18n-html="settings.retention.intro_html">
     Audit records older than your retention window are <strong>permanently deleted</strong> by a daily job. Keep longer to preserve an evidence trail (the EU AI Act Art. 19 requires at least six months); keep shorter to hold less applicant personal data (GDPR storage limitation). Minimum 180 days. Applies to your whole organization.
   </p>
   <div class="ret-presets">
@@ -1446,19 +1449,19 @@ img, video, table { max-width: 100%; }
     <span style="font-size:13px;color:#374151" data-i18n="settings.retention.days">days</span>
     <button class="btn btn-primary btn-sm" id="retSaveBtn" data-action="saveRetention" data-i18n="common.save">Save</button>
   </div>
-  <div id="retTradeoff" style="font-size:11px;color:#6b7280;margin-top:6px"></div>
+  <div id="retTradeoff" style="font-size:11px;color:var(--text-muted);margin-top:6px"></div>
   <div id="retStats" class="ret-stats" style="display:none"></div>
   <details id="retHistoryWrap" style="margin-top:10px;display:none">
     <summary style="font-size:12px;color:#0f2847;cursor:pointer;font-weight:600" data-i18n="settings.retention.runsTitle">Recent purge runs (execution evidence)</summary>
     <div id="retHistory" style="margin-top:8px;overflow-x:auto"></div>
   </details>
-  <div id="retOwnerNote" style="display:none;font-size:11px;color:#9ca3af;margin-top:4px" data-i18n="settings.retention.ownerNote">Only the organization owner can change retention and use the controls below.</div>
+  <div id="retOwnerNote" style="display:none;font-size:11px;color:var(--text-inactive);margin-top:4px" data-i18n="settings.retention.ownerNote">Only the organization owner can change retention and use the controls below.</div>
   <h3 style="margin-top:18px" data-i18n="settings.org.title">Organization Data</h3>
   <div class="settings-row" style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
     <button class="btn btn-ghost btn-sm" id="orgExportBtn" data-action="exportOrgData" data-i18n="settings.org.export">Export all data (JSON)</button>
     <button class="btn btn-danger btn-sm" id="orgDeleteBtn" data-action="deleteAllOrgData" data-i18n="settings.org.delete">Delete all audit data</button>
   </div>
-  <div style="font-size:11px;color:#6b7280;margin-top:4px" data-i18n="settings.org.note">Export downloads every audit record (incl. change history) and template in your organization. Delete permanently removes all audit records and change history &mdash; it cannot be undone.</div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:4px" data-i18n="settings.org.note">Export downloads every audit record (incl. change history) and template in your organization. Delete permanently removes all audit records and change history &mdash; it cannot be undone.</div>
 </div>
 
 <!-- === ANALYZER === -->
@@ -2506,7 +2509,7 @@ function planBlockNote(sum){
 function planUsageValue(used, limit){
   return h('b', null, I18N.formatNumber(used),
     limit==null
-      ? [' ', h('span', { style: 'font-weight:400;color:#6b7280' }, '/ ' + I18N.t('app.plan.unlimited'))]
+      ? [' ', h('span', { style: 'font-weight:400;color:var(--text-muted)' }, '/ ' + I18N.t('app.plan.unlimited'))]
       : ' / ' + I18N.formatNumber(limit));
 }
 // The tier name, price and interval — all three as the server phrased them.
@@ -2696,7 +2699,7 @@ function openPausedScreen(sum){
   const btn=function(a){ return a ? planActionBtn(a) : null; };
   const option=function(titleKey, bodyKey){
     return h('div', { class: 'pp-row' }, h('span', null,
-      h('b', null, I18N.t(titleKey)), h('br'), h('span', { style: 'color:#6b7280' }, I18N.t(bodyKey))));
+      h('b', null, I18N.t(titleKey)), h('br'), h('span', { style: 'color:var(--text-muted)' }, I18N.t(bodyKey))));
   };
 
   appendKids(box, [
@@ -2891,9 +2894,9 @@ function renderPlanCompare(currentPlan){
       h('div', { style: 'font-weight:700;font-size:13px;color:#111827' }, p.name,
         cur ? [' ', h('span', { style: 'font-size:10px;background:#0f2847;color:#fff;border-radius:8px;padding:1px 7px;vertical-align:middle' }, I18N.t('settings.plan.currentBadge'))] : null),
       h('div', { style: 'font-size:15px;font-weight:800;color:#0f2847;margin:2px 0 6px' }, p.priceLabel,
-        h('span', { style: 'font-size:11px;font-weight:600;color:#6b7280' }, p.per||'',
+        h('span', { style: 'font-size:11px;font-weight:600;color:var(--text-muted)' }, p.per||'',
           p.taxNote ? [' ', h('span', { style: 'font-weight:400' }, p.taxNote)] : null)),
-      (p.highlights||[]).map(function(l){ return h('div', { style: 'font-size:11px;color:#6b7280' }, l); }),
+      (p.highlights||[]).map(function(l){ return h('div', { style: 'font-size:11px;color:var(--text-muted)' }, l); }),
       h('div', { style: 'font-size:11px;color:#0f2847;font-weight:600;margin-top:6px' }, I18N.t('settings.plan.viewDetails')));
   })));
 }
@@ -2909,7 +2912,7 @@ function showPlanDetail(el){
   const cur=tier.id===currentPlan;
   const isUpgrade=!!tier.upgradePlan && (_PLAN_ORDER[tier.id]||0)>(_PLAN_ORDER[currentPlan]||0);
   const li=function(t,strong){ return h('li', { style: 'padding:6px 0;border-top:1px solid #f1f4f9;color:'+(strong?'#111827':'#374151')+';font-weight:'+(strong?'600':'400') }, t); };
-  const cap='font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:2px';
+  const cap='font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px';
 
   // .modal-backdrop sits at z-index 2000, which is fine for #infoModal (opened
   // from the main app) but not here: this dialog opens from INSIDE the settings
@@ -2927,9 +2930,9 @@ function showPlanDetail(el){
       closeX),
     h('div', { class: 'modal-body' },
       h('div', { style: 'font-size:24px;font-weight:800;color:#0f2847' }, tier.priceLabel,
-        h('span', { style: 'font-size:13px;font-weight:600;color:#6b7280' }, tier.per||'',
+        h('span', { style: 'font-size:13px;font-weight:600;color:var(--text-muted)' }, tier.per||'',
           tier.taxNote ? [' ', h('span', { style: 'font-weight:400' }, tier.taxNote)] : null)),
-      tier.tagline ? h('p', { style: 'color:#6b7280;font-size:13px;margin:4px 0 12px' }, tier.tagline) : null,
+      tier.tagline ? h('p', { style: 'color:var(--text-muted);font-size:13px;margin:4px 0 12px' }, tier.tagline) : null,
       h('div', { style: cap }, I18N.t('settings.plan.thisTier')),
       h('ul', { style: 'list-style:none;margin:0 0 14px;padding:0' }, (tier.highlights||[]).map(function(x){ return li(x,true); })),
       h('div', { style: cap }, I18N.t('settings.plan.allPlans')),
@@ -2944,7 +2947,7 @@ function showPlanDetail(el){
     up.addEventListener('click', function(){ cleanup(); if(typeof startCheckout==='function') startCheckout(tier.upgradePlan); });
     foot.appendChild(up);
   } else if(isUpgrade){
-    foot.appendChild(h('span', { style: 'flex:1;color:#6b7280;font-size:12px' }, I18N.t('settings.plan.askOwner')));
+    foot.appendChild(h('span', { style: 'flex:1;color:var(--text-muted);font-size:12px' }, I18N.t('settings.plan.askOwner')));
   }
   const closeBtn=h('button', { type: 'button', class: 'btn btn-ghost' }, I18N.t('common.close'));
   closeBtn.addEventListener('click', cleanup);
@@ -3518,13 +3521,13 @@ async function openChangeHistory(auditId) {
   const list = document.getElementById('history-list');
   if (!overlay || !list) return;
   const note = (text, color) => h('li', { style: 'padding:16px 20px;color:' + color + ';' }, text);
-  fill(list, note(I18N.t('common.loading'), '#9aa6c0'));
+  fill(list, note(I18N.t('common.loading'), 'var(--text-inactive)'));
   overlay.classList.add('open');
   renderScoringInputs((typeof lastAuditRecords !== 'undefined' ? lastAuditRecords : []).find(r => r && r.id === auditId));
   try {
     const rows = await api('/api/audit/' + encodeURIComponent(auditId) + '/changes');
     if (!Array.isArray(rows) || !rows.length) {
-      fill(list, note(I18N.t('app.history.none'), '#9aa6c0'));
+      fill(list, note(I18N.t('app.history.none'), 'var(--text-inactive)'));
       return;
     }
     fill(list, rows.map(r => h('li', null,
@@ -3861,7 +3864,7 @@ function renderFileList(){
     const show=n>0 && (mode==='batch' || n>1);
     head.style.display=show?'flex':'none';
     fill(head, show ? [
-      h('span', { style: 'font-size:12px;color:#6b7280' }, I18N.t('app.upload.staged', { count: n })),
+      h('span', { style: 'font-size:12px;color:var(--text-muted)' }, I18N.t('app.upload.staged', { count: n })),
       h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-action': 'clearAllFiles' }, I18N.t('app.audit.clearAll')),
     ] : null);
   }
@@ -4012,7 +4015,7 @@ function renderSingleResult(data,fileName,role){
   const found=data.found||data.keywords?.found||[],missing=data.missing||data.keywords?.missing||[];
   fill(document.getElementById('foundChips'), found.length
     ? found.map(k=>h('span', { class: 'chip chip-found' }, k))
-    : h('span', { style: 'color:#9ca3af;font-size:13px' }, I18N.t('app.results.noneFound')));
+    : h('span', { style: 'color:var(--text-inactive);font-size:13px' }, I18N.t('app.results.noneFound')));
   fill(document.getElementById('missingChips'), missing.length
     ? missing.map(k=>h('span', { class: 'chip chip-miss' }, k))
     : h('span', { style: 'color:#059669;font-size:13px' }, I18N.t('app.results.noneMissing')));
@@ -4409,19 +4412,19 @@ function renderAuditTable(records){
     sel.value=rec.decision||'';
     if(!scored){ sel.disabled=true; sel.setAttribute('title', I18N.t('app.audit.notScoredTitle')); }
     return h('tr', scored ? null : { class: 'unscored-row' },
-      h('td', { style: 'font-size:11px;color:#9ca3af;white-space:nowrap' }, rec.createdAt?fmtInOrgTz(rec.createdAt):'—'),
+      h('td', { style: 'font-size:11px;color:var(--text-inactive);white-space:nowrap' }, rec.createdAt?fmtInOrgTz(rec.createdAt):'—'),
       h('td', null,
         h('button', { type: 'button', class: 'audit-cand-link', 'data-action': 'auditFilterCandidate', 'data-cid': rec.candidateId||'', title: I18N.t('app.audit.showCandidate') }, rec.candidateName),
-        rec.anonymized ? [' ', h('span', { style: 'font-size:10px;color:#9ca3af' }, I18N.t('app.audit.anon'))] : null,
+        rec.anonymized ? [' ', h('span', { style: 'font-size:10px;color:var(--text-inactive)' }, I18N.t('app.audit.anon'))] : null,
         rec.candidateLegacy ? [' ', h('span', { class: 'legacy-badge', title: I18N.t('app.audit.legacyTitle') }, I18N.t('app.audit.legacyBadge'))] : null,
         scored ? null : h('span', { class: 'unscored-badge', title: I18N.t('app.audit.notScoredTitle') }, I18N.t('app.audit.notScored'))),
-      h('td', { style: 'color:#6b7280;font-size:12px' }, rec.role||'—'),
+      h('td', { style: 'color:var(--text-muted);font-size:12px' }, rec.role||'—'),
       h('td', null, h('span', { class: 'score-pill '+pill }, scored ? s : '—')),
       h('td', null, dash(rec.scores?.keywords)), h('td', null, dash(rec.scores?.skills)),
       h('td', null, dash(rec.scores?.experience)), h('td', null, dash(rec.scores?.education)),
       h('td', null, sel),
       h('td', null, h('input', { class: 'note-inp', type: 'text', value: rec.note||'', placeholder: I18N.t('app.decision.notePlaceholder'), 'aria-label': I18N.t('app.table.note'), 'data-action': 'audit-note', 'data-id': rec.id })),
-      h('td', { class: 'col-reviewer', style: 'font-size:11px;color:#6b7280;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis', title: rec.reviewedBy||'' }, rec.reviewedBy||'—'),
+      h('td', { class: 'col-reviewer', style: 'font-size:11px;color:var(--text-muted);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis', title: rec.reviewedBy||'' }, rec.reviewedBy||'—'),
       h('td', { style: 'white-space:nowrap;display:flex;gap:4px' },
         h('button', { type: 'button', class: 'history-btn', 'data-action': 'audit-history', 'data-id': rec.id, title: I18N.t('app.history.title'), 'aria-label': I18N.t('app.history.title') }, '⧉'),
         // No report for a record without a score: it would show a 0 (the server refuses it).
@@ -4535,7 +4538,7 @@ async function loadRoles(){
 function renderRoleTabs(){
   const tabs=document.getElementById('roleTabs');
   if(!tabs||!_roles)return;
-  if(!_roles.length){fill(tabs, h('span', { style: 'color:#9ca3af;font-size:13px' }, I18N.t('app.roles.none')));return;}
+  if(!_roles.length){fill(tabs, h('span', { style: 'color:var(--text-inactive);font-size:13px' }, I18N.t('app.roles.none')));return;}
   const active=_roleHistory&&_roleHistory.role;
   fill(tabs, _roles.map(role=>h('button', { class: 'rtab'+(role.role===active?' active':''), 'data-action': 'load-role', 'data-role': role.role },
     role.role, ' ', h('span', { style: 'opacity:.6;font-size:11px' }, '('+I18N.formatNumber(role.count)+')'))));
@@ -4565,7 +4568,7 @@ function renderRoleHistory(){
   const top=scored.length?Math.max(...scored.map(r=>r.overall)):null;
   const short=scored.filter(r=>r.decision==='shortlist').length;
   const statC=(l,v,c)=>h('div', { style: 'background:#fff;border:1.5px solid #e5e7eb;border-radius:10px;padding:16px 20px;min-width:110px;flex:1;box-shadow:0 1px 4px rgba(0,0,0,0.05)' },
-    h('div', { style: 'font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px' }, l),
+    h('div', { style: 'font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-inactive);margin-bottom:6px' }, l),
     h('div', { style: 'font-size:30px;font-weight:800;color:'+c }, v==null?'—':I18N.formatNumber(v)));
   const th=(key)=>h('th', null, I18N.t(key));
   const abbr=(key, full)=>h('th', null, h('abbr', { title: I18N.t(full) }, I18N.t(key)));
@@ -4573,7 +4576,7 @@ function renderRoleHistory(){
   fill(content,
     h('div', { style: 'display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap' },
       statC(I18N.t('app.roles.candidates'),scored.length,'#0f2847'),
-      statC(I18N.t('app.batch.avg'),avg,avg==null?'#6b7280':avg>=thr?'#059669':avg>=50?'#d97706':'#dc2626'),
+      statC(I18N.t('app.batch.avg'),avg,avg==null?'var(--text-muted)':avg>=thr?'#059669':avg>=50?'#d97706':'#dc2626'),
       statC(I18N.t('app.roles.top'),top,'#059669'),
       statC(I18N.t('app.roles.shortlisted'),short,'#7c3aed')),
     h('div', { style: 'overflow-x:auto' }, h('table', { class: 'data-table' },
@@ -4585,7 +4588,7 @@ function renderRoleHistory(){
         const s=r.overall;const pill=s>=thr?'pill-hi':s>=50?'pill-med':'pill-lo';
         const dc=r.decision==='shortlist'?'#15803d':r.decision==='reject'?'#b91c1c':'#a16207';
         return h('tr', { style: 'animation:fadeUp .25s ease '+(i*.04)+'s both' },
-          h('td', { style: 'color:#9ca3af;font-size:12px' }, i+1),
+          h('td', { style: 'color:var(--text-inactive);font-size:12px' }, i+1),
           h('td', { style: 'font-weight:600;color:#111827' }, r.candidateName),
           h('td', null, h('span', { class: 'score-pill '+pill }, s)),
           h('td', null, dash(r.scores?.keywords)), h('td', null, dash(r.scores?.skills)),
@@ -4959,7 +4962,7 @@ function renderTeam(){
     if(inviteRow)inviteRow.style.display='none';
     return;
   }
-  const cap='font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;';
+  const cap='font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-inactive);';
   const row='display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;flex-wrap:wrap';
   const roleLabel=function(r){ return r==='owner' ? I18N.t('settings.team.role.owner') : r==='member' ? I18N.t('settings.team.role.member') : r; };
   fill(body,
@@ -4969,8 +4972,8 @@ function renderTeam(){
     members.map(function(m){
       const removable=_teamIsOwner && m.email!==(me&&me.user&&me.user.email) && !(m.role==='owner');
       return h('div', { style: row },
-        h('span', { style: 'flex:1;color:#111827;min-width:0;overflow-wrap:anywhere' }, m.email, ' ', h('span', { style: 'color:#9ca3af;font-size:11px' }, '('+roleLabel(m.role)+')')),
-        h('span', { style: 'font-size:11px;color:#9ca3af' }, I18N.t('settings.team.lastActive', { when: _fmtWhen(m.lastLoginAt) })),
+        h('span', { style: 'flex:1;color:#111827;min-width:0;overflow-wrap:anywhere' }, m.email, ' ', h('span', { style: 'color:var(--text-inactive);font-size:11px' }, '('+roleLabel(m.role)+')')),
+        h('span', { style: 'font-size:11px;color:var(--text-inactive)' }, I18N.t('settings.team.lastActive', { when: _fmtWhen(m.lastLoginAt) })),
         removable ? h('button', { class: 'btn btn-danger btn-sm', 'data-team': 'remove', 'data-id': m.id, 'data-email': m.email }, I18N.t('common.remove')) : null);
     }),
     // Pending invites (owner only)
@@ -5595,7 +5598,7 @@ function toggleBatchWhy(btn, idx){
           <span class="ex-pill" style="background:#fef9c3;color:#92400e" data-i18n="app.info.bandPossible">50-79 Possible Fit</span>
           <span class="ex-pill" style="background:#fee2e2;color:#b91c1c" data-i18n="app.info.bandWeak">0-49 Weak Fit</span>
         </div>
-        <p style="font-size:12px;color:#9ca3af;margin-top:8px" data-i18n="app.info.decisionAid">Scores come from a deterministic rules engine and should be used as a decision aid alongside human judgement.</p>
+        <p style="font-size:12px;color:var(--text-inactive);margin-top:8px" data-i18n="app.info.decisionAid">Scores come from a deterministic rules engine and should be used as a decision aid alongside human judgement.</p>
       </div>
       <div id="tabPanel1" style="display:none">
         <h4 data-i18n="app.info.aboutTitle">About CVsprings</h4>
@@ -5632,7 +5635,7 @@ function toggleBatchWhy(btn, idx){
 
       <!-- Paid path -->
       <div id="freqForm">
-        <p style="font-size:13px;color:#6b7280;margin:0 0 14px" data-i18n="app.freq.intro">Tell us what would make CVsprings better. It goes straight to the product team, and we reply to your account email.</p>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px" data-i18n="app.freq.intro">Tell us what would make CVsprings better. It goes straight to the product team, and we reply to your account email.</p>
         <div class="fr-field">
           <label for="freqCategory" data-i18n="app.freq.category">Category</label>
           <select id="freqCategory" class="text-input">
