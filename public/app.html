@@ -13,8 +13,11 @@ __I18N_HEAD__
 <link rel="stylesheet" href="/assets/fonts/inter.css">
 <style>
 /* Muted and inactive text. Both hold WCAG AA (4.5:1) down to the #f0f2f5 page
-   background, the darkest surface they sit on: muted 5.15:1, inactive 4.62:1. */
-:root{--text-muted:#5f6673;--text-inactive:#676d7b}
+   background, the darkest surface they sit on: muted 5.15:1, inactive 4.62:1.
+   Success and warning text: 5.48:1 and 5.02:1 on white, at least 5.24:1 and
+   4.80:1 on the tinted panels they sit on. Amber text on amber fills uses
+   #92400e. */
+:root{--text-muted:#5f6673;--text-inactive:#676d7b;--text-success:#047857;--text-warning:#b45309}
 *{box-sizing:border-box;margin:0;padding:0}
 @media(max-width:768px){input,textarea,select{font-size:16px!important}}
 html{scroll-behavior:smooth}
@@ -122,7 +125,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   transition:border .18s,box-shadow .18s
 }
 .text-input:focus{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.08)}
-.text-input::placeholder{color:#d1d5db}
+.text-input::placeholder{color:var(--text-inactive)}
 
 /* ==================== Mode toggle ==================== */
 .mode-toggle{
@@ -189,8 +192,8 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   padding:5px 14px;font-size:12px;font-weight:600;color:#1d4ed8;
   display:flex;align-items:center;gap:6px
 }
-.file-chip button{background:none;border:none;cursor:pointer;color:#93c5fd;font-size:15px;padding:0;transition:color .15s;line-height:1}
-.file-chip button:hover{color:#dc2626}
+.file-chip button{background:none;border:none;cursor:pointer;color:#1d4ed8;font-size:15px;padding:0;transition:color .15s;line-height:1}
+.file-chip button:hover{color:#b91c1c}
 
 /* ==================== Options row ==================== */
 .options-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
@@ -228,7 +231,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 }
 .w-input:focus{border-color:#0f2847}
 .w-sum{font-size:12px;font-weight:600;color:var(--text-inactive)}
-.w-sum.ok{color:#047857}.w-sum.err{color:#dc2626;font-weight:700}
+.w-sum.ok{color:var(--text-success)}.w-sum.err{color:#dc2626;font-weight:700}
 
 /* ==================== Textarea ==================== */
 .textarea{
@@ -238,7 +241,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   resize:vertical;outline:none;transition:border .18s,box-shadow .18s;line-height:1.65
 }
 .textarea:focus{border-color:#0f2847;box-shadow:0 0 0 3px rgba(15,40,71,0.07)}
-.textarea::placeholder{color:#d1d5db}
+.textarea::placeholder{color:var(--text-inactive)}
 
 /* ==================== Score boxes ==================== */
 .score-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
@@ -307,9 +310,9 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
   display:inline-flex;align-items:center;justify-content:center;
   width:26px;height:26px;border-radius:50%;font-size:11px;font-weight:700
 }
-.r1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,0.4)}
+.r1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#451a03;box-shadow:0 2px 8px rgba(245,158,11,0.4)}
 .r2{background:linear-gradient(135deg,#6b7280,#4b5563);color:#fff}
-.r3{background:linear-gradient(135deg,#d97706,#92400e);color:#fff}
+.r3{background:linear-gradient(135deg,#b45309,#92400e);color:#fff}
 .rn{background:#f3f4f6;color:var(--text-muted);font-size:12px}
 
 /* ==================== Badges ==================== */
@@ -350,7 +353,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 
 /* ==================== Messages ==================== */
 .msg{border-radius:8px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:16px;display:none}
-.msg-err{background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626}
+.msg-err{background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c}
 .msg-ok{background:#f0fdf4;border:1.5px solid #bbf7d0;color:#15803d}
 .msg-warn{background:#fffbeb;border:1.5px solid #fde68a;color:#92400e}
 
@@ -404,18 +407,18 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 .audit-tz-label{font-size:11px;color:var(--text-muted);font-style:italic}
 .history-scoring{padding:12px 20px;border-bottom:1px solid #eef1f6;font-size:12px;color:#374151;line-height:1.6}
 .history-scoring .hs-k{color:var(--text-muted);font-weight:600}
-.history-scoring .hs-missing{color:#b45309;font-style:italic}
+.history-scoring .hs-missing{color:var(--text-warning);font-style:italic}
 .ret-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px}
 .ret-preset.active{background:#0f2847;color:#fff;border-color:#0f2847}
 .ret-stats{font-size:12px;color:#374151;margin-top:10px;padding:10px 12px;background:#f8fafc;border:1px solid #e7ebf3;border-radius:8px;line-height:1.7}
 .ret-stats .ret-k{color:var(--text-muted)}
-.ret-stats .ret-warn{color:#b45309;font-weight:600}
+.ret-stats .ret-warn{color:var(--text-warning);font-weight:600}
 .ret-runs{width:100%;border-collapse:collapse;font-size:11px}
 .ret-runs th{text-align:left;color:var(--text-muted);font-weight:600;padding:4px 8px;border-bottom:1px solid #e7ebf3;white-space:nowrap}
 .ret-runs td{padding:4px 8px;border-bottom:1px solid #f1f4f9;color:#374151;white-space:nowrap}
 .ret-runs .st-success{color:#166534}
 .ret-runs .st-error{color:#b91c1c;font-weight:600}
-.ret-runs .st-dryrun{color:#b45309;font-weight:600}
+.ret-runs .st-dryrun{color:var(--text-warning);font-weight:600}
 .ret-runs tr.ret-run-dry td{background:#fffbeb}
 #auditOrderToggle{white-space:nowrap}
 .audit-filter-count{font-size:12px;font-weight:600;color:#0f2847;background:#eef2f9;border:1px solid #dbe3f0;border-radius:999px;padding:3px 10px}
@@ -459,7 +462,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111827;font-size:1
 /* Anonymize tooltip */
 .anon-tooltip-wrap{position:relative;display:inline-flex;align-items:center;margin-left:4px;cursor:default}
 .anon-tooltip-icon{width:15px;height:15px;border-radius:50%;border:1.5px solid #9ca3af;color:var(--text-inactive);font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;user-select:none;transition:border-color .15s,color .15s}
-.anon-tooltip-wrap:hover .anon-tooltip-icon{border-color:#6366f1;color:#6366f1}
+.anon-tooltip-wrap:hover .anon-tooltip-icon{border-color:#4f46e5;color:#4f46e5}
 .anon-tooltip-box{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1e1b4b;color:#e0e7ff;font-size:12px;line-height:1.55;padding:10px 13px;border-radius:9px;width:240px;box-shadow:0 6px 24px rgba(0,0,0,.22);z-index:9999;pointer-events:none;text-align:left;white-space:normal}
 .anon-tooltip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#1e1b4b}
 .anon-tooltip-wrap:hover .anon-tooltip-box{display:block}
@@ -551,7 +554,7 @@ html[lang="en"] .en-note{display:none}
 .tpl-chip:hover{border-color:#c7d6f5}
 .tpl-chip-name{flex:1;padding:9px 13px;font-size:13px;font-weight:600;color:#0f2847;cursor:pointer;transition:background .15s;background:none;border:none;text-align:left}
 .tpl-chip-name:hover{background:#f0f4ff}
-.tpl-chip-del{padding:9px 11px;color:#d1d5db;font-size:13px;cursor:pointer;transition:all .15s;background:none;border:none;border-left:1.5px solid #f3f4f6;line-height:1}
+.tpl-chip-del{padding:9px 11px;color:var(--text-inactive);font-size:13px;cursor:pointer;transition:all .15s;background:none;border:none;border-left:1.5px solid #f3f4f6;line-height:1}
 .tpl-chip-del:hover{color:#dc2626;background:#fff5f5}
 .tpl-panel-footer{padding:10px 16px;border-top:1px solid #f3f4f6;font-size:11px;color:var(--text-inactive);font-style:italic}
 .tpl-wrap{position:relative;display:inline-block}
@@ -622,7 +625,7 @@ html[lang="en"] .en-note{display:none}
    no score pill, no decision — the reason and the fix, across the score
    columns, on a muted amber ground so it cannot be read as a result. */
 .lb tr.failed-row td{background:#fffbeb;color:#78350f;vertical-align:top}
-.lb tr.failed-row td.failed-mark{border-left:3px dashed #d97706;text-align:center;color:#b45309;font-size:15px}
+.lb tr.failed-row td.failed-mark{border-left:3px dashed #d97706;text-align:center;color:var(--text-warning);font-size:15px}
 .failed-badge{display:inline-block;margin-top:4px;padding:1px 8px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;letter-spacing:.02em}
 .failed-body{position:sticky;left:0;display:grid;grid-template-columns:minmax(120px,200px) minmax(0,1fr);gap:4px 24px;align-items:start}
 /* The table scrolls sideways on a phone; the reason wraps to what is visible:
@@ -632,12 +635,12 @@ html[lang="en"] .en-note{display:none}
 .failed-hint{margin-top:3px;font-size:12px;color:#92400e}
 .batch-failed-note{display:block;margin:0 20px 12px}
 .batch-failed-note[hidden],.bs-failed[hidden]{display:none}
-.bs-failed{color:#b45309;font-weight:600}
+.bs-failed{color:var(--text-warning);font-weight:600}
 .score-pill.pill-na{background:#f3f4f6;color:var(--text-muted)}
 .unscored-badge{display:inline-block;margin-left:4px;padding:0 6px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700}
 /* ── Score text colour in single result ── */
 .score-hi-text{color:#15803d!important;font-weight:800}
-.score-med-text{color:#b45309!important;font-weight:800}
+.score-med-text{color:var(--text-warning)!important;font-weight:800}
 .score-lo-text{color:#b91c1c!important;font-weight:800}
 /* ── Footer link style ── */
 .footer-link{background:none;border:none;color:#93c5fd;font-size:inherit;cursor:pointer;text-decoration:underline;padding:0;font-family:inherit}
@@ -713,7 +716,7 @@ html[lang="en"] .en-note{display:none}
 .row-notes-wrap{padding:4px 0}
 .row-notes{width:100%;border:1px solid #e5e7eb;border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;color:#374151;resize:none;height:32px;transition:border-color .15s,height .2s;background:#fafafa}
 .row-notes:focus{outline:none;border-color:#0f2847;background:#fff;height:56px}
-.row-notes::placeholder{color:#d1d5db}
+.row-notes::placeholder{color:var(--text-inactive)}
 
 /* ── Keyboard hint ── */
 .kbd-hint{font-size:11px;color:var(--text-inactive);margin-left:10px}
@@ -727,7 +730,7 @@ html[lang="en"] .en-note{display:none}
 .sample-row.nudge #trySampleBtn{border-color:#1d4ed8;color:#0f2847;animation:samplePulse 1.6s ease-in-out infinite}
 @keyframes samplePulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,0)}50%{box-shadow:0 0 0 5px rgba(29,78,216,0.18)}}
 .file-chip.sample-chip{background:#eef2ff;border-color:#c7d2fe;color:#4338ca}
-.file-chip.sample-chip .sample-tag{opacity:.7;font-weight:500;margin-left:2px}
+.file-chip.sample-chip .sample-tag{color:#4f46e5;font-weight:500;margin-left:2px}
 .kbd-hint kbd{background:#f3f4f6;border:1px solid #d1d5db;border-radius:3px;padding:1px 5px;font-size:10px;font-family:inherit}
 /* ── Splash screen ── */
 #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
@@ -872,7 +875,7 @@ html[lang="en"] .en-note{display:none}
 .pp-meter.warn span{background:#d97706}
 .pp-ent{list-style:none;margin:0;padding:0}
 .pp-ent li{font-size:12px;color:#374151;padding:3px 0 3px 16px;position:relative}
-.pp-ent li::before{content:"✓";position:absolute;left:0;color:#16a34a;font-weight:700}
+.pp-ent li::before{content:"✓";position:absolute;left:0;color:var(--text-success);font-weight:700}
 .pp-foot{margin-top:13px;display:flex;flex-direction:column;gap:7px}
 .pp-foot .btn{width:100%;justify-content:center}
 /* Payment failure. Deliberately the loudest thing in the panel: removing the
@@ -881,7 +884,7 @@ html[lang="en"] .en-note{display:none}
    unmissable rather than merely present. */
 .pp-alert{background:#fef3c7;border:1px solid #fcd34d;border-radius:7px;padding:9px 10px;margin-bottom:11px}
 .pp-alert-t{font-size:12px;font-weight:700;color:#92400e}
-.pp-alert-b{font-size:11px;color:#a16207;margin-top:2px;line-height:1.45}
+.pp-alert-b{font-size:11px;color:#92400e;margin-top:2px;line-height:1.45}
 .pp-note{font-size:11px;color:var(--text-muted);line-height:1.5}
 /* Upgrade teaser inside the paid panel (Pro -> Team). Team gets no upgrades
    from the server, so this block is simply never rendered for it. */
@@ -924,7 +927,7 @@ html[lang="en"] .en-note{display:none}
 /* Plan & Billing settings buttons */
 .plan-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .plan-status-line{font-size:12px;color:#374151;margin-top:4px}
-.plan-status-line .past-due{color:#b45309;font-weight:700}
+.plan-status-line .past-due{color:var(--text-warning);font-weight:700}
 
 /* === MOBILE RESPONSIVENESS OVERHAUL === */
 html, body { max-width: 100%; overflow-x: hidden; }
@@ -1419,7 +1422,7 @@ img, video, table { max-width: 100%; }
   </div>
   <div class="settings-row" style="display:flex;align-items:center;gap:10px;margin-top:12px">
     <button class="btn btn-primary btn-sm" data-action="saveSettings" data-i18n="settings.save">Save Settings</button>
-    <span id="settingsSavedMsg" style="font-size:12px;color:#059669;font-weight:700;display:none" data-i18n="settings.saved">Settings saved</span>
+    <span id="settingsSavedMsg" style="font-size:12px;color:var(--text-success);font-weight:700;display:none" data-i18n="settings.saved">Settings saved</span>
   </div>
   <hr style="margin:14px 0;border:0;border-top:1px solid #e5e7eb">
   <h3 data-i18n="settings.password.title">Change Password</h3>
@@ -1552,7 +1555,7 @@ img, video, table { max-width: 100%; }
           </div>
           <div class="tpl-migration-banner" id="tplMigrationBanner" style="display:none;align-items:center;gap:10px;padding:10px 12px;margin:0 0 10px 0;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:13px;color:#7c2d12">
             <span style="flex:1" class="tpl-mig-text"></span>
-            <button type="button" class="tpl-mig-upload" style="padding:6px 10px;background:#ea580c;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer" data-i18n="app.tpl.upload">Upload</button>
+            <button type="button" class="tpl-mig-upload" style="padding:6px 10px;background:#c2410c;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer" data-i18n="app.tpl.upload">Upload</button>
             <button type="button" class="tpl-mig-dismiss" style="padding:6px 10px;background:transparent;color:#7c2d12;border:0;cursor:pointer" data-i18n="app.tpl.dismiss">Dismiss</button>
           </div>
           <div class="tpl-chips" id="tplChips">
@@ -4001,8 +4004,8 @@ function renderSingleResult(data,fileName,role){
     ringBox(I18N.t('app.results.overall'),data.overall,true,scoreColor(data.overall)),
     ringBox(I18N.t('common.dimension.keywords'),data.scores?.keywords,false,'#2563eb'),
     ringBox(I18N.t('common.dimension.skills'),data.scores?.skills,false,'#7c3aed'),
-    ringBox(I18N.t('common.dimension.experience'),data.scores?.experience,false,'#d97706'),
-    ringBox(I18N.t('common.dimension.education'),data.scores?.education,false,'#059669'));
+    ringBox(I18N.t('common.dimension.experience'),data.scores?.experience,false,'#d97706','var(--text-warning)'),
+    ringBox(I18N.t('common.dimension.education'),data.scores?.education,false,'#059669','var(--text-success)'));
   const whyEl = document.getElementById('singleWhy');
   if(whyEl) fill(whyEl, buildWhyNodes(data));
   requestAnimationFrame(()=>{
@@ -4018,7 +4021,7 @@ function renderSingleResult(data,fileName,role){
     : h('span', { style: 'color:var(--text-inactive);font-size:13px' }, I18N.t('app.results.noneFound')));
   fill(document.getElementById('missingChips'), missing.length
     ? missing.map(k=>h('span', { class: 'chip chip-miss' }, k))
-    : h('span', { style: 'color:#059669;font-size:13px' }, I18N.t('app.results.noneMissing')));
+    : h('span', { style: 'color:var(--text-success);font-size:13px' }, I18N.t('app.results.noneMissing')));
   const skills=data.skills||[];
   fill(document.getElementById('skillsTable').querySelector('tbody'), skills.length
     ? skills.map(s=>h('tr', null,
@@ -4035,7 +4038,9 @@ function renderSingleResult(data,fileName,role){
     : h('tr', null, h('td', { colspan: '2', class: 'empty-state', style: 'padding:20px' }, h('span', { lang: I18N.lang }, I18N.t('app.results.noRecs')))));
 }
 
-function ringBox(label,val,isOverall,color){
+// textColor: the number can be darker than its ring. The ring is a graphic
+// (3:1), the number is 17px text and needs 4.5:1 on the white box.
+function ringBox(label,val,isOverall,color,textColor){
   const v=val??0,r=28,circ=2*Math.PI*r;
   const ring=svg('svg', { class: 'ring-svg', width: 70, height: 70, viewBox: '0 0 70 70', role: 'img', 'aria-label': label+': '+v });
   const bg=svg('circle', { class: 'ring-bg', cx: 35, cy: 35, r: r });
@@ -4043,7 +4048,7 @@ function ringBox(label,val,isOverall,color){
   const fg=svg('circle', { class: 'ring-fill', cx: 35, cy: 35, r: r, stroke: color, 'data-v': v, transform: 'rotate(-90 35 35)',
     style: 'stroke-dasharray:'+circ+';stroke-dashoffset:'+circ });
   const text=svg('text', { x: 35, y: 35, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-    fill: isOverall?'#fff':color, 'font-family': 'Inter', 'font-weight': 800, 'font-size': 17 });
+    style: 'fill:'+(isOverall?'#fff':(textColor||color)), 'font-family': 'Inter', 'font-weight': 800, 'font-size': 17 });
   text.textContent=String(v);
   ring.appendChild(bg); ring.appendChild(fg); ring.appendChild(text);
   return h('div', { class: 'score-box'+(isOverall?' overall':'') }, h('div', { class: 's-label' }, label), ring);
